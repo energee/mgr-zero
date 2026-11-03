@@ -20,6 +20,91 @@ Ask MGR's hosted composer gate (#329) has its own runbook: [Ask MGR hosted verif
   disposition below; a nonzero scanner exit is not itself proof of a reachable
   application vulnerability.
 
+## Dependency hygiene — 2026-10-30 (#1667)
+
+The local maintenance change starts at `18df6c892`. It upgrades the existing
+`shadcn` dev dependency from 4.22.0 to 4.23.0 and its registry from 0.2.0 to
+0.2.1. The new MCP server dependency replaces the old SDK graph, removing
+`body-parser` from the lock. No direct dependency is added.
+
+After the shadcn upgrade but before the approved overrides, `bun audit --json`
+with Bun 1.3.10 exited 1 with six advisories across three dev-only packages.
+`bun audit --prod --json` exited 0 with `{}`. The paths below came from
+`bun why`, not the old issue's ancestry summary:
+
+| Pre-override lock / advisory | Path and disposition |
+| --- | --- |
+| `deepmerge@4.3.1`, [prototype poisoning](https://github.com/advisories/GHSA-gcqx-w48m-w2h4) (low) | `shadcn` directly and through `@shadcn/registry`. No application or script import was found. Do not accept untrusted objects into the CLI's merge API. An override or replacement remains ask-first. |
+| `fast-uri@3.1.8`, four URI-normalization advisories (two moderate, two low) | `shadcn` directly or through `@shadcn/registry` → `@dotenvx/dotenvx` → `conf` → `ajv` (also through `ajv-formats`). The audit names 3.1.9 as the fixed boundary. No application or script import was found; the existing lock remains unchanged by the shadcn update. |
+| `systeminformation@5.33.15`, [Windows services command injection](https://github.com/advisories/GHSA-3f7j-7jwc-fxfj) (high) | `shadcn` directly or through `@shadcn/registry` → `@dotenvx/dotenvx`. Fixed boundary: 5.33.16. The prerequisite is attacker-controlled service names reaching `services()` on Windows; no application or script import was found. The lock remains unchanged by the shadcn update. |
+
+The owner subsequently approved root overrides of `fast-uri` to 3.1.9 and
+`systeminformation` to 5.33.16, retaining `katex` at 0.19.0. Both are published
+patch releases within the actual parent ranges (`ajv` requires `^3.0.1`;
+`@dotenvx/dotenvx` requires `^5.22.11`). After lock regeneration and a forced
+frozen install, `bun why` resolves those exact patched versions.
+
+Before the redirect patch, on 2026-10-31 after a forced frozen install with
+Bun 1.3.10, `bun audit --json` exited 1 with three affected packages.
+The production-only audit also exited 1, reporting `follow-redirects`.
+
+On 2026-11-01, the owner approved an exact `follow-redirects` override from
+1.16.1 to 1.16.2, within Axios's `^1.16.0` dependency range. A forced frozen
+install retained the existing approved versions; lock regeneration changed
+only the redirect package and its override.
+`bun why` resolves the patched production chain:
+`@chat-adapter/slack@4.42.0` → `@slack/web-api@7.19.0` (also through
+`@slack/socket-mode@2.0.7`) → `axios@1.20.0` → `follow-redirects@1.16.2`.
+The patch fixes [GHSA-mrwp-f3q8-3g9p](https://github.com/advisories/GHSA-mrwp-f3q8-3g9p),
+the cross-realm sensitive-header redirect advisory. After this install,
+`bun audit --prod --json` exited 0 with `{}`; `bun audit --json` exited 1
+with only the two development-tooling packages below.
+
+The installed Slack client sets `maxRedirects: 0`; no matching MGR exploit
+path was established. The local native proof exercises the resolved package
+from the production dependency graph, not actual Slack traffic.
+Remove this override only when the upstream dependency floor excludes the
+vulnerable versions. Review newer advisories for a suitable patched version;
+do not simply drop the pin when another advisory appears.
+
+| Residual locked package / advisory | Reachability and disposition |
+| --- | --- |
+| `deepmerge@4.3.1`, [GHSA-gcqx-w48m-w2h4](https://github.com/advisories/GHSA-gcqx-w48m-w2h4) (low) | Development-only shadcn/registry merge APIs, as above. No patched release exists (`first_patched_version` is null; registry `latest` is 4.3.1), and a downgrade below the affected range is not an established fix. Do not accept untrusted merge objects. |
+| `minimatch@10.2.6` and nested `3.1.5`, [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249) (moderate) | Development-only ESLint/config/plugins and shadcn → ts-morph. The advisory describes attacker-controlled glob amplification with `optimizationLevel >= 2`; no application/script import was found. The advisory marks versions below 11.0.1 affected. That major-version override is outside this approved change; keep untrusted glob patterns away from tooling. |
+
+`bun outdated` also reports newer direct dependencies. No broader upgrade
+was applied: this change retains the specifically approved versions and the
+TypeScript compatibility-tarball policy. Re-review redirect handling if the
+Slack client configuration, transport, or custom-header inputs change.
+
+This is not an advisory-free claim or release approval. Do not expose these
+tooling APIs to request input. Re-audit the eventual release SHA and retain
+the existing KaTeX override alongside the three approved patch overrides.
+
+Weekly Bun version-update PRs are configured alongside the existing Actions
+updates. Bun security updates are not supported by Dependabot; audit remains
+a separate release check. The TypeScript compatibility tarball is deliberately
+retained, with its manual update procedure in the README.
+
+Owner dispositions and the remaining hosted gate:
+
+- **Frozen hosted install:** the owner declined the Vercel install-command
+  change; `vercel.json` is unchanged. Local frozen-install proof does not
+  verify Vercel's configured install command. This acceptance item remains
+  blocked, so #1667 is only partially addressed.
+- **Provider icons:** retain the current deep SVG imports in
+  `ai-model-icon.tsx`. Local SVGs could remove the unused `@lobehub/ui` peer
+  tree, but need license preservation and visual checks for every provider
+  mark. No icon-rendering defect was established; replacement is outside
+  this bounded hygiene change, not a completed consolidation.
+- **Icon/primitive consolidation:** retain Lucide in shadcn primitives and
+  `sort-head.tsx`, Hugeicons in the product wrapper, and the actively used
+  Radix and Base UI primitives. Their overlap is not evidence of a bug.
+  No primitive is hand-edited or claimed consolidated here.
+- **License policy:** retain the existing AGPL-3.0-only license in
+  `package.json` and `LICENSE`, and retain current repository visibility.
+  A future owner request is required to change that policy.
+
 ## Dependency advisory disposition — 2026-10-16 (#934)
 
 Baseline inventory revision: `b74c620869b7fa98e61b588ab36e8b183d8b2708`.

@@ -36,6 +36,13 @@ when the compatibility package itself is installed through an npm alias.
 See [Microsoft's side-by-side guidance](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6.0).
 Node type definitions stay on the latest 24.x release to match the runtime.
 
+The compatibility tarball is intentionally pinned, so `bun outdated` cannot
+track it. During dependency review, check
+`npm view @typescript/typescript6 version dist.tarball`, compare it with the
+`typescript` URL in `package.json`, and review Microsoft's release notes.
+Update that URL and `bun.lock` together; retain the tarball workaround until
+Bun can resolve the compatibility package's nested alias correctly.
+
 Local Supabase runs on non-default ports (54341/54342/54343) configured
 in the committed `supabase/config.toml`. These ports are used by every
 developer and in CI — they were chosen to avoid colliding with a
@@ -250,6 +257,22 @@ are for humans); all checkouts use v6. Weekly GitHub Actions Dependabot PRs
 update those pins. Review the upstream commit/release diff, especially token
 handling and composite actions' own downloads, before merging; CI must pass.
 The workflow-contract test rejects mutable action references.
+
+Weekly Bun Dependabot PRs cover `package.json` and `bun.lock` using the native
+`bun` ecosystem, with at most five open version-update PRs. Review and prove
+each lock change before merging; no automatic merge is configured.
+[GitHub's ecosystem support](https://docs.github.com/en/code-security/reference/supply-chain-security/supported-ecosystems-and-repositories#bun)
+does not include Bun security updates, so keep running `bun audit --json`
+and `bun audit --prod --json` during dependency and release reviews.
+
+The owner-approved #1667 overrides pin `fast-uri` 3.1.9,
+`systeminformation` 5.33.16, and `follow-redirects` 1.16.2 within their parents'
+compatible ranges, alongside the existing KaTeX pin. After the redirect patch
+on 2026-11-01, the full audit exits 1 for development-tooling `deepmerge` and
+`minimatch`; the production audit exits 0 with `{}`. This is not an
+advisory-free or release-ready claim. Exact prerequisites, pin review policy,
+and the declined hosted-install gate are in the
+[release checklist](docs/operations/release-checklist.md#dependency-hygiene--2026-10-30-1667).
 
 The review marketplace is checked out separately at an immutable commit and
 passed as a local directory. The pinned action's
