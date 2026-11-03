@@ -75,7 +75,7 @@ export function ScreenFrame({ screen: s, persona = PERSONAS[0], container }: { s
       brand="Demo Brewing"
       items={navFor(STAFF_NAV, persona.roles)}
       headerRight={<><Button variant="ghost" size="sm"><Icon icon={Search01Icon} />Search</Button>{me}</>}
-      composer={s.surface === "composer" ? <ComposerDemo initialOpen disabled={!persona.roles.length} container={container}>{s.body}</ComposerDemo> : <ComposerDemo disabled={!persona.roles.length} container={container} />}
+      composer={<ComposerDemo initialOpen={s.surface === "composer"} disabled={!persona.roles.length} container={container}>{s.surface === "composer" ? s.body : undefined}</ComposerDemo>}
       active={s.tab}
     >
       {s.surface === "composer" ? null : body}

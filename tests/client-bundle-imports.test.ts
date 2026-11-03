@@ -19,11 +19,11 @@ function staticPackages(entry: string): Set<string> {
     seen.add(file);
     const source = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest);
     for (const statement of source.statements) {
-      const edge = ts.isImportDeclaration(statement) ? !statement.importClause?.isTypeOnly
-        : ts.isExportDeclaration(statement) ? !statement.isTypeOnly && !!statement.moduleSpecifier
-        : false;
-      if (!edge) continue;
-      const specifier = ((statement as ts.ImportDeclaration | ts.ExportDeclaration).moduleSpecifier as ts.StringLiteral).text;
+      const target = ts.isImportDeclaration(statement) && !statement.importClause?.isTypeOnly ? statement.moduleSpecifier
+        : ts.isExportDeclaration(statement) && !statement.isTypeOnly ? statement.moduleSpecifier
+        : undefined;
+      if (!target || !ts.isStringLiteral(target)) continue;
+      const specifier = target.text;
       const local = localModule(file, specifier);
       if (local) visit(local);
       else if (!specifier.startsWith("@/") && !specifier.startsWith(".")) packages.add(specifier);
