@@ -5,6 +5,7 @@ import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandForm } from "@/components/mgr/command-form";
 import { DatePicker } from "@/components/mgr/date-picker";
+import { BrewFooter } from "./brew-prep";
 import { OrderQuantity } from "./new-order";
 import { brandAnchor, type ShopViewModel } from "@/lib/mgr/shop-view";
 
@@ -49,10 +50,13 @@ export function ShopView({ model, footer, comingUp, controls = {}, quantities, l
       {messages}
       {E.sp()}
       {E.info(model.depositInfo)}
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="outline" disabled={disabled} onClick={controls.saveDraft}>Save draft</Button>
-        <Button type="button" disabled={disabled} onClick={controls.review}>{preparing ? "Preparing review…" : model.reviewVerb}</Button>
-      </div>
+      {/* Pinned to the phone's foot so Review (which carries the subtotal) stays in reach on a long catalog; one row keeps the bar slim. */}
+      <BrewFooter>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" disabled={disabled} onClick={controls.saveDraft}>Save draft</Button>
+          <Button type="button" className="flex-1 md:flex-none" disabled={disabled} onClick={controls.review}>{preparing ? "Preparing review…" : model.reviewVerb}</Button>
+        </div>
+      </BrewFooter>
     </>}
   </>;
 }

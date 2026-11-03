@@ -45,6 +45,13 @@ describe("Shop view", () => {
     expect(html).not.toMatch(/→/);
   });
 
+  // On a phone the catalog is longer than the screen; Review order (which
+  // carries the subtotal) and Save draft stay pinned to its foot.
+  it("keeps Save draft and Review order in the sticky footer", () => {
+    const html = htmlOf(createElement(ShopView, { model: toShopViewProps(ridgelineShop) }));
+    expect(html).toMatch(/<div class="sticky [^"]*">(?:(?!<\/div>).)*>Save draft<\/button>(?:(?!<\/div>).)*>Review order · \$828\.00<\/button>/);
+  });
+
   it("controlled quantities use the same brand and package controls", () => {
     const html = htmlOf(createElement(ShopView, {
       model: toShopViewProps(ridgelineShop),
