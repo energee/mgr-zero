@@ -82,7 +82,7 @@ client-local conversation history is involved.
 The endpoint accepts at most **8 MiB** of JSON per request and admits **120
 requests per authenticated account per 60 seconds**. The account budget is
 shared by cookie and bearer authentication, every brewery, and the pre-tenant
-provisioning command. A `429` response includes `Retry-After` in seconds. The
+provisioning command. A `rate_limited` `429` response includes `Retry-After` in seconds. The
 same budget is spent by Ask MGR chat turns (`/api/chat`); it is not an IP or
 general Data API limit. The 5,000-row CSV limit is separate, so imports with
 unusually large string cells may need to be split into smaller batches.
