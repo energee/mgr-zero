@@ -224,20 +224,6 @@ describe("SCREENS", () => {
     expect(body("Entity picker")).toContain("All SKUs");
   });
 
-  it("ports the step-1 frames with names, jobs and IO", () => {
-    const step1 = SCREENS.filter((s) => s.step === 1);
-    expect(step1.map((s) => s.name)).toEqual([
-      "Today", "Sales", "Brewer", "Driver", "Taproom",
-      "Beer", "Work", "More", "Search", "Me", "Settings", "Permission denied",
-    ]);
-    for (const s of SCREENS) {
-      expect(s.job).toBeTruthy();
-      expect(s.reads).toBeTruthy();
-      expect(s.writes).toBeTruthy();
-      expect(Boolean(s.tab) || Boolean(s.group) || Boolean(s.portal) || Boolean(s.venue)).toBe(true);
-    }
-  });
-
   it("keeps synthetic state captions out of the rendered screen frame", () => {
     const screen: Screen = { ...SCREENS[0], states: [["Caption only", "Not part of the screen body"]] };
     const frame = renderToStaticMarkup(createElement(ScreenFrame, { screen }));

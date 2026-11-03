@@ -3,11 +3,13 @@ import { toParsViewProps } from "@/lib/mgr/pars-view";
 import { OUNCES_PER_BBL } from "@/lib/volume";
 
 const pils = { skuId: "lantern-pils-case", sku: "Lantern Pils · 16 oz case" };
+export const replenishmentShortfallFormats: Record<string, { unit: string; bblPerUnit: number }> = {
+  [pils.skuId]: { unit: "case", bblPerUnit: (24 * 16) / OUNCES_PER_BBL },
+};
 const shortfall = { skuId: pils.skuId, skuName: pils.sku, onHand: 22, allocated: 28, atp: -6 };
 const detail = toParsViewProps({
   shortfall,
-  unit: "case",
-  bblPerUnit: (24 * 16) / OUNCES_PER_BBL,
+  ...replenishmentShortfallFormats[pils.skuId],
   orderAllocations: [],
   standing: [],
   par: null,

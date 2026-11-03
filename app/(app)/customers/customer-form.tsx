@@ -6,15 +6,13 @@
 
 import { useState } from "react";
 import { E } from "@/components/mgr/e";
-import { CustomerSaleChannelField, CustomerTaxTreatmentField } from "@/components/mgr/views/customer";
-import { UsStateField } from "@/components/mgr/us-state-field";
+import { CustomerAccountFields, CustomerLicenseField, CustomerPaymentTermsField, CustomerSaleChannelField, CustomerTaxTreatmentField } from "@/components/mgr/views/customer";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { FieldDescription } from "@/components/ui/field";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { PAYMENT_TERMS, type CustomerType, type PaymentTerm } from "@/lib/mgr/enums";
-import { CUSTOMER_ALIAS_HELP, customerNameError, customerStateReason, type CustomerEditValues } from "@/lib/mgr/customer-view";
-import { COUNTRY_OPTIONS, CUSTOMER_TYPE_OPTIONS, PAYMENT_TERM_LABEL, paymentTermLabel } from "@/lib/mgr/labels";
+import type { CustomerType, PaymentTerm } from "@/lib/mgr/enums";
+import { customerNameError, customerStateReason, type CustomerEditValues } from "@/lib/mgr/customer-view";
+import { paymentTermLabel } from "@/lib/mgr/labels";
 import type { TaxTreatment } from "@/lib/mgr/tax-treatments";
 import { submitReason } from "@/lib/mgr/submit-reason";
 import { useTouchedLines } from "@/lib/mgr/touched-lines";
@@ -105,19 +103,16 @@ export function CustomerForm({
           }
           void form.submit(event);
         }} className="flex flex-col gap-4">
-          {E.edit("Name", name, "text", undefined, { id: "customer-name", onChange: setName, onBlur: () => touched.touch(0), required: true, error: (touched.shown(0) ? nameError : undefined) ?? form.fieldErrors.name })}
-          <div className="flex flex-col gap-2">
-            {E.edit("Alias", alias, "text", undefined, { id: "customer-alias", onChange: setAlias, error: form.fieldErrors.alias, "aria-describedby": "customer-alias-help" })}
-            <FieldDescription id="customer-alias-help">{CUSTOMER_ALIAS_HELP}</FieldDescription>
-          </div>
-          {E.pick("Type", type, CUSTOMER_TYPE_OPTIONS, { id: "customer-type", onChange: (value) => setType(value as CustomerType) })}
-          {E.pick("Country", country, COUNTRY_OPTIONS, { id: "customer-country", onChange: setCountry, required: true, error: form.fieldErrors.country })}
-          {country === "US"
-            ? <UsStateField value={state} label="State (required)" controls={{ id: "customer-state", onChange: setState, required: true, error: form.fieldErrors.state }} />
-            : E.edit("State", "Not applicable", "text", undefined, { id: "customer-state", disabled: true })}
+          <CustomerAccountFields values={{ name, alias, type, country, state }} nameLabel="Name" controls={{
+            name: { id: "customer-name", onChange: setName, onBlur: () => touched.touch(0), error: (touched.shown(0) ? nameError : undefined) ?? form.fieldErrors.name },
+            alias: { id: "customer-alias", onChange: setAlias, error: form.fieldErrors.alias },
+            type: { id: "customer-type", onChange: value => setType(value as CustomerType) },
+            country: { id: "customer-country", onChange: setCountry, error: form.fieldErrors.country },
+            state: { id: "customer-state", onChange: setState, error: form.fieldErrors.state },
+          }} />
           <CustomerSaleChannelField value={saleChannelId} channels={channels} controls={{ id: "customer-sale-channel", onChange: setSaleChannelId, error: form.fieldErrors.saleChannelId }} />
-          {E.edit("License number", licenseNumber, "text", undefined, { id: "customer-license", onChange: setLicenseNumber, error: form.fieldErrors.licenseNumber })}
-          {E.pick("Payment terms", paymentTerms, PAYMENT_TERMS.map(t => ({ value: t, label: PAYMENT_TERM_LABEL[t] })), { id: "customer-terms", onChange: setPaymentTerms, displayValue: paymentTermLabel(paymentTerms) })}
+          <CustomerLicenseField value={licenseNumber} controls={{ id: "customer-license", onChange: setLicenseNumber, error: form.fieldErrors.licenseNumber }} />
+          <CustomerPaymentTermsField value={paymentTerms} controls={{ id: "customer-terms", onChange: setPaymentTerms, displayValue: paymentTermLabel(paymentTerms) }} />
           <CustomerTaxTreatmentField value={taxTreatment} controls={{ id: "customer-tax", onChange: value => setTaxTreatment(value as TaxTreatment | "") }} />
           {/* upsert_customer takes no ship-to; ship-tos are upsert_ship_to on Customer detail. Create only: edit already has that page. */}
           {!isEdit && E.info("Add ship-to addresses on the customer’s page after you create the customer.")}

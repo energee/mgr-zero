@@ -4,12 +4,11 @@ import { isUuid } from "@/lib/uuid";
 // movement ledger. Record movement opens movement-form.tsx, the one
 // append-only inventory write; on hand is read at bin grain (get_bin_on_hand),
 // summed per SKU here, and handed to the form so a chosen SKU starts on the
-// bin holding the most of it. Combined live drawing slots into
-// FinishedGoodsView. Add SKU in Catalog sits beside Record
+// bin holding the most of it. FinishedGoodsView draws the register and movement
+// ledger from the loaded data. Add SKU in Catalog sits beside Record
 // movement, and the form's empty SKU picker links Catalog, only for a user who
 // may create a SKU (#1113). Each active SKU's row opens Record movement on
 // that SKU for the same roles (#1507).
-import { E } from "@/components/mgr/e";
 import { sentenceCase } from "@/lib/mgr/labels";
 import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -73,6 +72,9 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   const initialLot = initial?.lotId && canMove
     ? await runCommand("get_inventory_lot", { lotId: initial.lotId }, ctx) as { id: string; code: string } | null
     : null;
+  const movementLinks: { label: string; href: string }[] = [];
+  if (pagination.firstHref) movementLinks.push({ label: "Newest movements", href: pagination.firstHref });
+  if (pagination.moreHref) movementLinks.push({ label: "Older movements", href: pagination.moreHref });
   return (
     <FinishedGoodsView
       model={toFinishedGoodsViewProps(assembleFinishedGoods(skus, onHand, atp, value))}
@@ -80,17 +82,16 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
       addSkuHref={skusHref}
       countHref={canRun(ctx, "record_taproom_count") ? "/taproom" : null}
       linkRows
-      footer={
-        <>
-          {E.ttl("Movements")}
-          {movements.length === 0
-            ? E.blank("No movements recorded yet")
-            : movements.map((m) => (
-              <div key={m.id}>{E.row(`${Number(m.qty) > 0 ? "+" : ""}${m.qty} ${skuLabel(skuById.get(m.sku_id) ?? { name: "—" })}`, `${sentenceCase(m.type)} · ${locationName(m.location_id)} · ${bins.find(b => b.id === m.bin_id)?.name ?? "—"}${m.lots?.code ? ` · ${m.lots.code}` : ""} · ${m.bbl} bbl${m.dest_state ? ` · ${m.dest_state}` : ""}${m.sale_channel_id ? ` · ${channels.find(c => c.id === m.sale_channel_id)?.name ?? "—"}` : ""}${m.note ? ` · ${m.note}` : ""}`, <span>{formatDateTime(m.created_at, brewery.timeZone)}{m.ref_label ? ` · ${m.ref_label}` : ""}</span>, Number(m.qty) < 0 ? "w" : "ok")}</div>
-            ))}
-          <div className="flex gap-2">{pagination.firstHref && E.btn("Newest movements", "g", pagination.firstHref)}{pagination.moreHref && E.btn("Older movements", "g", pagination.moreHref)}</div>
-        </>
-      }
+      movements={{
+        rows: movements.map(m => ({
+          key: m.id,
+          title: `${Number(m.qty) > 0 ? "+" : ""}${m.qty} ${skuLabel(skuById.get(m.sku_id) ?? { name: "—" })}`,
+          detail: `${sentenceCase(m.type)} · ${locationName(m.location_id)} · ${bins.find(b => b.id === m.bin_id)?.name ?? "—"}${m.lots?.code ? ` · ${m.lots.code}` : ""} · ${m.bbl} bbl${m.dest_state ? ` · ${m.dest_state}` : ""}${m.sale_channel_id ? ` · ${channels.find(c => c.id === m.sale_channel_id)?.name ?? "—"}` : ""}${m.note ? ` · ${m.note}` : ""}`,
+          trailing: `${formatDateTime(m.created_at, brewery.timeZone)}${m.ref_label ? ` · ${m.ref_label}` : ""}`,
+          outbound: Number(m.qty) < 0,
+        })),
+        links: movementLinks,
+      }}
     />
   );
 }

@@ -23,17 +23,17 @@ const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 describe("Finished goods view", () => {
   it("renders authorized inventory value and counts uncosted units without valuing them (#810)", () => {
     const snapshot = assembleFinishedGoods([{ id: "s1", name: "Costed keg" }], [{ sku_id: "s1", qty: 4 }], [{ sku_id: "s1", qty: 4 }], { value_cents: 2000.4, uncosted_qty: 1.5 });
-    const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(snapshot) }));
+    const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(snapshot), movements: { rows: [] } }));
     expect(html).toContain("Inventory value");
     expect(html).toContain("$20.00");
     expect(html).toContain("1.5 units without cost");
-    expect(htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps({ skus: [] }) }))).not.toContain("Inventory value");
+    expect(htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps({ skus: [] }), movements: { rows: [] } }))).not.toContain("Inventory value");
   });
 
   it("leaves out Inventory value while no unit has a cost, so it never reads $0.00 (#1518)", () => {
     const snapshot = assembleFinishedGoods([{ id: "s1", name: "Opening keg" }], [{ sku_id: "s1", qty: 15 }], [{ sku_id: "s1", qty: 15 }], { value_cents: 0, uncosted_qty: 15 });
     expect(toFinishedGoodsViewProps(snapshot).valueLine).toBeUndefined();
-    expect(htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(snapshot) }))).not.toContain("Inventory value");
+    expect(htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(snapshot), movements: { rows: [] } }))).not.toContain("Inventory value");
   });
 
   it.each([[1, "1 unit"], [2, "2 units"], [1.5, "1.5 units"]] as const)("names %s uncosted units with the correct plural (#1382)", (uncostedUnits, label) => {
@@ -41,7 +41,7 @@ describe("Finished goods view", () => {
     const unitLabel = new RegExp(`\\b${label.replace(".", "\\.")}\\b`);
     expect(model.valueLine).toContain("$20.00");
     expect(model.valueLine).toMatch(unitLabel);
-    expect(htmlOf(createElement(FinishedGoodsView, { model }))).toMatch(unitLabel);
+    expect(htmlOf(createElement(FinishedGoodsView, { model, movements: { rows: [] } }))).toMatch(unitLabel);
   });
 
   it("maps each SKU onto a register row with on hand, allocated, available and its links (#942)", () => {
@@ -75,17 +75,17 @@ describe("Finished goods view", () => {
 
   it("each live row opens Record movement on its SKU, only for a user who may record one (#1507)", () => {
     const model = toFinishedGoodsViewProps({ skus: [...finishedGoodsList.skus, { id: "s-retired", name: "Retired keg", active: false, on_hand: 1, atp: 1 }] });
-    const live = htmlOf(createElement(FinishedGoodsView, { model, createAction: "MOVE", linkRows: true }));
+    const live = htmlOf(createElement(FinishedGoodsView, { model, movements: { rows: [] }, createAction: "MOVE", linkRows: true }));
     for (const sku of [SKU_HAZY, SKU_PILS, SKU_STOUT]) {
       expect(live).toMatch(new RegExp(`<a [^>]*href="/inventory\\?recordMovement=1&amp;skuId=${sku.sku_id}">Record movement</a>`));
     }
     expect(live).not.toContain("skuId=s-retired");
-    const reader = htmlOf(createElement(FinishedGoodsView, { model, createAction: null, linkRows: true }));
+    const reader = htmlOf(createElement(FinishedGoodsView, { model, movements: { rows: [] }, createAction: null, linkRows: true }));
     expect(reader).not.toMatch(/Record movement/);
   });
 
   it("the inventory draws each row's Record movement inert (#1507)", () => {
-    const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(finishedGoodsList) }));
+    const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(finishedGoodsList), movements: { rows: [] } }));
     // The header's button plus one per row, drawn in both the desk table and
     // the phone list, none of them a link.
     expect(html.match(/<button[^>]*>Record movement<\/button>/g)).toHaveLength(1 + 2 * finishedGoodsList.skus.length);
@@ -99,7 +99,7 @@ describe("Finished goods view", () => {
   });
 
   it("the inventory drawing offers Record movement, Add SKU in Catalog and a worded Shortfall, with no Review and no live hrefs (#942, #1113)", () => {
-    const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(finishedGoodsList) }));
+    const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(finishedGoodsList), movements: { rows: [] } }));
     // Inert in the frame: the explorer resolves "Record movement" by screen name.
     expect(html).toMatch(/<button[^>]*>Record movement<\/button>/);
     expect(html.indexOf(">Record movement<")).toBeLessThan(html.indexOf(">Add SKU in Catalog<"));
@@ -116,6 +116,7 @@ describe("Finished goods view", () => {
   it("linkRows makes the SKU name the stock-detail link and Shortfall the replenishment link (#942)", () => {
     const html = htmlOf(createElement(FinishedGoodsView, {
       model: toFinishedGoodsViewProps(finishedGoodsList),
+      movements: { rows: [] },
       linkRows: true,
     }));
     expect(html).toMatch(new RegExp(`href="/inventory/${SKU_HAZY.sku_id}"[^>]*>${SKU_HAZY.name}<`));
@@ -124,69 +125,21 @@ describe("Finished goods view", () => {
     expect(html).not.toMatch(/>Review</);
   });
 
-  it("live Finished goods puts Record movement and Add SKU in Catalog together in the header, above the table (#1113)", () => {
-    const html = htmlOf(createElement(FinishedGoodsView, {
-      model: toFinishedGoodsViewProps(finishedGoodsList),
-      createAction: "MOVE",
-      addSkuHref: "/catalog",
-      footer: "LEDGER",
-    }));
-    const title = html.indexOf(">Finished goods</h1>");
-    const move = html.indexOf("MOVE");
-    expect(title).toBeGreaterThan(-1);
-    expect(move).toBeGreaterThan(title);
-    expect(html.slice(move)).toMatch(/^MOVE.*?<a[^>]*href="\/catalog"[^>]*>Add SKU in Catalog<\/a>/);
-    expect(html.indexOf("Add SKU in Catalog")).toBeLessThan(html.indexOf("<table"));
-    expect(html).toMatch(/LEDGER/);
-  });
-
   it("a user who may not create a SKU gets no Add SKU in Catalog (#1113)", () => {
-    const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(finishedGoodsList), createAction: "MOVE", addSkuHref: null }));
+    const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(finishedGoodsList), movements: { rows: [] }, createAction: "MOVE", addSkuHref: null }));
     expect(html).toMatch(/MOVE/);
     expect(html).not.toMatch(/Add SKU/);
   });
 
-  it("a reader who may not record a movement, count the taproom or create a SKU gets a bare title, with no empty action row (#1113)", () => {
-    const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(finishedGoodsList), createAction: null, countHref: null, addSkuHref: null }));
-    expect(html).toMatch(/<div><div class="flex flex-col gap-1"><a[^>]*>.*?Beer<\/a><h1[^>]*>Finished goods<\/h1><\/div>/);
+  it("a reader who may not record a movement, count the taproom or create a SKU gets no actions (#1113)", () => {
+    const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(finishedGoodsList), movements: { rows: [] }, createAction: null, countHref: null, addSkuHref: null }));
     expect(html).not.toMatch(/Record movement|Record taproom count|Add SKU/);
-  });
-
-  it("the live page gates Add SKU in Catalog and the empty SKU picker's link on create_sku, one href for both (#1113)", () => {
-    const src = readFileSync("app/(app)/inventory/page.tsx", "utf8");
-    expect(src).toMatch(/const skusHref = canRun\(ctx, "create_sku"\) \? "\/catalog" : null;/);
-    expect(src).toMatch(/<MovementForm\b[^\n]*skusHref=\{skusHref\}/);
-    expect(src).toMatch(/addSkuHref=\{skusHref\}/);
-  });
-
-  it("the Finished goods inventory record is FinishedGoodsView", () => {
-    const body = screen("Finished goods").body as { type: unknown; props: { model: unknown } };
-    expect(isValidElement(screen("Finished goods").body)).toBe(true);
-    expect(body.type).toBe(FinishedGoodsView);
-    expect(body.props.model).toEqual(toFinishedGoodsViewProps(finishedGoodsList));
-  });
-
-  it("the live inventory page mounts its shared views; a saved movement toasts instead of opening a receipt sheet (#1507)", () => {
-    const src = readFileSync("app/(app)/inventory/page.tsx", "utf8");
-    const form = readFileSync("app/(app)/inventory/movement-form.tsx", "utf8");
-    expect(src).toMatch(/from "@\/components\/mgr\/views\/finished-goods"/);
-    expect(src).toMatch(/<FinishedGoodsView\b/);
-    expect(src).toMatch(/<MovementForm\b/);
-    expect(form).not.toContain('title="Record Movement"');
-    expect(form).toMatch(/<RecordMovementView\b/);
-    expect(form).not.toMatch(/title="Movement recorded"/);
-    expect(form).toMatch(/toast\.success\("Movement recorded", \{ description: movementReceiptLine\(/);
   });
 
   it("names a SKU once when its name already starts with the brand (#493)", () => {
     expect(skuLabel({ name: "Hazy IPA · 4 × 12.3 oz cans", brands: { name: "Hazy IPA" } })).toBe("Hazy IPA · 4 × 12.3 oz cans");
     expect(skuLabel({ name: "Case", brands: { name: "Pils" } })).toBe("Pils · Case");
     expect(skuLabel({ name: "Case" })).toBe("Case");
-  });
-
-  it("does not print the raw movement id on inventory movement rows (#493)", () => {
-    const src = readFileSync("app/(app)/inventory/page.tsx", "utf8");
-    expect(src).not.toMatch(/ · \{m\.id\}/);
   });
 
   it("the live movement form picks SKUs by id, not by their non-unique label (#472)", () => {

@@ -3,7 +3,6 @@ import { useId, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { formatDate } from "@/lib/date-format";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { TimeWindowField } from "@/components/mgr/time-window-field";
 import { TimezonePicker } from "@/components/mgr/timezone-picker";
 import { timezoneLabel } from "@/lib/mgr/labels";
@@ -97,7 +96,7 @@ export function ChatPersonalPreferencesView({ preferences, canSetQuietHours = tr
     {preferences.preferences.map(({ reason, enabled, personalDestinationId }) => {
       const label = NOTIFICATION_REASON_LABEL[reason];
       return <div key={reason}>
-      {E.row(label, "", <Switch aria-label={label} checked={onPreference ? enabled : undefined} defaultChecked={onPreference ? undefined : enabled} disabled={busy} onCheckedChange={next => onPreference?.(reason, next)} />)}
+      {E.row(label, "", E.sw(enabled, label, onPreference ? next => onPreference(reason, next) : undefined, busy))}
       {Boolean(preferences.destinations?.length) && <label className="flex items-center justify-between gap-3 py-3 text-sm">{label} destination
         {E.pick(`${label} destination`, personalDestinationId ?? "", [{ value: "", label: "Default delivery", disabled: true }, ...(preferences.destinations!.map(destination => ({ value: destination.id, label: destination.external_destination_id })))], { onChange: onDestination ? (nextValue: string) => onDestination?.(reason, nextValue) : undefined, disabled: busy, hideLabel: true })}
       </label>}
@@ -170,7 +169,7 @@ export function ChatDeliveryView({ enabled, busy = false, error, onDisable }: { 
   const active = onDisable ? enabled : localEnabled;
   const disable = () => { setLocalEnabled(false); onDisable?.(); };
   return <>
-    {E.row("Delivery enabled", active ? "turn off all Slack sends" : "reauthorize Slack to enable delivery", <Switch aria-label="Slack delivery" checked={active} disabled={busy || !active} onCheckedChange={checked => { if (!checked) disable(); }} />, active ? "ok" : "w")}
+    {E.row("Delivery enabled", active ? "turn off all Slack sends" : "reauthorize Slack to enable delivery", E.sw(active, "Slack delivery", checked => { if (!checked) disable(); }, busy || !active), active ? "ok" : "w")}
     <CommandFormMessage error={error} />
   </>;
 }

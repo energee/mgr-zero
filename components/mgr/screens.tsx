@@ -1,9 +1,10 @@
 import { NotFoundView } from "@/components/mgr/views/not-found";
 import { BatchCompletionFixture } from "@/components/mgr/fixtures/batch-completion";
 import { AccountInvitationsView } from "@/components/mgr/views/account-invitations";
+import { RouteErrorView } from "@/components/mgr/views/route-error";
 import { CommandRecoveryView } from "@/components/mgr/views/command-recovery";
 import { PackagingSourcePicker, PlanActions } from "@/components/mgr/views/plan-actions";
-import { RefusedReturnFormView } from "@/components/mgr/views/refused-return";
+import { RefusedReturnFormView, RefusedReturnStatusView } from "@/components/mgr/views/refused-return";
 import { InventoryDetailView } from "@/components/mgr/views/inventory-detail";
 import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 // components/mgr/screens.tsx — the screen inventory and the source of truth
@@ -88,7 +89,7 @@ import { EntryView } from "@/components/mgr/views/entry";
 import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
 import { FermentationReadingActionsView, FermentationReadingView, readingIdentity } from "@/components/mgr/views/fermentation-reading";
 import { FirstRunView } from "@/components/mgr/views/first-run";
-import { CatalogCategoriesFixture, FormatFixture, ReceiptFixture, TransferDetailFixture, WeeklyCountFixture } from "@/components/mgr/fixture-adapters";
+import { AccountingFixture, CatalogCategoriesFixture, ConfirmDeliveryFixture, FormatFixture, ReceiptFixture, RefusedReturnFixture, ResetPasswordFixture, RouteErrorFixture, TransferDetailFixture, WeeklyCountFixture } from "@/components/mgr/fixture-adapters";
 import { FormatView } from "@/components/mgr/views/format";
 import { DeleteFormatControl } from "@/components/mgr/views/delete-format";
 import { FormatsView } from "@/components/mgr/views/formats";
@@ -197,7 +198,7 @@ import { teamRoster } from "@/lib/mgr/fixtures/team";
 import { todayBrewer, todayDriver, todayEmpty, todaySales, todayTaproom, todayWarehouse } from "@/lib/mgr/fixtures/today";
 import { workWarehouse } from "@/lib/mgr/fixtures/work";
 import { invoiceFailedAls, invoiceFailedAlsAccounting, invoiceLocalPartlyPaid } from "@/lib/mgr/fixtures/invoice";
-import { finishedGoodsList, recordMovementFestival, reverseMovementAdjustment } from "@/lib/mgr/fixtures/inventory";
+import { finishedGoodsEmpty, finishedGoodsList, finishedGoodsMovements, recordMovementFestival, reverseMovementAdjustment } from "@/lib/mgr/fixtures/inventory";
 import { binCold, locationBinsTaproom, locationTaproom, locationsList } from "@/lib/mgr/fixtures/locations";
 import { newOrderDraft, orderPickedRestock, orderPickedRestockPutBack, orderSubmittedRidgeline, orderTransferComplete, ordersWorkList } from "@/lib/mgr/fixtures/orders";
 import { orderPick, orderReturnCredit, orderShipInvoice, orderShipOnDelivery, orderShipmentDone, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
@@ -463,8 +464,8 @@ export const SCREENS: Screen[] = [
     job: "Bartender landing: open the board, count, or review completed variance",
     reads: "list_locations · list_open_taps · list_taproom_counts · get_taproom_variance", writes: "none",
     states: [["no location", "no observed taproom facts; Taproom stock remains available"], ["role hidden", "no Work, Search, orders, invoices, or brewery quiet settings", 1], ["narrow surface", "three permitted exits with last observed facts"]],
-    spec: "Taproom Today uses only permitted taproom reads. It links the board, weekly count and four-week variance with last-opened, last-counted and report as-of facts. It does not invent an overdue count, shift schedule, or POS mapping action. Work, Search, business records and brewery quiet settings stay hidden.",
-    body: <TodayView model={toTodayViewProps(todayTaproom)} footer={E.note("Observed facts only. No fabricated overdue or shift policy; no Work, Search, orders or invoices.")} />,
+    spec: "Taproom Today uses only permitted taproom reads. It links the board, weekly count and four-week variance with last-opened, last-counted and report as-of facts. Observed facts only: no fabricated overdue or shift policy, Work, Search, orders or invoices.",
+    body: <TodayView model={toTodayViewProps(todayTaproom)} />,
   },
   {
     step: 1, slice: "all", tab: "Beer", name: "Beer", job: "Inventory, cellar, materials and kegs",
@@ -653,7 +654,7 @@ export const SCREENS: Screen[] = [
     writes: "supabase_auth_reset_password_for_email [platform]",
     states: [["sent", "Check your email"], ["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["error", "Did not load · Retry", 1]],
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: <EntryView model={resetPassword} />,
+    body: <ResetPasswordFixture><EntryView model={resetPassword} secondaryHref="/docs/screens-explore#q=Sign+in" secondaryTo="Sign in" /></ResetPasswordFixture>,
   },
   {
     step: 2,
@@ -690,14 +691,14 @@ export const SCREENS: Screen[] = [
     group: "Entry",
     surface: "entry",
     name: "Portal forgot password",
-    to: { "Send reset link": "Portal set password", "Back to sign in": "Portal sign in" },
+    to: { "Back to sign in": "Portal sign in" },
     job: "Recover a buyer login without saying whether the email exists",
     reads: "none",
     writes: "supabase_auth_reset_password_for_email [platform]",
     states: DEFAULT_STATES,
     spec: "The sent state is this same screen with the info. Enumeration is never confirmed.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: <EntryView model={portalForgotPassword} />,
+    body: <ResetPasswordFixture><EntryView model={portalForgotPassword} secondaryHref="/docs/screens-explore#q=Portal+sign+in" secondaryTo="Portal sign in" /></ResetPasswordFixture>,
   },
   {
     step: 6,
@@ -798,11 +799,21 @@ export const SCREENS: Screen[] = [
     name: "Finished goods",
     to: { "Add SKU in Catalog": "Catalog", "Record taproom count": "Weekly count" },
     job: "See sellable beer by SKU and act on shortages",
-    reads: "get_on_hand · get_atp · get_inventory_value",
+    reads: "get_bin_on_hand · get_atp · get_inventory_value · list_movements",
     writes: "none [SKU creation happens on its own surface]",
-    states: [["uncosted", "units without receipt cost are counted but not valued"], ["permission", "value total shows only for Admin and Sales"], ["short", "a negative Available says Shortfall and links to the competing orders"], ["empty", "no finished goods yet: header actions and the taproom count pointer remain"]],
-    spec: "The Beer landing's Finished goods row opens this list. On hand, allocated and available sit in aligned columns on the desk and as labeled values on the phone; the SKU name opens SKU detail, and Shortfall under a negative Available opens the shortfall. The header holds the page actions. Record movement is for Admin and Warehouse; for them each active SKU's row also ends with Record movement, which opens the form with that SKU chosen. Record taproom count points to the existing Weekly count for taproom stock, not a general finished-goods count. Add SKU in Catalog is for Admin and Sales and opens Catalog, where SKUs are made. Inventory value uses frozen packaging-close cost and separately counts units without cost.",
-    body: <FinishedGoodsView model={toFinishedGoodsViewProps(finishedGoodsList)} />,
+    states: [["uncosted", "units without receipt cost are counted but not valued"], ["permission", "Admin, Sales and Warehouse may view"], ["value", "inventory value shows only for Admin and Sales"], ["short", "a negative Available says Shortfall and links to the competing orders"], ["empty", "no finished goods yet: header actions and the taproom count pointer remain"]],
+    spec: "The Beer landing's Finished goods row opens this list. On hand, allocated and available sit in aligned columns on the desk and as labeled values on the phone; the SKU name opens SKU detail, and Shortfall under a negative Available opens the shortfall. The header holds the page actions. Record movement is for Admin and Warehouse; for them each active SKU's row also ends with Record movement, which opens the form with that SKU chosen. Record taproom count points to the existing Weekly count for taproom stock, not a general finished-goods count. Add SKU in Catalog is for Admin and Sales and opens Catalog, where SKUs are made. Inventory value uses frozen packaging-close cost and separately counts units without cost. The same view draws recent signed movement rows and the live page's history links; the fixture supplies synthetic rows, not live pagination destinations.",
+    body: <FinishedGoodsView model={toFinishedGoodsViewProps(finishedGoodsList)} movements={finishedGoodsMovements} />,
+  },
+  {
+    step: 3, slice: 1, tab: "Beer", name: "Finished goods empty",
+    to: { "Add SKU in Catalog": "Catalog", "Record taproom count": "Weekly count" },
+    job: "Read an empty stock register and movement history without invented rows",
+    reads: "get_bin_on_hand · get_atp · get_inventory_value · list_movements",
+    writes: "none",
+    states: [["empty", "no stock or movements; authorized header actions remain"], ["permission", "Admin, Sales and Warehouse may view"]],
+    spec: "The empty fixture supplies zero authorized inventory cost and no stock or movement rows to the same FinishedGoodsView. It offers no invented history page.",
+    body: <FinishedGoodsView model={toFinishedGoodsViewProps(finishedGoodsEmpty)} movements={{ rows: [] }} />,
   },
   {
     step: 3,
@@ -1320,6 +1331,14 @@ export const SCREENS: Screen[] = [
     states: [["permission", "admin only", 1], ["healthy", "safe company status shown; the self-renewing token expiry is not"], ["expired", "reconnect before mapping or push", 1], ["payments unavailable", "Pay returns the customer to the invoice when QuickBooks has no payment link", 1], ["ACH only", "card disabled; cheaper, and slower to arrive"], ["defaults changed", "applies to the next push, never retroactively"]],
     spec: "Accounting shows connection health and customer portal access readiness. The missing-email count means no current portal member has a nonblank login email; it does not establish QuickBooks billing-email or payment readiness. Review opens that same filtered customer set and is hidden when the count is zero. Staff correct access through the existing Invite and Remove actions. QuickBooks Payments and invoice payment options remain separate provider concerns.",
     body: <AccountingView model={accountingExpired} />,
+  },
+  {
+    step: 5, slice: 1, tab: "More", group: "QuickBooks Online", name: "Accounting connected",
+    to: { Mappings: "QuickBooks mappings", Review: "Customers missing email", "Customers missing a portal login email": "Customers missing email", Disconnect: "Disconnect QuickBooks", "Retry saved sync": "Accounting", "Sync QuickBooks": "Accounting" },
+    job: "Choose the payment options for new invoices", reads: "get_qbo_connection · get_qbo_sync_status · count_customers_missing_portal_email", writes: "set_qbo_push_defaults",
+    states: [["connected", "payment defaults save on each change"], ["both off", "new invoices cannot be paid online"]],
+    spec: "The connected fixture owns local ACH and card values. Both the switches and the online-payment summary use that same state; it sends nothing to QuickBooks.",
+    body: <AccountingFixture><AccountingView model={{ ...accountingExpired, connected: true, reconnect: false, status: "Connected · production", error: undefined, syncStatus: undefined }} /></AccountingFixture>,
   },
   {
     step: 5, slice: 1, tab: "More", group: "QuickBooks Online",
@@ -2648,13 +2667,40 @@ export const SCREENS: Screen[] = [
     slice: 10,
     tab: "Work",
     name: "Confirm delivery",
-    to: { "Check in refused beer": "Check in refused beer", "Not delivered · leave for a later route": "Driver route", Delivered: "Driver route" },
+    to: { "Check in refused beer": "Check in refused beer" },
     job: "Name receiving contact, then commit delivery and invoice",
     reads: "get_delivery_stop",
     writes: "confirm_delivery [one RPC: delivered_at + signed_by + invoice only when persisted mode is on-delivery; never ships] · leave_delivery_for_later [one RPC: deletes an open unattempted stop and unassigns its document]",
     states: [["offline", "keep stop open; commit waits", 1], ["response lost", "same requestId returns result"], ["permission", "warehouse membership and being the route’s assigned driver, or admin", 1], ["success", "INV number after commit"], ["transfer stop", "destination and picked lines instead of a customer; stamped, never invoiced; Receive on the transfer moves the stock"]],
     spec: "Not delivered · leave for a later route removes an unattempted stop from its departed route, logs an order event for a shipment, and leaves stock, invoices and refusals untouched. No driver note is needed. The document is unassigned for a later route. Closed / no access is not a refusal reason. Enter refused quantities and a refusal reason when needed; accepted quantities are billed at captured order prices. Full refusal needs no receiving name and creates no on-delivery invoice. Either outcome returns to Driver route. Received by starts as the newest earlier signer at this ship-to and suggests the others. Back goes to Driver route. The receiving name is stored as text; the UI never implies a signature image is retained.",
-    body: <ConfirmDeliveryView model={confirmDeliveryStop1} />,
+    body: <ConfirmDeliveryFixture><ConfirmDeliveryView model={confirmDeliveryStop1} /></ConfirmDeliveryFixture>,
+  },
+  {
+    step: 7, slice: 10, tab: "Work", name: "Delivery recorded",
+    job: "Read the saved receiving contact and outcome", reads: "get_delivery_stop", writes: "none",
+    states: [["partial", "accepted and refused quantities remain visible"]],
+    body: <ConfirmDeliveryView model={{ ...confirmDeliveryStop1, lines: confirmDeliveryStop1.lines.map(line => {
+      const refused = line.key === "hazy" ? 2 : 0;
+      return { ...line, qty: `${Number(line.qty) - refused} accepted · ${refused} refused` };
+    }) }} readout={{ kind: "delivered", receivedBy: "Dana", outcome: "Partial", transfer: false, invoice: "INV-0241", refused: true, checkInHref: "/docs/screens-explore#q=Check+in+refused+beer" }} />,
+  },
+  {
+    step: 7, slice: 10, tab: "Work", name: "Delivery not departed",
+    job: "Wait for route departure", reads: "get_delivery_stop", writes: "none",
+    states: [["not departed", "no delivery action is offered"]],
+    body: <ConfirmDeliveryView model={confirmDeliveryStop1} readout={{ kind: "not_departed" }} />,
+  },
+  {
+    step: 7, slice: 10, tab: "Work", name: "Delivery other driver",
+    job: "Explain who may confirm this stop", reads: "get_delivery_stop", writes: "none",
+    states: [["permission", "assigned driver or admin only", 1]],
+    body: <ConfirmDeliveryView model={confirmDeliveryStop1} readout={{ kind: "not_assigned" }} />,
+  },
+  {
+    step: 7, slice: 10, tab: "Work", name: "Delivery transfer in transit",
+    job: "Read the stamped stop without claiming stock was received", reads: "get_delivery_stop", writes: "none",
+    states: [["delivered transfer", "stock remains in transit"]],
+    body: <ConfirmDeliveryView model={{ ...confirmDeliveryStop1, heading: "TRF-0004 · Storage", shipTo: undefined, invoiceTiming: "None · stock transfer", lines: [{ key: "hazy", title: "Hazy IPA · ½ bbl keg", qty: "4 accepted · 0 refused" }] }} readout={{ kind: "delivered", receivedBy: "Dana", outcome: "Delivered", transfer: true, invoice: "", refused: false }} />,
   },
   {
     step: 7, slice: 10, tab: "Work", name: "Check in refused beer",
@@ -2663,7 +2709,46 @@ export const SCREENS: Screen[] = [
     writes: "check_in_refused_return",
     states: [["permission", "warehouse or admin for on-delivery shipments; admin or sales uses Return and credit for invoice-now", 1], ["damage", "return and loss posted together"], ["retry", "same request replays"]],
     spec: "Refusal alone restores no stock. Check in actual received quantities against their shipped source lot. Outstanding returns remain visible after the route returns. Invoice-now refusals use Return and credit.",
-    body: <RefusedReturnFormView model={{ title: "Check in · Ridgeline", locationId: "warehouse", locations: [{ value: "warehouse", label: "Warehouse" }], bins: [{ value: "cold", label: "Cold room", locationId: "warehouse" }], lines: [{ id: "hazy", name: "Hazy IPA · ½ bbl keg", outstanding: 2, sources: [{ id: "source", label: "HZ-041 · Cold room", shipped: 4 }] }] }} />,
+    body: <RefusedReturnFixture><RefusedReturnFormView model={{ title: "Check in · Ridgeline", locationId: "warehouse", locations: [{ value: "warehouse", label: "Warehouse" }], bins: [{ value: "cold", label: "Cold room", locationId: "warehouse" }], lines: [{ id: "hazy", name: "Hazy IPA · ½ bbl keg", outstanding: 2, sources: [{ id: "source", label: "HZ-041 · Cold room", shipped: 4 }] }] }} /></RefusedReturnFixture>,
+  },
+  {
+    step: 7, slice: 10, tab: "Work", name: "No refused beer",
+    job: "Confirm no physical returns are outstanding", reads: "list_refused_returns", writes: "none",
+    states: [["empty", "no check-in action"]],
+    body: <RefusedReturnStatusView />,
+  },
+  {
+    step: 7, slice: 10, tab: "Work", name: "Refused beer invoiced at ship",
+    job: "Use the invoice correction for beer already billed", reads: "list_refused_returns · get_delivery_stop", writes: "none",
+    to: { "Return and credit": "Return and credit" },
+    states: [["invoice now", "Admin or Sales records Return and credit"]],
+    body: <RefusedReturnStatusView invoiceNow returnHref="/docs/screens-explore#q=Return+and+credit" />,
+  },
+  {
+    step: 7, slice: 10, tab: "Work", name: "Release standing allocation",
+    to: { "Create replenishment order": "Order" },
+    job: "Confirm releasing a reservation without moving stock", reads: "list_standing_allocations", writes: "release_allocation",
+    states: [["ready", "release the named quantity"], ["error", "keep the confirmation open", 1]],
+    spec: "The replenishment workspace opens its actual confirmation dialog. Cancel preserves the reservation. Confirm removes that allocation and clears the resulting shortfall, while par and on-hand stock remain unchanged. The fixture changes local state only.",
+    body: <ReplenishmentDemo initialRelease><ReplenishmentView model={replenishmentDemo} fromLocationId="" qtys={{}} /></ReplenishmentDemo>,
+  },
+  {
+    step: 1, slice: "all", group: "Global", name: "Page load error",
+    job: "Retry a failed page without exposing internal error text", reads: "none", writes: "none",
+    states: [["reference", "report the reference when retry does not help"], ["no reference", "the generic message and retry remain"]],
+    body: <RouteErrorFixture recovered={<TodayView model={toTodayViewProps(todayWarehouse)} />}><RouteErrorView reference="example-reference" /></RouteErrorFixture>,
+  },
+  {
+    step: 1, slice: "all", group: "Global", portal: "Order", name: "Portal page load error",
+    job: "Retry the buyer's failed page in the portal shell", reads: "none", writes: "none",
+    states: [["no reference", "retry remains available without internal details"]],
+    body: <RouteErrorFixture recovered={<ShopView model={toShopViewProps(ridgelineShop)} />}><RouteErrorView /></RouteErrorFixture>,
+  },
+  {
+    step: 1, slice: "all", group: "Entry", surface: "entry", name: "Entry page load error",
+    job: "Recover a failed entry page without a signed-in shell", reads: "none", writes: "none",
+    states: [["reference", "report the reference when retry does not help"]],
+    body: <RouteErrorFixture recovered={<EntryView model={signIn} />}><RouteErrorView reference="example-reference" /></RouteErrorFixture>,
   },
   {
     step: 7,

@@ -18,6 +18,7 @@ describe("route error reference (#1299)", () => {
   it("shows no reference line when there is no digest", () => {
     expect(render(new Error("client render failed"))).not.toContain("Reference");
     expect(render("thrown string")).not.toContain("Reference");
+    expect(render("thrown string")).not.toContain("thrown string");
   });
 
   it("logs one structured line with the digest and route, not the message", async () => {

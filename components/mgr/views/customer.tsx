@@ -39,6 +39,37 @@ export function CustomerTaxTreatmentField({ value, controls }: { value: string; 
   });
 }
 
+type CustomerAccountValues = Pick<CustomerEditValues, "name" | "alias" | "type" | "country" | "state">;
+
+/** The create dialog and detail page bind the same account fields to their own controller. */
+export function CustomerAccountFields({ values, controls, nameLabel = "Customer name" }: {
+  values: CustomerAccountValues;
+  controls: Record<keyof CustomerAccountValues, FieldControls>;
+  nameLabel?: string;
+}) {
+  const aliasHelpId = controls.alias.id ? `${controls.alias.id}-help` : undefined;
+  return <>
+    {E.edit(nameLabel, values.name, "text", undefined, { ...controls.name, required: true })}
+    <div className="flex min-w-0 flex-col gap-2">
+      {E.edit("Alias", values.alias, "text", undefined, { ...controls.alias, "aria-describedby": aliasHelpId })}
+      <FieldDescription id={aliasHelpId}>{CUSTOMER_ALIAS_HELP}</FieldDescription>
+    </div>
+    {E.pick("Type", values.type, CUSTOMER_TYPE_OPTIONS, controls.type)}
+    {E.pick("Country", values.country, COUNTRY_OPTIONS, { ...controls.country, required: true })}
+    {values.country === "US"
+      ? <UsStateField value={values.state} label="State (required)" controls={{ ...controls.state, required: true }} />
+      : E.edit("State", "Not applicable", "text", undefined, { id: controls.state.id, form: controls.state.form, disabled: true })}
+  </>;
+}
+
+export function CustomerLicenseField({ value, controls }: { value: string; controls: FieldControls }) {
+  return E.edit("License number", value, "text", undefined, controls);
+}
+
+export function CustomerPaymentTermsField({ value, controls }: { value: string; controls: FieldControls & { displayValue?: ReactNode } }) {
+  return E.pick("Payment terms", value, TERMS_OPTIONS, controls);
+}
+
 export type CustomerDetailSlot = {
   /** `action` edits the ship-to; `remove` deletes it (live: a non-default ship-to only, #1487). */
   shipTos?: { key: string; title: string; detail: string; action?: ReactNode; remove?: ReactNode }[];
@@ -91,17 +122,11 @@ export function CustomerView({
           <section aria-label="Account details" className="py-5">
             <h2 className="mb-3 font-heading text-xl font-semibold">Account details</h2>
             <div className="flex flex-col gap-4">
-              {E.edit("Customer name", values.name, "text", undefined, { ...controls("name"), required: true, onBlur: () => touched.touch(0), error: touched.shown(0) ? nameError : undefined })}
-              <div className="flex min-w-0 flex-col gap-2">
-                {E.edit("Alias", values.alias, "text", undefined, { ...controls("alias"), "aria-describedby": `${formId}-alias-help` })}
-                <FieldDescription id={`${formId}-alias-help`}>{CUSTOMER_ALIAS_HELP}</FieldDescription>
-              </div>
-              {E.pick("Type", values.type, CUSTOMER_TYPE_OPTIONS, controls("type"))}
-              {E.pick("Country", values.country, COUNTRY_OPTIONS, { ...controls("country"), required: true })}
-              {values.country === "US"
-                ? <UsStateField value={values.state} label="State (required)" controls={{ ...controls("state"), required: true }} />
-                : E.edit("State", "Not applicable", "text", undefined, { ...controls("state"), disabled: true })}
-              {E.edit("License number", values.licenseNumber, "text", undefined, controls("licenseNumber"))}
+              <CustomerAccountFields values={values} controls={{
+                name: { ...controls("name"), onBlur: () => touched.touch(0), error: touched.shown(0) ? nameError : undefined },
+                alias: controls("alias"), type: controls("type"), country: controls("country"), state: controls("state"),
+              }} />
+              <CustomerLicenseField value={values.licenseNumber} controls={controls("licenseNumber")} />
             </div>
           </section>
           <section aria-label="Ship-tos" className="py-5">
@@ -140,7 +165,7 @@ export function CustomerView({
             <h2 className="mb-3 font-heading text-xl font-semibold">Trading terms</h2>
             <div className="flex flex-col gap-4">
               <CustomerSaleChannelField value={values.saleChannelId} channels={model.channelOptions} controls={controls("saleChannelId")} />
-              {E.pick("Payment terms", values.paymentTerms, TERMS_OPTIONS, controls("paymentTerms"))}
+              <CustomerPaymentTermsField value={values.paymentTerms} controls={controls("paymentTerms")} />
               <CustomerTaxTreatmentField value={values.taxTreatment} controls={controls("taxTreatment")} />
             </div>
           </section>

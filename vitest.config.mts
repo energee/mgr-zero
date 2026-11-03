@@ -11,6 +11,7 @@ const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 // Every unlisted file stays in the guarded database project.
 const pureTests = [
   "tests/production-attention-experiment.test.ts",
+  "tests/dependency-tooling.test.ts",
   "tests/integration-token-failures.test.ts",
   "tests/integration-transport-failures.test.ts",
   "tests/order-email-job.test.ts",
@@ -72,6 +73,7 @@ const pureTests = [
   "tests/shell-view.test.ts",
   "tests/first-run.test.ts",
   "tests/route-error.test.ts",
+  "tests/screen-follow-ups.test.tsx",
   // Entry rendering and Auth-boundary tests use fixtures or explicit Auth mocks, not a database.
   "tests/entry-email-link.test.ts",
   "tests/invite-entry-view.test.ts",
