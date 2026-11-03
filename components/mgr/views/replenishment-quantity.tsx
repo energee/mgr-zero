@@ -4,6 +4,8 @@ import { useId } from "react";
 import type { ReactElement } from "react";
 import { E } from "@/components/mgr/e";
 import { FieldDescription } from "@/components/ui/field";
+import { Button } from "@/components/ui/button";
+import { CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { noSkus } from "@/components/mgr/views/new-transfer";
 import { useTouchedLines } from "@/lib/mgr/touched-lines";
 import { replenishmentQuantityError } from "@/lib/replenishment-form";
@@ -48,4 +50,12 @@ export function ReplenishmentQuantityView({ kind, skus, skuId, qty, onSku, onQua
     <FieldDescription id={`${id}-precision`}>Fractional quantities are allowed; stored to two decimal places.</FieldDescription>
     <FieldDescription id={`${id}-help`}>{spec.help}</FieldDescription>
   </fieldset>;
+}
+
+export function ReleaseAllocationView({ sku, qty, submitting = false, error }: { sku: string; qty: number; submitting?: boolean; error?: string | null }) {
+  return <>
+    <p>Release {qty} units of {sku} and make it available to other orders? This does not move stock or change the taproom par.</p>
+    <CommandFormMessage error={error} />
+    <CommandFormFooter><Button type="submit" variant="destructive" disabled={submitting}>{submitting ? "Releasing…" : "Release allocation"}</Button></CommandFormFooter>
+  </>;
 }

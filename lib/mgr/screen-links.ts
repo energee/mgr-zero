@@ -39,7 +39,6 @@ export const TAPS: [string | RegExp, string][] = [
   ["Reorder", "Shop"],
   ["Sign out", "Sign in"],
   ["Sign in", "Today"],
-  ["Send reset link", "Set new password"],
   ["Save password", "Today"],
   ["Change password", "Set new password"],
   ["Understood", BACK],
@@ -351,8 +350,9 @@ export const PORTAL: Record<string, string> = { Me: "Portal Me", "Sign out": "Po
 export const ROUTES: Record<string, string> = {
   "/": "Today",
   "/inventory": "Finished goods",
-  "/inventory#taproom": "Taproom",
-  "/inventory#taps": "Tap board",
+  "/taproom": "Weekly count",
+  "/taproom/board": "Tap board",
+  "/taproom/variance": "Variance by brand",
   "/cellar": "Cellar map",
   "/materials": "Materials on hand",
   "/kegs": "Keg fleet",
@@ -369,7 +369,7 @@ export const ROUTES: Record<string, string> = {
   "/routes": "Routes",
   "/invoices": "Invoices",
   "/catalog": "Catalog",
-  "/catalog#menu": "Menu",
+  "/menu": "Menu",
   "/customers": "Customers",
   "/pricing": "Price groups",
   "/recipes": "Recipes",
@@ -404,7 +404,7 @@ export const isInertOn = (screen: Screen, label: string, to?: string | null) => 
   const draftSku = screen.name === "Edit draft" && (/^Line \d+ SKU$/.test(l) || l === "Pils - case" || l === "Stout - case");
   // The Ingredient sheet's material picker opens its own search; elsewhere "Material" opens Edit material.
   const ingredientMaterial = screen.name === "Ingredient" && l === "Material";
-  const replenishmentAction = screen.name === "Pars and allocation" && (
+  const replenishmentAction = ["Pars and allocation", "Release standing allocation"].includes(screen.name) && (
     ["Set taproom par", "Set standing allocation", "Review", "All shortfalls"].includes(l)
     || /^(Order \d+ · |Standing allocation · )/.test(l)
   );

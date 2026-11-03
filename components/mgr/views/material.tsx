@@ -1,7 +1,6 @@
 // components/mgr/views/material.tsx — shared Material sheet body.
 import { E } from "@/components/mgr/e";
 import { NONE } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import type { MaterialViewModel } from "@/lib/mgr/material-view";
 import { sentenceCase } from "@/lib/mgr/labels";
 import type { ReactNode } from "react";
@@ -76,23 +75,13 @@ export function MaterialView({ model, controls = {}, messages, footer }: {
       {E.row(
         "Lot-tracked",
         "Receipts name a lot. Consumption picks one.",
-        <Switch
-          checked={controls.lotTracked ? model.lotTracked : undefined}
-          defaultChecked={controls.lotTracked ? undefined : model.lotTracked}
-          onCheckedChange={controls.lotTracked}
-          aria-label="Lot-tracked"
-        />,
+        E.sw(model.lotTracked, "Lot-tracked", controls.lotTracked),
         "ok",
       )}
       {E.row(
         "Active",
         "This material is available to recipes and purchase orders.",
-        <Switch
-          checked={controls.active ? model.active : undefined}
-          defaultChecked={controls.active ? undefined : model.active}
-          onCheckedChange={controls.active}
-          aria-label="Material active"
-        />,
+        E.sw(model.active, "Material active", controls.active),
         "ok",
       )}
       {messages}

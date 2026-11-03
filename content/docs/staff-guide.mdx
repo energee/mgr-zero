@@ -34,6 +34,11 @@ Signed in already? **Change password** in **Me** asks for **Current password**, 
 
 On **Change password**, use at least eight characters and a password different from your current one. **Show password** lets you check for a typo before saving; **Hide password** masks it again. **Back to MGR** leaves without saving and returns to the page you opened from Me. If you followed a recovery link or opened the address directly, it returns to Today. An unknown page offers **Back to Today**, so a mistyped address is not a dead end.
 
+If a page says **Something went wrong loading this page**, select **Try again** to reload it. If the problem continues, report the **Reference** shown below the message, when one is available.
+
+<Screen name="Page load error" />
+<Screen name="Entry page load error" />
+
 <Screen name="Staff page not found" />
 
 ## Accept an invitation and create a brewery [#getting-started]
@@ -851,6 +856,8 @@ The route list keeps **Resume**, **Return**, **Assign**, and **Add to route** be
 <Screen name="Driver route" />
 
 A departed route lists its stops with their delivered times. The lowest undelivered stop is **Next** and its **Deliver** opens [Confirm delivery](#orders). On Today, that stop appears with its route name, stop number, and **next stop** detail; **Resume** opens the same confirmation. Today shows the next stop, not the full route or a return status. Open the route from Deliveries to see all stops and Return. Confirming a customer stop stamps it and, for a shipment saved as invoice on delivery, raises the invoice for the accepted quantities. Confirming a transfer stop only stamps it: nothing is invoiced, and the stock moves when the transfer is received on its own page. After **Delivered** (or a refusal), the page returns to the route, where the next open stop is **Next**.
+
+Reopening a completed stop shows **Received by**, **Outcome**, and each line's accepted and refused amounts instead of delivery controls. A completed transfer stop says its stock remains in transit until received or cancelled. If no refused beer is still awaiting check-in, the check-in page says so; beer invoiced at ship instead offers **Return and credit** for Admin or Sales.
 
 The customer stop's **Ship to** shows the recorded destination label, both street lines, city, state or region, and postal code; destinations outside the US also show the country. Missing street or postal details are called out as **not recorded**, not guessed from the customer name or label. A missing postal code does not mean every country requires one. Confirm any missing directions with the route planner before travelling. The stop reads the linked ship-to's current details; it is not a saved historical address. Internal transfer stops keep their actual destination location instead of a customer address.
 

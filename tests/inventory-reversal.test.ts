@@ -114,7 +114,7 @@ it("posts a signed later-period correction without rewriting a filing", async ()
   const filed = await runCommand("file_compliance_report", past, ctx) as { id: string; figures: unknown };
   await reverse(ctx, row.id);
   expect((await admin.from("report_filings").select("figures").eq("id", filed.id).single()).data?.figures).toEqual(filed.figures);
-  const periodStart = new Date().toISOString().slice(0, 7) + "-01";
+  const periodStart = sql(`select to_char(now() at time zone timezone, 'YYYY-MM-01') from breweries where id='${ctx.breweryId}'`)[0];
   const report = await runCommand("generate_compliance_report", { jurisdiction: "TTB", periodStart, periodEnd: "2099-12-31" }, ctx) as { figures: { lines: { class: string; begin: number; in: number; out: number; end: number }[]; balances: boolean } };
   expect(report.figures.lines.find(l => l.class === "keg")).toMatchObject({ begin: 2, in: -2, out: 0, end: 0 });
   expect(report.figures.balances).toBe(true);

@@ -9,7 +9,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
-import { QUANTITY_KINDS, ReplenishmentQuantityView } from "@/components/mgr/views/replenishment-quantity";
+import { QUANTITY_KINDS, ReleaseAllocationView, ReplenishmentQuantityView } from "@/components/mgr/views/replenishment-quantity";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { replenishmentQuantityReason } from "@/lib/replenishment-form";
@@ -72,9 +72,7 @@ export function ReleaseAllocationForm({ allocationId, sku, qty }: { allocationId
   return <CommandForm open={form.open} onOpenChange={form.setOpen} title="Release standing allocation"
     trigger={<Button variant="destructive" size="sm" aria-label={`Release ${sku} allocation`}>Release</Button>}>
     <form onSubmit={form.submit} className="flex flex-col gap-4">
-      <p>Release {qty} units of {sku} and make it available to other orders? This does not move stock or change the taproom par.</p>
-      <CommandFormMessage error={form.error} />
-      <CommandFormFooter><Button type="submit" variant="destructive" disabled={form.submitting}>{form.submitting ? "Releasing…" : "Release allocation"}</Button></CommandFormFooter>
+      <ReleaseAllocationView sku={sku} qty={qty} submitting={form.submitting} error={form.error} />
     </form>
   </CommandForm>;
 }

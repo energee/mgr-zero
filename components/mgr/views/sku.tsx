@@ -8,7 +8,6 @@ import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { RegistryInput } from "@/components/mgr/views/registry-fields";
 import { FieldDescription } from "@/components/ui/field";
-import { Switch } from "@/components/ui/switch";
 import { batchShareError, pourOuncesError, type SkuViewModel } from "@/lib/mgr/sku-view";
 import { useTouchedLines } from "@/lib/mgr/touched-lines";
 import { upcError } from "@/lib/mgr/upc";
@@ -62,7 +61,7 @@ export function SkuView({
       {activeRow !== undefined
         ? activeRow
         : E.row("Active", "available to price and sell",
-          <Switch checked={controls.active ? model.active : undefined} defaultChecked={controls.active ? undefined : model.active} onCheckedChange={controls.active} aria-label="Active" />)}
+          E.sw(model.active, "Active", controls.active))}
       {fields}
       {E.edit("UPC (optional)", model.upc, "text", undefined, { id: "sku-upc", onChange: controls.upc, onBlur: () => touched.touch(UPC), error: touched.shown(UPC) ? upcError(model.upc) : undefined })}
       {model.showKegPool ? E.pick("Keg pool", model.kegPool ?? "", model.kegPoolOptions ?? [{ value: "", label: "None" }], { id: "sku-keg-pool", onChange: controls.kegPool, "aria-describedby": "sku-keg-pool-help", description: <FieldDescription id="sku-keg-pool-help">Wholesale orders charge this pool&apos;s deposit per keg. None charges no deposit.</FieldDescription> }) : null}

@@ -3,7 +3,6 @@ import { useId, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { QuickBooksMark } from "@/components/mgr/brand-icons";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { SubmitButton } from "@/components/mgr/submit-button";
 import { plural } from "@/lib/mgr/plural";
@@ -51,16 +50,14 @@ export function QboConnectionView({ configured = true, reconnect = false, busy =
   </div>;
 }
 
-/** The ACH and card push defaults. A switch saves when tapped (#1509): the
- *  caller runs set_qbo_push_defaults with both values and owns them, so the
- *  inventory, which passes no onChange, draws inert switches. */
+/** The caller owns both payment defaults; each switch saves the pair on tap. */
 export function QboDefaultsView({ allowAch, allowCard, busy = false, disabled = false, error, onChange }: { allowAch: boolean; allowCard: boolean; busy?: boolean; disabled?: boolean; error?: string | null; onChange?: (ach: boolean, card: boolean) => void }) {
   const reasonId = useId();
-  const locked = { disabled: busy || disabled, "aria-describedby": disabled ? reasonId : undefined };
+  const accessibility = { "aria-describedby": disabled ? reasonId : undefined };
   return <div className="flex flex-col gap-3">
     {E.info("Each new invoice is pushed with these payment options. Turning both off means new invoices cannot be paid online; invoices pushed earlier keep theirs.")}
-    {E.row("Bank transfer (ACH)", `${allowAch ? "on" : "off"} · lowest fee`, <Switch aria-label="Bank transfer payments" checked={allowAch} onCheckedChange={ach => onChange?.(ach, allowCard)} {...locked} />, allowAch ? "ok" : "")}
-    {E.row("Card", `${allowCard ? "on" : "off"} · percentage fee applies`, <Switch aria-label="Card payments" checked={allowCard} onCheckedChange={card => onChange?.(allowAch, card)} {...locked} />, allowCard ? "ok" : "")}
+    {E.row("Bank transfer (ACH)", `${allowAch ? "on" : "off"} · lowest fee`, E.sw(allowAch, "Bank transfer payments", ach => onChange?.(ach, allowCard), busy || disabled, accessibility), allowAch ? "ok" : "")}
+    {E.row("Card", `${allowCard ? "on" : "off"} · percentage fee applies`, E.sw(allowCard, "Card payments", card => onChange?.(allowAch, card), busy || disabled, accessibility), allowCard ? "ok" : "")}
     {disabled && <p id={reasonId} className="text-sm text-muted-foreground">Connect or reconnect QuickBooks before saving payment options.</p>}
     <CommandFormMessage error={error} />
   </div>;
@@ -84,7 +81,7 @@ function missingEmailsDetail(count?: number) {
 
 /** `disconnect` is the row's Disconnect control; the live page passes the
  *  confirming dialog, and the inventory draws the plain verb (#1509). */
-export function AccountingView({ model, connection, disconnect, defaults, messages, sync }: { model: AccountingViewModel; connection?: ReactNode; disconnect?: ReactNode; defaults?: ReactNode; messages?: ReactNode; sync?: ReactNode }) {
+export function AccountingView({ model, connection, disconnect, defaults, messages, sync, onDefaultsChange }: { model: AccountingViewModel; connection?: ReactNode; disconnect?: ReactNode; defaults?: ReactNode; messages?: ReactNode; sync?: ReactNode; onDefaultsChange?: (ach: boolean, card: boolean) => void }) {
   return <>
     {E.back("Settings", "Accounting", undefined, model.backHref)}
     {E.ttl("QuickBooks")}{messages}
@@ -95,7 +92,7 @@ export function AccountingView({ model, connection, disconnect, defaults, messag
     {model.connected && <>{model.companyId && E.fld("Company ID", model.companyId)}{E.nav("Mappings", "Customers, SKUs and returnable-keg deposits", "", undefined, model.mappingsHref)}</>}
     {(model.connected || model.reconnect) && (sync !== undefined ? sync : <QboSyncView status={model.syncStatus} disabled={!model.connected} />)}
     {E.ttl("Push defaults")}
-    {defaults !== undefined ? defaults : model.defaults ? <QboDefaultsView {...model.defaults} disabled={!model.connected} /> : E.gated("Bank transfer (ACH) and card", "Connect QuickBooks to read and save the company's payment options.")}
+    {defaults !== undefined ? defaults : model.defaults ? <QboDefaultsView {...model.defaults} disabled={!model.connected} onChange={onDefaultsChange} /> : E.gated("Bank transfer (ACH) and card", "Connect QuickBooks to read and save the company's payment options.")}
     {E.row("Customers missing a portal login email", missingEmailsDetail(model.missingEmails), model.missingEmails !== 0 && E.act("Review", "primary", model.customersHref), model.missingEmails ? "w" : "")}
     {model.remoteRevocationUnresolved && E.note("Local access is disconnected. QuickBooks could not confirm remote revocation; reconnect to continue.", "alert")}
     {E.info("QuickBooks remains the accounting record. Connecting does not push existing invoices, and MGR never displays credentials.")}

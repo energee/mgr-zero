@@ -12,6 +12,7 @@ vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
 import { area, SCREENS, type Screen } from "../components/mgr/screens";
 import { isInertOn, resolveTap } from "../lib/mgr/screen-links";
 import { ScreenFrame } from "../components/mgr/screen-frame";
+import { E } from "../components/mgr/e";
 
 // React escapes these characters in SSR; the live explorer reads decoded textContent.
 const text = (h: string) => h.replace(/<[^>]+>/g, "")
@@ -50,9 +51,9 @@ function taps(s: Screen, html: string): [string, string | null, string | null][]
     // Every switch in the inventory sits in a row's action slot, so a chunk
     // holding one is a toggle row: its title acts in place and is not a tap.
     if (!t || /role="switch"/.test(item) || /<select\b|<button\b[^>]*aria-labelledby=/.test(t[1])) continue;
-    // RecordTable's href=null names are plain text, not whole-record links.
-    const attributes = item.slice(0, item.indexOf(">"));
-    if (!/\bdata-row\b/.test(attributes) && !/<(?:a|button)\b/.test(t[1])) continue;
+    // E.row opens through data-tap; controls on a plain record stay independent.
+    const opensRow = /^[^>]*\bdata-row[=\s>]/.test(item) && /\bdata-tap[=\s>]/.test(item);
+    if (!opensRow && !/<(?:a|button)\b/.test(t[1])) continue;
     if (!inert(s, text(t[1]))) out.push([text(t[1]), null, null]);
   }
   return out;
@@ -76,7 +77,7 @@ it("resolves every tap in every MGR screen", () => {
   if (process.env.REPORT) {
     writeFileSync(process.env.REPORT, [`taps ${total} missed ${missed}`, ...[...byArea].flatMap(([a, lines]) => ["", `## ${a}`, ...lines])].join("\n"));
   }
-  expect(missed, "unresolved taps (run with REPORT=<file> for the list)").toBe(0);
+  expect([...byArea.values()].flat(), "Unresolved inventory taps").toEqual([]);
 });
 
 
@@ -111,4 +112,15 @@ it("does not treat a plain record name as navigation but still follows record li
   const linked = '<div data-slot="item"><div data-slot="item-title"><a href="/inventory/sku">Linked SKU</a></div></div>';
   expect(taps(screen, plain)).toEqual([]);
   expect(taps(screen, linked)).toEqual([["Linked SKU", "/inventory/sku", null], ["Linked SKU", null, null]]);
+});
+
+it("distinguishes read-only facts from rows that open a screen", () => {
+  const screen = SCREENS.find(s => s.name === "Finished goods")!;
+  const html = renderToStaticMarkup(createElement("div", null,
+    E.row("Recorded stock adjustment", "+1 keg"),
+    E.nav("SKU detail"),
+  ));
+  const independentAction = '<div data-slot="item"><div data-slot="item-title">Recorded stock fact</div><button data-tap data-to="Record movement">Adjust</button></div>';
+  expect(new Set(taps(screen, html + independentAction).map(([label, href, to]) => resolveTap(screen, label, href, to))))
+    .toEqual(new Set(["SKU detail", "Record movement"]));
 });
