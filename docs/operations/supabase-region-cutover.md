@@ -1,7 +1,8 @@
 # Supabase region cutover
 
 Production destination: `uogrvqmrbmolvtftotsf` (`us-east-1`), alongside Vercel `iad1`.
-The original `ugzhwxzictzvrzlacjmv` project is retained; do not delete it as cleanup.
+The original `ugzhwxzictzvrzlacjmv` project no longer exists (#1616).
+Whether to recreate a Preview project is an open owner decision.
 
 `CHAT_STATE_DATABASE_URL` uses a dedicated login belonging only to `mgr_chat_sdk`,
 through the session pooler (port 5432). Set `CHAT_STATE_DATABASE_CA` to the PEM
