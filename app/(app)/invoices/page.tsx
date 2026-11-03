@@ -1,10 +1,11 @@
+import { isUuid } from "@/lib/uuid";
 import { qboCompanyName, toQboSyncViewProps, type QboHealth, type QboSyncStatus } from "@/lib/mgr/accounting-view";
 import { historyPage, pageCursor, type HistoryPage, type HistoryRow } from "@/lib/mgr/history-page";
 import { InvoicesView } from "@/components/mgr/views/invoices";
 import { invoicesHref, invoiceStatusOptions, toInvoiceListRow, type InvoiceFilter, type InvoiceListRecord } from "@/lib/mgr/invoices-view";
 import { getActiveBrewery } from "@/lib/brewery";
 import { connectionStateLabel } from "@/lib/mgr/labels";
-import { buildContext, isUuid } from "@/lib/commands/context";
+import { buildContext } from "@/lib/commands/context";
 import { optionalPageQuery, runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { QboSyncButton } from "@/app/(app)/settings/accounting/qbo-controls";

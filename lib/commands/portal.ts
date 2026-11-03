@@ -5,7 +5,7 @@ import { historyInput, historyResult, newestFirst, type HistoryRow } from "./his
 import { z } from "zod";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
 import { integrationFailureCause } from "@/lib/integration-failure";
-import { defineCommand, defineQuery, unwrap, CommandError, Ctx } from "./registry";
+import { isoDate, defineCommand, defineQuery, unwrap, CommandError, Ctx } from "./registry";
 import type { QboOAuthClient } from "@/lib/qbo";
 import type { Database } from "@/lib/supabase/database";
 
@@ -20,7 +20,7 @@ const lines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().int()
 const quoteLines = lines;
 const quoteInput = z.object({
   shipToId: z.string().uuid(), poNumber: z.string().optional(), note: z.string().optional(),
-  requestedShipDate: z.string().date().nullable().optional(), lines: quoteLines,
+  requestedShipDate: isoDate.nullable().optional(), lines: quoteLines,
 });
 type PortalTaxClient = Pick<QboOAuthClient, "calculateSalesTax" | "refresh">;
 
@@ -99,7 +99,7 @@ defineCommand({
 defineCommand({
   name: "portal_create_order", description: "Portal: create a draft order for the caller's account",
   roles: "customer",
-  input: z.object({ shipToId: z.string().uuid(), poNumber: z.string().optional(), note: z.string().optional(), requestedShipDate: z.string().date().nullable().optional(), expectedIdentity, lines }),
+  input: z.object({ shipToId: z.string().uuid(), poNumber: z.string().optional(), note: z.string().optional(), requestedShipDate: isoDate.nullable().optional(), expectedIdentity, lines }),
   handler: (ctx, i, execution) => {
     const customerId = requireCustomer(ctx);
     assertExpectedIdentity(ctx, i.expectedIdentity);
@@ -119,7 +119,7 @@ defineCommand({
 defineCommand({
   name: "portal_update_draft_order", description: "Portal: replace a draft order's lines/fields",
   roles: "customer",
-  input: z.object({ orderId: z.string().uuid(), shipToId: z.string().uuid().optional(), poNumber: z.string().optional(), note: z.string().optional(), requestedShipDate: z.string().date().nullable().optional(), expectedIdentity, lines }),
+  input: z.object({ orderId: z.string().uuid(), shipToId: z.string().uuid().optional(), poNumber: z.string().optional(), note: z.string().optional(), requestedShipDate: isoDate.nullable().optional(), expectedIdentity, lines }),
   handler: (ctx, i, execution) => {
     assertExpectedIdentity(ctx, i.expectedIdentity);
     return unwrap(ctx.db.rpc("update_draft_order", {

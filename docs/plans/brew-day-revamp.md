@@ -126,7 +126,7 @@ Each task writes its named test first and watches it fail. Rendering is checked 
 7. **Brew day timeline view-model.** In `lib/mgr/brew-day-view.ts`: `brewTimeline(model)` returns the five stages with their actuals, their regrouped process fields and a confirmed flag per actual; `canRecordBrewDay` also requires every actual confirmed; `brewPlanActuals` prefers saved pulls over plan.
    - Test: `tests/brew-day-actuals-view.test.ts`.
    - Depends on 1; 6 for the pull shape.
-8. **Live Prep tab.** `app/(app)/batches/[id]/page.tsx` reads pulls; a new `prep-form.tsx` binds the shared Prep view to `save_batch_pulls`. Tabs via `E.tabs`. **Print pull list** uses the pick sheet's print pattern.
+8. **Live Prep tab.** `app/(app)/batches/[id]/page.tsx` reads pulls; a new `prep-form.tsx` binds the shared Prep view to `save_batch_pulls`. Tabs use the page's `?tab=` links. **Print pull list** uses the pick sheet's print pattern.
    - Test: view-model tests from 6; render checked by eye.
    - Depends on 2, 5, 6.
 9. **Live Brew day timeline.** `record-brew-day-form.tsx` mounts the timeline view; vessel and date move to Knockout; the Stage picker goes.

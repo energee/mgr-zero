@@ -1,3 +1,4 @@
+import { nameWithAlias } from "../lib/mgr/labels";
 // tests/catalog-view.test.ts — Catalog family adapters plus HTML.
 // Views own no sample data.
 import { readFileSync } from "node:fs";
@@ -25,7 +26,7 @@ import {
   skuListHazy,
 } from "../lib/mgr/fixtures/catalog";
 import { SKU_HAZY, SKU_PILS, SKU_STOUT } from "../lib/mgr/fixtures/demo";
-import { brandLabel, toBrandViewProps, UNPRICED } from "../lib/mgr/brand-view";
+import { toBrandViewProps, UNPRICED } from "../lib/mgr/brand-view";
 import { toCatalogScopes, toCatalogViewProps } from "../lib/mgr/catalog-view";
 import { toFormatViewProps } from "../lib/mgr/format-view";
 import { toFormatsViewProps } from "../lib/mgr/formats-view";
@@ -87,9 +88,9 @@ describe("Catalog view", () => {
 
   it("keeps a brand's staff-only alias apart from its name (brand-alias.md)", () => {
     // Pickers and the brand page title still join the two.
-    expect(brandLabel({ name: "Appaloosa", alias: "Animal #14" })).toBe("Appaloosa · Animal #14");
-    expect(brandLabel({ name: "Lupula", alias: null })).toBe("Lupula");
-    expect(brandLabel({ name: "Lupula" })).toBe("Lupula");
+    expect(nameWithAlias({ name: "Appaloosa", alias: "Animal #14" })).toBe("Appaloosa · Animal #14");
+    expect(nameWithAlias({ name: "Lupula", alias: null })).toBe("Lupula");
+    expect(nameWithAlias({ name: "Lupula" })).toBe("Lupula");
     const [first, second, third] = catalogBrands.brands;
     const model = toCatalogViewProps({ ...catalogBrands, brands: [{ ...first!, alias: "Animal #14" }, { ...second!, alias: null }, { ...third!, alias: "" }] });
     expect(model.brands.map(({ name, alias }) => [name, alias])).toEqual([

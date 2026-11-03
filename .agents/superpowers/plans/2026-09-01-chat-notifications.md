@@ -87,9 +87,8 @@ The slice-4 cellar and slice-10 delivery plans own those MGR pages/commands. Thi
 - `lib/chat/job-auth.ts` — constant-time internal-job bearer authentication.
 - `lib/chat/preview-web.tsx` — accessible web renderer for the shared fixtures.
 - `lib/commands/today.ts` — registered `get_today` query over one typed Postgres RPC.
-- `lib/commands/chat.ts` — RLS-bound integration queries/commands.
+- `lib/commands/chat.ts` — RLS-bound integration queries/commands, including authenticated admin OAuth start.
 - `app/api/webhooks/slack/route.ts` — Chat SDK Slack webhook route.
-- `app/api/chat/slack/install/route.ts` — authenticated admin OAuth start.
 - `app/api/chat/slack/oauth/route.ts` — OAuth callback and partial-failure reconciliation.
 - `app/api/chat/jobs/scan/route.ts` — authenticated scheduler wake.
 - `app/api/chat/jobs/deliver/route.ts` — authenticated bounded delivery worker.
@@ -645,7 +644,6 @@ git commit -m "feat: add production chat surface previews"
 - Create: `lib/chat/state.ts`
 - Create: `lib/chat/slack-adapter.ts`
 - Create: `lib/chat/oauth.ts`
-- Create: `app/api/chat/slack/install/route.ts`
 - Create: `app/api/chat/slack/oauth/route.ts`
 - Modify: `supabase/migrations/00001_baseline.sql`
 
@@ -697,7 +695,7 @@ Expected: PASS; raw state and tokens never appear in logs or database snapshots 
 - [x] **Step 6: Commit lifecycle**
 
 ```bash
-git add lib/chat/state.ts lib/chat/slack-adapter.ts lib/chat/oauth.ts app/api/chat/slack/install/route.ts app/api/chat/slack/oauth/route.ts supabase/migrations/00001_baseline.sql tests/chat-oauth.test.ts
+git add lib/chat/state.ts lib/chat/slack-adapter.ts lib/chat/oauth.ts app/api/chat/slack/oauth/route.ts supabase/migrations/00001_baseline.sql tests/chat-oauth.test.ts
 git commit -m "feat: add Slack installation lifecycle"
 ```
 

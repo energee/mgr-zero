@@ -21,8 +21,6 @@ export type UnitsSnapshot = {
 };
 
 const breweryOptions = GRAVITY_UNITS.map(gravityUnitLabel);
-/** The unit each option position stands for: the chips report a position. */
-export const BREWERY_UNITS: readonly GravityUnit[] = GRAVITY_UNITS;
 /** Position 0 is "Use brewery default", the null personal override. */
 export const MINE_UNITS: readonly (GravityUnit | null)[] = [null, ...GRAVITY_UNITS];
 
@@ -38,7 +36,7 @@ export function toUnitsViewProps({ brewery, mine, effective }: UnitsSnapshot): U
   const otherUnit: GravityUnit = effective === "sg" ? "plato" : "sg";
   return {
     breweryOptions,
-    breweryIndex: BREWERY_UNITS.indexOf(brewery),
+    breweryIndex: GRAVITY_UNITS.indexOf(brewery),
     mineOptions: [`Use brewery default · ${gravityUnitLabel(brewery)}`, ...breweryOptions],
     mineIndex: MINE_UNITS.indexOf(mine),
     preview: `A reading of ${reading(SAMPLE_PLATO[otherUnit], otherUnit)} shows as ${reading(SAMPLE_PLATO[otherUnit], effective)}.`,

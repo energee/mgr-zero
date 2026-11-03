@@ -4,7 +4,7 @@
 // command-request claim; a move inside one location is move_stock_bin
 // (inventory.ts), and create_stock_transfer refuses same-location pairs.
 import { z } from "zod";
-import { completeRows, defineCommand, defineQuery, PAGE_SIZE, unwrap } from "./registry";
+import { isoDate, completeRows, defineCommand, defineQuery, PAGE_SIZE, unwrap } from "./registry";
 import { stockLine } from "./stock-line";
 
 const roles = ["admin", "warehouse"] as const;
@@ -15,7 +15,7 @@ defineCommand({
   roles: [...roles],
   input: z.object({
     fromLocationId: z.string().uuid(), toLocationId: z.string().uuid(),
-    requestedDate: z.string().date().optional(), note: z.string().optional(), lines: z.array(stockLine).min(1),
+    requestedDate: isoDate.optional(), note: z.string().optional(), lines: z.array(stockLine).min(1),
   }),
   handler: async (ctx, i, execution) => {
     const r = await unwrap(ctx.db.rpc("create_stock_transfer", {

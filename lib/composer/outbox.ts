@@ -5,7 +5,6 @@ import type { CommandContextExpectation } from "@/lib/commands/registry";
 import { fermentationReadingInput, fermentationReadingOfflinePolicy } from "@/lib/composer/offline-policy";
 import { hasAnyRole } from "@/lib/mgr/roles";
 
-export { fermentationReadingInput, fermentationReadingOfflinePolicy } from "@/lib/composer/offline-policy";
 
 /** Shipped C4 array key, read once and migrated to collision-free row keys. */
 export const OUTBOX_STORAGE_KEY = "mgr-offline-outbox:v1";

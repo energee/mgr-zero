@@ -1,3 +1,4 @@
+import type * as RegistryModule from "@/lib/commands/registry";
 import { expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 const state = vi.hoisted(() => ({ roles: ["warehouse"], calls: [] as [string, unknown][], gates: [] as [string, string | undefined][], source: null as { id: string; name: string } | null, locations: null as { id: string; name: string; uses: string[] }[] | null, reservations: null as { id: string; source: string; ref: string; qty: number; orderId?: string; orderNo?: number }[] | null }));
@@ -16,7 +17,10 @@ vi.mock("@/components/mgr/query-provider", () => ({ useCommandQuery: (name: stri
     : name === "list_skus" ? [{ id: "active", name: "Keg", active: true }, { id: "inactive", active: false }] : name === "list_orders" ? { rows: [], nextCursor: null } : [], error: null, refetch() {} };
 } }));
 vi.mock("@/lib/commands/use-command-form", () => ({ useCommandForm: () => ({ open: false, setOpen() {}, busy: false, error: "", submit() {} }) }));
-vi.mock("@/lib/commands/registry", () => ({ runCommand: query }));
+vi.mock("@/lib/commands/registry", async original => ({
+  ...await original<typeof RegistryModule>(),
+  runCommand: query,
+}));
 vi.mock("@/lib/mgr/page-query", () => ({ runPageQuery: query, optionalPageQuery: query, requirePagePermission: (_ctx: unknown, name: string, resource?: string) => { state.gates.push([name, resource]); } }));
 async function query(name: string, input: unknown) {
   state.calls.push([name, input]);

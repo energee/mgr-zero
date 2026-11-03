@@ -11,7 +11,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { readAppUrl } from "@/lib/env/server-parser";
 import { sha256 } from "@/lib/hash";
-import { isUuid } from "@/lib/commands/context";
+import { isUuid } from "@/lib/uuid";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import { paced } from "@/lib/chat/pacing";
 import { assertPortableNotification, NOTIFICATION_REASON_LABEL, type NotificationReason, type PortableNotification, type Occurrence } from "./contracts";

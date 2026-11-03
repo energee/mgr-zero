@@ -4,9 +4,9 @@
 // So a list of record rows ran one record read per row before any click.
 // Owner decision (2026-10-29): row links to record pages do not prefetch.
 
-/** A record id (UUID) anywhere in an href. Not `isUuid` (lib/commands/context,
- *  server-only) or `isImportUuid` (lib/import-csv): both match a whole string,
- *  and neither module belongs in the client bundle of every screen. */
+/** A record id (UUID) anywhere in an href. Unlike `isUuid` (lib/uuid) and
+ * `isImportUuid` (lib/import-csv), this finds an embedded id rather than
+ * validating a whole string. */
 const RECORD_ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 /** The `prefetch` prop for a row link: `false` when the href names a record,
