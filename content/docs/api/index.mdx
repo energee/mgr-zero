@@ -279,9 +279,12 @@ in the connected company. Only admin and sales may send `true`. Any other role
 that sends `true` gets `403 permission_denied`, even where the operation admits
 that role without the filter. With no company connected, every row counts as unmapped.
 
-An empty list and a forbidden read look the same from outside, on purpose.
-Keep that in mind when you debug an empty result. A caller cannot probe another
-tenant's data by watching which ids return `404` rather than `403`.
+A read that row-level security filters out returns an empty list, or
+`404 not_found` for a single id, and looks the same as a record that does not
+exist. That is on purpose. A role the operation does not admit is different: it gets
+`403 permission_denied`, never an empty list. Keep that in mind when you debug
+an empty result. A caller cannot probe another tenant's data by watching which
+ids return `404` rather than `403`.
 
 A portal user sees only their own customer's records. That is why the portal
 operations are a separate set, not the staff ones with a filter applied.
