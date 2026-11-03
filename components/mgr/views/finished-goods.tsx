@@ -4,13 +4,13 @@
 // record a movement, each active SKU's row ends with Record movement, the same
 // deep link as SKU detail's header button (#1507). The header holds
 // the page actions: live slots MovementForm as createAction beside Add SKU in
-// Catalog (#1113) and Record taproom count (#1518), and the movements ledger
-// as footer.
+// Catalog (#1113) and Record taproom count (#1518). The shared view also draws
+// the movement ledger and the page's supplied history links.
 import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { RECORD_LINK, RecordTable } from "@/components/mgr/views/record-table";
-import type { FinishedGoodsRowView, FinishedGoodsViewModel } from "@/lib/mgr/finished-goods-view";
+import type { FinishedGoodsMovements, FinishedGoodsRowView, FinishedGoodsViewModel } from "@/lib/mgr/finished-goods-view";
 
 /** The Available figure. Negative stock is red and also says Shortfall in
  *  words, so color is never the only signal; that word links to replenishment. */
@@ -29,7 +29,7 @@ export function FinishedGoodsView({
   createAction,
   addSkuHref,
   countHref,
-  footer,
+  movements,
   linkRows,
 }: {
   model: FinishedGoodsViewModel;
@@ -44,8 +44,8 @@ export function FinishedGoodsView({
    *  taproom stock only); null hides it when denied. The inventory leaves it
    *  out and the button stays inert. */
   countHref?: string | null;
-  /** Live: movements ledger. Inventory omits this. */
-  footer?: ReactNode;
+  /** Already-authorized history rows and pagination destinations, never a second drawing. */
+  movements: FinishedGoodsMovements;
   /** Live: the name and Shortfall go to their pages. Inventory leaves the name
    *  an inert tap and Shortfall "#". Each names its screen in data-to, because
    *  tests/mgr-screens.test.ts requires it of every link whose text is not a
@@ -79,7 +79,11 @@ export function FinishedGoodsView({
           to: "SKU detail",
         }))}
       />}
-      {footer}
+      {E.ttl("Movements")}
+      {movements.rows.length === 0 ? E.blank("No movements recorded yet") : movements.rows.map(row => (
+        <div key={row.key}>{E.row(row.title, row.detail, <span>{row.trailing}</span>, row.outbound ? "w" : "ok")}</div>
+      ))}
+      {movements.links?.length ? <div className="flex gap-2">{movements.links.map(link => <Fragment key={link.href}>{E.btn(link.label, "g", link.href)}</Fragment>)}</div> : null}
     </>
   );
 }

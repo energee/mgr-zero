@@ -1,4 +1,4 @@
-import { E } from "@/components/mgr/e";
+import { RefusedReturnStatusView } from "@/components/mgr/views/refused-return";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery } from "@/lib/mgr/page-query";
@@ -32,10 +32,10 @@ export default async function ReturnPage({ params }: { params: Promise<{ id: str
     runPageQuery("list_locations", {}, ctx) as Promise<{ id: string; name: string }[]>,
     runPageQuery("list_bins", {}, ctx) as Promise<{ id: string; name: string; location_id: string }[]>,
   ]);
-  if (!lines.length) return E.status("No refused beer awaiting check-in", "ok");
+  if (!lines.length) return <RefusedReturnStatusView />;
   // Refused beer usually returns to where it shipped from; preselect that location when every source agrees.
   const shippedFrom = [...new Set(sources.map((s) => s.location_id))];
-  if (lines[0].invoice_timing === "now") return <>{E.hd("Refused beer to check in")}{E.note("This shipment was invoiced at ship. Admin or Sales records Return and credit when the beer physically returns.")}{stop.invoice && E.btn("Return and credit", "p", `/invoices/${stop.invoice.id}/return?refusedDeliveryId=${id}`)}</>;
+  if (lines[0].invoice_timing === "now") return <RefusedReturnStatusView invoiceNow returnHref={stop.invoice ? `/invoices/${stop.invoice.id}/return?refusedDeliveryId=${id}` : null} />;
   return <RefusedReturnForm deliveryId={id} model={{ title: `Check in · ${lines[0].customer_name}`, backHref: `/work/deliveries/${id}`, locationId: shippedFrom.length === 1 ? shippedFrom[0] : "",
     locations: locations.map((l) => ({ value: l.id, label: l.name })), bins: bins.map((b) => ({ value: b.id, label: b.name, locationId: b.location_id })),
     lines: lines.map((l) => ({ id: l.order_line_id, name: l.sku_name, outstanding: Number(l.outstanding_qty), sources: sources.filter((s) => s.sku_id === l.sku_id).map((s) => ({ id: s.id, label: `${s.lots?.code ?? "No lot"} · ${s.bins?.name ?? "Bin"}`, shipped: -Number(s.qty) })) })),

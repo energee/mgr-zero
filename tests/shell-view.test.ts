@@ -12,7 +12,6 @@ import { MeSheet } from "../components/mgr/me-sheet";
 import { EntrySurface } from "../components/mgr/entry-surface";
 import { BeerView } from "../components/mgr/views/beer";
 import { DeniedView } from "../components/mgr/views/denied";
-import { EntryView } from "../components/mgr/views/entry";
 import { FirstRunView } from "../components/mgr/views/first-run";
 import { MeView } from "../components/mgr/views/me";
 import { MoreView } from "../components/mgr/views/more";
@@ -24,17 +23,6 @@ import { TodayView } from "../components/mgr/views/today";
 import { WorkView } from "../components/mgr/views/work";
 import { beerOverview } from "../lib/mgr/fixtures/beer";
 import { deniedInvoices } from "../lib/mgr/fixtures/denied";
-import {
-  expiredReset,
-  noMembership,
-  portalForgotPassword,
-  portalSetPassword,
-  portalSignIn,
-  portalStaffOnly,
-  resetPassword,
-  setPassword,
-  signIn,
-} from "../lib/mgr/fixtures/entry";
 import { firstRunDemo } from "../lib/mgr/fixtures/first-run";
 import { meMaria } from "../lib/mgr/fixtures/me";
 import { moreNavs } from "../lib/mgr/fixtures/more";
@@ -507,22 +495,6 @@ describe("First-run view", () => {
 });
 
 describe("Entry views", () => {
-  it.each([
-    ["Sign in", signIn],
-    ["Reset password", resetPassword],
-    ["Set new password", setPassword],
-    ["Portal sign in", portalSignIn],
-    ["Portal forgot password", portalForgotPassword],
-    ["Portal set password", portalSetPassword],
-    ["No membership", noMembership],
-    ["Portal staff only", portalStaffOnly],
-    ["Expired reset", expiredReset],
-  ] as const)("the %s inventory record is EntryView", (name, fixture) => {
-    const body = screen(name).body as { type: unknown; props: { model: unknown } };
-    expect(body.type).toBe(EntryView);
-    expect(body.props.model).toEqual(fixture);
-  });
-
   it("the Session expired inventory record is SessionExpiredView", () => {
     const body = screen("Session expired").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(SessionExpiredView);

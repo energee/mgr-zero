@@ -4,8 +4,7 @@
 // unattempted stop for later through delivered-form.tsx's command adapter,
 // which returns to the route. Received by starts from the ship-to's earlier
 // signers. Today's delivery_next row and the route's Deliver land here.
-import { E } from "@/components/mgr/e";
-import { ConfirmDeliveryView } from "@/components/mgr/views/confirm-delivery";
+import { ConfirmDeliveryView, type DeliveryReadout } from "@/components/mgr/views/confirm-delivery";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
@@ -52,6 +51,18 @@ export default async function DeliveryStopPage({ params }: { params: Promise<{ i
   const heading = transfer
     ? `${docNo("TRF", transfer.transfer_no, "Transfer")} · ${transfer.to_location?.name ?? "destination"}`
     : (order?.customers?.name ?? "Customer");
+  let readout: DeliveryReadout | undefined;
+  if (delivery.delivered_at) {
+    readout = {
+      kind: "delivered", receivedBy: delivery.signed_by ?? "", outcome: sentenceCase(delivery.outcome ?? "delivered"),
+      transfer: Boolean(transfer), invoice: docNo("INV", invoice?.invoice_no ?? null, "Delivered"),
+      refused: Boolean(delivery.outcome && delivery.outcome !== "delivered"), checkInHref: `/work/deliveries/${delivery.id}/return`,
+    };
+  } else if (!delivery.routes?.departed_at) {
+    readout = { kind: "not_departed" };
+  } else if (!ctx.roles.includes("admin") && delivery.routes.driver_user_id !== ctx.userId) {
+    readout = { kind: "not_assigned" };
+  }
   return (
     <ConfirmDeliveryView
       model={{
@@ -66,32 +77,8 @@ export default async function DeliveryStopPage({ params }: { params: Promise<{ i
           return { key: l.id, title: l.name, qty: delivery.delivered_at ? `${l.qty - refused} accepted · ${refused} refused` : String(l.qty) };
         }),
       }}
-      action={deliveryAction(delivery, ctx, invoice, transfer, lines, signers)}
+      readout={readout}
+      action={!readout && delivery.routes && <DeliveredForm routeId={delivery.routes.id} deliveryId={delivery.id} transfer={Boolean(transfer)} signers={signers} lines={lines.map((l) => ({ key: l.id, title: l.name, qty: String(l.qty) }))} />}
     />
   );
-}
-
-function deliveryAction(
-  delivery: Stop["delivery"],
-  ctx: { roles: readonly string[]; userId: string },
-  invoice: Stop["invoice"],
-  transfer: Stop["delivery"]["stock_transfers"],
-  lines: Stop["lines"],
-  signers: Stop["signers"],
-) {
-  if (delivery.delivered_at) {
-    return (
-      <>
-        {E.fld("Received by", delivery.signed_by ?? "")}
-        {E.fld("Outcome", sentenceCase(delivery.outcome ?? "delivered"))}
-        {delivery.outcome && delivery.outcome !== "delivered" && !transfer && E.btn("Check in refused beer", "p", `/work/deliveries/${delivery.id}/return`)}
-        {E.status(transfer ? "Transfer remains in transit until received or cancelled" : docNo("INV", invoice?.invoice_no ?? null, "Delivered"), "ok")}
-      </>
-    );
-  }
-  if (!delivery.routes?.departed_at) return E.status("The route has not departed", "w");
-  if (!ctx.roles.includes("admin") && delivery.routes.driver_user_id !== ctx.userId) {
-    return E.status("Only the route's assigned driver or an admin may confirm this stop", "w");
-  }
-  return <DeliveredForm routeId={delivery.routes.id} deliveryId={delivery.id} transfer={Boolean(transfer)} signers={signers} lines={lines.map((l) => ({ key: l.id, title: l.name, qty: String(l.qty) }))} />;
 }

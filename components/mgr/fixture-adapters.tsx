@@ -4,7 +4,7 @@
 // Nothing under app/ imports this; live forms own the same state and call commands.
 "use client";
 
-import { cloneElement, useState, type ComponentProps, type ReactElement } from "react";
+import { cloneElement, useState, type ComponentProps, type ReactElement, type ReactNode } from "react";
 import type { FormatView } from "@/components/mgr/views/format";
 import { CatalogCategoriesControl } from "@/components/mgr/views/catalog-categories";
 import { deleteCategory, saveCategory } from "@/lib/mgr/catalog-categories-view";
@@ -14,7 +14,86 @@ import type { StaffRole } from "@/lib/commands/registry";
 import { receiptPoBillPending, receiptPoBillPosted } from "@/lib/mgr/fixtures/purchasing";
 import { hasAnyRole } from "@/lib/mgr/roles";
 import type { WeeklyCountView } from "@/components/mgr/views/weekly-count";
+import type { EntryView } from "@/components/mgr/views/entry";
+import type { RouteErrorView } from "@/components/mgr/views/route-error";
+import type { AccountingView } from "@/components/mgr/views/accounting";
+import { DeliveryOutcomeForm, type ConfirmDeliveryView, type DeliveryReadout } from "@/components/mgr/views/confirm-delivery";
+import { DriverRouteView } from "@/components/mgr/views/driver-route";
+import { RefusedReturnStatusView, type RefusedReturnFormView } from "@/components/mgr/views/refused-return";
+import { driverRouteA } from "@/lib/mgr/fixtures/delivery";
 import type { TransferDetailView } from "@/components/mgr/views/transfer-detail";
+
+/** Reset submission stays on this card, just as the live Auth response does. */
+export function ResetPasswordFixture({ children }: { children: ReactElement<ComponentProps<typeof EntryView>> }) {
+  const [sent, setSent] = useState(false);
+  return cloneElement(children, {
+    model: { ...children.props.model, info: sent ? "If that email is on an account, a reset link is on its way." : undefined },
+    action: () => setSent(true),
+  });
+}
+
+/** Retrying replaces the failed subtree with the same shared destination view. */
+export function RouteErrorFixture({ children, recovered }: {
+  children: ReactElement<ComponentProps<typeof RouteErrorView>>; recovered: ReactNode;
+}) {
+  const [retried, setRetried] = useState(false);
+  return retried ? recovered : cloneElement(children, { onRetry: () => setRetried(true) });
+}
+
+/** Payment preferences change only this connected inventory company's state. */
+export function AccountingFixture({ children }: { children: ReactElement<ComponentProps<typeof AccountingView>> }) {
+  const [model, setModel] = useState(children.props.model);
+  return cloneElement(children, {
+    model,
+    onDefaultsChange: (allowAch, allowCard) => setModel(previous => ({ ...previous, defaults: { allowAch, allowCard } })),
+  });
+}
+
+/** Records the entered outcome locally, or removes an unattempted stop from its route. */
+export function ConfirmDeliveryFixture({ children }: { children: ReactElement<ComponentProps<typeof ConfirmDeliveryView>> }) {
+  const [model, setModel] = useState(children.props.model);
+  const [readout, setReadout] = useState<DeliveryReadout>();
+  const [left, setLeft] = useState(false);
+  return left ? <DriverRouteView model={{
+    ...driverRouteA,
+    stops: driverRouteA.stops.slice(1).map((stop, index) => index === 0 ? { ...stop, detail: "Next", verb: "Deliver", warning: true } : stop),
+  }} /> : cloneElement(children, {
+    model,
+    readout,
+    action: <DeliveryOutcomeForm lines={model.lines} initialSignedBy={model.receivedBy} receivedSuggestions={model.receivedSuggestions}
+      onLeave={() => setLeft(true)}
+      onSubmit={input => {
+        const refused = new Map(input.refused.map(line => [line.orderLineId, line.qty]));
+        const fullRefusal = model.lines.every(line => refused.get(line.key) === Number(line.qty));
+        setModel(previous => ({ ...previous, lines: previous.lines.map(line => {
+          const refusedQty = refused.get(line.key) ?? 0;
+          return { ...line, qty: `${Number(line.qty) - refusedQty} accepted · ${refusedQty} refused` };
+        }) }));
+        setReadout({
+          kind: "delivered", receivedBy: input.signedBy, transfer: false,
+          outcome: fullRefusal ? "Refused" : refused.size ? "Partial" : "Delivered",
+          invoice: fullRefusal ? "No invoice · full refusal" : "INV-0241",
+          refused: refused.size > 0, checkInHref: "/docs/screens-explore#q=Check+in+refused+beer",
+        });
+      }} />,
+  });
+}
+
+/** Each physical check-in subtracts only its entered quantities from outstanding refusals. */
+export function RefusedReturnFixture({ children }: { children: ReactElement<ComponentProps<typeof RefusedReturnFormView>> }) {
+  const [model, setModel] = useState(children.props.model);
+  return model.lines.length ? cloneElement(children, {
+    model,
+    key: model.lines.map(line => `${line.id}:${line.outstanding}`).join(","),
+    onSubmit: input => setModel(previous => ({
+      ...previous,
+      lines: previous.lines.map(line => {
+        const received = input.lines.find(entry => entry.orderLineId === line.id)?.sources.reduce((total, source) => total + source.qty, 0) ?? 0;
+        return { ...line, outstanding: line.outstanding - received };
+      }).filter(line => line.outstanding > 0),
+    })),
+  }) : <RefusedReturnStatusView />;
+}
 
 /** Receive and cancellation stay local while using the same transfer drawing. */
 export function TransferDetailFixture({ children }: { children: ReactElement<ComponentProps<typeof TransferDetailView>> }) {

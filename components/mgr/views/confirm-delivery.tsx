@@ -15,12 +15,31 @@ const REFUSAL_LABEL: Record<(typeof REFUSAL_REASONS)[number], string> = {
   customer_refused: "Customer refused", damaged: "Damaged in transit", wrong_item: "Wrong item", other: "Other",
 };
 
+export type DeliveryReadout =
+  | { kind: "not_departed" | "not_assigned" }
+  | { kind: "delivered"; receivedBy: string; outcome: string; transfer: boolean; invoice: string; refused: boolean; checkInHref?: string };
+
+export function DeliveryReadoutView({ state }: { state: DeliveryReadout }) {
+  return <>
+    {state.kind === "not_departed" && E.status("The route has not departed", "w")}
+    {state.kind === "not_assigned" && E.status("Only the route's assigned driver or an admin may confirm this stop", "w")}
+    {state.kind === "delivered" && <>
+      {E.fld("Received by", state.receivedBy)}
+      {E.fld("Outcome", state.outcome)}
+      {state.refused && !state.transfer && E.btn("Check in refused beer", "p", state.checkInHref)}
+      {E.status(state.transfer ? "Transfer remains in transit until received or cancelled" : state.invoice, "ok")}
+    </>}
+  </>;
+}
+
 export function ConfirmDeliveryView({
   model,
   action,
+  readout,
 }: {
   model: ConfirmDeliveryViewModel;
   action?: ReactNode;
+  readout?: DeliveryReadout;
 }) {
   const missingAddress: string[] = [];
   if (model.shipTo === null) missingAddress.push("Ship-to address not recorded");
@@ -38,7 +57,7 @@ export function ConfirmDeliveryView({
       {model.lines.map((row) => (
         <Fragment key={row.key}>{E.row(row.title, "", row.qty)}</Fragment>
       ))}
-      {action ?? <DeliveryOutcomeForm lines={model.lines} initialSignedBy={model.receivedBy} receivedSuggestions={model.receivedSuggestions} />}
+      {readout ? <DeliveryReadoutView state={readout} /> : action ?? <DeliveryOutcomeForm lines={model.lines} initialSignedBy={model.receivedBy} receivedSuggestions={model.receivedSuggestions} />}
     </>
   );
 }
@@ -76,11 +95,10 @@ export function DeliveryOutcomeForm({ lines, transfer = false, initialSignedBy =
     {E.edit("Received by", signedBy, "text", receivedSuggestions, { onChange: setSignedBy, required: !fullRefusal })}
     {error && E.status(error, "w")}
     <CommandFormFooter>
-      {/* Inventory keeps the same action inert; the live adapter supplies the command. */}
-      {E.btn("Not delivered · leave for a later route", "g", undefined, onLeave ?? (() => {}))}
+      {E.btn("Not delivered · leave for a later route", "g", undefined, onLeave, { "data-preview-action": onLeave ? true : undefined })}
       {E.submit(fullRefusal ? "Record refusal" : hasRefusal ? "Record partial delivery" : "Delivered", {
         id: "confirm-delivery", type: "button", reason: outcome.reason, submitting: busy, onClick: submit,
-        className: IRREVERSIBLE,
+        className: IRREVERSIBLE, "data-preview-action": onSubmit ? true : undefined,
       })}
     </CommandFormFooter>
     </fieldset>
