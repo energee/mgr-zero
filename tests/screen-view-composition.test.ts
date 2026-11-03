@@ -250,10 +250,13 @@ describe("screen/live component parity", () => {
     expect(mountedComponents("tests/fixtures/screen-parity/lazy-unused.tsx")).not.toContain("ExampleView");
   });
 
-  it("detects a transfer footer replacement even beside the shared document", () => {
+  it("rejects a retired transfer footer replacement and accepts shared delegation", () => {
     const overrides = new Set<string>();
     expect(mountedComponents("tests/fixtures/screen-parity/transfer-footer.tsx", overrides)).toContain("TransferDetailView");
     expect([...overrides]).toEqual(["TransferDetailView.footer"]);
+    const delegatedOverrides = new Set<string>();
+    expect(mountedComponents("tests/fixtures/screen-parity/transfer-footer.tsx", delegatedOverrides, "TransferDelegation")).toContain("TransferDetailView");
+    expect([...delegatedOverrides]).toEqual([]);
     const liveOverrides = new Set<string>();
     mountedComponents("app/(app)/transfers/[id]/page.tsx", liveOverrides);
     expect([...liveOverrides]).not.toContain("TransferDetailView.footer");
