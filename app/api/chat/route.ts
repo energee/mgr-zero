@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     const result = streamText({
       model: gateway(ai.model),
       maxOutputTokens: 2000,
-      // Recovery is explicit in the drawer; do not silently repeat a credit/access denial wrapped in a 500.
+      // Recovery is explicit in the Ask MGR panel; do not silently repeat a credit/access denial wrapped in a 500.
       maxRetries: 0,
       abortSignal: req.signal,
       system: SYSTEM,
