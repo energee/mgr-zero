@@ -244,5 +244,6 @@
   "20261030032503_packaging_output_draw_rounding_guard.sql": "377fe4dcf35f8efeb79a998dc5ddf5cfd0b4619e7d9758a12fac6f89e7a6115b",
   "20261030033000_brewery_local_document_dates.sql": "196f6d13961699ee0c57a8b30acbf63c1f79be7c5361577e984ea4f7437312e2",
   "20261030033001_receipt_lots_keep_saved_date.sql": "1ec8c82cc5805a0e9ece765aaa142a6715bd1de492e3cfa06925fefe95ca74c4",
-  "20261031172734_production_history_query_indexes.sql": "a06eae357678daad1c22608794b359d84d1deb1f07909812d6c41354e792b455"
+  "20261031172734_production_history_query_indexes.sql": "a06eae357678daad1c22608794b359d84d1deb1f07909812d6c41354e792b455",
+  "20261103062554_atp_warnings_order_skus.sql": "15840abfc451eb6464930f0517b9d46c3bd6c88483773da27173fd9d35a55483"
 }

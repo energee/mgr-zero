@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { admin, asUser, insertFixture, makeBrewery, makeStaff, seedCatalog, seedLocation, sql } from "./helpers";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { admin, asUser, closePgSessions, insertFixture, makeBrewery, makeStaff, pgSession, priceSku, seedCatalog, seedCustomer, seedLocation, sql } from "./helpers";
 
 type PlanNode = {
   "Relation Name"?: string;
@@ -18,11 +18,18 @@ function ledgerScans(plan: PlanNode): PlanNode[] {
   ];
 }
 
+function ledgerRowsVisited(plan: PlanNode): number {
+  const scans = ledgerScans(plan);
+  expect(scans.length, "the ledger must be visible to the planner, not hidden in a definer function").toBeGreaterThan(0);
+  return scans.reduce((total, scan) => total +
+    (scan["Actual Rows"] + (scan["Rows Removed by Filter"] ?? 0)) * scan["Actual Loops"], 0);
+}
+
 describe("filtered stock reads on a 50,000-movement ledger", () => {
   let brewery: { id: string };
   let staff: { id: string; email: string };
   let db: SupabaseClient<Database>;
-  let target: { skuId: string; formatId: string };
+  let target: { skuId: string; formatId: string; brandId: string };
   let reserved: { skuId: string };
   let closed: { skuId: string };
   let zero: { skuId: string };
@@ -104,12 +111,53 @@ describe("filtered stock reads on a 50,000-movement ledger", () => {
           explain (analyze, buffers, format json)
           select * from public.${view} where brewery_id = '${brewery.id}' and ${skuFilter};
           rollback`, true).join("\n")) as { Plan: PlanNode }[];
-        const scans = ledgerScans(result.Plan);
-        expect(scans.length, "the ledger must be visible to the planner, not hidden in a definer function").toBeGreaterThan(0);
-        const visited = scans.reduce((total, scan) => total +
-          (scan["Actual Rows"] + (scan["Rows Removed by Filter"] ?? 0)) * scan["Actual Loops"], 0);
-        expect(visited, "unrelated SKU movements must not be scanned before aggregation").toBeLessThan(100);
+        expect(ledgerRowsVisited(result.Plan), "unrelated SKU movements must not be scanned before aggregation").toBeLessThan(100);
       });
     }
   }
+
+  // #1643: confirm and adjust read their oversell warnings from atp inside a
+  // function body, so a plain EXPLAIN cannot see them. auto_explain (preloaded
+  // in the Supabase image) reports each nested statement's plan as a notice.
+  describe("order warning reads", () => {
+    afterEach(closePgSessions);
+
+    it("confirm and adjust scan only the order's SKU movements", async () => {
+      const orderStaff = await makeStaff(brewery.id);
+      const customer = await seedCustomer(brewery.id);
+      await priceSku(brewery.id, { saleChannelId: customer.saleChannelId, brandId: target.brandId,
+        formatId: target.formatId, cents: 1000 });
+
+      const client = await pgSession();
+      const plans: PlanNode[] = [];
+      client.on("notice", (notice) => {
+        // A notice reads "duration: … ms  plan:" followed by the JSON plan.
+        const start = notice.message?.indexOf("{") ?? -1;
+        if (start < 0) return;
+        const { "Query Text": text, Plan } = JSON.parse(notice.message!.slice(start)) as { "Query Text": string; Plan: PlanNode };
+        if (/from public\.atp a\b/.test(text)) plans.push(Plan);
+      });
+      await client.query(`set auto_explain.log_min_duration = 0; set auto_explain.log_analyze = on;
+        set auto_explain.log_nested_statements = on; set auto_explain.log_format = json;
+        set auto_explain.log_level = notice`);
+      await client.query("begin");
+      await client.query("select set_config('request.jwt.claim.sub', $1, true)", [orderStaff.id]);
+      await client.query("set local role authenticated");
+      const created = await client.query<{ r: { order_id: string } }>(
+        "select public.create_order($1, 'wholesale', $2, $3, $4, null, '2026-11-05', null, null, $5, $6) r",
+        [brewery.id, customer.customerId, customer.shipToId, warehouse.id,
+          JSON.stringify([{ sku_id: target.skuId, qty: 20 }]), crypto.randomUUID()]);
+      const orderId = created.rows[0].r.order_id;
+      await client.query("select public.submit_order($1, $2)", [orderId, crypto.randomUUID()]);
+      await client.query("select public.confirm_order($1, $2)", [orderId, crypto.randomUUID()]);
+      await client.query("select public.adjust_order_lines($1, $2, 'short week', $3)",
+        [orderId, JSON.stringify([{ sku_id: target.skuId, qty: 30 }]), crypto.randomUUID()]);
+      await client.query("rollback");
+
+      expect(plans, "one warning read each from confirm and adjust").toHaveLength(2);
+      for (const plan of plans) {
+        expect(ledgerRowsVisited(plan), "the warning read must not aggregate the brewery's whole ledger").toBeLessThan(100);
+      }
+    });
+  });
 });
