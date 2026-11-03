@@ -1,5 +1,6 @@
 // lib/mgr/portal-orders-view.ts — view-model for portal Order history.
 // portal_orders rows plus buyerStatus; drafts continue and shipped rows reorder.
+import { plural } from "@/lib/mgr/plural";
 import type { EmptyState } from "./empty-state";
 import { docNo } from "./doc-no";
 import { money } from "./money";
@@ -50,7 +51,7 @@ function shortCopy(lines: PortalOrdersLineSnapshot[]): string | undefined {
   if (shorts.length === 0) return undefined;
   const n = shorts.reduce((sum, l) => sum + (Number(l.qty_ordered) - Number(l.qty_shipped)), 0);
   const cases = shorts.every((l) => /case/i.test(l.skus?.name ?? ""));
-  return cases ? `adjusted · ${n} ${n === 1 ? "case" : "cases"} short` : `adjusted · ${n} short`;
+  return cases ? `adjusted · ${plural(n, "case")} short` : `adjusted · ${n} short`;
 }
 
 /** Map a portal_orders payload onto PortalOrdersView. */

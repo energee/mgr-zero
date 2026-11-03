@@ -25,10 +25,6 @@ export const PERSONAS: Persona[] = [
 
 export const personaFor = (id: StaffRole) => PERSONAS.find((p) => p.id === id) ?? PERSONAS[0];
 
-/** The customer the portal frames are signed in as: the buyer at the account
- * the staff screens ship to. One person, no roles — the portal has none. */
-export { PORTAL_BUYER } from "@/components/mgr/screens";
-
 /** The role's landing: its own Today where one is drawn (Sales, Brewer). */
 export const homeFor = (role: StaffRole) => ({ sales: "Sales", brewer: "Brewer" } as Partial<Record<StaffRole, string>>)[role] ?? "Today";
 

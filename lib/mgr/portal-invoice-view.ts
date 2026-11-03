@@ -1,3 +1,4 @@
+import { sentenceCase } from "./labels";
 // lib/mgr/portal-invoice-view.ts — view-model for one portal invoice. Domain
 // comes from portal_invoice (number, total, due/status, lines, brewery phone).
 // Pay vs unavailable vs paid is a presentation prop on the view, not a mode.
@@ -77,7 +78,7 @@ export function toPortalInvoiceViewProps({ invoice, lines, brewery, backHref }: 
   const status = invoice.qbo_accountant_drift && state === "unpaid"
     ? "Review"
     : settled ? "Settled"
-    : state === "written_off" ? "Written off" : `${state[0].toUpperCase()}${state.slice(1)}` as PortalInvoiceViewModel["status"];
+    : sentenceCase(state) as PortalInvoiceViewModel["status"];
   return {
     backHref,
     title: docNo(credit ? "CM" : "INV", invoice.invoice_no, credit ? "Credit memo" : "Invoice"),

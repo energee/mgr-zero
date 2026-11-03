@@ -240,6 +240,16 @@ against it, then
 `bun run lint`, `tsc --noEmit` and `bun run build`. This is the merge gate — RLS and
 command-registry correctness are enforced here, not just locally.
 
+If `/simplify` or its delivery guard fails, the review workflow attempts to
+retain `simplify-jobs-source-diagnostic` for one day: only tracked
+`lib/chat/jobs.ts` status and its patch against the runner's `HEAD`.
+It excludes raw prompts, tool arguments, environment files, agent transcripts,
+and untracked contents. This source allowlist is not secret redaction:
+a sensitive literal written into that source would remain in its patch.
+Collection or upload errors leave the original failure fatal. A successful
+run does not exercise this failure-only diagnostic. Committed-but-unpushed
+edits have no `HEAD`-relative patch and are not recovered by this diagnostic.
+
 ### CI provenance and updates
 
 External `uses:` entries are pinned to 40-character commits (version comments
@@ -316,7 +326,7 @@ explicit `permissions` mapping is present):
 | `anthropics/claude-code-action` dream maintenance | OAuth secret; explicit `github.token`, contents / pull requests / issues read | No publication permissions in the model job. |
 | `anthropics/claude-code-action` `@claude` | OAuth secret; contents / pull requests / issues write, actions read, id-token write | Intentional interactive write workflow; actions read supports CI inspection. |
 | `actions/create-github-app-token` | `MGR_APP_PRIVATE_KEY` and App ID | Dream identity requests metadata read only; publication tokens explicitly request contents / PR write and dream issues read, scoped to the current repository. |
-| `actions/upload-artifact`, `actions/download-artifact` | GitHub runner artifact runtime token | Same-run patch/bundle transport; neither gets the App key or OAuth secret as an input. |
+| `actions/upload-artifact`, `actions/download-artifact` | GitHub runner artifact runtime token | Same-run patch/bundle transport, plus the one-day allowlisted simplify failure diagnostic; neither gets the App key or OAuth secret as an input. |
 | Watcher (no third-party action except read-only checkout) | `github.token`: issues write; stale-dream job also contents read | Creates diagnostic issues only. |
 | Hosted jobs (no external actions) | Order-email / retention bearer secrets; `permissions: {}` | Existing operator-authorized service calls, never exercised by provenance verification. |
 

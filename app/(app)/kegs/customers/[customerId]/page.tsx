@@ -1,3 +1,4 @@
+import { isUuid } from "@/lib/uuid";
 // app/(app)/kegs/customers/[customerId]/page.tsx — Customer keg balance
 // (screen record Customer keg balance): kegs one customer has out per pool
 // and size with the deposit invoiced for them, from get_customer_keg_balance.
@@ -10,7 +11,7 @@ import { notFound } from "next/navigation";
 import { E } from "@/components/mgr/e";
 import { KegBalanceView } from "@/components/mgr/views/keg-balance";
 import { getActiveBrewery } from "@/lib/brewery";
-import { buildContext, isUuid } from "@/lib/commands/context";
+import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toKegBalanceViewProps } from "@/lib/mgr/keg-balance-view";
 import "@/lib/commands/all";

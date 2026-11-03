@@ -1,5 +1,6 @@
 // lib/mgr/purchase-orders-view.ts — view-model for the Purchase orders list,
 // and the status wording the list and one PO's page share.
+import { plural } from "@/lib/mgr/plural";
 import type { EmptyState } from "./empty-state";
 import { formatDate } from "@/lib/date-format";
 import { sentenceCase } from "@/lib/mgr/labels";
@@ -44,7 +45,7 @@ const closedLabel = (status: string) => (status === "cancelled" ? "Cancelled" : 
 /** A PO's status on its list row, in sentence case (#1501). */
 export function poListStatus(po: PoStatusFacts & { lines_open: number }): string {
   if (po.closed_at) return closedLabel(po.status);
-  if (po.status === "partially_received") return `Partially received · ${po.lines_open} ${po.lines_open === 1 ? "line" : "lines"} still due`;
+  if (po.status === "partially_received") return `Partially received · ${plural(po.lines_open, "line")} still due`;
   if (po.status === "sent") return `Sent${po.ordered_on ? ` ${formatDate(po.ordered_on)}` : ""}${po.expected_on ? ` · expected ${formatDate(po.expected_on)}` : ""}`;
   return sentenceCase(po.status);
 }

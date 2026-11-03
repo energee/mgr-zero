@@ -1,7 +1,8 @@
+import { isUuid } from "@/lib/uuid";
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import { getActiveBrewery } from "@/lib/brewery";
-import { buildContext, isUuid } from "@/lib/commands/context";
+import { buildContext } from "@/lib/commands/context";
 import { runPageQuery } from "@/lib/mgr/page-query";
 import type { LocationUse } from "@/lib/mgr/enums";
 import "@/lib/commands/all";

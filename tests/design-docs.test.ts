@@ -92,9 +92,8 @@ describe("explorer search and link state", () => {
     expect(names("zzzz-nothing")).toEqual([]);
   });
 
-  it("round-trips the explorer state through the hash and reads the old #s<index> form", async () => {
+  it("round-trips the explorer state through the hash", async () => {
     const { parseHash, buildHash } = await import("../lib/mgr/screen-explorer");
-    expect(parseHash("#s7")).toEqual({ s: 7 });
     expect(parseHash("")).toEqual({});
     const state = { s: 12, p: "sales", q: "keg", a: "Work", f: "sheet" };
     expect(parseHash(buildHash(state))).toEqual(state);

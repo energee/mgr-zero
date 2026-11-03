@@ -34,11 +34,8 @@ export function defaultWorkKinds(roles: readonly (StaffRole | "customer")[]): Wo
     role !== "customer" && DEFAULT_WORK_KINDS[role].includes(kind)));
 }
 
-const count = async (q: PromiseLike<{ count: number | null; error: unknown }>) => {
-  const { count: n, error } = await q;
-  if (error) throw error;
-  return n ?? 0;
-};
+const count = async (q: PromiseLike<{ count: number | null; error: { message: string; code?: string; details?: string } | null }>) =>
+  (await unwrap(q.then(({ count, error }) => ({ data: count, error })))) ?? 0;
 
 export function labeledTaproomStock(
   stock: { sku_id: string; location_id: string; qty: number }[],

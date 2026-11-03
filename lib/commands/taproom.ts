@@ -9,13 +9,12 @@
 // keg_deposit_balances. Tap board writes
 // and durable physical counts are implemented below.
 import { z } from "zod";
-import { cents, completeRows, defineCommand, defineQuery, PAGE_SIZE, unwrap, type Ctx } from "./registry";
+import { isoDate, cents, completeRows, defineCommand, defineQuery, PAGE_SIZE, unwrap, type Ctx } from "./registry";
 import { kegDepositRows, type DepositBalanceRow, type KegBalanceRow } from "@/lib/keg-deposits";
 import { KEG_SIZES, KEG_POOL_KINDS, KEG_EVENT_REASONS } from "@/lib/mgr/enums";
 
 // The option arrays live in lib/mgr/enums.ts so a "use client" form can read
 // them without importing this module and registering every command in it.
-export { KEG_SIZES, KEG_POOL_KINDS, KEG_EVENT_REASONS } from "@/lib/mgr/enums";
 
 const ROLES: ("admin" | "warehouse")[] = ["admin", "warehouse"];
 
@@ -235,7 +234,7 @@ defineQuery({
 });
 defineCommand({
   name: "record_taproom_count", description: "Save today's complete explicit-bucket count of remaining whole packaged units using the prepared revision; partial kegs count as one until gone. Persist matching counts without movements; shortages post sold depletion by default or destruction when explicitly classified. Stale, incomplete, duplicate and overcounts are refused",
-  input: z.object({ locationId: z.string().uuid(), countedOn: z.string().date(), revision: z.string().min(1),
+  input: z.object({ locationId: z.string().uuid(), countedOn: isoDate, revision: z.string().min(1),
     lines: z.array(z.object({ binId: z.string().uuid(), skuId: z.string().uuid(), lotId: z.string().uuid().nullable(), qtyCounted: z.number().int().nonnegative(), disposition: z.enum(["sold", "destroyed"]).optional() })) }),
   roles: [...COUNT_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_taproom_count", {
