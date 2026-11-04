@@ -48,6 +48,8 @@ export type WorkRowView = {
   tone: "info" | "attention" | "success";
   warning?: boolean;
   href?: string;
+  /** The order this row is about, live only: its title opens the order sheet (lib/mgr/order-sheet.ts). */
+  orderId?: string;
   icon?: "package" | "truck" | "route" | "thermometer";
 };
 
@@ -69,7 +71,7 @@ export function toWorkViewProps({ rows }: WorkSnapshot): WorkViewModel {
 
 export function workFromQuery(rows: WorkRow[], defaults: WorkKind[]): WorkViewModel {
   const icons: Record<WorkKind, NonNullable<WorkRowView["icon"]>> = { orders: "package", transfers: "package", batches: "thermometer", runs: "package", POs: "truck", routes: "route" };
-  return { ...toWorkViewProps({ rows: rows.map(row => ({ key: `${row.kind}:${row.id}`, kind: row.kind, title: row.label, detail: row.detail, verb: row.verb, tone: row.tone, warning: row.tone === "attention", href: row.href, icon: icons[row.kind] })) }), defaults };
+  return { ...toWorkViewProps({ rows: rows.map(row => ({ key: `${row.kind}:${row.id}`, kind: row.kind, title: row.label, detail: row.detail, verb: row.verb, tone: row.tone, warning: row.tone === "attention", href: row.href, ...(row.orderId ? { orderId: row.orderId } : {}), icon: icons[row.kind] })) }), defaults };
 }
 
 export function filterWorkRows(model: WorkViewModel, chip: string) {

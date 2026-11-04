@@ -12,7 +12,8 @@ import { salesRoles, type OrderFilter } from "@/lib/mgr/order-status";
 import { hasAnyRole } from "@/lib/mgr/roles";
 import { historyPage, type HistoryPage, type HistoryRow } from "@/lib/mgr/history-page";
 
-export function OrdersClient({ roles, timeZone, status, customerId, customerName, cursor }: { roles: readonly StaffRole[]; timeZone: string; status?: OrderFilter; customerId?: string; customerName?: string; cursor?: string }) {
+/** `sheet` is the order sheet the page opened from ?order= (app/(app)/orders/order-sheet.tsx), drawn over the list. */
+export function OrdersClient({ roles, timeZone, status, customerId, customerName, cursor, sheet }: { roles: readonly StaffRole[]; timeZone: string; status?: OrderFilter; customerId?: string; customerName?: string; cursor?: string; sheet?: React.ReactNode }) {
   const result = useCommandQuery<HistoryPage<OrdersListSnapshot["orders"][number] & HistoryRow>>("list_orders", { status, customerId, cursor });
   const page = historyPage(result.data ?? { rows: [], nextCursor: null }, "/orders", cursor, { status, customerId });
   // get_customer can fail (a stale or malformed link); say so rather than invent a name.
@@ -27,6 +28,7 @@ export function OrdersClient({ roles, timeZone, status, customerId, customerName
       feedback={result.data ? <QueryFeedback timeZone={timeZone} error={result.error} fetching={result.isFetching} paused={result.isPaused} updatedAt={result.dataUpdatedAt} retry={() => void result.refetch()} /> : undefined}
       pagination={page.pagination}
       workHrefs={workHrefsFor(roles)}
+      sheet={sheet}
     />
   );
 }

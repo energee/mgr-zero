@@ -9,7 +9,7 @@ import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
 import { CommandError } from "@/lib/commands/registry";
 import { isUuid } from "@/lib/uuid";
-import { orNotFound } from "@/lib/mgr/not-found";
+import { orNotFound, orNull } from "@/lib/mgr/not-found";
 import { navTitle } from "@/lib/mgr/nav";
 import { periodLabel, periodRange } from "@/lib/compliance-period";
 import { recipePageTitle } from "@/lib/mgr/recipe-view";
@@ -51,7 +51,7 @@ function requestBindings() {
   };
   const ctx = { roles: ["admin"], userId: "actor", breweryId: "brewery" };
   const bindings: Record<string, unknown> = {
-    cache, notFound, redirect, orNotFound, isUuid, navTitle, periodLabel, periodRange, recipePageTitle, historyPage, pageCursor,
+    cache, notFound, redirect, orNotFound, orNull, isUuid, navTitle, periodLabel, periodRange, recipePageTitle, historyPage, pageCursor,
     getActiveBrewery: async () => ({ id: "brewery", roles: ["admin"], timeZone: "UTC" }),
     buildContext: async () => ctx,
     getPortalContext: async () => ({ customer: { customerId: "customer" }, ctx }),

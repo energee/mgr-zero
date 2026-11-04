@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs";
 import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { ScreenFrame, ScreenSheet } from "../components/mgr/screen-frame";
 import { MeSheet } from "../components/mgr/me-sheet";
@@ -46,6 +46,9 @@ import { searchEmptyMessage } from "../lib/mgr/search-palette-state";
 import { todayActions, toTodayViewProps } from "../lib/mgr/today-view";
 import { filterWorkRows, toWorkViewProps, workFromQuery } from "../lib/mgr/work-view";
 
+// A live Today row links into the order sheet through Next's navigation hooks, which have no router here.
+vi.mock("next/navigation", () => ({ usePathname: () => "/", useSearchParams: () => new URLSearchParams(), useRouter: () => ({ replace() {} }) }));
+
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const src = (file: string) => readFileSync(file, "utf8");
@@ -82,7 +85,7 @@ describe("Today view", () => {
     const model = toTodayViewProps(todayWarehouse);
     expect(model.rows.map((r) => [r.title, r.verb])).toEqual([
       ["3 orders ready", "Pick"],
-      ["ORD-0228 · Hillside Tavern", "Pick"],
+      ["ORD-0228", "Pick"],
       ["Staged · ORD-0229", "Put back"],
       ["PO-0142 · Fictional Malt Supply", "Receive"],
       ["Next delivery · Ridgeline", "Resume"],
@@ -108,6 +111,7 @@ describe("Today view", () => {
         safeLabel: "ORD-1",
         customerName: null,
         detail: "due now",
+        amountCents: null,
         dueAt: null,
         href: "/orders/o1",
         recipientRoles: ["warehouse"],
@@ -118,6 +122,8 @@ describe("Today view", () => {
       {
         key: "pick_due:o1",
         title: "ORD-1",
+        orderId: "o1",
+        state: "Pick due",
         detail: "due now",
         verb: "Pick",
         tone: "info",
@@ -187,7 +193,7 @@ describe("Today view", () => {
       now: new Date("2026-09-03T16:00:00Z"),
       items: [{
         reason: "delivery_next", subjectType: "delivery", subjectId: "stop-1", sourceVersion: "1",
-        safeLabel: "Route A · stop 1", customerName: null, detail: "next stop", dueAt: "2026-09-03T04:00:00Z",
+        safeLabel: "Route A · stop 1", customerName: null, detail: "next stop", amountCents: null, dueAt: "2026-09-03T04:00:00Z",
         href: "/work/deliveries/stop-1", recipientRoles: ["admin", "warehouse"], assignedUserId: "driver-1",
       }],
     });

@@ -85,11 +85,11 @@ describe("live page exclusion decisions", () => {
   });
 
   it("chooses taproom Today only for taproom-only staff", async () => {
-    await TodayPage();
+    await TodayPage({ searchParams: Promise.resolve({}) });
     expect(pageState.calls).toContain("list_locations");
     expect(pageState.calls).not.toContain("get_today");
     pageState.roles = ["taproom", "brewer"]; pageState.calls = [];
-    await TodayPage();
+    await TodayPage({ searchParams: Promise.resolve({}) });
     expect(pageState.calls).toEqual(["get_today"]);
   });
 

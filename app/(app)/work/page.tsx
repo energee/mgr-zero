@@ -1,7 +1,8 @@
 // app/(app)/work/page.tsx — Work: everything currently in motion, ordered by
 // next due action (list_work). The role's default chips show first; the chip
 // bar and its memory are work-list.tsx. New order is size="sm" like every Work
-// list's create button, so the tab strip sits at the same height (#1226).
+// list's create button, so the tab strip sits at the same height (#1226). An
+// order row opens the order sheet (?order=, OrderSheetFromAddress) over the list.
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { workHrefsFor } from "@/components/mgr/work-tabs";
@@ -12,18 +13,24 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { WorkList } from "./work-list";
 import { navTitle } from "@/lib/mgr/nav";
+import { ORDER_SHEET_PARAM, orderSheetId } from "@/lib/mgr/order-sheet";
+import { OrderSheetFromAddress } from "../orders/order-sheet";
 
 export const metadata = { title: navTitle("/work") };
 
-export default async function WorkPage() {
+export default async function WorkPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const brewery = await getActiveBrewery();
   const rows = (await runCommand("list_work", {}, await buildContext(brewery.id))) as WorkRow[];
   const canCreate = brewery.roles.includes("admin") || brewery.roles.includes("sales");
+  const sheet = orderSheetId((await searchParams)[ORDER_SHEET_PARAM]);
   return (
-    <WorkList
-      rows={rows} defaults={defaultWorkKinds(brewery.roles)}
-      chips={Object.keys(workHrefsFor(brewery.roles))}
-      createAction={canCreate ? <Button size="sm" variant="outline" asChild><Link href="/orders/new">New order</Link></Button> : null}
-    />
+    <>
+      <WorkList
+        rows={rows} defaults={defaultWorkKinds(brewery.roles)}
+        chips={Object.keys(workHrefsFor(brewery.roles))}
+        createAction={canCreate ? <Button size="sm" variant="outline" asChild><Link href="/orders/new">New order</Link></Button> : null}
+      />
+      {sheet && <OrderSheetFromAddress id={sheet} />}
+    </>
   );
 }

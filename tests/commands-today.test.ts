@@ -30,6 +30,10 @@ async function createOrder(requested: string | null, submit = false, confirm = f
 }
 
 const today = (ctx: CommandCtx, now: string) => runCommand("get_today", { now }, ctx) as Promise<TodayItem[]>;
+const depositCents = async (orderId: string) => {
+  const { data } = await adminCtx.db.from("order_deposit_lines").select("amount_cents").eq("order_id", orderId);
+  return (data ?? []).reduce((sum, d) => sum + (d.amount_cents ?? 0), 0);
+};
 
 beforeAll(async () => {
   b = await makeBrewery();
@@ -56,6 +60,8 @@ describe("get_today (registered reader)", () => {
     const forSales = await today(sales, noon);
     expect(forSales.map((i) => [i.reason, i.subjectId])).toEqual([["submitted_order", submitted]]);
     expect(forSales[0].detail).toBe("submitted · ships Sep 5, 2026");
+    // The order page's amount before tax: 1 keg at the captured 12000 cents plus its returnable deposit.
+    expect(forSales[0].amountCents).toBe(12000 + (await depositCents(submitted)));
     const forWarehouse = await today(warehouse, noon);
     expect(forWarehouse.map((i) => [i.reason, i.subjectId])).toEqual([["pick_due", confirmed]]);
     expect((await today(adminCtx, noon)).map((i) => i.reason).sort()).toEqual(["pick_due", "submitted_order"]);

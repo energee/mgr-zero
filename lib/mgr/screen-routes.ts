@@ -86,6 +86,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Complete transfer", file: "app/(app)/orders/[id]/complete/page.tsx" },
   { name: "Order draft", file: "app/(app)/orders/[id]/page.tsx" },
   { name: "Order", file: "app/(app)/orders/[id]/page.tsx" },
+  { name: "Order sheet", file: "app/(app)/orders/page.tsx" },
   { name: "Edit draft", file: "app/(app)/orders/[id]/edit/page.tsx" },
   { name: "Short pick", file: "app/(app)/orders/[id]/pick/page.tsx" },
   { name: "Pick", file: "app/(app)/orders/[id]/pick/page.tsx" },

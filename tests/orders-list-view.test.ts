@@ -4,7 +4,7 @@ import { createElement, isValidElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 // The live Status pick navigates with the app router; outside Next it needs a stand-in.
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => "/orders" }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => "/orders", useSearchParams: () => new URLSearchParams() }));
 vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", roles: ["sales"], timeZone: "America/Los_Angeles" }) }));
 vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ roles: ["sales"] }) }));
 vi.mock("@/lib/commands/all", () => ({}));
@@ -199,7 +199,8 @@ describe("Orders list view loop", () => {
     expect(headers).toEqual(expect.arrayContaining(["Order", "Customer", "Requested ship date", "Status"]));
     expect(html).toContain(">Not scheduled<");
     expect(html).toContain(">Restock staged<");
-    expect(html).toContain('href="/orders/00000000-0000-4000-8000-000000000231"');
+    // A live order number opens the order sheet over this list (lib/mgr/order-sheet.ts), not the order page.
+    expect(html).toContain('href="/orders?order=00000000-0000-4000-8000-000000000231"');
     expect(html).not.toMatch(/>Open</);
   });
 

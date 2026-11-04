@@ -17,7 +17,8 @@ import type { StaffRole } from "./registry";
 export type WorkKind = "orders" | "transfers" | "batches" | "runs" | "POs" | "routes";
 /** `id` is the row's own identity: two rows can share an href (two open questions on one invoice). */
 type OpenRoute = { id: string; name: string | null; delivery_date: string; departed_at: string | null; deliveries: { count: number }[] };
-export type WorkRow = { kind: WorkKind; id: string; label: string; detail: string; href: string; verb: string; tone: "info" | "attention" | "success"; dueAt: string | null };
+/** `orderId` is set when the row's subject is an order (not an invoice question or a refused delivery), so Work can open it in the order sheet. */
+export type WorkRow = { kind: WorkKind; id: string; orderId?: string; label: string; detail: string; href: string; verb: string; tone: "info" | "attention" | "success"; dueAt: string | null };
 
 const KIND: Record<TodayItem["reason"], WorkKind> = {
   submitted_order: "orders", pick_due: "orders", ship_due: "orders", restock_due: "orders", delivery_next: "routes", refused_return: "routes", refused_credit: "orders", fermentation_reading_overdue: "batches", invoice_question: "orders",
@@ -105,7 +106,7 @@ defineQuery({
         .order("delivery_date").order("created_at").order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<OpenRoute[]> : [],
     ]);
     const rows: WorkRow[] = [
-      ...today.map((t) => ({ kind: KIND[t.reason], id: t.subjectId, label: t.safeLabel, detail: t.detail, href: t.href, verb: TODAY_VERB[t.reason][0], tone: TODAY_VERB[t.reason][1], dueAt: t.dueAt })),
+      ...today.map((t) => ({ kind: KIND[t.reason], id: t.subjectId, ...(t.subjectType === "order" ? { orderId: t.subjectId } : {}), label: t.safeLabel, detail: t.detail, href: t.href, verb: TODAY_VERB[t.reason][0], tone: TODAY_VERB[t.reason][1], dueAt: t.dueAt })),
       ...pos.map((p) => ({
         kind: "POs" as const, id: p.id, label: `${poNo(p.po_no)} · ${p.vendor_name ?? "vendor"}`, detail: p.status.replace("_", " ") + (p.expected_on ? ` · due ${formatDate(p.expected_on)}` : ""),
         href: `/purchase-orders/${p.id}`, verb: p.status === "draft" ? "Mark sent" : "Receive", tone: "info" as const, dueAt: p.expected_on,

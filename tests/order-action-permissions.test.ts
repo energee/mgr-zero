@@ -60,7 +60,7 @@ it("draws the primary verb first, Complete transfer once, and Cancel only in the
 });
 
 it("the live page fills OrderView's header and bottom slots from lifecycle-buttons.tsx", () => {
-  const src = readFileSync("app/(app)/orders/[id]/page.tsx", "utf8");
+  const src = readFileSync("app/(app)/orders/[id]/order-detail.tsx", "utf8");
   expect(src).toMatch(/actions=\{<LifecycleButtons\b/);
   expect(src).toMatch(/footer=\{<CancelOrderAction\b/);
   expect(src).toMatch(/<OrderActionScope>[\s\S]*?<OrderLinesForm\b/);
@@ -82,5 +82,5 @@ it("makes Put back the filled primary while beer is staged, and fulfillment verb
   const clear = render(false, toOrderViewProps({ ...staged, order: { ...staged.order, needs_restock: false } }));
   expect(clear).not.toContain(">Put back<");
   expect(variant(clear, "Ship")).toBe("default");
-  expect(readFileSync("app/(app)/orders/[id]/page.tsx", "utf8")).toMatch(/restockFirst=\{model\.putBackHref !== undefined\}/);
+  expect(readFileSync("app/(app)/orders/[id]/order-detail.tsx", "utf8")).toMatch(/restockFirst=\{model\.putBackHref !== undefined\}/);
 });
