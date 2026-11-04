@@ -44,8 +44,8 @@ describe("transfer pick under concurrency (#1033)", { concurrent: false }, () =>
     // The pick either finishes on the stale ledger (the bug) or waits on the move's lock (the fix).
     await expect.poll(async () => settled || (await waitOf())?.wait_event_type === "Lock", { timeout: 5000 }).toBe(true);
     expect(settled, "the pick waits for the open bin move").toBe(false);
-    // A table lock, the ledger lock, not a row or advisory lock.
-    expect((await waitOf()).wait_event).toBe("relation");
+    // The brewery's ledger lock (an advisory lock, #1628), not a row lock.
+    expect((await waitOf()).wait_event).toBe("advisory");
     await mover.query("commit");
     const outcome = await pending;
     await picker.query("rollback");

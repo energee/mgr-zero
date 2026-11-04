@@ -992,7 +992,7 @@ describe("record_repack", () => {
     try {
       await Promise.all([a.connect(), b.connect()]);
       await a.query("begin");
-      await a.query("lock table public.inventory_movements in share row exclusive mode");
+      await a.query("select private.lock_ledger($1, 'inventory_movements')", [brewery.id]);
       await b.query("select set_config('request.jwt.claim.sub',$1,false)", [warehouse.userId]);
       await b.query("set role authenticated");
       const pid = (await b.query("select pg_backend_pid() pid")).rows[0].pid;

@@ -130,11 +130,16 @@ File each slow stage as its own fix, with its numbers.
 
 ### Ledger lock hypothesis (#1628)
 
-[#1628](https://github.com/energee/mgr-zero/issues/1628) asks whether
+[#1628](https://github.com/energee/mgr-zero/issues/1628) asked whether
 table-wide inventory and keg ledger locks caused the slow hosted Ship in
 [#1490](https://github.com/energee/mgr-zero/issues/1490).
-The locks exist; their contribution to that request has not been measured.
-Do not replace them on that hypothesis alone.
+Their contribution to that request was never measured.
+The owner had them replaced anyway (2026-11-03), because they serialized every
+brewery's stock writes and conflicted with autovacuum.
+Migration `20261104010440_brewery_ledger_locks.sql` locks per brewery and
+ledger table instead, and `tests/ledger-brewery-locks.test.ts` proves it.
+A Ship timed on the release SHA shows whether hosted Ship latency moved.
+Wait events from ledger writers now read `advisory`, not `relation`.
 
 The owner's #1490 decision permits hosted reads, not hosted saves.
 Do not trigger Ship, create competing writes, run manual vacuum, or change

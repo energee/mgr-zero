@@ -808,11 +808,13 @@ it("waits for a real concurrent bin transfer, then refuses its stale observation
   const client = new Client({ connectionString: DB }); await client.connect();
   let pending: PromiseLike<unknown> | undefined;
   try {
-    await client.query("begin; lock table public.inventory_movements in share row exclusive mode");
+    await client.query("begin");
+    await client.query("select private.lock_ledger($1, 'inventory_movements')", [f.brewery.id]);
     const count = f.ctx.db.rpc("record_taproom_count", input).then(result => result); pending = count;
     let waiting = false;
     for (let i = 0; i < 100; i++) {
-      const locks = await client.query("select 1 from pg_locks where relation='public.inventory_movements'::regclass and mode='ShareRowExclusiveLock' and not granted");
+      // The count waits on this brewery's ledger lock (private.lock_ledger's key).
+      const locks = await client.query("select 1 from pg_locks where locktype='advisory' and objsubid=1 and not granted and ((classid::bigint<<32)|objid::bigint)=pg_catalog.hashtextextended('ledger:inventory_movements:'||$1::text,0)", [f.brewery.id]);
       if (locks.rowCount) { waiting = true; break; }
       await new Promise(resolve => setTimeout(resolve, 10));
     }

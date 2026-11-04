@@ -47,7 +47,7 @@ describe("atomic inventory movement previews", () => {
     let pending: PromiseLike<unknown> | undefined;
     try {
       await writer.query("begin");
-      await writer.query("lock table public.inventory_movements in share row exclusive mode");
+      await writer.query("select private.lock_ledger($1, 'inventory_movements')", [breweryId]);
       await writer.query("select set_config('request.jwt.claim.sub',$1,true)", [ctx.userId]);
       await writer.query("set local role authenticated");
       await writer.query(
@@ -63,9 +63,10 @@ describe("atomic inventory movement previews", () => {
       }).then((result) => result);
       pending = commit;
 
+      // The commit waits on this brewery's ledger lock (private.lock_ledger's key).
       await expect.poll(() => Number(sql(`select count(*) from pg_locks
-        where relation='public.inventory_movements'::regclass
-          and mode='ShareRowExclusiveLock' and not granted`)[0])).toBeGreaterThan(0);
+        where locktype='advisory' and objsubid=1 and not granted
+          and ((classid::bigint<<32)|objid::bigint)=pg_catalog.hashtextextended('ledger:inventory_movements:${breweryId}',0)`)[0])).toBeGreaterThan(0);
       await writer.query("commit");
 
       const result = await commit;
