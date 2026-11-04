@@ -3,7 +3,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { RouteError } from "@/components/mgr/route-error";
+import { RouteError, claimAutoRetry } from "@/components/mgr/route-error";
 import { onRequestError } from "@/instrumentation";
 
 const render = (error: unknown) => renderToStaticMarkup(createElement(RouteError, { error, retry: () => {} }));
@@ -34,5 +34,11 @@ describe("route error reference (#1299)", () => {
     expect(line).toContain('"routePath":"/(app)/page"');
     expect(line).not.toContain("secret");
     log.mockRestore();
+  });
+
+  it("retries a server error once, then not again for 30 s, so a lasting failure cannot loop", () => {
+    expect(claimAutoRetry(1_000_000)).toBe(true);
+    expect(claimAutoRetry(1_010_000)).toBe(false);
+    expect(claimAutoRetry(1_030_001)).toBe(true);
   });
 });
