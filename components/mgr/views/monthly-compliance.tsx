@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode } from "react";
 import { DestinationStateExport } from "./destination-state-export";
 import { FileSnapshotForm } from "./file-snapshot";
+import { RecordTable } from "./record-table";
 import { E } from "@/components/mgr/e";
 import type { LossReview } from "@/lib/commands/compliance";
 import type { BeforeBooksState, ComplianceFiguresViewModel, MonthlyComplianceViewModel } from "@/lib/mgr/monthly-compliance-view";
@@ -19,7 +20,9 @@ function ComplianceFigures({ model, inProcessDetail, warnings = [] }: { model: C
     {model.cellarRemovals.length ? <>{E.info("Cellar removals breakdown is explanatory and is already included once in the filing removal totals above. Do not add it again.")}{model.cellarRemovals.map((row) => <Fragment key={row.key}>{E.fld(`${row.title} · already counted above`, row.bbl)}</Fragment>)}</> : null}
     {E.ttl("Destination-state totals")}
     {model.stateExport ? <>
-      {E.tbl(["State", "Removed (bbl)", "Returned (bbl)", "Adjustments (bbl)", "Net (bbl)", "Sales", "Credits", "Net sales"], model.stateRows, ["l", "r", "r", "r", "r", "r", "r", "r"], { sortable: false })}
+      {/* Eight columns are wider than a phone, so RecordTable draws each state as a card of labeled figures there. A state is not a record to open (href null). */}
+      <RecordTable headers={["State", "Removed (bbl)", "Returned (bbl)", "Adjustments (bbl)", "Net (bbl)", "Sales", "Credits", "Net sales"]}
+        rows={model.stateRows.map((cells) => ({ key: cells[0], cells, href: null }))} align={["l", "r", "r", "r", "r", "r", "r", "r"]} sortable={false} />
       {E.info("Beer moves and beer sales count on their own dates. Net (bbl) is Removed less Returned, plus signed Adjustments. Net sales is Sales less Credits; keg deposits are excluded. The Unassigned row holds transactions with no recorded destination: shipments, returns, adjustments, invoices, or credits. These totals match the exported transactions. State taxes and state filing forms are done outside MGR.")}
       <DestinationStateExport {...model.stateExport} />
     </> : E.info("This snapshot was saved without the transactions behind its destination-state totals.")}
