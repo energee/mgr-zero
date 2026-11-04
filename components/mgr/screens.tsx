@@ -122,6 +122,7 @@ import { NewPoView } from "@/components/mgr/views/new-po";
 import { NewTransferView } from "@/components/mgr/views/new-transfer";
 import { OrderView } from "@/components/mgr/views/order";
 import { OrdersView } from "@/components/mgr/views/orders-list";
+import { RecordSheet } from "@/components/mgr/record-sheet";
 import { PackageBomView } from "@/components/mgr/views/package-bom";
 import { PackagingRunsView } from "@/components/mgr/views/packaging-runs";
 import { ReplenishmentDemo } from "@/components/mgr/replenishment-demo";
@@ -1008,6 +1009,19 @@ export const SCREENS: Screen[] = [
     states: [["draft", "Edit draft corrects headers and lines; Submit advances the order"], ["confirmed / picked", "Admin and Sales change, add (Add line) and remove (✕) lines in place with a required Reason; restock rows appear when picked qty exceeds ordered; a save leaving a SKU below zero available still saves: Lines saved · Available is below zero for … under the lines"], ["changed after pick", "count only the added or raised lines · the rest is already staged", 1], ["shipped", "read-only tape · Return shipment is the correction · Cost line for Admin and Sales: frozen lot cost, returns netted, margin on the order-line prices; units without a receipt cost are counted and the margin is withheld"], ["shipped · stop delivered", "the route stamped the stop; the order stays shipped · read-only, Return shipment still corrects"], ["stale", "another user changed a line · refresh", 1], ["permission", "sales or admin to adjust and see Cost; warehouse reads", 1]],
     spec: "Drawn as picked after a line was adjusted down: staged 3 Pils cases must go back to Warehouse. Adjusting down, shipping short and cancelling all set the restock flag; Put back is what clears it. Shipped is the last lifecycle state: Confirm delivery on the route stamps the stop, not the order, and no verb here sets it. Ship opens Ship and invoice rather than committing here. Cancel is destructive and asks for confirm. Every transition appends an order event row in the same RPC. A submitted order has no direct Confirm here: Review and confirm opens Confirm order, so stock and source warnings show before commit (#713). Lines change in place, not on a separate page: Ordered is a number field, ✕ removes a line, and Add line appends one that picks its SKU; any change asks for a Reason and saves the full line set in one RPC. On a picked order an added or raised line is unpicked work: the order returns to confirmed with that line uncounted and a changed-after-pick marker, and Ship stays hidden until Pick counts it.",
     body: <OrderView model={toOrderViewProps(orderPickedRestock)} pickup={{ value: false }} actions={<>{E.btn("Ship", "g")}{E.btn("Record pick", "g")}</>} lineEdit={{ skus: [], added: [] }} complianceNote={OHIO_STOUT_NOTE} />,
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "Work",
+    name: "Order sheet",
+    to: { Finish: "Order", Pick: "Pick", "Record pick": "Pick", Ship: "Ship and invoice", "Put back": "Put back", "Edit draft": "Edit draft", "Cancel order": "Orders" },
+    job: "Open and edit an order without leaving the list it was picked from",
+    reads: "get_order · get_atp [the Order screen's reads]",
+    writes: "none [the Order screen's commands, run from the sheet]",
+    states: [["open", "an order picked on Today, Work or Orders slides in from the right over the list"], ["closed", "Close, Escape or Back returns to the list where it was, with its filters"], ["missing", "an address naming an order this brewery has not got leaves the sheet closed", 1]],
+    spec: "The Order screen, whole, in a sheet over the list it was opened from: the full phone width, a wide column on the desk. Tapping an order number on Orders, or anywhere on an order row on Today or Work, opens it; the row's verb (Pick, Confirm) still goes straight to that step. The address carries the order (?order=), so a refresh or a shared link reopens it over the same list, and the order's own pages keep opening full size.",
+    body: <OrdersView model={toOrdersListViewProps(ordersWorkList)} sheet={<RecordSheet title="Order"><OrderView model={toOrderViewProps(orderPickedRestock)} pickup={{ value: false }} actions={<>{E.btn("Ship", "g")}{E.btn("Record pick", "g")}</>} lineEdit={{ skus: [], added: [] }} complianceNote={OHIO_STOUT_NOTE} /></RecordSheet>} />,
   },
   {
     step: 5,

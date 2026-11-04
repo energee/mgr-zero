@@ -9,13 +9,14 @@ import type { StaffRole } from "@/lib/commands/registry";
 /** The role's live quick actions, inert: the inventory keeps no live href. */
 const actions = (role: StaffRole): TodayAction[] => todayActions([role]).map(({ label }) => ({ label }));
 
-/** A pick due on Sep 2, seen on Thu Sep 3. The detail leaves out the "pick due"
- *  that get_today (20261017190000_today_ship_date_format.sql) puts first, because
- *  the State column says it. The adapter sets its Overdue badge and attention dot
- *  (#993); the inventory row keeps no live href. */
+/** A pick due on Sep 2, seen on Thu Sep 3, with get_today's detail as written
+ *  (20261017190000_today_ship_date_format.sql): the adapter drops the "pick due"
+ *  the State column says and the date the Ships column says, sets its Overdue
+ *  badge and attention dot (#993), and draws the amount; the inventory row keeps
+ *  no live href. */
 const OVERDUE_PICK: TodayItem = {
   reason: "pick_due", subjectType: "order", subjectId: "ord-0228", sourceVersion: "1",
-  safeLabel: "ORD-0228", customerName: "Hillside Tavern", detail: "ships Sep 2, 2026", dueAt: "2026-09-02T04:00:00Z",
+  safeLabel: "ORD-0228", customerName: "Hillside Tavern", detail: "pick due · ships Sep 2, 2026", amountCents: 124000, dueAt: "2026-09-02T04:00:00Z",
   href: "/orders/ord-0228/pick", recipientRoles: ["warehouse"], assignedUserId: null,
 };
 const overduePick: TodayRowView = {
@@ -27,7 +28,7 @@ const overduePick: TodayRowView = {
 const refusedCredit: TodayRowView = {
   ...toTodayViewProps({ items: [{
     reason: "refused_credit", subjectType: "delivery", subjectId: "refused-1", sourceVersion: "1",
-    safeLabel: "Refused beer to return and credit", customerName: null, detail: "Hillside Tavern · 2 units",
+    safeLabel: "Refused beer to return and credit", customerName: null, detail: "Hillside Tavern · 2 units", amountCents: null,
     dueAt: null, href: "/invoices/inv-1043/return?refusedDeliveryId=refused-1",
     recipientRoles: ["admin", "sales"], assignedUserId: null,
   }] }).rows[0],
@@ -54,8 +55,8 @@ export const todayEmpty: TodayViewModel = {
 export const todaySales: TodayViewModel = {
   actions: actions("sales"),
   rows: [
-    { key: "ord1", title: "ORD-0231", customer: "Ridgeline", state: "Submitted", detail: "ships Sep 3, 2026", verb: "Confirm", tone: "success", warning: true, icon: "package" },
-    { key: "ord2", title: "ORD-0235", customer: "Teresa’s", state: "Submitted", detail: "ships Sep 4, 2026", verb: "Confirm", tone: "success", icon: "package" },
+    { key: "ord1", title: "ORD-0231", customer: "Ridgeline", state: "Submitted", ships: "Sep 3", amount: "$1,240.00", detail: "", verb: "Confirm", tone: "success", warning: true, icon: "package" },
+    { key: "ord2", title: "ORD-0235", customer: "Teresa’s", state: "Submitted", ships: "Sep 4", amount: "$386.50", detail: "", verb: "Confirm", tone: "success", icon: "package" },
     refusedCredit,
     { key: "pils", title: "Pils · 16 oz case", detail: "Not enough Pils for 2 orders", verb: "Choose who gets it", tone: "attention", warning: true },
     { key: "hazy", title: "Hazy IPA · ½ bbl", detail: "11 ready · fine" },
@@ -79,7 +80,7 @@ export const todayDriver: TodayViewModel = toTodayViewProps({
   now: new Date("2026-09-03T16:00:00Z"),
   items: [{
     reason: "delivery_next", subjectType: "delivery", subjectId: "stop-1", sourceVersion: "1",
-    safeLabel: "Route A · stop 1", customerName: null, detail: "next stop", dueAt: "2026-09-03T04:00:00Z",
+    safeLabel: "Route A · stop 1", customerName: null, detail: "next stop", amountCents: null, dueAt: "2026-09-03T04:00:00Z",
     href: "#", recipientRoles: ["admin", "warehouse"], assignedUserId: "driver-1",
   }],
 });

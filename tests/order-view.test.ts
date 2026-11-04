@@ -10,7 +10,8 @@ import { OrderView } from "../components/mgr/views/order";
 import { orderConfirmedWholesale, orderPickedRestock } from "../lib/mgr/fixtures/orders";
 import { orderLineCents, toOrderViewProps, type OrderSnapshot } from "../lib/mgr/order-view";
 
-const PAGE = "app/(app)/orders/[id]/page.tsx";
+// The Order screen's live body; the order page and the order sheet both mount it.
+const PAGE = "app/(app)/orders/[id]/order-detail.tsx";
 
 describe("Order view loop", () => {
   it("shows the shared pickup switch only when supplied, with its saved value, busy state and failure", () => {

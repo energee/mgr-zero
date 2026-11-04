@@ -1,7 +1,8 @@
 // app/(app)/page.tsx — Today: the role-filtered work list from get_today,
 // drawn to the Today screen record (components/mgr/screens.tsx) in the E
-// vocabulary. The row verb is the action and opens the item's href; the
-// role's quick actions (todayActions) sit above the rows. An admin on a
+// vocabulary. The row verb is the action and opens the item's href; an order
+// row opens the order sheet (?order=, OrderSheetFromAddress) from anywhere else
+// on its line; the role's quick actions (todayActions) sit above the rows. An admin on a
 // brewery without both a location and a brand sees the First-run checklist (first-run.tsx) instead.
 // Screens stay fixtures: nothing here imports SCREENS.
 import { E } from "@/components/mgr/e";
@@ -17,10 +18,12 @@ import { taproomTodayRows } from "@/lib/mgr/taproom-today";
 import type { TapInterval } from "@/lib/mgr/tap-board-state";
 import { onlyRoles } from "@/lib/mgr/roles";
 import { navTitle } from "@/lib/mgr/nav";
+import { ORDER_SHEET_PARAM, orderSheetId } from "@/lib/mgr/order-sheet";
+import { OrderSheetFromAddress } from "./orders/order-sheet";
 
 export const metadata = { title: navTitle("/") };
 
-export default async function TodayPage() {
+export default async function TodayPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   // Admin reads Today alongside the first-run state, not after it; a new brewery's Today is empty and cheap.
@@ -47,5 +50,11 @@ export default async function TodayPage() {
     return <TodayView model={toTodayViewProps({ taproom: taproomTodayRows(location, open, counts, report, brewery.timeZone) })} linkRows />;
   }
   const items = adminItems ?? (await runCommand("get_today", {}, ctx)) as TodayItem[];
-  return <TodayView model={toTodayViewProps({ items, timeZone: brewery.timeZone, actions: todayActions(brewery.roles) })} linkRows />;
+  const sheet = orderSheetId((await searchParams)[ORDER_SHEET_PARAM]);
+  return (
+    <>
+      <TodayView model={toTodayViewProps({ items, timeZone: brewery.timeZone, actions: todayActions(brewery.roles) })} linkRows />
+      {sheet && <OrderSheetFromAddress id={sheet} />}
+    </>
+  );
 }

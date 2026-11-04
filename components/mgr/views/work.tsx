@@ -3,6 +3,7 @@
 import { Fragment, useState, type ReactNode } from "react";
 import { DeliveryTruck01Icon, Package01Icon, Route01Icon, ThermometerIcon } from "@hugeicons/core-free-icons";
 import { E } from "@/components/mgr/e";
+import { OrderSheetLink } from "@/components/mgr/order-sheet-link";
 import { TabBar } from "@/components/mgr/qty";
 import { filterWorkRows, WORK_EMPTY, WORK_LABELS, type WorkViewModel } from "@/lib/mgr/work-view";
 
@@ -33,7 +34,14 @@ export function WorkView({
   const newOrder = createAction !== undefined ? createAction : E.btn("New order", "g");
   const emptyAction = model.rows.length === 0 && (selected === "all" || selected === "orders") ? newOrder : undefined;
   const list = rows.length === 0 ? E.blank(WORK_EMPTY, undefined, emptyAction) : rows.map(row => <Fragment key={row.key}>
-    {E.row(row.title, row.detail, E.act(row.verb, row.tone, row.href), row.warning ? "w" : "", row.icon ? ICON[row.icon] : undefined)}
+    {/* A live order row opens the order sheet from anywhere on the row; the verb sits above that cover. */}
+    {E.row(
+      row.orderId ? <OrderSheetLink orderId={row.orderId} className="after:absolute after:inset-0">{row.title}</OrderSheetLink> : row.title,
+      row.detail,
+      <span className="relative z-10">{E.act(row.verb, row.tone, row.href)}</span>,
+      row.warning ? "w" : "",
+      row.icon ? ICON[row.icon] : undefined,
+    )}
   </Fragment>);
   return (
     <>

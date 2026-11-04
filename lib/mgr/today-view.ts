@@ -2,7 +2,8 @@
 import type { EmptyState } from "./empty-state";
 import type { TodayItem } from "@/lib/commands/today";
 import type { TaproomTodayRow } from "@/lib/mgr/taproom-today";
-import { breweryDate, formatDateTime, formatTimeOfDay } from "@/lib/date-format";
+import { breweryDate, formatDateTime, formatMonthDay, formatTimeOfDay } from "@/lib/date-format";
+import { money } from "@/lib/mgr/money";
 import { hasAnyRole } from "@/lib/mgr/roles";
 
 export type TodayIcon = "package" | "truck" | "route" | "thermo" | "beer" | "task" | "invoice";
@@ -11,12 +12,19 @@ export type TodayRowView = {
   key: string;
   /** The record: an order, invoice or vessel label. */
   title: string;
+  /** The order this row is about, live only: tapping the row opens it in the order sheet (lib/mgr/order-sheet.ts). */
+  orderId?: string;
   /** The customer the record is for, drawn in its own column (#1512). */
   customer?: string;
   /** Where the record stands (TODAY_STATE), drawn as the State column's badge. */
   state?: string;
   /** Past its due day or time: an Overdue badge beside the state, not words in the detail. */
   overdue?: boolean;
+  /** An order's requested ship day, "Oct 8", drawn as the Ships column; from dueAt, so the detail need not repeat it. */
+  ships?: string;
+  /** An order's amount before tax, "$240.50", drawn as the Amount column. */
+  amount?: string;
+  /** What the other columns do not say; "" when they say it all. */
   detail: string;
   verb?: string;
   tone?: "info" | "attention" | "success" | "primary";
@@ -119,6 +127,15 @@ export function toTodayViewProps(s: TodaySnapshot): TodayViewModel {
   return { ...todayRows(s), ...(s.actions ? { actions: s.actions } : {}) };
 }
 
+/** An order's detail without what the State and Ships cells already say. get_today
+ *  writes "<state> · ships <date>[ · changed after pick]" or "<state> · no ship date"
+ *  (and Slack and Work still read that whole text); Today keeps the rest. */
+function orderDetail(detail: string, state: string, ships: string | undefined): string {
+  return detail.split(" · ")
+    .filter((part, i) => !(i === 0 && part === state.toLowerCase()) && !(ships && part.startsWith("ships ")))
+    .join(" · ");
+}
+
 function todayRows(s: TodaySnapshot): TodayViewModel {
   if (s.rows !== undefined) {
     return { empty: s.empty, emptyVerb: s.emptyVerb, rows: s.rows };
@@ -155,13 +172,21 @@ function todayRows(s: TodaySnapshot): TodayViewModel {
       // A ship or route date is past due once its brewery day is before today's (#993).
       const pastDay = Boolean(it.dueAt && !timed && breweryDate(s.timeZone!, new Date(it.dueAt)) < today!);
       const overdue = pastDay || Boolean(timed && timed <= now);
+      const order = it.subjectType === "order";
+      const ships = order && it.dueAt ? formatMonthDay(breweryDate(s.timeZone!, new Date(it.dueAt))) : undefined;
+      let detail = it.detail;
+      if (timed) detail = `${it.detail} · ${dueText(timed, s.timeZone!, now)}`;
+      else if (order) detail = orderDetail(it.detail, TODAY_STATE[it.reason], ships);
       return {
         key: `${it.reason}:${it.subjectId}`,
         title: it.safeLabel,
+        ...(order ? { orderId: it.subjectId } : {}),
         ...(it.customerName ? { customer: it.customerName } : {}),
         state: TODAY_STATE[it.reason],
         ...(overdue ? { overdue } : {}),
-        detail: timed ? `${it.detail} · ${dueText(timed, s.timeZone!, now)}` : it.detail,
+        ...(ships ? { ships } : {}),
+        ...(it.amountCents != null ? { amount: money(it.amountCents) } : {}),
+        detail,
         ...(it.dueAt ? { dueAt: it.dueAt } : {}),
         verb,
         tone,

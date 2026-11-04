@@ -40,6 +40,8 @@ function Register({ rows, scoped }: { rows: OrdersListRowView[]; scoped: boolean
       rows={rows.map((row) => ({
         key: row.key,
         href: row.href,
+        // A live row (one with an order page) opens in the order sheet; its key is the order id.
+        orderSheet: row.href ? row.key : undefined,
         to: "Order",
         cells: shown([
           row.orderNo,
@@ -62,6 +64,7 @@ export function OrdersView({
   workHrefs,
   listStatus,
   feedback,
+  sheet,
 }: {
   pagination?: HistoryNavigationProps;
   model: OrdersListViewModel;
@@ -70,6 +73,8 @@ export function OrdersView({
   workHrefs?: Record<string, string>;
   listStatus?: ReactNode;
   feedback?: ReactNode;
+  /** Live: the order sheet the page opened from ?order= (app/(app)/orders/order-sheet.tsx), drawn over the list. */
+  sheet?: ReactNode;
 }) {
   const newOrder = createAction !== undefined ? createAction : E.btn("New order");
   const emptyAction = model.status === "all" && !model.customer && !pagination?.firstHref ? newOrder : undefined;
@@ -84,6 +89,7 @@ export function OrdersView({
       {feedback}
       {listStatus ?? (model.empty ? E.blank(model.empty, undefined, emptyAction) : <Register rows={model.rows} scoped={Boolean(model.customer)} />)}
       <HistoryNavigation {...pagination} />
+      {sheet}
     </>
   );
 }
