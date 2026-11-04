@@ -82,7 +82,7 @@ describe("Today view", () => {
     const model = toTodayViewProps(todayWarehouse);
     expect(model.rows.map((r) => [r.title, r.verb])).toEqual([
       ["3 orders ready", "Pick"],
-      ["ORD-0228 · Hillside Tavern", "Pick"],
+      ["ORD-0228", "Pick"],
       ["Staged · ORD-0229", "Put back"],
       ["PO-0142 · Fictional Malt Supply", "Receive"],
       ["Next delivery · Ridgeline", "Resume"],
@@ -118,6 +118,7 @@ describe("Today view", () => {
       {
         key: "pick_due:o1",
         title: "ORD-1",
+        state: "Pick due",
         detail: "due now",
         verb: "Pick",
         tone: "info",

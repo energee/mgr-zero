@@ -54,8 +54,9 @@ const Dot = ({ cls, className }: { cls: RowClass; className?: string }) => (dotC
  *  media (E.face). With an icon the status rides its corner rather than the
  *  title line — a dot before the title indents the title away from its
  *  description — and the positioning wrapper costs a node only when there is
- *  a dot to hang. */
-const RowMedia = ({ icon, cls }: { icon: IconSvgElement | React.ReactElement; cls: RowClass }) => {
+ *  a dot to hang. With no icon it is the dot alone. Today's table uses it too. */
+export const RowMedia = ({ icon, cls }: { icon?: IconSvgElement | React.ReactElement; cls: RowClass }) => {
+  if (!icon) return <Dot cls={cls} />;
   const glyph = isValidElement(icon) ? icon : <Icon icon={icon} size={24} />;
   return dotColor[cls] ? (
     <span className="relative">{glyph}<Dot cls={cls} className="-top-1 -right-1 absolute" /></span>
@@ -208,7 +209,7 @@ export const E = {
     <Item data-row data-gated={cls === "dis" || undefined} className={cn("relative rounded-none border-0 px-0", cls === "dis" ? "cursor-not-allowed" : TAP_ROW)}>
       {(icon || dotColor[cls]) && (
         <ItemMedia className={CENTER_MEDIA}>
-          {icon ? <RowMedia icon={icon} cls={cls} /> : <Dot cls={cls} />}
+          <RowMedia icon={icon} cls={cls} />
         </ItemMedia>
       )}
       <ItemContent>

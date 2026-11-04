@@ -9,12 +9,13 @@ import type { StaffRole } from "@/lib/commands/registry";
 /** The role's live quick actions, inert: the inventory keeps no live href. */
 const actions = (role: StaffRole): TodayAction[] => todayActions([role]).map(({ label }) => ({ label }));
 
-/** A pick due on Sep 2, seen on Thu Sep 3, as get_today returns it
- *  (20261017190000_today_ship_date_format.sql). The adapter writes its
- *  "overdue" and attention dot (#993); the inventory row keeps no live href. */
+/** A pick due on Sep 2, seen on Thu Sep 3. The detail leaves out the "pick due"
+ *  that get_today (20261017190000_today_ship_date_format.sql) puts first, because
+ *  the State column says it. The adapter sets its Overdue badge and attention dot
+ *  (#993); the inventory row keeps no live href. */
 const OVERDUE_PICK: TodayItem = {
   reason: "pick_due", subjectType: "order", subjectId: "ord-0228", sourceVersion: "1",
-  safeLabel: "ORD-0228", customerName: "Hillside Tavern", detail: "pick due · ships Sep 2, 2026", dueAt: "2026-09-02T04:00:00Z",
+  safeLabel: "ORD-0228", customerName: "Hillside Tavern", detail: "ships Sep 2, 2026", dueAt: "2026-09-02T04:00:00Z",
   href: "/orders/ord-0228/pick", recipientRoles: ["warehouse"], assignedUserId: null,
 };
 const overduePick: TodayRowView = {
@@ -36,11 +37,11 @@ const refusedCredit: TodayRowView = {
 export const todayWarehouse: TodayViewModel = {
   actions: actions("warehouse"),
   rows: [
-    { key: "pick", title: "3 orders ready", detail: "quantities default to ordered", verb: "Pick", tone: "info", warning: true, icon: "package" },
+    { key: "pick", title: "3 orders ready", state: "Pick due", detail: "quantities default to ordered", verb: "Pick", tone: "info", warning: true, icon: "package" },
     overduePick,
-    { key: "restock", title: "Staged · ORD-0229", detail: "restock 3 Pils cases to Warehouse", verb: "Put back", tone: "attention", warning: true, icon: "package" },
+    { key: "restock", title: "Staged · ORD-0229", state: "Restock due", detail: "restock 3 Pils cases to Warehouse", verb: "Put back", tone: "attention", warning: true, icon: "package" },
     { key: "po", title: "PO-0142 · Fictional Malt Supply", detail: "arrives Thu", verb: "Receive", tone: "info", icon: "truck" },
-    { key: "route", title: "Next delivery · Ridgeline", detail: "your route · stop 1 of 3", verb: "Resume", tone: "info", icon: "route" },
+    { key: "route", title: "Next delivery · Ridgeline", state: "Next stop", detail: "your route · stop 1 of 3", verb: "Resume", tone: "info", icon: "route" },
   ],
 };
 
@@ -53,20 +54,20 @@ export const todayEmpty: TodayViewModel = {
 export const todaySales: TodayViewModel = {
   actions: actions("sales"),
   rows: [
-    { key: "ord1", title: "ORD-0231 · Ridgeline", detail: "submitted · ships Sep 3, 2026", verb: "Confirm", tone: "success", warning: true, icon: "package" },
-    { key: "ord2", title: "ORD-0235 · Teresa’s", detail: "submitted · ships Sep 4, 2026", verb: "Confirm", tone: "success", icon: "package" },
+    { key: "ord1", title: "ORD-0231", customer: "Ridgeline", state: "Submitted", detail: "ships Sep 3, 2026", verb: "Confirm", tone: "success", warning: true, icon: "package" },
+    { key: "ord2", title: "ORD-0235", customer: "Teresa’s", state: "Submitted", detail: "ships Sep 4, 2026", verb: "Confirm", tone: "success", icon: "package" },
     refusedCredit,
     { key: "pils", title: "Pils · 16 oz case", detail: "Not enough Pils for 2 orders", verb: "Choose who gets it", tone: "attention", warning: true },
     { key: "hazy", title: "Hazy IPA · ½ bbl", detail: "11 ready · fine" },
     { key: "oh", title: "Al’s Bar · OH", detail: "Al’s Bar can’t receive Stout in OH", verb: "Fix registration", tone: "attention", warning: true },
-    { key: "inv", title: "INV-1042 · Ridgeline", detail: "buyer asked about this invoice", verb: "Open", tone: "primary", warning: true },
+    { key: "inv", title: "INV-1042", customer: "Ridgeline", state: "Question", detail: "buyer asked about this invoice", verb: "Open", tone: "primary", warning: true },
   ],
 };
 
 export const todayBrewer: TodayViewModel = {
   actions: actions("brewer"),
   rows: [
-    { key: "fv3", title: "FV3 · Stout", detail: "reading overdue 31 h", verb: "Reading", tone: "info", warning: true, icon: "thermo" },
+    { key: "fv3", title: "FV3 · Stout", state: "Reading due", overdue: true, detail: "last read 31 h ago", verb: "Reading", tone: "info", warning: true, icon: "thermo" },
     { key: "brew", title: "B-0416 · Hazy IPA v4", detail: "brew day Sep 4, 2026 · 15 bbl", verb: "Start", tone: "info", icon: "beer" },
     { key: "run", title: "RUN-0031 · Hazy cans", detail: "packaged today · close due", verb: "Close", tone: "info", warning: true, icon: "package" },
     { key: "fv1", title: "FV1 · Pils", detail: "1.9 °P · read 4 h ago", icon: "thermo" },
