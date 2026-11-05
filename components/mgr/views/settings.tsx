@@ -11,6 +11,7 @@ import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-ic
 import { navAbout } from "@/lib/mgr/nav";
 import type { SettingsViewModel } from "@/lib/mgr/settings-view";
 import { WATER_PROFILES_CAPTION } from "@/lib/mgr/water-profiles-view";
+import { AgentsSettingsView } from "@/components/mgr/views/agents-settings";
 import { AiModelSettingsView } from "@/components/mgr/views/ai-model-settings";
 import { BrewerySettingsFormView } from "@/components/mgr/views/brewery-settings-form";
 import { PortalFulfillmentView } from "@/components/mgr/views/portal-fulfillment";
@@ -25,6 +26,7 @@ export function SettingsView({
   unitsForm,
   fulfillmentForm,
   aiModelForm,
+  agentsForm,
   reportingBasisForm,
   hrefs = {},
 }: {
@@ -34,6 +36,7 @@ export function SettingsView({
   unitsForm?: ReactNode;
   fulfillmentForm?: ReactNode;
   aiModelForm?: ReactNode;
+  agentsForm?: ReactNode;
   reportingBasisForm?: ReactNode;
   hrefs?: Partial<Record<"locations" | "team" | "accounting" | "pos" | "chat" | "import" | "water" | "channels", string>>;
 }) {
@@ -55,6 +58,8 @@ export function SettingsView({
         <FieldSeparator className="@min-[48rem]:hidden" />
         <div className="flex min-w-0 flex-col gap-6">
           {aiModelForm ?? <AiModelSettingsView value={model.aiModel} models={model.aiModels} />}
+          <FieldSeparator />
+          {agentsForm ?? <AgentsSettingsView enabled={model.agentsEnabled} />}
           <FieldSeparator />
           {fulfillmentForm ?? <PortalFulfillmentView locations={model.warehouseOptions} currentId={model.warehouseId} />}
         </div>

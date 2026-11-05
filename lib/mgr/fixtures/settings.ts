@@ -23,6 +23,7 @@ export const settingsDemo: SettingsViewModel = {
   hasFiledReports: true,
   basisCorrections: [basisCorrectionDemo],
   oneWayKegFee: "10.00",
+  agentsEnabled: false,
   aiModel: "anthropic/claude-sonnet-4.5",
   aiModels: [
     { id: "anthropic/claude-sonnet-4.5", name: "Claude Sonnet 4.5" },

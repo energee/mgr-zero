@@ -51,6 +51,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                   }}
                   switchAction={switchBrewery}
                   chatHref="/settings/chat"
+                  agentsHref="/settings/agents"
                   units={<GravityUnitForm part="mine" brewery={brewery.gravityUnit} mine={brewery.myGravityUnit} />}
                   footer={<MeSheetActions guide="/docs/staff-guide" />}
                 />

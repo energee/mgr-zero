@@ -7,8 +7,10 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { POST } from "@/app/api/command/route";
 import { createRequestAuthContext } from "@/lib/auth/request-context";
 import { buildContextFromBearer } from "@/lib/commands/context";
+import { runCommand } from "@/lib/commands/registry";
+import "@/lib/commands/all";
 import type { Database } from "@/lib/supabase/database";
-import { admin, asUser, ins, makeBrewery, makeStaff, seedCustomer, seedLocation, sql } from "./helpers";
+import { admin, asUser, ins, makeBrewery, makeStaff, makeStaffCtx, seedCustomer, seedLocation, sql } from "./helpers";
 
 const API = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
@@ -225,5 +227,33 @@ describe("agent tokens", () => {
       "get_material_count_preview", "get_order_email_status", "get_qbo_sync_status", "preview_inventory_movement",
       "record_invite_failure", "record_submitted_order_occurrence",
     ]);
+  });
+});
+
+describe("the Admin switch for agents", () => {
+  it("is off for a new brewery, and an Admin can turn it on and off", async () => {
+    const adminCtx = await makeStaffCtx((await makeBrewery()).id, "admin");
+    const isOn = async () => (await runCommand("get_brewery", {}, adminCtx) as { agents_enabled: boolean }).agents_enabled;
+    expect(await isOn()).toBe(false);
+    await runCommand("set_brewery_agents_enabled", { enabled: true }, adminCtx);
+    expect(await isOn()).toBe(true);
+    await runCommand("set_brewery_agents_enabled", { enabled: false }, adminCtx);
+    expect(await isOn()).toBe(false);
+  });
+
+  it("is refused for everyone else", async () => {
+    const warehouse = await makeStaffCtx((await makeBrewery()).id, "warehouse");
+    await expect(runCommand("set_brewery_agents_enabled", { enabled: true }, warehouse)).rejects.toMatchObject({ code: "permission_denied" });
+  });
+
+  it("lists only the person's own breweries, each with its switch", async () => {
+    const on = await makeBrewery();
+    const off = await makeBrewery();
+    await makeBrewery();
+    const staff = await makeStaff(on.id, "warehouse");
+    sql(`insert into public.brewery_users (brewery_id, user_id, roles) values ('${off.id}', '${staff.id}', array['sales']::public.staff_role[])`);
+    setAgentsEnabled(on.id, true);
+    const breweries = await runCommand("list_my_agent_breweries", {}, { db: await asUser(staff.email), userId: staff.id, breweryId: null, roles: [] }) as { id: string; agentsEnabled: boolean }[];
+    expect(breweries.map(b => [b.id, b.agentsEnabled]).sort()).toEqual([[on.id, true], [off.id, false]].sort());
   });
 });

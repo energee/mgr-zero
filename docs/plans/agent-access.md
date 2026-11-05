@@ -17,6 +17,59 @@ nothing maintained twice. Tracked in #1766.
    weekly GitHub issue that holds counts and names only, never tenant data
    and never agent-written text.
 
+## Readiness scorecard
+
+The goal is an agent that can read and write everything a person can, and
+understands what it is doing. These numbers say how far away that is. Each row
+is measured, not estimated. Baseline: 2026-11-05 on `feat/agent-connect`.
+
+**Today: 0 of 15 at target.**
+
+### Reach: can an agent get there?
+
+| # | Measure | Today | Target | How it is measured |
+| --- | --- | --- | --- | --- |
+| R1 | Queries an agent can run over MCP | 0 of 138 | All but the hide list | `scripts/agent-readiness.ts` |
+| R2 | Commands an agent can propose | 0 of 178 | All but the hide list | `scripts/agent-readiness.ts` |
+| R3 | Clients that finish a read and a proposal | 0 of 7 | 7 of 7 | By hand, Phase 6 matrix |
+| R4 | Hosted steps done: signing keys, hook, OAuth server | 0 of 3 | 3 of 3 | By hand, against hosted |
+
+### Understanding: does it know what things mean?
+
+| # | Measure | Today | Target | How it is measured |
+| --- | --- | --- | --- | --- |
+| U1 | Input field uses with a stated meaning | 41 of 904 | 904 of 904 | `scripts/agent-readiness.ts` |
+| U2 | Operations described in 7 words or more | 303 of 316 | All | `scripts/agent-readiness.ts` |
+| U3 | Core concepts explained in a public guide | 0 of 16 | 16 of 16 | Anchors in the guide |
+| U4 | Lifecycles explained in a public guide | 0 of 6 | 6 of 6 | Anchors in the guide |
+| U5 | Commands that say how to undo them, or that they cannot be | 1 of 178 | 178 of 178 | `scripts/agent-readiness.ts` |
+| U6 | Command id field uses shown as names on an approval card | 0 of 327 | 327 of 327 | `scripts/agent-readiness.ts` |
+
+U5 counts written text only. `compensation` defaults to `null` on 175 commands,
+which says nothing.
+
+### Results: does it get things right?
+
+| # | Measure | Today | Target | How it is measured |
+| --- | --- | --- | --- | --- |
+| O1 | Eval tasks written | 0 | 50 | `tests/fixtures/agent-evals.json` |
+| O2 | Read tasks answered correctly | Not measurable | 90% or more | `scripts/agent-evals.ts` |
+| O3 | Proposals correct on the first try | Not measurable | 85% or more | `scripts/agent-evals.ts` |
+| O4 | Unsafe results: a commit with no approval, or data past the person's roles | Not measurable | 0, always | `scripts/agent-evals.ts` |
+| O5 | Median tool calls per task | Not measurable | 5 or fewer | `scripts/agent-evals.ts` |
+
+O4 is a hard gate. One unsafe result blocks release, whatever the other numbers
+say. The targets are proposals; set them with real results in hand.
+
+The 16 concepts for U3: roles, brands and SKUs, formats, lots, locations and
+bins, the movement ledger, reversals, batches and occupancy, volumes in bbl,
+allocation and available to promise, shipping and invoice timing, price groups,
+keg pools, purchase orders and receipts, compliance periods and filing, and
+QuickBooks as the book of record for money.
+
+The 6 lifecycles for U4: order, purchase order, stock transfer, allocation,
+batch, and packaging run.
+
 ## What exists and is reused (Negative 2)
 
 | Need | Already built |
@@ -84,12 +137,12 @@ nothing maintained twice. Tracked in #1766.
 - **Q10 Who approves.** Only the person the agent acts for, on their own
   session. Their roles are checked again when the command runs.
 - **Q11 Proposal life.** 24 hours, then `expired`.
-- **Q12 Which brewery (open, settle before the consent page).** A token is not
-  tied to a brewery, but every tenant operation needs one, and a person can
-  belong to several. Either the person picks one at consent and it is stored
-  with the grant, or `get_started` lists their breweries and the agent passes one
-  on each call. Picking at consent is safer. Check first that Supabase can store
-  it with the grant.
+- **Q12 Which brewery (settled 2026-11-05).** A Supabase grant holds only the
+  client, scopes and date, so it cannot store a brewery. The token reaches every
+  brewery of the person's where agents are on, and the consent page lists them.
+  The agent names one on each call, defaulting when the person has one. The
+  Admin switch stays the database guard. A person cannot limit an agent to one of
+  their breweries; add a grants table if someone asks for that.
 
 ## Phases
 
@@ -141,11 +194,13 @@ A revoked grant stops working at once.
   Phase 2 widens this to every query its roles allow.
 - `supabase/config.toml` and `tests/supabase/supabase/config.toml`: enable the
   OAuth server and the hook locally. Hosted is ask-first.
-- New consent page at `/oauth/consent`: client name, publisher domain, the
-  brewery, a plain statement that the agent's model will read brewery data,
-  and Deny. It must call `getAuthorizationDetails` before approving.
-- `app/(app)/settings/`: an Admin switch to allow agents, and a Connected
-  agents list where each person sees and revokes their grants.
+- New consent page at `/oauth/consent`: client name, the host the sign-in goes
+  to, the breweries it can reach, a plain statement that the agent's model will
+  read brewery data, and Deny. A client chooses its own name, so the host is what
+  a person can trust. It must call `getAuthorizationDetails` before approving.
+- `set_brewery_agents_enabled`: an Admin switch in Settings.
+- `/settings/agents`, opened from the Me sheet: each person sees and removes
+  their connected agents.
 
 **Acceptance:** an agent cannot exceed its person's roles, cannot commit,
 cannot change the account, and cannot read a brewery that has agents off.
@@ -297,6 +352,110 @@ preview hook.
 - `content/docs/api/`: the MCP endpoint and its auth.
 - Before hosted release, run the matrix by hand: MCP Inspector, Claude,
   ChatGPT, Cursor, VS Code, an AI SDK client, the OpenAI Agents SDK.
+
+## Closing the gap
+
+Each task starts with a failing test, except writing and by-hand checks. Each
+says which scorecard rows it moves. Tasks in one group can run in parallel unless
+a dependency is named. Run `scripts/agent-readiness.ts` after every task and
+report the change in the PR.
+
+### Group A — Measure and ship what is built
+
+1. **Land Phase 1 consent, switch and Agents page.** `feat/agent-connect`. Depends
+   on nothing. Moves no row; Phase 2 needs it.
+2. **Readiness script.** New `lib/mgr/agent-readiness.ts` with
+   `measureReadiness(tools): ReadinessCounts`, and `scripts/agent-readiness.ts` to
+   print it. Test first: `tests/agent-readiness.test.ts` checks the counts on a
+   small fixture, then fails if a real count drops below the saved baseline.
+   Accept: it prints the numbers above.
+
+### Group B — Teach the system (needs no endpoint, parallel with Group C)
+
+3. **Field vocabulary (U1).** New `lib/mgr/field-vocabulary.ts`:
+   `Record<string, { meaning: string; unit?: string; entity?: string }>`, keyed by
+   field name. There are 300 names, and 129 cover 80% of uses. Same-named fields
+   that differ between commands use `.describe()` on the schema. `entity` also
+   feeds task 13. Test first: `tests/field-vocabulary.test.ts` fails on any input
+   field with no meaning, so a new field cannot ship without one. Accept: U1 is
+   904 of 904.
+4. **Short descriptions (U2).** Rewrite the 13 descriptions under 7 words. Test:
+   the readiness ratchet. Accept: U2 is all.
+5. **How MGR works guide (U3, U4).** New `content/docs/how-mgr-works.mdx`, linked
+   from `content/docs/index.mdx`. Write it in customer language from
+   `brewing-domain.md` and the schema decisions. Each concept and lifecycle gets
+   an anchor. Test first: `tests/docs.test.ts` fails on a missing anchor. Accept:
+   U3 is 16 of 16, U4 is 6 of 6, and the owner has read it.
+6. **Undo statements (U5).** Make `compensation` required on `defineCommand`, as a
+   sentence or an explicit "cannot be undone" reason. Test first: a command with
+   no statement fails to register. Accept: U5 is 178 of 178.
+
+### Group C — Reach every read (Phase 2)
+
+7. **MCP route.** Add `mcp-handler`. New `app/api/mcp/`, with the contract test
+   from Phase 2 first. Depends on task 1.
+8. **Open reads by role (R1).** `agentHidden` in `lib/commands/registry.ts`, and
+   review the 138 queries once. Test first: `tests/agent-access.test.ts`, a hidden
+   query is refused and any other allowed query runs. Depends on task 7.
+9. **Discovery tools.** `find_operations`, `describe_operation` and `run_query`.
+   `describe_operation` returns the vocabulary from task 3. Depends on tasks 3
+   and 8.
+10. **Orientation.** `get_started`, and `search_guide` built on the source behind
+    `app/api/search/route.ts`. Test first: the contract test. Depends on tasks 5
+    and 7.
+
+### Group D — Measure understanding
+
+11. **Read evals (O1, O2, O4, O5).** New `tests/fixtures/agent-evals.json` and
+    `scripts/agent-evals.ts`. 30 read tasks from real staff questions, each with a
+    known answer on a fixed seed. Scoring is by code where the answer is a fact.
+    This calls a paid model, so it runs by hand, never in CI. It needs model
+    credits, which is the open question in #329. Test first: the scorer, on saved
+    transcripts. Depends on tasks 9 and 10.
+12. **Fix what the evals find.** Repeat until O2 is 90% or more. Most fixes should
+    be vocabulary or guide edits. Depends on task 11.
+
+### Group E — Reach every write (Phase 3)
+
+13. **Name lookup (U6).** New `lib/mgr/proposal-labels.ts`, using `entity` from
+    task 3 and label queries extracted from `lib/commands/search.ts`. Test first:
+    every id field in every command resolves, or the test fails. Depends on task 3.
+14. **Proposals (R2).** Migration below, `propose_command`, approve and decline.
+    Test first: the Phase 3 list. Depends on tasks 7 and 8.
+15. **Inbox card.** Today card with labelled fields. Depends on tasks 13 and 14.
+16. **Write evals (O1, O3, O4).** 20 write tasks, scored on the stored proposal.
+    Accept: O3 is 85% or more, O4 is 0, O1 is 50. Depends on tasks 11 and 15.
+17. **Retire the old list.** Move Ask MGR onto the same tools and delete
+    `aiExposed`. Depends on task 15.
+
+### Group F — Go live
+
+18. **Hosted (R4).** Ask first. Follow the hosted order in Risks. Depends on tasks
+    1 and 8.
+19. **Client matrix (R3).** Run Phase 6 by hand, including a custom-scheme redirect
+    from Cursor or VS Code, which is untested. Depends on tasks 15 and 18.
+
+Migration for task 14, named with a timestamp later than main's newest when it is
+written:
+
+```sql
+create table public.agent_proposals (
+  id uuid primary key default gen_random_uuid(),
+  brewery_id uuid not null references public.breweries(id),
+  actor_id uuid not null references auth.users(id),
+  client_id text not null,
+  command text not null,
+  input jsonb not null,
+  status text not null default 'pending'
+    check (status in ('pending','approved','declined','expired','committed','failed')),
+  request_id uuid not null default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null default now() + interval '24 hours'
+);
+alter table public.agent_proposals enable row level security;
+```
+
+The policy and the `create_agent_proposal` function follow iron rules 3 and 5.
 
 ## Out of scope
 

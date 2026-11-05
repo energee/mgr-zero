@@ -8,7 +8,7 @@
 // override on their own brewery_users row, and null there means "follow the
 // brewery".
 import { z } from "zod";
-import { isoDate, defineCommand, defineQuery, phone, unwrap, STAFF_ROLES } from "./registry";
+import { completeRows, isoDate, defineCommand, definePreTenantQuery, defineQuery, PAGE_SIZE, phone, unwrap, STAFF_ROLES } from "./registry";
 import { GRAVITY_UNITS, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { chatModelFromSettings, DEFAULT_CHAT_MODEL, MODEL_ID } from "@/lib/chat/models";
 
@@ -26,6 +26,27 @@ defineQuery({
     const breweryUnit = (brewery?.gravity_unit ?? "plato") as GravityUnit;
     const mine = (membership?.gravity_unit ?? null) as GravityUnit | null;
     return { brewery: breweryUnit, mine, effective: mine ?? breweryUnit };
+  },
+});
+
+defineCommand({
+  name: "set_brewery_agents_enabled",
+  description: "Allow or stop outside agents, such as Claude or ChatGPT, for this brewery. Off stops every connected agent at once",
+  input: z.object({ enabled: z.boolean() }),
+  roles: ["admin"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_brewery_agents_enabled", {
+    p_brewery: ctx.breweryId, p_enabled: i.enabled, p_request_id: execution.requestId,
+  })),
+});
+
+definePreTenantQuery({
+  name: "list_my_agent_breweries",
+  description: "The breweries this person works at, each with whether outside agents are allowed there",
+  input: z.object({}),
+  handler: async (ctx) => {
+    const rows = await completeRows("Brewery list", start => ctx.db.from("breweries")
+      .select("id, name, agents_enabled", { count: "exact" }).order("name").order("id").range(start, start + PAGE_SIZE - 1));
+    return rows.map(row => ({ id: row.id, name: row.name, agentsEnabled: row.agents_enabled }));
   },
 });
 
@@ -51,7 +72,7 @@ defineCommand({
 
 const readingDueHours = z.number().int().min(1).max(168);
 const gatewayModel = z.string().trim().min(3).max(200).regex(MODEL_ID);
-const BREWERY_COLUMNS = "id, name, timezone, ttb_registry_no, customer_phone, fermentation_reading_due_hours, days_to_package, gravity_unit, portal_fulfillment_location_id, books_opened_on, one_way_keg_fee_cents";
+const BREWERY_COLUMNS = "id, name, timezone, ttb_registry_no, customer_phone, fermentation_reading_due_hours, days_to_package, gravity_unit, portal_fulfillment_location_id, books_opened_on, one_way_keg_fee_cents, agents_enabled";
 
 defineQuery({
   name: "get_brewery",

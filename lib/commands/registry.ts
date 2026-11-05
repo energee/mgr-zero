@@ -368,7 +368,7 @@ export function definePreTenantCommand<In, Out>(definition: {
 
 /** Authenticated reads that do not require an existing membership. */
 export function definePreTenantQuery<In, Out>(definition: {
-  name: "list_my_invitations";
+  name: "list_my_invitations" | "list_my_agent_breweries";
   description: string;
   input: ZodType<In>;
   handler: (ctx: PreTenantCtx, input: In) => Promise<Out>;
