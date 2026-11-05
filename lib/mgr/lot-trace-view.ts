@@ -1,7 +1,7 @@
 // lib/mgr/lot-trace-view.ts — view-model for Lot trace.
 import { formatDate } from "@/lib/date-format";
 import { sentenceCase } from "./labels";
-import { shipToAddress } from "./ship-to-view";
+import { shipToLine } from "./ship-to-view";
 import { bblFixed } from "@/lib/volume";
 import { batNo, docNo, runNo } from "./doc-no";
 
@@ -73,7 +73,7 @@ export function toRecipientViews(recipients: LotTraceSnapshot["recipients"], bac
   return recipients.map(recipient => ({
     id: recipient.id, orderNo: docNo("ORD", recipient.order_no, "Order"), orderHref: backHref ? `/orders/${recipient.id}` : undefined,
     customer: recipient.customers ? { ...recipient.customers, href: backHref ? `/customers/${recipient.customers.id}` : undefined } : undefined,
-    shipTo: recipient.ship_tos ? [recipient.ship_tos.label, shipToAddress(recipient.ship_tos)].filter(Boolean).join(" · ") : undefined,
+    shipTo: recipient.ship_tos ? shipToLine(recipient.ship_tos) : undefined,
     shipments: recipient.shipments.map(shipment => ({ id: shipment.id, label: [shipment.carrier, shipment.tracking].filter(Boolean).join(" · ") || "No carrier or tracking", invoices: shipment.invoices.map(invoice => ({ id: invoice.id, number: docNo("INV", invoice.invoice_no, "Invoice"), href: backHref ? `/invoices/${invoice.id}` : undefined })) })),
   }));
 }

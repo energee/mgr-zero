@@ -19,10 +19,11 @@ export const invoiceIsSettledWithoutPayment = (invoice: Parameters<typeof invoic
 
 /** An invoice can take a credit memo (Return) only while it is still owed or
  *  paid. Written off, voided, or deleted in QuickBooks means nothing is owed,
- *  so crediting it would credit money never collected. create_credit_memo_impl
- *  refuses the same states (#418). */
-export const invoiceIsCreditable = (invoice: Parameters<typeof invoiceCurrentState>[0] & { kind: "invoice" | "credit_memo" }) =>
-  invoice.kind === "invoice" && ["unpaid", "paid"].includes(invoiceCurrentState(invoice));
+ *  so crediting it would credit money never collected. A historical order's
+ *  invoice (not_synced) moved no stock, so it has nothing to return.
+ *  create_credit_memo_impl refuses the same states (#418). */
+export const invoiceIsCreditable = (invoice: Parameters<typeof invoiceCurrentState>[0] & { kind: "invoice" | "credit_memo"; qbo_sync_status?: string }) =>
+  invoice.kind === "invoice" && invoice.qbo_sync_status !== "not_synced" && ["unpaid", "paid"].includes(invoiceCurrentState(invoice));
 
 /** The facts that decide who owns an invoice's balance. The names are
  *  InvoiceListRecord's, so a register row passes as is. */

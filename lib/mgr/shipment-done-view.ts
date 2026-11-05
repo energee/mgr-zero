@@ -2,6 +2,7 @@
 import { docNo } from "./doc-no";
 import { kegShortageText, type KegShortage } from "./keg-fleet-view";
 import { saleVolume } from "@/lib/volume";
+import { stateOrCountry } from "./ship-to-view";
 
 export type ShipmentDoneViewModel = {
   backTo: string;
@@ -29,7 +30,7 @@ export type ShipmentDoneSnapshot = {
   order: {
     id: string;
     order_no: number | null;
-    ship_tos?: { state: string } | null;
+    ship_tos?: { country: string; state: string | null } | null;
   };
   invoice: { invoice_no: number | null } | null;
   lines: {
@@ -44,7 +45,7 @@ export type ShipmentDoneSnapshot = {
 
 /** Map get_order + get_invoice onto ShipmentDoneView. */
 export function toShipmentDoneViewProps({ order, invoice, lines, backHref, invoiceHref, routeHref, invoiceTiming, warnings }: ShipmentDoneSnapshot): ShipmentDoneViewModel {
-  const dest = order.ship_tos?.state ?? "";
+  const dest = stateOrCountry(order.ship_tos);
   const inv = docNo("INV", invoice?.invoice_no ?? null, "Invoice");
   const tape: [string, string][] = [];
   for (const l of lines) {

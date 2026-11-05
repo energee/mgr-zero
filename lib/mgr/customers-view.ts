@@ -1,7 +1,8 @@
 // lib/mgr/customers-view.ts — view-model for the Customers list: one fact per
 // column of its RecordTable (components/mgr/views/customers.tsx).
 import type { EmptyState } from "./empty-state";
-import { countryName, nameWithAlias, paymentTermLabel, sentenceCase } from "./labels";
+import { nameWithAlias, paymentTermLabel, sentenceCase } from "./labels";
+import { stateOrCountry } from "./ship-to-view";
 export type CustomersRowView = {
   key: string;
   title: string;
@@ -54,7 +55,7 @@ export function toCustomersViewProps({ customers, missingPortalEmail, filtered }
       key: c.id,
       title: nameWithAlias(c),
       type: sentenceCase(c.type),
-      region: c.country === "US" ? c.state ?? "" : countryName(c.country),
+      region: stateOrCountry(c),
       channel: c.sale_channels?.name,
       terms: c.payment_terms ? paymentTermLabel(c.payment_terms) : undefined,
       note: c.portal_user_count != null ? `${c.portal_user_count} portal users` : c.remit,

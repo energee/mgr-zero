@@ -22,9 +22,9 @@ export type ImportViewModel = {
 };
 
 /** How the upload step's column list marks a field; state is required only for a US row. */
-function columnRequirementLabel(field: { required?: boolean; usOnly?: boolean }): string {
+function columnRequirementLabel(field: { required?: boolean; type?: string }): string {
   if (field.required) return "required";
-  if (field.usOnly) return "required for a US address";
+  if (field.type === "state") return "required for a US address";
   return "optional";
 }
 

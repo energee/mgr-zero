@@ -17,12 +17,12 @@ export const IMPORT_FIELD_LABELS = {
   style: "Style", abv: "ABV (%)", upc: "UPC", priceGroupId: "Price group", unitPriceCents: "Unit price (cents)",
   skuId: "SKU", locationId: "Location", binId: "Bin", qty: "Quantity", note: "Note",
 };
-// usOnly: required only when the row's country is US (the default), as in
-// import_csv_row. A state outside the US is refused (customers_state_by_country).
-type Field = { name: keyof typeof IMPORT_FIELD_LABELS; required?: boolean; usOnly?: boolean; type?: "positive" | "cents" | "number" | "state" | "country"; lookup?: string; values?: readonly string[] };
+// A "state" field is required only when the row's country is US (the default), as in
+// import_csv_row, and refused for any other country (customers_state_by_country).
+type Field = { name: keyof typeof IMPORT_FIELD_LABELS; required?: boolean; type?: "positive" | "cents" | "number" | "state" | "country"; lookup?: string; values?: readonly string[] };
 export const IMPORT_FIELDS: Record<ImportKind, Field[]> = {
-  customers: [{ name: "name", required: true }, { name: "type", required: true, values: CUSTOMER_TYPES }, { name: "state", usOnly: true, type: "state" }, { name: "saleChannelId", required: true, lookup: "channels" }, { name: "licenseNumber" }, { name: "paymentTerms", values: PAYMENT_TERMS }, { name: "country", type: "country" }, { name: "alias" }],
-  ship_tos: [{ name: "customerId", required: true, lookup: "customers" }, { name: "label", required: true }, { name: "address1" }, { name: "city" }, { name: "zip" }, { name: "state", usOnly: true, type: "state" }, { name: "address2" }, { name: "country", type: "country" }],
+  customers: [{ name: "name", required: true }, { name: "type", required: true, values: CUSTOMER_TYPES }, { name: "state", type: "state" }, { name: "saleChannelId", required: true, lookup: "channels" }, { name: "licenseNumber" }, { name: "paymentTerms", values: PAYMENT_TERMS }, { name: "country", type: "country" }, { name: "alias" }],
+  ship_tos: [{ name: "customerId", required: true, lookup: "customers" }, { name: "label", required: true }, { name: "address1" }, { name: "city" }, { name: "zip" }, { name: "state", type: "state" }, { name: "address2" }, { name: "country", type: "country" }],
   products_skus: [{ name: "product", required: true }, { name: "formatId", required: true, lookup: "formats" }, { name: "sku_name" }, { name: "style" }, { name: "abv", type: "number" }, { name: "upc" }],
   channel_prices: [{ name: "saleChannelId", required: true, lookup: "channels" }, { name: "priceGroupId", required: true, lookup: "groups" }, { name: "formatId", required: true, lookup: "formats" }, { name: "unitPriceCents", required: true, type: "cents" }],
   opening_balances: [{ name: "skuId", required: true, lookup: "skus" }, { name: "locationId", required: true, lookup: "locations" }, { name: "binId", required: true, lookup: "bins" }, { name: "qty", required: true, type: "positive" }, { name: "note" }],
@@ -53,7 +53,7 @@ export function importTemplateCsv(kind: ImportKind): string {
 export function canReviewImport(kind: ImportKind, mapping: Record<string, number>, headers: string[], rows: Record<string, string>[]): boolean {
   const hasUsAddress = rows.some(row => (row.country?.trim() || "US") === "US");
   return rows.length > 0 && IMPORT_FIELDS[kind].every(field => {
-    if (!field.required && !(field.usOnly && hasUsAddress)) return true;
+    if (!field.required && !(field.type === "state" && hasUsAddress)) return true;
     const column = mapping[field.name];
     return Number.isInteger(column) && column >= 0 && column < headers.length;
   });
@@ -108,8 +108,8 @@ export function validateImportRow(kind: ImportKind, row: Record<string, string>,
   const us = (row.country?.trim() || "US") === "US";
   for (const f of IMPORT_FIELDS[kind]) {
     const value = row[f.name]?.trim() ?? "", label = IMPORT_FIELD_LABELS[f.name];
-    if (!value) { if (f.required || (f.usOnly && us)) errors.push(`${label} is required`); continue; }
-    if (f.name === "state" && !us) { errors.push("State is for a US address only; leave it blank for another country"); continue; }
+    if (!value) { if (f.required || (f.type === "state" && us)) errors.push(`${label} is required`); continue; }
+    if (f.type === "state" && !us) { errors.push("State is for a US address only; leave it blank for another country"); continue; }
     if (f.values && !f.values.includes(value)) errors.push(`${label}: choose ${f.values.join(", ")}`);
     // Preview resolves identities only for validation; the RPC receives the original cells.
     if (f.lookup && lookups) {

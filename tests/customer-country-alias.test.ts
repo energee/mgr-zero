@@ -184,6 +184,11 @@ describe("import_csv_row", () => {
     expect(row.status).toBe("committed");
     expect(row.result).toMatchObject({ country: "JP", state: null });
   });
+
+  it("refuses a foreign row that names a state, in words, not as a constraint name", async () => {
+    const [row] = await importRows("customers", [{ name: `CSV JP state ${R()}`, type: "distributor", country: "JP", state: "PA", saleChannelId: wholesale }]);
+    expect(row).toMatchObject({ status: "blocked", error: "state is for a US address only; leave it blank for another country" });
+  });
 });
 
 describe("QuickBooks invoice address", () => {

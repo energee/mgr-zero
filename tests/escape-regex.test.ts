@@ -1,6 +1,6 @@
 // tests/escape-regex.test.ts — escapeRegex makes user text literal inside a Postgres regex.
 import { describe, expect, it } from "vitest";
-import { escapeRegex, quotedSearchPattern } from "@/lib/escape-regex";
+import { escapeRegex, quotedRegex, quotedSearchPattern } from "@/lib/escape-regex";
 
 describe("escapeRegex", () => {
   it("escapes every regex metacharacter", () => {
@@ -8,6 +8,12 @@ describe("escapeRegex", () => {
   });
   it("leaves plain text, % and _ alone", () => {
     expect(escapeRegex("Hazy 100% IPA #14_b")).toBe("Hazy 100% IPA #14_b");
+  });
+});
+
+describe("quotedRegex", () => {
+  it("double-quotes a regex for or(), keeping its anchor and escaping quotes and backslashes again", () => {
+    expect(quotedRegex(`^${escapeRegex('a"b(')}`)).toBe('"^a\\"b\\\\("');
   });
 });
 

@@ -1,6 +1,7 @@
 // lib/mgr/ship-view.ts — view-model for Ship (invoice now and on delivery).
 import { docNo } from "./doc-no";
 import { saleVolume } from "@/lib/volume";
+import { stateOrCountry } from "./ship-to-view";
 
 export type ShipLineView = {
   key: string;
@@ -33,7 +34,7 @@ export type ShipSnapshot = {
     order_no: number | null;
     from_location_id: string;
     pickup?: boolean;
-    ship_tos?: { state: string } | null;
+    ship_tos?: { country: string; state: string | null } | null;
   };
   lines: {
     id: string;
@@ -57,7 +58,7 @@ export function toShipViewProps({ order, lines, locations, invoiceTiming: asked 
   const pickup = Boolean(order.pickup);
   const invoiceTiming = pickup ? "now" : asked;
   const source = locations.find((l) => l.id === order.from_location_id)?.name ?? "—";
-  const dest = order.ship_tos?.state ?? "";
+  const dest = stateOrCountry(order.ship_tos);
   const anyShort = lines.some((l) => shipOf(l) < pickedOf(l));
   const short = lines.find((l) => shipOf(l) < pickedOf(l));
   const tape: [string, string][] = [];

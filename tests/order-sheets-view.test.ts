@@ -152,10 +152,17 @@ describe("Ship view", () => {
   it("does not invent a destination code for an empty ship-to state", () => {
     const model = toShipViewProps({
       ...orderShipOnDelivery,
-      order: { ...orderShipOnDelivery.order, ship_tos: { state: "" } },
+      order: { ...orderShipOnDelivery.order, ship_tos: { country: "US", state: "" } },
       lines: [{ ...orderShipOnDelivery.lines[0], skus: { name: "Sample keg" } }],
     });
     expect(model.tape[0][0]).not.toMatch(/\b[A-Z]{2}\b/);
+  });
+  it("names an export's country on the removal tape, where a US ship-to names its state", () => {
+    const jp = { label: "Tokyo", country: "JP", city: null, state: null };
+    const ship = toShipViewProps({ ...orderShipOnDelivery, order: { ...orderShipOnDelivery.order, ship_tos: jp } });
+    expect(ship.tape[0]?.[0]).toMatch(/· ships to Japan$/);
+    const done = toShipmentDoneViewProps({ ...orderShipmentDone, order: { ...orderShipmentDone.order, ship_tos: jp } });
+    expect(done.tape[0]?.[0]).toMatch(/· ships to Japan$/);
   });
   it("names every held-back line on the restock preview", () => {
     const model = toShipViewProps({ ...orderShipInvoice, lines: orderShipInvoice.lines.map(line => ({ ...line, qty_shipped: 0 })) });
@@ -269,7 +276,7 @@ describe("Ship view", () => {
 
 describe("Shipment done view", () => {
   it("names the shipping destination only when supplied, preserving shortage notes", () => {
-    const destination = { ...orderShipmentDone, order: { ...orderShipmentDone.order, ship_tos: { state: "NY" } } };
+    const destination = { ...orderShipmentDone, order: { ...orderShipmentDone.order, ship_tos: { country: "US", state: "NY" } } };
     expect(toShipmentDoneViewProps(destination).tape[0][0]).toContain("NY");
     const model = toShipmentDoneViewProps({
       ...orderShipmentDone,
@@ -352,6 +359,12 @@ describe("Return and credit view", () => {
     });
     expect(model.tape.at(-1)).toEqual(["credit memo number · on commit", "−$1.08"]);
   });
+  it("counts the one-way fee credited with refused beer in the preview total", () => {
+    const line = { id: "keg", qty_shipped: 3, qty_returning: 1, unit_price_cents: 9000, skus: { name: "Keg" }, one_way_fee_cents: 1000 };
+    const { tape } = toReturnCreditViewProps({ ...orderReturnCredit, refusedDeliveryId: "stop", reason: "unsold", lines: [line] });
+    expect(tape).toEqual([["+1 Keg · return in", expect.any(String)], ["1 Keg · one-way keg fee", "−$10.00"], ["credit memo number · on commit", "−$100.00"]]);
+  });
+
   it("credits the beer and the refunded keg deposit in one memo, in whole kegs, with no stock for the deposit", () => {
     const model = toReturnCreditViewProps(orderReturnCredit);
     expect(model.title).toBe("Beer return");

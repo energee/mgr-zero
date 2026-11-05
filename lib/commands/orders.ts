@@ -210,7 +210,7 @@ defineQuery({
 });
 
 defineCommand({
-  name: "return_shipment", description: "Return shipped beer at invoice prices and its destination, posting damaged beer to loss and full-keg shells as Returned. Deposit-only refunds need no location or reason; returnEmptyKegs optionally checks empties into locationId and binId with the refund atomically",
+  name: "return_shipment", description: "Return shipped beer at invoice prices and its destination, posting damaged beer to loss and full-keg shells as Returned. Deposit-only refunds need no location or reason; returnEmptyKegs optionally checks empties into locationId and binId with the refund atomically. With refusedDeliveryId, the credit memo also credits the one-way keg fee for the refused kegs",
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({
     invoiceId: z.string().uuid(), refusedDeliveryId: z.string().uuid().optional(), locationId: z.string().uuid().optional(), reason: z.enum(["damaged", "wrong_item", "unsold"]).optional(),
@@ -467,7 +467,7 @@ defineQuery({
   handler: async (ctx, i) => {
     const [invoice, invLines, pushes, paymentRows, totals] = await Promise.all([
       unwrap(ctx.db.from("invoices").select("*, customers(id,name,qbo_customer_id,qbo_realm_id), shipments(orders(id, order_no))").eq("id", i.invoiceId).eq("brewery_id", ctx.breweryId).single()),
-      completeRows("Invoice lines", start => ctx.db.from("invoice_lines").select("*, skus(name,qbo_item_id,qbo_realm_id)", { count: "exact" })
+      completeRows("Invoice lines", start => ctx.db.from("invoice_lines").select("*, skus(name,qbo_item_id,qbo_realm_id), order_lines(sku_id)", { count: "exact" })
         .eq("invoice_id", i.invoiceId).eq("brewery_id", ctx.breweryId).order("kind").order("id").range(start, start + PAGE_SIZE - 1)),
       invoicePushFacts(ctx, [i.invoiceId]),
       // A void is its own row. PostgREST embeds it as one object or null, since

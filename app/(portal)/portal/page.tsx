@@ -5,7 +5,7 @@ import { getPortalContext } from "@/lib/portal";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { Cart, type CatalogItem, type ShipToOption } from "./cart";
-import { shipToAddress } from "@/lib/mgr/ship-to-view";
+import { shipToPlace } from "@/lib/mgr/ship-to-view";
 import { cache } from "react";
 
 const getSavedOrder = cache(async function getSavedOrder(id: string) {
@@ -23,7 +23,7 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
 type ShipToRow = { id: string; label: string; country: string; city: string | null; state: string | null; is_default: boolean };
 
 /** "Main (Phoenixville, PA)"; a ship-to with no city or state shows its country, or just its label. */
-const shipToOptionLabel = (s: ShipToRow) => { const place = shipToAddress(s); return place ? `${s.label} (${place})` : s.label; };
+const shipToOptionLabel = (s: ShipToRow) => { const place = shipToPlace(s); return place ? `${s.label} (${place})` : s.label; };
 
 export default async function ShopPage({ searchParams }: { searchParams: Promise<{ draft?: string; reorder?: string }> }) {
   const query = await searchParams;
