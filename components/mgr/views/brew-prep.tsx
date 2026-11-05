@@ -3,7 +3,8 @@
 // in whole packs plus loose base units; the brewer touches only exceptions.
 // Also exports the batch's Prep / Brew day tab bar, the packs + loose field and
 // the exact-source pick that the Brew day timeline (./brew-timeline.tsx) reuses
-// for its Edit.
+// for its Edit, and the after-knockout list (CellarPlan) that the timeline and
+// the recorded plan sheet (./brew-day.tsx) draw too.
 "use client";
 import { Fragment, useId, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
@@ -45,6 +46,14 @@ export function DetailParts({ text }: { text: string }) {
  *  on desk, right-aligned just after the content. The negative margins reach the page column's padding (app-shell's p-4). */
 export function BrewFooter({ children }: { children: ReactNode }) {
   return <div className="sticky -bottom-4 z-10 -mx-4 flex flex-col gap-2 border-t bg-background px-4 py-3 md:static md:mx-0 md:flex-row md:items-center md:justify-end md:border-0 md:bg-transparent md:p-0">{children}</div>;
+}
+
+/** What happens after knockout: the rows cellarPlanRows made, on Prep, Brew day and the recorded plan sheet. */
+export function CellarPlan({ rows }: { rows: [string, string][] }) {
+  return <>
+    {E.ttl("Later, in cellar")}
+    {rows.map(([label, detail], index) => <Fragment key={index}>{E.fld(label, <DetailParts text={detail} />)}</Fragment>)}
+  </>;
 }
 
 /** Reschedule and Cancel plan (planActions), folded at the foot of both tabs so the day's work comes first. Callers draw
@@ -122,7 +131,7 @@ export function BrewPrepView({ model, onChange, onPrint, onSave, messages, planA
           })}
         </Fragment>)}
       </div>
-      {E.fld("Later, in cellar", model.later)}
+      <CellarPlan rows={model.later} />
       {messages}
       <BrewFooter>
         <Button type="button" variant="outline" data-preview-action onClick={onPrint}>Print pull list</Button>

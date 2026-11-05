@@ -3,10 +3,10 @@
 // (Mash → Lauter → Boil → Whirlpool → Knockout). Both read the same brew-day
 // ingredients, counted in packs plus loose base units (./pack-qty). Open bags
 // are not inventory: a partial pull is just base units. Prep is saved as
-// brew_pulls through save_batch_pulls; nothing here moves stock.
-import { BREW_DAY_STAGES, fermentationStageDetail, ingredientDetail, INGREDIENT_STAGES, isBrewDayStage, perBblDisplay } from "./recipe-process-view";
+// brew_pulls through save_batch_pulls; nothing here moves stock. Both tabs and
+// the recorded plan sheet list what happens after knockout (cellarPlanRows).
+import { BREW_DAY_STAGES, fermentationStageDetail, ingredientDetail, isBrewDayStage, perBblDisplay } from "./recipe-process-view";
 import { brewDayLines, brewSourceKey, fitsStock, observedProcess, plannedIngredientQty, soleSource, type BrewDayVessel, type BrewMaterialSource, type BrewPlan, type BrewPlanIngredient, type BrewPull, type BrewWaterAddition } from "./brew-day-view";
-import { sentenceCase } from "./labels";
 import { materialSourceKey, type SourceIds } from "./material-source";
 import { fromPacks, splitPacks, withPacks } from "./pack-qty";
 import { fromTicks, isNumber, numberNotationError, toTicks } from "./quantity-input";
@@ -56,8 +56,8 @@ export type BrewPrepViewModel = {
   ingredients: BrewIngredient[];
   /** Stock a line without its exact source can be pulled from (get_brew_day_plan sources). Absent (the inventory), Choose lot is a plain verb; given, it opens an inline pick, or is disabled when none of it is that material. */
   sources?: BrewMaterialSource[];
-  /** The cellar-stage additions this batch still plans, e.g. "Fermentation 1 · Dry hop 6". */
-  later: string;
+  /** What happens after knockout, totalled for the planned barrels (cellarPlanRows). */
+  later: [string, string][];
 };
 
 /** The timeline's stages in process order; lauter and knockout hold readings only. */
@@ -86,6 +86,8 @@ export type BrewTimelineViewModel = {
   waterAdditions?: BrewWaterAddition[];
   /** The recipe target shown in each stage heading, e.g. "152 °F · 60 min · pH 5.3". */
   targets: Partial<Record<TimelineStage, string>>;
+  /** What happens after knockout, totalled for the planned barrels (cellarPlanRows). */
+  later: [string, string][];
   /** Process readings by the record_brew_day process keys, as typed. */
   process: Record<string, string>;
   vesselId: string;
@@ -145,15 +147,6 @@ export function waterAdditionRows(plan: BrewPlan, sources: BrewMaterialSource[])
       plan: fromTicks(toTicks(qty)), unit: addition.baseUnit, packSize: 1, source: only ? lineSource(only) : null }), water: true });
   }
   return { rows, reminders };
-}
-
-/** The cellar-stage lines still planned, counted by stage: "Fermentation 1 · Dry hop 6", or "None". */
-export function laterAdditions(plan: BrewPlan): string {
-  const stages = (plan.ingredients ?? []).map(row => row.stage);
-  const counts = INGREDIENT_STAGES.filter(stage => !isBrewDayStage(stage))
-    .map(stage => ({ stage, count: stages.filter(s => s === stage).length }))
-    .filter(({ count }) => count > 0);
-  return counts.map(({ stage, count }) => `${sentenceCase(stage)} ${count}`).join(" · ") || "None";
 }
 
 /** A later line's detail: "Dry hop · day 4 · 1.2 lb / bbl · 17.5 lb for 14.6 bbl". The total is left off unless `bbl` is above zero. */

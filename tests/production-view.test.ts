@@ -281,6 +281,47 @@ describe("Brew day view", () => {
     expect(html).not.toContain("18.181818");
   });
 
+  const textOf = (html: string) => html.replace(/<[^>]+>/g, "");
+
+  it("Prep and the Brew day timeline list the plan after knockout, totalled for the planned barrels", () => {
+    for (const html of [htmlOf(createElement(BrewPrepView, { model: brewPrepQuarry })), htmlOf(createElement(BrewTimelineView, { model: brewTimelineQuarry }))]) {
+      const text = textOf(html);
+      expect(text).toContain("Later, in cellar");
+      expect(text).toContain("68 °F · 4 days");
+      expect(text).toContain("Dry hop · day 4 · 1.2 lb / bbl · 26.4 lb for 22 bbl");
+    }
+  });
+
+  it("the live batch page totals both planned tabs for the planned barrels", () => {
+    expect(src("app/(app)/batches/[id]/page.tsx")).toContain("later: cellarPlanRows(plan.plan, plannedBbl)");
+  });
+
+  it("a recorded two-turn batch totals each turn's own knockout, never the planned barrels", () => {
+    const [first, second] = brewDayTurnsHazy.records!;
+    const model = { ...brewDayTurnsHazy, records: [first, { ...second, initial_bbl: 5 }] };
+    const text = textOf(htmlOf(createElement(BrewDayView, { model })));
+    expect(text).toContain("Dry hop · day 4 · 1.2 lb / bbl · 8.76 lb for 7.3 bbl");
+    expect(text).toContain("Dry hop · day 4 · 1.2 lb / bbl · 6 lb for 5 bbl");
+    expect(text).not.toContain("for 20 bbl");
+    expect(text).not.toContain("for 14.6 bbl");
+  });
+
+  it("the plan sheet carries boil, whirlpool and knockout targets, the cellar plan, and each later line once", () => {
+    const text = textOf(htmlOf(createElement(BrewDayView, { model: { ...brewDayTurnsHazy, records: brewDayTurnsHazy.records!.slice(0, 1) } })));
+    expect(text).toContain("Boil60 min");
+    expect(text).toContain("Whirlpool180 °F · 20 min");
+    expect(text).toContain("Knockout66 °F");
+    expect(text).toContain("Later, in cellar");
+    expect(text).toContain("68 °F · 4 days");
+    expect(text.match(/1\.2 lb/g)).toHaveLength(1);
+  });
+
+  it("an open turn's plan sheet totals the barrels in its form, and none while they are blank", () => {
+    const turn = brewTurnModel(brewDayTurnsHazy);
+    expect(textOf(htmlOf(createElement(BrewDayView, { model: turn })))).toContain("6.48 lb for 5.4 bbl");
+    expect(textOf(htmlOf(createElement(BrewDayView, { model: { ...turn, initialBbl: "" } })))).not.toMatch(/ lb for /);
+  });
+
   it("makes multiple recorded turns reachable in the inventory", () => {
     const html = htmlOf(screen("Brew day").body);
     for (const label of ["Add brew turn", "Correct turn 1", "Correct turn 2", "Turn 1", "Turn 2"]) expect(html).toContain(label);

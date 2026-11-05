@@ -2,7 +2,7 @@
 // snapshots. Views own no sample data.
 import type { BatchesSnapshot } from "@/lib/mgr/batches-view";
 import type { BrewDayViewModel } from "@/lib/mgr/brew-day-view";
-import { startAtPlan, waterAdditionRows, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
+import { cellarPlanRows, startAtPlan, waterAdditionRows, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import type { ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
 import type { RecipeViewModel } from "@/lib/mgr/recipe-view";
 import type { RecipesSnapshot } from "@/lib/mgr/recipes-view";
@@ -73,10 +73,23 @@ export const scheduleBatchHazy: ScheduleBatchViewModel = {
   note: "Dry hop on day 4",
 };
 
+/** The fermentation stages the Brew day and Prep frames list under Later, in cellar. */
+const cellarStages: FermentationStage[] = [
+  { name: "Primary", kind: "primary", tempF: 68, days: 4 },
+  { name: "Cold crash", kind: "cold crash", tempF: 34, days: 2 },
+];
+
 export const brewDayHazy: BrewDayViewModel = {
   sources: [{ material_id: "malt", material_name: "Pale malt", unit: "lb", location_id: "brewery", location_name: "Brewery", bin_id: "stock", bin_name: "Stock", lot_id: "malt-lot", lot_code: "M-24", qty: 800 }],
   actuals: [{ key: "malt", source: "malt/brewery/stock/malt-lot", stage: "mash", qty: "660" }], process: { knockoutTempF: "68" },
-  plan: { recipe: "Hazy v4", ingredients: [{ id: "malt", material_id: "malt", materialName: "Pale malt", unit: "lb", stage: "mash", per_bbl_qty: 45.2 }] },
+  plan: {
+    recipe: "Hazy v4",
+    version: { boil_minutes: 60, whirlpool_temp_f: 180, whirlpool_minutes: 20, knockout_temp_f: 66, fermentation_schedule: cellarStages },
+    ingredients: [
+      { id: "malt", material_id: "malt", materialName: "Pale malt", unit: "lb", stage: "mash", per_bbl_qty: 45.2 },
+      { id: "dry-hop", material_id: "citra", materialName: "Citra", unit: "lb", stage: "dry_hop", per_bbl_qty: 1.2, timing_minutes: 4 * 1440 },
+    ],
+  },
   title: "B-0416 · Hazy",
   lots: [
     { key: "malt", title: "2-row", detail: "lot L-0821 · 660 lb" },
@@ -116,6 +129,15 @@ const quarryIngredients: BrewIngredient[] = ([
 
 const quarryVessels = [1, 2, 3, 4, 5, 6].map(n => ({ id: `fv${n}`, name: `FV${n}`, kind: "fermenter", capacity_bbl: 25.5 }));
 
+/** Quarry's plan after knockout at 22 bbl: its stages, a yeast pitch on day 0 and a dry hop on day 4. */
+const quarryLater = cellarPlanRows({
+  version: { fermentation_schedule: cellarStages },
+  ingredients: [
+    { id: "yeast", material_id: "yeast", materialName: "House ale yeast", unit: "each", stage: "fermentation", per_bbl_qty: 0.1, timing_minutes: 0 },
+    { id: "dry-hop", material_id: "nelson", materialName: "Valley Hops Nelson Sauvin 2026", unit: "lb", stage: "dry_hop", per_bbl_qty: 1.2, timing_minutes: 4 * 1440 },
+  ],
+}, 22);
+
 /** Prep mid-pull: Fieldstone Pilsen came up 7.5 sacks, so it reads short. */
 export const brewPrepQuarry: BrewPrepViewModel = {
   title: "BAT-202 · Quarry #6 v1 · 22 bbl",
@@ -123,7 +145,7 @@ export const brewPrepQuarry: BrewPrepViewModel = {
   vesselId: "fv3",
   vessels: quarryVessels,
   ingredients: quarryIngredients.map(row => row.key === "pilsen" ? { ...row, packs: "7.5", loose: "0" } : row),
-  later: "Fermentation 1 · Dry hop 6",
+  later: quarryLater,
 };
 
 /** Chit Malt sits in two bins, so Prep could not pick its source alone: Edit offers both. */
@@ -149,6 +171,7 @@ export const brewTimelineQuarry: BrewTimelineViewModel = {
   sources: [...lineStock, ...chitStock, ...gypsumStock],
   ingredients: [...brewPrepQuarry.ingredients.map(row => ({ ...row, confirmed: row.key === "malted-oats" || row.key === "pilsen" })), ...quarryWater],
   targets: { mash: "152 °F · 60 min · pH 5.3", lauter: "pre-boil 25 bbl", boil: "60 min", whirlpool: "180 °F · 20 min", knockout: "66 °F" },
+  later: quarryLater,
   process: { mashWaterGal: "620", targetMashPh: "5.3" },
   vesselId: "fv3",
   vessels: quarryVessels,
