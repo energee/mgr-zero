@@ -283,7 +283,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   // Existing-account consent is authenticated own-identity work, covered by existing-account-invites.test.ts.
   const ownNames = ["accept_account_invitation","set_my_gravity_unit","consume_chat_link_proof","unlink_chat_user","set_notification_preference","set_personal_notification_destination","create_chat_conversation","append_chat_message"];
   const existing = [...readFileSync(new URL("./rls-command-boundary.test.ts", import.meta.url), "utf8").matchAll(/rpc: "(\w+)"/g)].map(m => m[1]);
-  const infrastructureNames = ["consume_command_admission"];
+  const infrastructureNames = ["agent_session_is_live", "consume_command_admission"];
   expect([...new Set(catalog.map(c => c.name))].sort()).toEqual([...new Set([...Object.keys(cases),...existing,...readNames,...ownNames,...infrastructureNames])].sort());
   const publicSnapshot = () => sql((Object.keys(matrix) as Table[]).map(table => {
     const predicate = table === "breweries" ? `id='${B}'` : table === "customer_users" ? `customer_id='${f.customer.customerId}'` : `brewery_id='${B}'`;
@@ -304,7 +304,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   expect(catalog.filter(c => ownNames.includes(c.name)).map(c => c.signature).sort()).toEqual([...ownSignatures].sort());
   // #467: brewery bootstrap is service-role only; the server passes the verified actor.
   expect(catalog.filter(c => c.name === "provision_brewery")).toEqual([]);
-  expect(catalog.filter(c => infrastructureNames.includes(c.name)).map(c => c.signature)).toEqual(["consume_command_admission()"]);
+  expect(catalog.filter(c => infrastructureNames.includes(c.name)).map(c => c.signature).sort()).toEqual(["agent_session_is_live()", "consume_command_admission()"]);
   await expect(db.rpc("consume_command_admission")).resolves.toMatchObject({ data: [{ allowed: true, retry_after: 0 }], error: null });
   for (const name of new Set(existing)) expect(catalog.filter(c => c.name === name), `${name} existing lifecycle case`).toHaveLength(1);
   const sharedDestination = await db.rpc("set_notification_destination", { p_brewery: B, p_installation: I, p_external_destination_id: "shared", p_request_id: R(), p_actor: f.owner.id, p_version: now });
