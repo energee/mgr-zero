@@ -86,7 +86,8 @@ export function createRequestAuthContext(createClient: RequestClientFactory = cr
     const db = await getSupabaseClient();
     const { data, error } = await db.auth.getClaims();
     const userId = data?.claims.sub;
-    if (error || typeof userId !== "string") return null;
+    // An agent token in a cookie is refused: only the bearer path applies agent limits.
+    if (error || typeof userId !== "string" || data?.claims.client_id) return null;
     const email = data?.claims.email;
     return { userId, email: typeof email === "string" ? email : null };
   })());
