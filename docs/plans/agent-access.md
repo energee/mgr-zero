@@ -21,7 +21,8 @@ nothing maintained twice. Tracked in #1766.
 
 The goal is an agent that can read and write everything a person can, and
 understands what it is doing. These numbers say how far away that is. Each row
-is measured, not estimated. Baseline: 2026-11-05 on `feat/agent-connect`.
+is measured, not estimated. Baseline: `main`, 2026-11-05. Print the current
+numbers with `bun run scripts/agent-readiness.ts`.
 
 **Today: 0 of 15 at target.**
 
@@ -29,8 +30,8 @@ is measured, not estimated. Baseline: 2026-11-05 on `feat/agent-connect`.
 
 | # | Measure | Today | Target | How it is measured |
 | --- | --- | --- | --- | --- |
-| R1 | Queries an agent can run over MCP | 0 of 138 | All but the hide list | `scripts/agent-readiness.ts` |
-| R2 | Commands an agent can propose | 0 of 178 | All but the hide list | `scripts/agent-readiness.ts` |
+| R1 | Queries an agent can run over MCP | 0 of 137 | All but the hide list | The MCP contract test |
+| R2 | Commands an agent can propose | 0 of 177 | All but the hide list | The MCP contract test |
 | R3 | Clients that finish a read and a proposal | 0 of 7 | 7 of 7 | By hand, Phase 6 matrix |
 | R4 | Hosted steps done: signing keys, hook, OAuth server | 0 of 3 | 3 of 3 | By hand, against hosted |
 
@@ -38,15 +39,15 @@ is measured, not estimated. Baseline: 2026-11-05 on `feat/agent-connect`.
 
 | # | Measure | Today | Target | How it is measured |
 | --- | --- | --- | --- | --- |
-| U1 | Input field uses with a stated meaning | 41 of 904 | 904 of 904 | `scripts/agent-readiness.ts` |
-| U2 | Operations described in 7 words or more | 303 of 316 | All | `scripts/agent-readiness.ts` |
+| U1 | Input field uses with a stated meaning | 41 of 916 | All | `scripts/agent-readiness.ts` |
+| U2 | Operations described in 7 words or more | 301 of 314 | All | `scripts/agent-readiness.ts` |
 | U3 | Core concepts explained in a public guide | 0 of 16 | 16 of 16 | Anchors in the guide |
 | U4 | Lifecycles explained in a public guide | 0 of 6 | 6 of 6 | Anchors in the guide |
-| U5 | Commands that say how to undo them, or that they cannot be | 1 of 178 | 178 of 178 | `scripts/agent-readiness.ts` |
-| U6 | Command id field uses shown as names on an approval card | 0 of 327 | 327 of 327 | `scripts/agent-readiness.ts` |
+| U5 | Commands that say how to undo them, or that they cannot be | 1 of 177 | All | `scripts/agent-readiness.ts` |
+| U6 | Command id field uses shown as names on an approval card | 0 of 334 | All | The name lookup test, task 13 |
 
-U5 counts written text only. `compensation` defaults to `null` on 175 commands,
-which says nothing.
+U5 counts written text only. `compensation` defaults to `null`, which says
+nothing.
 
 ### Results: does it get things right?
 
@@ -226,7 +227,7 @@ change.
 - `lib/commands/registry.ts`: `agentHidden` on a definition. `listTools` filters
   on it and `canRun`, and the agent gate in `runCommand` becomes "a query the
   person's roles allow and not hidden".
-- Review all 137 queries once for the hide list. Start with `get_qbo_connection`,
+- Review every query once for the hide list. Start with `get_qbo_connection`,
   `get_cola_image` and `preview_command`.
 - `/.well-known/oauth-protected-resource` for MCP auth discovery.
 - Server `instructions`, kept under 300 words: what MGR is, volumes are
@@ -355,6 +356,19 @@ preview hook.
 
 ## Closing the gap
 
+Work in this order, set by the owner on 2026-11-05:
+
+1. Prove one real read in a real client before anything else: the MCP route with
+   `get_started` and `run_query`, tried locally from Claude Code and MCP Inspector.
+   Everything so far was tested with scripts, not a client. The session swap in the
+   hook, client sign-in and `mcp-handler` could each force a design change.
+2. Finish Group C on `feat/agent-connect`, so #1773 lands Phase 1 and 2 together.
+3. Do Group B alongside it, in separate PRs off `main`. Start with the 129 field
+   names that cover 80% of uses.
+4. Run the read evals as soon as Group C works, and let their failures decide what
+   to write next.
+5. Then Group E, then Group F.
+
 Step 1 is done (2026-11-05). `mcp-remote`, a third-party client, found the server,
 registered itself, signed in through the consent page and ran `get_started` and
 `get_today`. The hook did not get in its way. Claude, ChatGPT, the 2026-07-28
@@ -369,11 +383,9 @@ report the change in the PR.
 
 1. **Land Phase 1 consent, switch and Agents page.** `feat/agent-connect`. Depends
    on nothing. Moves no row; Phase 2 needs it.
-2. **Readiness script.** New `lib/mgr/agent-readiness.ts` with
-   `measureReadiness(tools): ReadinessCounts`, and `scripts/agent-readiness.ts` to
-   print it. Test first: `tests/agent-readiness.test.ts` checks the counts on a
-   small fixture, then fails if a real count drops below the saved baseline.
-   Accept: it prints the numbers above.
+2. **Readiness script (done).** `lib/mgr/agent-readiness.ts`,
+   `scripts/agent-readiness.ts` and `tests/agent-readiness.test.ts`, which fails
+   if a number drops below its floor. Raise a floor when a number improves.
 
 ### Group B — Teach the system (needs no endpoint, parallel with Group C)
 
@@ -383,7 +395,7 @@ report the change in the PR.
    that differ between commands use `.describe()` on the schema. `entity` also
    feeds task 13. Test first: `tests/field-vocabulary.test.ts` fails on any input
    field with no meaning, so a new field cannot ship without one. Accept: U1 is
-   904 of 904.
+   all.
 4. **Short descriptions (U2).** Rewrite the 13 descriptions under 7 words. Test:
    the readiness ratchet. Accept: U2 is all.
 5. **How MGR works guide (U3, U4).** New `content/docs/how-mgr-works.mdx`, linked
@@ -393,14 +405,14 @@ report the change in the PR.
    U3 is 16 of 16, U4 is 6 of 6, and the owner has read it.
 6. **Undo statements (U5).** Make `compensation` required on `defineCommand`, as a
    sentence or an explicit "cannot be undone" reason. Test first: a command with
-   no statement fails to register. Accept: U5 is 178 of 178.
+   no statement fails to register. Accept: U5 is all.
 
 ### Group C — Reach every read (Phase 2)
 
 7. **MCP route.** Add `mcp-handler`. New `app/api/mcp/`, with the contract test
    from Phase 2 first. Depends on task 1.
 8. **Open reads by role (R1).** `agentHidden` in `lib/commands/registry.ts`, and
-   review the 138 queries once. Test first: `tests/agent-access.test.ts`, a hidden
+   review the queries once. Test first: `tests/agent-access.test.ts`, a hidden
    query is refused and any other allowed query runs. Depends on task 7.
 9. **Discovery tools.** `find_operations`, `describe_operation` and `run_query`.
    `describe_operation` returns the vocabulary from task 3. Depends on tasks 3
