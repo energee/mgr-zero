@@ -1,7 +1,6 @@
 # Recipe manager
 
-Status: approved to build, 2026-11-04. PRs 1 to 3 below ship together in #1767, and PR 4
-waits. This replaces plans B, C and D from the recipe page review
+Status: PRs 1 to 3 below are built and ship together in #1767, 2026-11-04. PR 4 is not built. This replaces plans B, C and D from the recipe page review
 (`brew-day-recipe-targets`, `recipe-outcomes`, `recipe-ibu-pitch`). Their full
 text is in commit 9de3f81e3 and on those local branches.
 

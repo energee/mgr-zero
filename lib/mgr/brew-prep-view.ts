@@ -155,8 +155,8 @@ function laterLineDetail(row: BrewPlanIngredient, bbl: number): string {
   return bbl > 0 ? `${detail} · ${perBblDisplay(plannedIngredientQty(row, bbl))} ${row.unit} for ${bblExact(bbl, 8)}` : detail;
 }
 
-/** What happens after knockout, as [label, detail] rows: each fermentation stage, then each line not confirmed on brew
- *  day, in plan order, or one "None" row when there are no such lines. `bbl` is the barrels the totals are for: the
+/** What happens after knockout, as [label, detail] rows: each fermentation stage, then each line outside the mash,
+ *  boil and whirlpool stages, in plan order, or one "None" row when there are no such lines. `bbl` is the barrels the totals are for: the
  *  planned barrels on a planned batch, a recorded turn's own knockout on its plan sheet. */
 export function cellarPlanRows(plan: BrewPlan, bbl: number): [string, string][] {
   const stages: [string, string][] = (plan.version?.fermentation_schedule ?? []).map(stage => [stage.name, fermentationStageDetail(stage)]);
