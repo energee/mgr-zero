@@ -67,7 +67,7 @@ defineCommand({
     p_brewery: ctx.breweryId, p_material: i.id ?? null, p_name: i.name, p_category: i.category, p_base_uom: i.baseUom,
     p_purchase_uom: i.purchaseUom, p_purchase_uom_factor: i.purchaseUomFactor ?? null, p_lot_tracked: i.lotTracked ?? null,
     p_default_vendor: i.defaultVendorId ?? null, p_reorder_point: i.reorderPoint ?? null, p_active: i.active ?? null,
-    p_extract_potential: i.extractPotential ?? null, p_request_id: execution.requestId,
+    p_extract_potential: i.extractPotential ?? null, p_alpha_acid: null, p_request_id: execution.requestId,
   })),
 });
 

@@ -69,7 +69,7 @@ describe("vendors, materials, contracts", () => {
     const { error } = await ctx.db.rpc("upsert_material", {
       p_brewery: ctx.breweryId, p_material: mosaic.id, p_name: hop.name, p_category: hop.category, p_base_uom: hop.baseUom,
       p_purchase_uom: hop.purchaseUom, p_purchase_uom_factor: 453.59237, p_lot_tracked: null, p_default_vendor: null,
-      p_reorder_point: null, p_active: null, p_extract_potential: null, p_request_id: crypto.randomUUID(),
+      p_reorder_point: null, p_active: null, p_extract_potential: null, p_alpha_acid: null, p_request_id: crypto.randomUUID(),
     });
     expect(error?.message).toMatch(/materials_purchase_uom_factor_four_decimals/);
   });
