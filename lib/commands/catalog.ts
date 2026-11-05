@@ -10,18 +10,18 @@ import { UPC_MESSAGE, UPC_PATTERN } from "@/lib/mgr/upc";
 const upc = z.string().trim().regex(UPC_PATTERN, UPC_MESSAGE);
 
 defineQuery({
-  name: "list_catalog_categories", description: "List this brewery's catalog categories",
+  name: "list_catalog_categories", description: "List this brewery's catalog categories by name, to choose or filter a brand's category",
   input: z.object({}), roles: STAFF_ROLES,
   handler: ctx => unwrap(ctx.db.from("catalog_categories").select("name").eq("brewery_id", ctx.breweryId).order("name")),
 });
 defineCommand({
   name: "save_catalog_category", description: "Add a category or rename it across every brand in this brewery",
-  input: z.object({ name: z.string().trim().min(1), previousName: z.string().min(1).optional() }), roles: ["admin", "sales"],
+  input: z.object({ name: z.string().trim().min(1).describe("The category name to save"), previousName: z.string().min(1).optional() }), roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("save_catalog_category", { p_brewery: ctx.breweryId, p_previous_name: i.previousName ?? null, p_name: i.name, p_request_id: execution.requestId })),
 });
 defineCommand({
   name: "delete_catalog_category", description: "Delete an unused category; brands using it block deletion",
-  input: z.object({ name: z.string().min(1) }), roles: ["admin", "sales"],
+  input: z.object({ name: z.string().min(1).describe("The name of the category to delete") }), roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("delete_catalog_category", { p_brewery: ctx.breweryId, p_name: i.name, p_request_id: execution.requestId })),
 });
 
@@ -31,8 +31,8 @@ defineCommand({
 defineCommand({
   name: "upsert_brand", description: "Create or edit a brand: name, style (added to the brewery's styles when new), ABV, and optional description, category, price group, hops, and a staff-only alias (an informal name such as a series number); every field is replaced, so omit the alias to clear it",
   input: z.object({
-    id: z.string().uuid().optional(), name: z.string().trim().min(1), style: z.string().optional(), abv: z.number().min(BRAND_ABV.min, BRAND_ABV.message).max(BRAND_ABV.max, BRAND_ABV.message).optional(),
-    description: z.string().optional(), category: z.string().optional(), priceGroupId: z.string().uuid().optional(), hops: z.string().optional(),
+    id: z.string().uuid().optional().describe("The brand to edit; omit to create one"), name: z.string().trim().min(1).describe("The brand's name"), style: z.string().optional(), abv: z.number().min(BRAND_ABV.min, BRAND_ABV.message).max(BRAND_ABV.max, BRAND_ABV.message).optional(),
+    description: z.string().optional(), category: z.string().optional().describe("The brand's catalog category"), priceGroupId: z.string().uuid().optional(), hops: z.string().optional(),
     alias: z.string().trim().min(1).optional(),
   }),
   roles: ["admin", "sales"],
@@ -45,7 +45,7 @@ defineCommand({
 
 defineCommand({
   name: "create_sku", description: "Create a SKU: one brand × one packaged format; the name defaults to brand · format; optional keg pool supplies the per-keg deposit",
-  input: z.object({ brandId: z.string().uuid(), formatId: z.string().uuid(), name: z.string().optional(), upc: upc.optional(), kegPoolId: z.string().uuid().nullable().optional() }),
+  input: z.object({ brandId: z.string().uuid(), formatId: z.string().uuid(), name: z.string().optional().describe("The SKU's name; it defaults to brand · format"), upc: upc.optional(), kegPoolId: z.string().uuid().nullable().optional() }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_sku", {
     p_brewery: ctx.breweryId, p_brand: i.brandId, p_format: i.formatId, p_name: i.name ?? null, p_upc: i.upc || null, p_request_id: execution.requestId, p_keg_pool: i.kegPoolId ?? null,
@@ -67,7 +67,7 @@ defineCommand({
 const KEG_SIZES = ["half_bbl", "quarter_bbl", "sixth_bbl", "fifty_l", "thirty_l", "twenty_l"] as const;
 defineCommand({
   name: "create_composed_format", description: "Create a packaged format and its atomic child quantities together; volume is always derived, never stored on the parent",
-  input: z.object({ name: z.string().trim().min(1), packageType: z.enum(["keg", "can", "bottle"]), components: z.array(z.object({ childFormatId: z.string().uuid(), qty: z.number().finite().positive() })).min(1) }).strict(),
+  input: z.object({ name: z.string().trim().min(1).describe("The format's name"), packageType: z.enum(["keg", "can", "bottle"]), components: z.array(z.object({ childFormatId: z.string().uuid(), qty: z.number().finite().positive().describe("How many of this child format make one unit of the parent") })).min(1) }).strict(),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_composed_format", {
     p_brewery: ctx.breweryId, p_name: i.name, p_package_type: i.packageType,
@@ -84,7 +84,7 @@ defineCommand({
 defineCommand({
   name: "upsert_format", description: "Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (priceGroupId and positive finite ounces required; no package facts, never stock). A format in use keeps its basis: one used by a SKU, component or BOM stays packaged; one used by a POS mapping, menu or sale stays poured. The same use also fixes its bblPerUnit, unitsPerCase and ounces; a rename still saves",
   input: z.object({
-    id: z.string().uuid().optional(), name: z.string().trim().min(1), basis: z.enum(["packaged", "poured"]),
+    id: z.string().uuid().optional().describe("The format to edit; omit to create one"), name: z.string().trim().min(1).describe("The format's name"), basis: z.enum(["packaged", "poured"]),
     packageType: z.enum(["keg", "can", "bottle"]).optional(), kegSize: z.enum(KEG_SIZES).optional(),
     unitsPerCase: z.number().int().positive().optional(), bblPerUnit: z.number().positive().optional(),
     priceGroupId: z.string().uuid().optional(), ounces: z.number().finite().positive().optional(),
@@ -102,7 +102,7 @@ defineCommand({
 
 defineCommand({
   name: "replace_format_components", description: "Replace a composed format's children (one level: atomic packaged children); its volume is derived from them",
-  input: z.object({ formatId: z.string().uuid(), components: z.array(z.object({ childFormatId: z.string().uuid(), qty: z.number().positive() })) }),
+  input: z.object({ formatId: z.string().uuid(), components: z.array(z.object({ childFormatId: z.string().uuid(), qty: z.number().positive().describe("How many of this child format make one unit of the parent") })) }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("replace_format_components", {
     p_brewery: ctx.breweryId, p_format: i.formatId, p_components: i.components.map((c) => ({ child_format_id: c.childFormatId, qty: c.qty })), p_request_id: execution.requestId,
@@ -144,7 +144,7 @@ defineQuery({
 
 defineCommand({
   name: "create_location", description: "Create a location and say what it is used for — one place may be warehouse, taproom and storage at once; it starts with the Walk-in, Cold and Dry bins",
-  input: z.object({ name: z.string().min(1), uses: z.array(z.enum(["warehouse", "taproom", "storage"])).min(1) }),
+  input: z.object({ name: z.string().min(1).describe("The location's name"), uses: z.array(z.enum(["warehouse", "taproom", "storage"])).min(1) }),
   roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_location", {
     p_brewery: ctx.breweryId, p_name: i.name, p_uses: i.uses, p_request_id: execution.requestId,
@@ -153,7 +153,7 @@ defineCommand({
 
 defineCommand({
   name: "update_location", description: "Rename a location or change what it is used for (any of warehouse, taproom, storage); movement history is untouched",
-  input: z.object({ locationId: z.string().uuid(), name: z.string().trim().min(1), uses: z.array(z.enum(["warehouse", "taproom", "storage"])).min(1) }),
+  input: z.object({ locationId: z.string().uuid(), name: z.string().trim().min(1).describe("The location's name"), uses: z.array(z.enum(["warehouse", "taproom", "storage"])).min(1) }),
   roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_location", {
     p_brewery: ctx.breweryId, p_id: i.locationId, p_name: i.name, p_uses: i.uses, p_request_id: execution.requestId,
@@ -178,8 +178,8 @@ defineQuery({
 });
 
 defineCommand({
-  name: "create_bin", description: "Add a bin to a location",
-  input: z.object({ locationId: z.string().uuid(), name: z.string().min(1) }),
+  name: "create_bin", description: "Add a bin to a location when stock needs another storage spot there",
+  input: z.object({ locationId: z.string().uuid(), name: z.string().min(1).describe("The bin's name") }),
   roles: ["admin", "warehouse"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_bin", {
     p_brewery: ctx.breweryId, p_location: i.locationId, p_name: i.name, p_request_id: execution.requestId,
@@ -187,8 +187,8 @@ defineCommand({
 });
 
 defineCommand({
-  name: "update_bin", description: "Rename a bin",
-  input: z.object({ binId: z.string().uuid(), name: z.string().min(1) }),
+  name: "update_bin", description: "Rename a bin; its stock and movement history are unchanged",
+  input: z.object({ binId: z.string().uuid(), name: z.string().min(1).describe("The bin's new name") }),
   roles: ["admin", "warehouse"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_bin", {
     p_brewery: ctx.breweryId, p_bin: i.binId, p_name: i.name, p_request_id: execution.requestId,
@@ -222,7 +222,7 @@ defineQuery({
 
 defineCommand({
   name: "upsert_sale_channel", description: "Create or edit a sale channel: its name and the tax treatment its removals are recorded under",
-  input: z.object({ id: z.string().uuid().optional(), name: z.string().trim().min(1), taxTreatment: z.enum(TAX_TREATMENTS) }),
+  input: z.object({ id: z.string().uuid().optional().describe("The sale channel to edit; omit to create one"), name: z.string().trim().min(1).describe("The sale channel's name"), taxTreatment: z.enum(TAX_TREATMENTS) }),
   roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_sale_channel", {
     p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_tax_treatment: i.taxTreatment, p_request_id: execution.requestId,
@@ -288,7 +288,7 @@ defineQuery({
 defineCommand({
   name: "upsert_price_group", description: "Create or rename a price group (a row of the price grid), set its position and optional cost ceiling",
   roles: ["admin", "sales"],
-  input: z.object({ id: z.string().uuid().optional(), name: z.string().trim().min(1), position: z.number().int().positive().max(PG_INT_MAX), costCeilingCents: cents.optional() }),
+  input: z.object({ id: z.string().uuid().optional().describe("The price group to edit; omit to create one"), name: z.string().trim().min(1).describe("The price group's name"), position: z.number().int().positive().max(PG_INT_MAX), costCeilingCents: cents.optional() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_price_group", {
     p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_position: i.position, p_cost_ceiling_cents: i.costCeilingCents ?? null, p_request_id: execution.requestId,
   })),
@@ -344,7 +344,7 @@ defineQuery({
     q: z.string().trim().max(100).optional(),
     sort: z.enum(BRAND_SORTS).optional(),
     // Empty means every category, as an empty q means no search.
-    category: z.string().trim().optional(),
+    category: z.string().trim().optional().describe("Only brands in this category; empty means every category"),
   }), roles: STAFF_ROLES,
   handler: async (ctx, i) => {
     let brands = ctx.db.from("brands").select("*, styles(name), price_groups(name), skus(id, name, format_id, active, upc, keg_pool_id, container_source, batch_share), colas:brand_approvals(id, ttb_id, approved_on, image_url)")

@@ -12,7 +12,7 @@ defineCommand({
 
 defineCommand({
   name: "disconnect_square", description: "Stop Square sync locally, purge its credential, and report whether remote revocation was confirmed; on a connection whose revocation is unresolved, retry it by merchant id",
-  input: z.object({ connectionId: z.string().uuid() }), roles: ["admin"],
+  input: z.object({ connectionId: z.string().uuid().describe("The Square connection to disconnect") }), roles: ["admin"],
   handler: async (ctx, input, execution) => {
     const [{ disconnectSquare }, { squareConfig, SquareClient }] = await Promise.all([
       import("@/lib/supabase/integration-tokens"), import("@/lib/pos"),
@@ -24,7 +24,7 @@ defineCommand({
 });
 
 defineQuery({
-  name: "get_pos_integration_health", agentHidden: true, description: "Get redacted Square seller connection health",
+  name: "get_pos_integration_health", agentHidden: true, description: "Get redacted Square seller connection health: its state, last error and how far sales have synced",
   input: z.object({}), roles: ["admin"],
   handler: async (ctx) => (await import("@/lib/supabase/integration-tokens")).getSquareHealth(ctx),
 });
@@ -242,7 +242,7 @@ defineCommand({
   name: "set_pos_item_mapping", description: "Map one Square variation to a packaged SKU or brand-owned poured format, or explicitly ignore it",
   input: z.object({
     externalItemId: z.string().trim().min(1), externalVariationId: z.string().trim().min(1),
-    skuId: z.string().uuid().optional(), formatId: z.string().uuid().optional(), disposition: z.enum(["mapped", "ignored"]),
+    skuId: z.string().uuid().optional(), formatId: z.string().uuid().optional(), disposition: z.enum(["mapped", "ignored"]).describe("mapped links the variation to skuId or formatId; ignored leaves it unmapped on purpose"),
   }).refine((value) => {
     const targets = Number(!!value.skuId) + Number(!!value.formatId);
     return (value.disposition === "mapped" && targets === 1) || (value.disposition === "ignored" && targets === 0);

@@ -16,7 +16,7 @@ function assertExpectedIdentity(ctx: Ctx, expected: z.infer<typeof expectedIdent
   }
 }
 
-const lines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().int().positive() })).min(1);
+const lines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().int().positive().describe("Whole units of the SKU on this line") })).min(1);
 const quoteLines = lines;
 const quoteInput = z.object({
   shipToId: z.string().uuid(), poNumber: z.string().optional(), note: z.string().optional(),
@@ -117,7 +117,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "portal_update_draft_order", description: "Portal: replace a draft order's lines/fields",
+  name: "portal_update_draft_order", description: "Portal: replace a draft order's lines and header fields before submitting it",
   roles: "customer",
   input: z.object({ orderId: z.string().uuid(), shipToId: z.string().uuid().optional(), poNumber: z.string().optional(), note: z.string().optional(), requestedShipDate: isoDate.nullable().optional(), expectedIdentity, lines }),
   handler: (ctx, i, execution) => {
@@ -132,7 +132,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "portal_submit_order", description: "Portal: submit a draft order",
+  name: "portal_submit_order", description: "Portal: submit the caller's draft order to the brewery for confirmation",
   roles: "customer",
   input: z.object({ orderId: z.string().uuid(), expectedIdentity }),
   handler: (ctx, i, execution) => {
@@ -175,7 +175,7 @@ defineQuery({
 });
 
 defineQuery({
-  name: "portal_orders", description: "Portal: the caller's orders, newest first",
+  name: "portal_orders", description: "Portal: the caller's orders, newest first, one page at a time; use portal_order for one order's events and shipment",
   roles: "customer",
   input: z.object(historyInput),
   handler: async (ctx, i) => historyResult(await unwrap(newestFirst(ctx.db.from("portal_orders").select(`${ORDER_ROW}, order_lines`).eq("brewery_id", ctx.breweryId).eq("customer_id", requireCustomer(ctx)).limit(i.limit + 1), i.cursor)) as HistoryRow[], i.limit),

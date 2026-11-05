@@ -69,7 +69,7 @@ defineCommand({
  */
 defineCommand({
   name: "set_standing_allocation", description: "Set or release a standing taproom allocation (source 'taproom_standing') for a SKU at a location; returns an ATP soft warning",
-  input: z.object({ locationId: z.string().uuid(), skuId: z.string().uuid(), qty: z.number().nonnegative() }),
+  input: z.object({ locationId: z.string().uuid(), skuId: z.string().uuid(), qty: z.number().nonnegative().describe("Units of the SKU to hold for this location; 0 releases the allocation") }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_standing_allocation", {
     p_location: i.locationId, p_sku: i.skuId, p_qty: i.qty, p_request_id: execution.requestId,
@@ -121,7 +121,7 @@ defineCommand({
 });
 
 defineQuery({
-  name: "get_bin_on_hand", description: "On-hand quantity per SKU/location/bin",
+  name: "get_bin_on_hand", description: "On-hand quantity per SKU, location and bin, optionally for one SKU or location; use it to see which bin holds stock, and get_on_hand for totals by location",
   input: z.object({ skuId: z.string().uuid().optional(), locationId: z.string().uuid().optional() }), roles: [...readRoles],
   handler: (ctx, i) => completeRows<BinOnHandRow>("Bin stock", async (_, after) => {
     let q = ctx.db.from("bin_on_hand").select("brewery_id, sku_id, location_id, bin_id, qty").eq("brewery_id", ctx.breweryId);
@@ -225,7 +225,7 @@ defineQuery({
 
 defineQuery({
   name: "get_inventory_lot", description: "The display code of one existing finished-goods lot, including lots with no remaining stock; null when not visible",
-  input: z.object({ lotId: z.string().uuid() }), roles: [...readRoles],
+  input: z.object({ lotId: z.string().uuid().describe("The finished-goods lot to read") }), roles: [...readRoles],
   handler: (ctx, i) => unwrap(ctx.db.from("lots").select("id, code")
     .eq("brewery_id", ctx.breweryId).eq("id", i.lotId).maybeSingle()),
 });

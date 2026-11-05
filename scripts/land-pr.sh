@@ -19,7 +19,8 @@
 # `supabase db push` refuses: rename it later, rerun), 4 CI failed for a real
 # reason, 5 push did not land, 6 main gained a migration since the sync (rerun
 # to resync), 7 no claude-code-review.yml run passed both its simplify and
-# claude-review jobs (read that run; the `review` label reruns it).
+# claude-review jobs (read that run; the `review` label reruns it), 8 no CI run
+# appeared for the pushed commit (GitHub missed the push; push again).
 # Env: CLAUDE_SESSION_URL
 # (added as a Claude-Session trailer to the regeneration commit when set).
 set -uo pipefail
@@ -117,7 +118,11 @@ fi
 [ "$(git rev-parse HEAD)" = "$(git rev-parse "origin/$b")" ] || { echo "push did not land"; exit 5; }
 head=$(git rev-parse HEAD); echo "pushed $head"
 
-sleep 30
+# Checks that have not registered yet cannot fail, so wait for this commit's run.
+ci_run() { gh run list --workflow ci.yml --branch "$b" --limit 10 --json headSha --jq "[.[]|select(.headSha==\"$head\")]|length"; }
+for _ in $(seq 40); do [ "$(ci_run)" != 0 ] && break; sleep 15; done
+[ "$(ci_run)" != 0 ] || { echo "no CI run for $head"; exit 8; }
+
 for attempt in 1 2 3; do
   gh pr checks "$n" --watch --interval 30 >/dev/null 2>&1
   # Vercel preview builds are rate limited on this plan; they are not the gate.

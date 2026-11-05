@@ -130,7 +130,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · customer
 
-Portal: the caller's orders, newest first
+Portal: the caller's orders, newest first, one page at a time; use portal_order for one order's events and shipment
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -184,7 +184,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · customer
 
-Portal: submit a draft order
+Portal: submit the caller's draft order to the brewery for confirmation
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -221,7 +221,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · customer
 
-Portal: replace a draft order's lines/fields
+Portal: replace a draft order's lines and header fields before submitting it
 
 | Field | Type | Required |
 | --- | --- | --- |

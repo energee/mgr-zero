@@ -36,6 +36,7 @@ const pureTests = [
   "tests/agent-connect-view.test.ts",
   "tests/agent-hidden.test.ts",
   "tests/agent-readiness.test.ts",
+  "tests/field-vocabulary.test.ts",
   "tests/monthly-compliance-view.test.ts",
   "tests/time-window-field.test.ts",
   "tests/compliance-more-copy.test.ts",

@@ -27,7 +27,7 @@ defineCommand({
 
 defineCommand({
   name: "disconnect_qbo", description: "Disable QuickBooks locally, release its company ownership, purge its credential, and attempt remote revocation; the exact requestId replays the recorded outcome",
-  input: z.object({ connectionId: z.string().uuid() }), roles: ["admin"],
+  input: z.object({ connectionId: z.string().uuid().describe("The QuickBooks connection to disconnect") }), roles: ["admin"],
   handler: async (ctx, input, execution) => {
     const [{ disconnectQbo }, { qboConfig, QboOAuthClient }] = await Promise.all([
       import("@/lib/supabase/integration-tokens"), import("@/lib/qbo"),
@@ -159,7 +159,7 @@ defineCommand({
 
 defineCommand({
   name: "write_off_invoice", description: "Mark an invoice written off in MGR without recording cash or changing QuickBooks: one voided or deleted in QuickBooks, or an unpaid one QuickBooks never received (its MGR payments stay)",
-  input: z.object({ invoiceId: z.string().uuid(), reason: z.string().trim().min(1).max(500) }),
+  input: z.object({ invoiceId: z.string().uuid(), reason: z.string().trim().min(1).max(500).describe("Why the invoice is written off") }),
   roles: ["admin"], requiresConfirmation: true,
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("write_off_invoice", {
     p_brewery: ctx.breweryId, p_invoice: input.invoiceId, p_reason: input.reason,

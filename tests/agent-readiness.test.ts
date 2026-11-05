@@ -33,6 +33,7 @@ describe("measureReadiness", () => {
     kind: "query", description: "Read every open order at this brewery today", inputSchema: z.object({}), ...over,
   });
 
+  // `note` has a description; `skuId` and `binId` are in the vocabulary; `id` has neither.
   it("counts each row of the scorecard", () => {
     expect(measureReadiness([
       tool({}),
@@ -41,14 +42,14 @@ describe("measureReadiness", () => {
       tool({ kind: "command", compensation: null, inputSchema: z.object({ lines: z.array(z.object({ binId: z.uuid() })) }) }),
     ])).toEqual({
       operations: 4, queries: 2, commands: 2, describedOperations: 3,
-      fieldUses: 4, fieldUsesWithMeaning: 1, commandsWithUndo: 1, commandIdFieldUses: 2,
+      fieldUses: 4, fieldUsesWithMeaning: 3, commandsWithUndo: 1, commandIdFieldUses: 2,
     });
   });
 });
 
 // Raise a floor when a number improves. A drop means a new operation or field
 // shipped without the meaning an agent needs.
-const FLOORS = { describedOperations: 301, fieldUsesWithMeaning: 41, commandsWithUndo: 1 };
+const FLOORS = { describedOperations: 314, fieldUsesWithMeaning: 916, commandsWithUndo: 1 };
 
 it("never loses ground on the scorecard", () => {
   expect(measureReadiness(listTools())).toMatchObject(Object.fromEntries(
