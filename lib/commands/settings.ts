@@ -45,8 +45,8 @@ definePreTenantQuery({
   input: z.object({}),
   handler: async (ctx) => {
     const rows = await completeRows("Brewery list", start => ctx.db.from("breweries")
-      .select("id, name, agents_enabled", { count: "exact" }).order("name").order("id").range(start, start + PAGE_SIZE - 1));
-    return rows.map(row => ({ id: row.id, name: row.name, agentsEnabled: row.agents_enabled }));
+      .select("id, name, timezone, agents_enabled", { count: "exact" }).order("name").order("id").range(start, start + PAGE_SIZE - 1));
+    return rows.map(row => ({ id: row.id, name: row.name, timezone: row.timezone, agentsEnabled: row.agents_enabled }));
   },
 });
 

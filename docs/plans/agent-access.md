@@ -429,10 +429,16 @@ report the change in the PR.
 
 11. **Read evals (O1, O2, O4, O5).** New `tests/fixtures/agent-evals.json` and
     `scripts/agent-evals.ts`. 30 read tasks from real staff questions, each with a
-    known answer on a fixed seed. Scoring is by code where the answer is a fact.
-    This calls a paid model, so it runs by hand, never in CI. It needs model
-    credits, which is the open question in #329. Test first: the scorer, on saved
-    transcripts. Depends on tasks 9 and 10.
+    known answer on a fixed seed. Reuse the shape of
+    `scripts/experiment-production-attention.ts`: cases in a JSON file, `--dry-run`
+    that sends nothing, `--live` that refuses to run without credentials, and each
+    case run in normal and reversed order. Claude or ChatGPT is the agent under
+    test, because that is what staff use. Code scores facts. Jev scores open
+    answers against fixed labels, which is what it did well there. Keep a separate
+    brewer-reviewed holdout: author-written cases are not a production accuracy
+    estimate. The agent run calls a paid model, so it runs by hand, never in CI,
+    and needs model credits (#329). Test first: the scorer, on saved transcripts.
+    Depends on tasks 9 and 10.
 12. **Fix what the evals find.** Repeat until O2 is 90% or more. Most fixes should
     be vocabulary or guide edits. Depends on task 11.
 

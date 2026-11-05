@@ -66,12 +66,41 @@ describe("/api/mcp", () => {
 
   it("offers the agent tools", async () => {
     const { tools } = await resultOf(await call("tools/list", {}, token));
-    expect(tools.map((t: { name: string }) => t.name).sort()).toEqual(["get_started", "run_query"]);
+    expect(tools.map((t: { name: string }) => t.name).sort()).toEqual(["describe_operation", "find_operations", "get_started", "run_query"]);
   });
 
   it("tells a fresh agent who it acts for and where", async () => {
     const { body } = await tool(token, "get_started");
-    expect(body.breweries).toEqual([{ id: breweryId, name: "Mcp Brewing" }]);
+    expect(body.breweries).toEqual([{ id: breweryId, name: "Mcp Brewing", timezone: "America/New_York", roles: ["admin"] }]);
+    expect(body.today).toEqual([]);
+  });
+
+  it("finds operations by words in their name or description", async () => {
+    const { body } = await tool(token, "find_operations", { text: "invoices unpaid" });
+    expect(body.map((op: { name: string }) => op.name)).toContain("list_invoices");
+  });
+
+  it("finds only what the person may run", async () => {
+    const warehouse = await connectAgent((await makeStaff(breweryId, "warehouse")).email);
+    const found = async (agentToken: string) => (await tool(agentToken, "find_operations", {})).body.map((op: { name: string }) => op.name);
+    const everything = await found(token);
+    expect(everything.length).toBeGreaterThan(100);
+    expect(everything).toContain("get_inventory_value");
+    expect(await found(warehouse.token)).not.toContain("get_inventory_value");
+    expect(everything).not.toContain("get_qbo_connection");
+    expect(everything).not.toContain("record_movement");
+  });
+
+  it("describes an operation's input, with an example", async () => {
+    const { body } = await tool(token, "describe_operation", { name: "get_today" });
+    expect(body.description).toContain("Role-filtered work");
+    expect(body.fields).toEqual([{ name: "now", type: expect.any(String), required: false }]);
+    expect(body.example).toEqual({});
+  });
+
+  it("will not describe what the agent cannot run", async () => {
+    expect((await tool(token, "describe_operation", { name: "get_qbo_connection" })).body.code).toBe("agent_not_allowed");
+    expect((await tool(token, "describe_operation", { name: "record_movement" })).body.code).toBe("agent_not_allowed");
   });
 
   it("runs a query its person's roles allow, defaulting a single brewery", async () => {
