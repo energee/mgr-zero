@@ -111,6 +111,8 @@ describe("record_historical_order", () => {
     expect((await rpc([{ sku_id: skuId, qty: -1, unit_price_cents: 1 }])).error?.message).toMatch(/positive/);
     expect((await rpc([{ sku_id: skuId, qty: 1, unit_price_cents: -1 }])).error?.message).toMatch(/price/);
     expect((await rpc([])).error?.message).toMatch(/at least one line/);
+    // Postgres reads "nan" in any case as NaN, so the check is on the number, not the raw text.
+    expect((await rpc([{ sku_id: skuId, qty: "nan", unit_price_cents: 1 }])).error?.message).toMatch(/positive/);
   });
 
   it("refuses history before a books opened date is set", async () => {

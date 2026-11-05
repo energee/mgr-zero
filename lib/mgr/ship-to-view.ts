@@ -95,7 +95,7 @@ export function shipToFormFields(shipTo: ShipToRecord | undefined, customerCount
 /** A ship-to as one line: street, then the city, state and zip, then the
  *  country outside the US. Missing parts drop out, so a foreign ship-to with
  *  no address reads as its country. Callers that only show the place (such
- *  as order summaries) may omit street and zip. */
+ *  as order summaries) may omit street and zip; the portal uses shipToPlace. */
 export type ShipToAddressParts = { country: string } & Partial<Record<"address1" | "address2" | "city" | "state" | "zip", string | null>>;
 
 export function shipToAddress(s: ShipToAddressParts): string {
@@ -103,3 +103,17 @@ export function shipToAddress(s: ShipToAddressParts): string {
   const place = [[s.city, s.state].filter(Boolean).join(", "), s.zip].filter(Boolean).join(" ");
   return [street, place, s.country === "US" ? "" : countryName(s.country)].filter(Boolean).join(" · ");
 }
+
+/** Where a ship-to is, without street or zip: "Phoenixville, PA", or the
+ *  country outside the US ("Japan"). The portal shows this to buyers. */
+export const shipToPlace = (s: ShipToAddressParts) =>
+  shipToAddress({ country: s.country, city: s.city, state: s.state });
+
+/** A US state code, or the country name outside the US: where a removal tape
+ *  says a sale went (dest_state / dest_country), and a customer's place. */
+export const stateOrCountry = (s: { country: string; state: string | null } | null | undefined) =>
+  s ? shipToAddress({ country: s.country, state: s.state }) : "";
+
+/** "Label · address": a ship-to named by its label, then shipToAddress. */
+export const shipToLine = (s: ShipToAddressParts & { label: string }) =>
+  [s.label, shipToAddress(s)].filter(Boolean).join(" · ");

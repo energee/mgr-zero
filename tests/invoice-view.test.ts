@@ -252,6 +252,8 @@ describe("Invoice view", () => {
     expect(invoiceIsCreditable({ ...base, qbo_remote_state: "voided" })).toBe(false);
     expect(invoiceIsCreditable({ ...base, qbo_remote_state: "deleted" })).toBe(false);
     expect(invoiceIsCreditable({ ...base, kind: "credit_memo" })).toBe(false);
+    // A historical order (record_historical_order) is not_synced; create_credit_memo_impl refuses it.
+    expect(invoiceIsCreditable({ ...base, paid_at: "2026-01-02", qbo_sync_status: "not_synced" })).toBe(false);
     const src = readFileSync("app/(app)/invoices/[id]/page.tsx", "utf8");
     expect(src).toMatch(/invoiceIsCreditable\(invoice\) && canRun\(ctx, "return_shipment"\)/);
     // Return corrects a shipment; it closes the page instead of heading it.

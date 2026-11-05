@@ -53,6 +53,8 @@ export type ReturnCreditSnapshot = {
     /** A keg_deposit invoice line refunds its deposit (whole kegs, no
      *  inventory); omitted or "sku" is a beer line that comes back as stock. */
     kind?: "sku" | "keg_deposit";
+    /** The frozen per-keg fee return_shipment credits with refused beer. Only a refused check-in sets it. */
+    one_way_fee_cents?: number;
   }[];
   locations: { id: string; name: string }[];
   reason?: "damaged" | "wrong_item" | "unsold" | "";
@@ -108,7 +110,7 @@ export function toReturnCreditViewProps({
   const returnToOptions = locations.map(l => ({ id: l.id, label: l.id === order?.from_location_id ? `${l.name} · original fulfillment source` : l.name }));
   const destName = from?.name ?? "—";
   const inv = docNo("INV", invoice.invoice_no, "Invoice");
-  const creditCents = lines.reduce((n, l) => n + orderLineCents(Number(l.qty_returning), Number(l.unit_price_cents)), 0);
+  const creditCents = lines.reduce((n, l) => n + orderLineCents(Number(l.qty_returning), Number(l.unit_price_cents) + (l.one_way_fee_cents ?? 0)), 0);
   const returningBeer = lines.some(line => line.kind !== "keg_deposit" && Number(line.qty_returning) > 0);
   const tape: [string, string][] = [];
   for (const l of lines) {
@@ -120,6 +122,7 @@ export function toReturnCreditViewProps({
       continue;
     }
     tape.push([`+${qty} ${short} · return in`, destName]);
+    if (l.one_way_fee_cents) tape.push([`${qty} ${short} · one-way keg fee`, money(-orderLineCents(qty, l.one_way_fee_cents))]);
     if (reason === "damaged") tape.push([`−${qty} ${short} · loss · damaged`, "not sellable"]);
   }
   tape.push(["credit memo number · on commit", money(-creditCents)]);

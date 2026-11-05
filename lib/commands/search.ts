@@ -13,9 +13,10 @@ import { z } from "zod";
 import { canRun, defineQuery, unwrap, type Ctx } from "./registry";
 import { formatDate } from "@/lib/date-format";
 import { docNo, poNo, batNo, runNo, trfNo } from "@/lib/mgr/doc-no";
-import { escapeRegex } from "@/lib/escape-regex";
+import { escapeRegex, quotedRegex } from "@/lib/escape-regex";
 import { sentenceCase } from "@/lib/mgr/labels";
 import { SEARCH_QUERY_MAX_LENGTH } from "@/lib/mgr/search-view";
+import { stateOrCountry } from "@/lib/mgr/ship-to-view";
 
 export const SEARCH_KINDS = [
   "sku", "order", "invoice", "lot", "customer", "po", "batch", "material_lot", "packaging_run", "transfer", "route",
@@ -84,8 +85,10 @@ async function byKind(ctx: Ctx, kind: SearchKind, q: string): Promise<SearchHit[
       return rows.map((r) => hit(r.id as string, r.name as string, (r.brands as { name: string } | null)?.name ?? "SKU", `/catalog`));
     }
     case "customer": {
-      const rows = await unwrap(ctx.db.from("customers").select("id, name, state").eq("brewery_id", b).regexIMatch("name", prefix).limit(LIMIT)) as Row[];
-      return rows.map((r) => hit(r.id as string, r.name as string, `customer · ${r.state}`, `/customers/${r.id}`));
+      // A customer matches on its name or its staff-only alias, as list_customers does.
+      const pattern = quotedRegex(prefix);
+      const rows = await unwrap(ctx.db.from("customers").select("id, name, country, state").eq("brewery_id", b).or(`name.imatch.${pattern},alias.imatch.${pattern}`).limit(LIMIT)) as Row[];
+      return rows.map((r) => hit(r.id as string, r.name as string, `customer · ${stateOrCountry(r as { country: string; state: string | null })}`, `/customers/${r.id}`));
     }
     case "material_lot": {
       const rows = await unwrap(ctx.db.from("material_lots").select("id,lot_code,materials(name)").eq("brewery_id", b).regexIMatch("lot_code", prefix).limit(LIMIT)) as Row[];

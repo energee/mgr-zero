@@ -38,6 +38,11 @@ describe("Account view", () => {
     expect(model.shipTos[0]?.detail).toBe("Japan");
   });
 
+  it("shows the place, not the street or zip get_portal_account also returns", () => {
+    const shipTos = [{ id: "m", label: "Main", country: "US", address1: "123 Bridge St", city: "Phoenixville", state: "PA", zip: "19460" }];
+    expect(toPortalAccountViewProps({ ...portalAccountRidgeline, shipTos }).shipTos[0]?.detail).toBe("Phoenixville, PA");
+  });
+
   it("omits keg-deposit rows when the snapshot has none", () => {
     const model = toPortalAccountViewProps({ ...portalAccountRidgeline, deposits: [] });
     expect(model.deposits).toEqual([]);

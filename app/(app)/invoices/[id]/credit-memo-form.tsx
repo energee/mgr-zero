@@ -25,7 +25,7 @@ export function buildReturnLines(lines: ReturnLine[], qtys: Record<string, strin
 
 export function CreditMemoForm({ invoiceId, invoiceNo, shipmentId, refusedDeliveryId, refusedQuantities, lines, locations, sources, bins }: {
   invoiceId: string; invoiceNo: number | null; shipmentId: string | null; refusedDeliveryId?: string; refusedQuantities?: Record<string, number>;
-  lines: (ReturnLine & { unitPriceCents: number })[];
+  lines: (ReturnLine & { unitPriceCents: number; oneWayFeeCents?: number })[];
   locations: { id: string; name: string }[]; sources: ReturnSource[];
   bins: { id: string; name: string; location_id: string }[];
 }) {
@@ -41,7 +41,7 @@ export function CreditMemoForm({ invoiceId, invoiceNo, shipmentId, refusedDelive
   const returningBeer = beerLines.some(line => Number(qtys[line.id]) > 0);
   const model = toReturnCreditViewProps({
     invoice: { invoice_no: invoiceNo }, refusedDeliveryId, locations, returnLocationId: locationId, reason, backHref: `/invoices/${invoiceId}`,
-    lines: lines.map(line => ({ id: line.id, qty_shipped: line.qty, qty_returnable: refusedQuantities && line.kind === "sku" ? refusedQuantities[line.skuId] ?? 0 : undefined, qty_returning: Number(qtys[line.id] ?? 0), unit_price_cents: line.unitPriceCents, skus: { name: line.label }, kind: line.kind })),
+    lines: lines.map(line => ({ id: line.id, qty_shipped: line.qty, qty_returnable: refusedQuantities && line.kind === "sku" ? refusedQuantities[line.skuId] ?? 0 : undefined, qty_returning: Number(qtys[line.id] ?? 0), unit_price_cents: line.unitPriceCents, skus: { name: line.label }, kind: line.kind, one_way_fee_cents: refusedDeliveryId ? line.oneWayFeeCents : undefined })),
   });
   const checkInEmpty = returnEmptyKegs && !returningBeer;
   const blockedReason = returnCreditReason({ lines: model.lines, quantities: qtys, reason, locationId, returnEmptyKegs: checkInEmpty, binMissing: (shipmentId !== null || checkInEmpty) && !binId });

@@ -86,6 +86,12 @@ describe("search_entities", () => {
     expect((await search("star*l", adminCtx, ["lot", "material_lot"])).map((h) => h.id)).toEqual([lot.id]);
     expect((await search("star*h", adminCtx, ["lot", "material_lot"])).map((h) => h.id)).toEqual([materialLot.id]);
   });
+  it("names a foreign customer's country, never null, and finds a customer by its alias", async () => {
+    const jp = await ins("customers", { brewery_id: b.id, name: "Harbor Imports KK", alias: "Tokyo account", type: "distributor", country: "JP", state: null, sale_channel_id: await channelId(b.id, "Wholesale") });
+    const byName = await search("Harbor", adminCtx, ["customer"]);
+    expect(byName).toEqual([expect.objectContaining({ id: jp.id, detail: "customer · Japan" })]);
+    expect((await search("toky", adminCtx, ["customer"])).map(h => h.id)).toContain(jp.id);
+  });
   it("a document number past the column's range is no match, not an error", async () => {
     await expect(search("ORD-99999999999999999999")).resolves.toEqual([]);
     await expect(search("INV-2147483648")).resolves.toEqual([]);
