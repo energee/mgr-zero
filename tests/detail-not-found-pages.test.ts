@@ -23,13 +23,13 @@ vi.mock("@/lib/commands/registry", async (original) => ({
 
 import BatchPage from "@/app/(app)/batches/[id]/page";
 import RoutePage from "@/app/(app)/routes/[id]/page";
-import CustomerPage from "@/app/(app)/customers/[id]/page";
+import { CustomerDetail } from "@/app/(app)/customers/[id]/customer-detail";
 
 const missingId = "afffffff-ffff-4fff-8fff-ffffffffffff";
 const pages = [
   { name: "Batches", read: "get_brew_day", open: (id: string) => BatchPage({ params: Promise.resolve({ id }), searchParams: Promise.resolve({}) }) },
   { name: "Routes", read: "list_routes", open: (id: string) => RoutePage({ params: Promise.resolve({ id }) }) },
-  { name: "Customers", read: "get_customer", open: (id: string) => CustomerPage({ params: Promise.resolve({ id }) }) },
+  { name: "Customers", read: "get_customer", open: (id: string) => CustomerDetail({ id }) },
 ];
 
 beforeEach(() => {
