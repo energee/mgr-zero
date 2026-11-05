@@ -143,7 +143,7 @@ export function RecipeView({
       {schedule(model.water, slots.water)}
       {versionNote}
       {model.tape?.length ? <>{E.ttl("Batch actuals · predicted in brackets")}{E.tape(model.tape)}</> : null}
-      {model.actualsNote ? E.note(model.actualsNote) : null}
+      {model.actualsNote ? E.info(model.actualsNote) : null}
       {controls ? (
         <>
           <div role="status">{E.polite(controls.blockedReason)}</div>

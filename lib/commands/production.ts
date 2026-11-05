@@ -278,7 +278,7 @@ defineQuery({
       completeRows("Batches", start => ctx.db.from("batches")
         .select("id, batch_no, recipe_version_id, planned_bbl, brewed_on, closed_at, recipe_version:recipe_versions!inner(recipe_id)", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).eq("recipe_version.recipe_id", i.recipeId).not("brewed_on", "is", null)
-        .order("brewed_on", { ascending: false }).order("id").range(start, start + PAGE_SIZE - 1)),
+        .order("brewed_on", { ascending: false }).order("batch_no", { ascending: false }).range(start, start + PAGE_SIZE - 1)),
     ]);
     if (!recipe) throw new CommandError("recipe not found", 404, "not_found");
 

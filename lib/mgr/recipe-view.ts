@@ -22,7 +22,7 @@ import { sentenceCase } from "./labels";
 import { submitReason } from "./submit-reason";
 import { READING_BOUNDS } from "@/lib/composer/offline-policy";
 import {
-  fermentationSummary, ingredientDetail, isBrewDayStage, lineReady, mashRowSummary, mashStepDetail, materialLookup, perBblDisplay, processReadout, scheduleDays, timingOutOfRange, toIngredientFields, waterAdditionDetail,
+  fermentationStageDetail, fermentationSummary, ingredientDetail, isBrewDayStage, lineReady, mashRowSummary, mashStepDetail, materialLookup, perBblDisplay, processReadout, scheduleDays, timingOutOfRange, toIngredientFields, waterAdditionDetail,
   type FermentationStage, type IngredientLine, type IngredientStage, type MashStep, type ProcessColumns, type RecipeMaterial, type WaterDraft,
 } from "./recipe-process-view";
 /** A brew-day line's per-bbl amount, its material's pack size (base units per pack; 1 = no pack) and base unit. */
@@ -323,7 +323,7 @@ export function toRecipePageModel(
     fermentation: {
       title: `Fermentation schedule · ${plural(v.fermentation_schedule.length, "stage")}`,
       detail: v.fermentation_schedule.length ? fermentationSummary(v.fermentation_schedule) : "No stages yet",
-      rows: v.fermentation_schedule.map((f) => ({ title: f.name, detail: `${f.tempF} °F · ${plural(f.days, "day")}` })),
+      rows: v.fermentation_schedule.map((f) => ({ title: f.name, detail: fermentationStageDetail(f) })),
     },
     water: {
       title: "Water", detail: "",

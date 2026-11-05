@@ -264,7 +264,8 @@ describe("recipe form copy (#1139)", () => {
     const planned = html(createElement(BrewDayView, { model: {
       title: "Batch", vesselId: "v", vessels: [], initialBbl: "2", brewedOn: "2026-10-01", plan: { ingredients: [ingredient] },
     } }));
-    expect(planned).toContain("1.2 lb per bbl · Dry hop");
+    expect(planned).toContain(">Dry hop<");
+    expect(planned).toContain("1.2 lb / bbl");
     const recorded = html(createElement(BrewDayView, { model: {
       title: "Batch", vesselId: "", vessels: [], initialBbl: "2", brewedOn: "2026-10-01", recorded: true,
       records: [{ id: "r", turn: 1, initial_bbl: 2, brewed_on: "2026-10-01", created_at: "2026-10-01", correction_reason: null, corrects_id: null, plan_snapshot: {}, process: {},
