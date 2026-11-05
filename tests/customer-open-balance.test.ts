@@ -54,7 +54,7 @@ describe("the customer's Open balance line", () => {
   });
 
   it("the live page reads every unpaid page for Admin and Sales only", () => {
-    const src = readFileSync("app/(app)/customers/[id]/page.tsx", "utf8");
+    const src = readFileSync("app/(app)/customers/[id]/customer-detail.tsx", "utf8");
     expect(src).toMatch(/status: "unpaid"/);
     expect(src).toMatch(/nextCursor/);
     expect(src).toMatch(/canWrite \? unpaidInvoices/);

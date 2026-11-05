@@ -102,6 +102,12 @@ const RECORDS = [
   ["work/deliveries/[id]/return", "id", "get_delivery_stop"],
 ] as const;
 
+/** Pages whose body is a shared component (the page and a sheet both mount it): the page only returns the element, so the read boundary is the component. */
+const DETAIL_BODY: Record<string, [file: string, name: string]> = {
+  "catalog/brands/[id]": ["catalog/brands/[id]/brand-detail.tsx", "BrandDetail"],
+  "customers/[id]": ["customers/[id]/customer-detail.tsx", "CustomerDetail"],
+};
+
 function dynamicPages(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
@@ -119,11 +125,14 @@ describe("missing-record browser metadata", () => {
 
   it.each(RECORDS)("%s rejects missing metadata and rendering at the authorized read boundary", async (route, parameter, primary) => {
     const { bindings, calls } = requestBindings();
+    const body = route in DETAIL_BODY ? DETAIL_BODY[route] : undefined;
+    if (body) Object.assign(bindings, loadPage(`app/(app)/${body[0]}`, bindings));
     const page = loadPage(`app/(app)/${route}/page.tsx`, bindings);
     const props = { params: Promise.resolve({ [parameter]: MISSING }), searchParams: Promise.resolve({}) };
     await expect(page.generateMetadata(props)).rejects.toMatchObject(NOT_FOUND);
     expect(calls).toContain(primary);
-    await expect(page.default(props)).rejects.toMatchObject(NOT_FOUND);
+    const render = body ? () => (bindings[body[1]] as (p: { id: string }) => Promise<unknown>)({ id: MISSING }) : () => page.default(props);
+    await expect(render()).rejects.toMatchObject(NOT_FOUND);
   });
 
   it.each(["portal/orders/[id]", "portal/invoices/[id]", "portal"])("%s rejects missing customer-owned records in metadata", async (route) => {
@@ -157,7 +166,9 @@ describe("successful record metadata", () => {
     const { bindings } = requestBindings();
     const query = bindings.runCommand as (name: string) => Promise<unknown>;
     const read = async (name: string) => name === primary ? [{ id: MISSING, name: "Saved record" }] : query(name);
-    const page = loadPage(`app/(app)/${route}/page.tsx`, { ...bindings, runCommand: read, runPageQuery: read });
+    const reading = { ...bindings, runCommand: read, runPageQuery: read };
+    const body = route in DETAIL_BODY ? DETAIL_BODY[route] : undefined;
+    const page = loadPage(`app/(app)/${route}/page.tsx`, body ? { ...reading, ...loadPage(`app/(app)/${body[0]}`, reading) } : reading);
     expect(await page.generateMetadata({ params: Promise.resolve({ id: "new" }), searchParams: Promise.resolve({}) })).toEqual({ title: creationTitle });
     expect(await page.generateMetadata({ params: Promise.resolve({ id: MISSING }), searchParams: Promise.resolve({}) })).toEqual({ title: savedTitle });
   });

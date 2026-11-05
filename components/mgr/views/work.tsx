@@ -1,13 +1,12 @@
-// Shared Work filters, standalone-task navigation, and rows; the live adapter owns device persistence.
+// components/mgr/views/work.tsx — shared Work filters, standalone-task navigation,
+// and rows drawn through the queue table (queue-table.tsx) as Today's are; the
+// live adapter owns device persistence.
 "use client";
-import { Fragment, useState, type ReactNode } from "react";
-import { DeliveryTruck01Icon, Package01Icon, Route01Icon, ThermometerIcon } from "@hugeicons/core-free-icons";
+import { useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import { OrderSheetLink } from "@/components/mgr/order-sheet-link";
 import { TabBar } from "@/components/mgr/qty";
+import { QueueTable } from "./queue-table";
 import { filterWorkRows, WORK_EMPTY, WORK_LABELS, type WorkViewModel } from "@/lib/mgr/work-view";
-
-const ICON = { package: Package01Icon, truck: DeliveryTruck01Icon, route: Route01Icon, thermometer: ThermometerIcon };
 
 export function WorkView({
   model,
@@ -33,16 +32,7 @@ export function WorkView({
   }
   const newOrder = createAction !== undefined ? createAction : E.btn("New order", "g");
   const emptyAction = model.rows.length === 0 && (selected === "all" || selected === "orders") ? newOrder : undefined;
-  const list = rows.length === 0 ? E.blank(WORK_EMPTY, undefined, emptyAction) : rows.map(row => <Fragment key={row.key}>
-    {/* A live order row opens the order sheet from anywhere on the row; the verb sits above that cover. */}
-    {E.row(
-      row.orderId ? <OrderSheetLink orderId={row.orderId} className="after:absolute after:inset-0">{row.title}</OrderSheetLink> : row.title,
-      row.detail,
-      <span className="relative z-10">{E.act(row.verb, row.tone, row.href)}</span>,
-      row.warning ? "w" : "",
-      row.icon ? ICON[row.icon] : undefined,
-    )}
-  </Fragment>);
+  const list = rows.length === 0 ? E.blank(WORK_EMPTY, undefined, emptyAction) : <QueueTable rows={rows} linkRows />;
   return (
     <>
       {E.hd("Work", newOrder)}

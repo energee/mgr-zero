@@ -18,7 +18,7 @@ import { taproomTodayRows } from "@/lib/mgr/taproom-today";
 import type { TapInterval } from "@/lib/mgr/tap-board-state";
 import { onlyRoles } from "@/lib/mgr/roles";
 import { navTitle } from "@/lib/mgr/nav";
-import { ORDER_SHEET_PARAM, orderSheetId } from "@/lib/mgr/order-sheet";
+import { ORDER_SHEET_PARAM, sheetId } from "@/lib/mgr/order-sheet";
 import { OrderSheetFromAddress } from "./orders/order-sheet";
 
 export const metadata = { title: navTitle("/") };
@@ -50,7 +50,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
     return <TodayView model={toTodayViewProps({ taproom: taproomTodayRows(location, open, counts, report, brewery.timeZone) })} linkRows />;
   }
   const items = adminItems ?? (await runCommand("get_today", {}, ctx)) as TodayItem[];
-  const sheet = orderSheetId((await searchParams)[ORDER_SHEET_PARAM]);
+  const sheet = sheetId((await searchParams)[ORDER_SHEET_PARAM]);
   return (
     <>
       <TodayView model={toTodayViewProps({ items, timeZone: brewery.timeZone, actions: todayActions(brewery.roles) })} linkRows />

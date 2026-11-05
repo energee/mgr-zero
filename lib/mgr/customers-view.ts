@@ -1,12 +1,18 @@
-// lib/mgr/customers-view.ts — view-model for the Customers list.
+// lib/mgr/customers-view.ts — view-model for the Customers list: one fact per
+// column of its RecordTable (components/mgr/views/customers.tsx).
 import type { EmptyState } from "./empty-state";
 import { nameWithAlias, paymentTermLabel, sentenceCase } from "./labels";
 import { stateOrCountry } from "./ship-to-view";
 export type CustomersRowView = {
   key: string;
   title: string;
-  detail: string;
-  href: string;
+  type: string;
+  /** A US customer's state; any other customer's country. */
+  region: string;
+  channel?: string;
+  terms?: string;
+  /** Inventory only: portal users or the remit warning, under the name. */
+  note?: string;
   warning?: boolean;
 };
 
@@ -38,17 +44,6 @@ export type CustomersSnapshot = {
   }[];
 };
 
-function detail(c: CustomersSnapshot["customers"][number]): string {
-  // A US customer reads its state; any other its country.
-  const head = `${sentenceCase(c.type)} · ${stateOrCountry(c)}`;
-  if (c.portal_user_count != null) return `${head} · ${c.portal_user_count} portal users`;
-  if (c.remit) return `${head} · ${c.remit}`;
-  const channel = c.sale_channels?.name;
-  const terms = c.payment_terms && paymentTermLabel(c.payment_terms);
-  const tail = [channel, terms].filter(Boolean).join(" · ");
-  return tail ? `${head} · ${tail}` : head;
-}
-
 export function toCustomersViewProps({ customers, missingPortalEmail, filtered }: CustomersSnapshot): CustomersViewModel {
   return {
     missingPortalEmail,
@@ -59,8 +54,11 @@ export function toCustomersViewProps({ customers, missingPortalEmail, filtered }
     rows: customers.map((c) => ({
       key: c.id,
       title: nameWithAlias(c),
-      detail: detail(c),
-      href: `/customers/${c.id}`,
+      type: sentenceCase(c.type),
+      region: stateOrCountry(c),
+      channel: c.sale_channels?.name,
+      terms: c.payment_terms ? paymentTermLabel(c.payment_terms) : undefined,
+      note: c.portal_user_count != null ? `${c.portal_user_count} portal users` : c.remit,
       warning: Boolean(c.remit),
     })),
   };

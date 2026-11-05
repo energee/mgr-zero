@@ -64,4 +64,11 @@ describe("Work task layout (#1259)", () => {
     expect(html).toMatch(/<a\b[^>]*href="#"[^>]*>Replenishment<\/a>/);
     expect(html).not.toMatch(/href="\/(?:pick|replenishment)"/);
   });
+
+  it("draws the Work rows as Today's dense queue table, one row per item with its verb (rows-like-today task 2)", () => {
+    const html = renderToStaticMarkup(createElement("div", null, SCREENS.find(screen => screen.name === "Work")!.body));
+    expect(html.match(/<table/g)).toHaveLength(1);
+    expect(html).toContain("[&amp;_td]:py-1");
+    expect(html).not.toContain('data-slot="item"');
+  });
 });

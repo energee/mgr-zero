@@ -48,7 +48,7 @@ describe("More page consistency", () => {
   });
 
   it("capitalizes customer type labels in the list as detail already does", () => {
-    expect(toCustomersViewProps(customersList).rows[0]!.detail).toBe("Retailer · PA · 2 portal users");
+    expect(toCustomersViewProps(customersList).rows[0]!.type).toBe("Retailer");
   });
 
   it.each([["Vendor", "Edit vendor"], ["Contract", "Edit contract"], ["Ship-to form", "Edit ship-to"], ["License", "Edit license"]])("titles the %s inventory dialog by action", (name, title) => {
