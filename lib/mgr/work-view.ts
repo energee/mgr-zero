@@ -3,6 +3,7 @@
 import type { WorkKind, WorkRow } from "@/lib/commands/landings";
 import type { EmptyState } from "@/lib/mgr/empty-state";
 import { STAFF_NAV } from "@/lib/mgr/nav";
+import type { TodayIcon } from "@/lib/mgr/today-view";
 
 /** Work landing filters, separate from standalone task-page navigation. */
 const WORK_FILTER_HREFS: Record<"all" | WorkKind, string> = {
@@ -50,7 +51,7 @@ export type WorkRowView = {
   href?: string;
   /** The order this row is about, live only: its title opens the order sheet (lib/mgr/order-sheet.ts). */
   orderId?: string;
-  icon?: "package" | "truck" | "route" | "thermometer";
+  icon?: TodayIcon;
 };
 
 export type WorkViewModel = {
@@ -70,7 +71,7 @@ export function toWorkViewProps({ rows }: WorkSnapshot): WorkViewModel {
 }
 
 export function workFromQuery(rows: WorkRow[], defaults: WorkKind[]): WorkViewModel {
-  const icons: Record<WorkKind, NonNullable<WorkRowView["icon"]>> = { orders: "package", transfers: "package", batches: "thermometer", runs: "package", POs: "truck", routes: "route" };
+  const icons: Record<WorkKind, NonNullable<WorkRowView["icon"]>> = { orders: "package", transfers: "package", batches: "thermo", runs: "package", POs: "truck", routes: "route" };
   return { ...toWorkViewProps({ rows: rows.map(row => ({ key: `${row.kind}:${row.id}`, kind: row.kind, title: row.label, detail: row.detail, verb: row.verb, tone: row.tone, warning: row.tone === "attention", href: row.href, ...(row.orderId ? { orderId: row.orderId } : {}), icon: icons[row.kind] })) }), defaults };
 }
 

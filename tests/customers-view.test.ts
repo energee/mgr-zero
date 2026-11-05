@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { createElement, isValidElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { CustomerView } from "../components/mgr/views/customer";
 import { CustomersView } from "../components/mgr/views/customers";
@@ -16,16 +16,24 @@ import { CUSTOMER_TYPES } from "../lib/mgr/enums";
 import { toCustomersViewProps } from "../lib/mgr/customers-view";
 import { shipToAddress, shipToFormFields, toShipToViewProps } from "../lib/mgr/ship-to-view";
 
+// The live row opens the customer sheet through the address (components/mgr/order-sheet-link.tsx).
+vi.mock("next/navigation", () => ({ usePathname: () => "/customers", useSearchParams: () => new URLSearchParams("q=al"), useRouter: () => ({ replace: vi.fn() }) }));
+
 const html = (node: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(node);
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 
 describe("Customers list", () => {
-  it("maps list_customers through portal-user and remit copy", () => {
+  it("maps list_customers onto one fact per column, with portal-user and remit copy as the note", () => {
     const model = toCustomersViewProps(customersList);
     expect(model.rows.map((r) => r.title)).toEqual([RIDGELINE.name, ALS.name]);
-    expect(model.rows[0]?.detail).toBe("Retailer · PA · 2 portal users");
-    expect(model.rows[1]?.detail).toBe("Retailer · OH · brewery remits");
-    expect(model.rows[1]?.warning).toBe(true);
+    expect(model.rows[0]).toMatchObject({ type: "Retailer", region: "PA", channel: "Wholesale", terms: "Net 30", note: "2 portal users" });
+    expect(model.rows[1]).toMatchObject({ region: "OH", note: "brewery remits", warning: true });
+  });
+
+  it("draws the list as a table headed by its facts, as Orders does", () => {
+    const markup = html(screen("Customers").body);
+    for (const head of ["Customer", "Type", "Region", "Channel", "Terms"]) expect(markup).toContain(`>${head}<`);
+    expect(markup).toContain("<table");
   });
 
   it("the Customers inventory record is CustomersView", () => {
@@ -42,19 +50,18 @@ describe("Customers list", () => {
     expect(body.props.search?.props.search.label).toBe("Search customers");
   });
 
-  it("the inventory list offers New customer, as live does, and each row opens by its arrow, not an Open verb (#996, #1026)", () => {
+  it("the inventory list offers New customer, as live does, and each name is an inert tap to Customer detail, not an Open verb (#996, #1026)", () => {
     const markup = html(screen("Customers").body);
     expect(markup).toMatch(/>New customer</);
     expect(readFileSync("app/(app)/customers/customer-form.tsx", "utf8")).toContain('"New customer"');
     expect(markup).not.toMatch(/>Open</);
-    const first = toCustomersViewProps(customersList).rows[0]!.title;
-    expect(markup.split('data-slot="item"').find(item => item.includes(first))).toContain('aria-label="Open"');
+    expect(markup).toMatch(/data-to="Customer detail"[^>]*>[^<]*Ridgeline/);
   });
 
-  it("a live customer row is one link to its detail page (#996)", () => {
+  it("a live customer name opens the customer sheet over the list, keeping its search", () => {
     const model = toCustomersViewProps(customersList);
     const markup = html(createElement(CustomersView, { model, linkRows: true, createAction: null, search: null }));
-    expect(markup).toContain(`href="${model.rows[0]!.href}"`);
+    expect(markup).toContain(`href="/customers?q=al&amp;customer=${model.rows[0]!.key}"`);
     expect(markup).not.toMatch(/>Open</);
   });
 
@@ -122,8 +129,11 @@ describe("Customer detail", () => {
     expect(markup).toMatch(/Ship-tos/);
   });
 
-  it("the live customer page mounts CustomerView with no second E.* tree", () => {
-    const src = readFileSync("app/(app)/customers/[id]/page.tsx", "utf8");
+  it("the live customer page and sheet share one body, which mounts CustomerView with no second E.* tree", () => {
+    expect(readFileSync("app/(app)/customers/[id]/page.tsx", "utf8")).toMatch(/<CustomerDetail\b/);
+    expect(readFileSync("app/(app)/customers/customer-sheet.tsx", "utf8")).toMatch(/<CustomerDetail\b/);
+    expect(readFileSync("app/(app)/customers/page.tsx", "utf8")).toMatch(/sheet=\{/);
+    const src = readFileSync("app/(app)/customers/[id]/customer-detail.tsx", "utf8");
     expect(src).toMatch(/<CustomerDetailForm\b/);
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
     expect(src).toMatch(/detail=\{/);
@@ -205,8 +215,8 @@ describe("country and alias", () => {
       { ...customersList.customers[1], country: "JP", state: null },
     ] });
     expect(model.rows[0]?.title).toBe(`${RIDGELINE.name} · Evergreen`);
-    expect(model.rows[0]?.detail).toBe("Retailer · PA · 2 portal users");
-    expect(model.rows[1]?.detail).toBe("Retailer · Japan · brewery remits");
+    expect(model.rows[0]?.region).toBe("PA");
+    expect(model.rows[1]?.region).toBe("Japan");
   });
 
   it("customer detail keeps State in place, required only for a US customer (#1306)", () => {

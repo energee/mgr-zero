@@ -12,7 +12,7 @@ vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery"
 // answers each role the way it does live.
 vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ breweryId: "brewery", roles: state.roles }) }));
 vi.mock("@/lib/uuid", () => ({ isUuid: () => true }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh() {} }), notFound() { throw new Error("not found"); } }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh() {} }), usePathname: () => "/customers", useSearchParams: () => new URLSearchParams(), notFound() { throw new Error("not found"); } }));
 vi.mock("@/lib/commands/use-command-form", () => ({ useCommandAction: () => ({ busy: false, error: "", fieldErrors: {}, run() {} }), useCommandForm: () => ({ open: false, setOpen() {}, busy: false, error: "", fieldErrors: {}, submit() {} }) }));
 vi.mock("@/lib/mgr/page-query", () => ({ runPageQuery: query }));
 const brand = { id: "brand", name: "Hazy", abv: 6.8, description: "Juicy", category: "Core", price_group_id: "group", hops: "Citra", styles: { name: "IPA" }, skus: [{ id: "sku", name: "Hazy keg", format_id: "keg", active: false, upc: "123456" }] };
@@ -56,7 +56,7 @@ async function query(name: string, input?: { basis?: string; missingPortalEmail?
 import CatalogPage from "@/app/(app)/catalog/page";
 import SkuListPage from "@/app/(app)/catalog/brands/[id]/skus/page";
 import CustomersPage from "@/app/(app)/customers/page";
-import CustomerPage from "@/app/(app)/customers/[id]/page";
+import { CustomerDetail } from "@/app/(app)/customers/[id]/customer-detail";
 import LocationPage from "@/app/(app)/locations/[id]/page";
 import { SCREENS } from "@/components/mgr/screens";
 import PricingPage from "@/app/(app)/pricing/page";
@@ -151,7 +151,7 @@ it.each(["warehouse", "brewer"])("shared catalog and customers suppress denied c
   expect(render(customers)).not.toContain("New customer");
 });
 it("customer view keeps tax edit prefill, default ship-to, filtered Orders, Invite and Remove access", async () => {
-  const page = await CustomerPage({ params: Promise.resolve({ id: "buyer" }) });
+  const page = await CustomerDetail({ id: "buyer" });
   expect(page.type).toBe(CustomerDetailForm);
   expect(page.props.model.editValues.taxTreatment).toBe("research");
   expect(page.props.detail.shipTos[0].action.props.shipTo.is_default).toBe(true);
@@ -162,7 +162,7 @@ it("customer view keeps tax edit prefill, default ship-to, filtered Orders, Invi
   const html = render(page);
   for (const text of ["Tax treatment", "Research", "Dock · default", "/orders?customerId=buyer", "/orders/new?customerId=buyer", "Invite portal user", "jo@buyer.test", "Remove access", "Delete ship-to", "$250.00 · 1 unpaid invoice", "/invoices?customerId=buyer&amp;status=unpaid"]) expect(html).toContain(text);
   state.roles = ["warehouse"]; state.calls = [];
-  const readonly = render(await CustomerPage({ params: Promise.resolve({ id: "buyer" }) }));
+  const readonly = render(await CustomerDetail({ id: "buyer" }));
   expect(state.calls).not.toContain("list_customer_users");
   expect(state.calls).not.toContain("list_invoices");
   expect(readonly).not.toMatch(/Open balance|Edit customer|Add ship-to|Edit ship-to|Delete ship-to|Invite portal user|invitations aren|Portal users|Remove access/);
