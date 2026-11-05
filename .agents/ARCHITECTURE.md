@@ -131,7 +131,9 @@ a gap to close, not a convention to trust.
    `defineCommand`/`defineQuery` and the single
    endpoint `app/api/command/route.ts` (cookie session or Bearer access token;
    an agent's OAuth token is Bearer only and runs queries only, through
-   `/api/command` or `app/api/mcp/route.ts`, unless a query sets `agentHidden`).
+   `/api/command` or `app/api/mcp/route.ts`, unless a query sets `agentHidden`.
+   A role limits database reads only, so a query that reaches a provider or a
+   credential must set it; `tests/agent-hidden.test.ts` fails otherwise).
    No route handler or page contains
    inline business logic. There is no resource REST API and no API-key table —
    new operations are registered commands, not new routes. Handlers signal user-facing failures by throwing

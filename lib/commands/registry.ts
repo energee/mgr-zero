@@ -470,6 +470,7 @@ export function listTools(options: { aiOnly?: boolean; ctx?: OperationCtx } = {}
     scope: d.scope,
     requiresConfirmation: !!d.requiresConfirmation,
     aiExposed: d.aiExposed,
+    agentHidden: !!d.agentHidden,
     risk: d.risk,
     compensation: d.compensation,
     idempotency: d.idempotency,

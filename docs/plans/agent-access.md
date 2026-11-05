@@ -227,8 +227,12 @@ change.
 - `lib/commands/registry.ts`: `agentHidden` on a definition. `listTools` filters
   on it and `canRun`, and the agent gate in `runCommand` becomes "a query the
   person's roles allow and not hidden".
-- Review every query once for the hide list. Start with `get_qbo_connection`,
-  `get_cola_image` and `preview_command`.
+- The hide list covers every query that reaches past the person's database
+  access, plus Ask MGR history and Slack link details. A role says nothing about
+  credentials or outside calls: `list_qbo_customers` calls QuickBooks and can
+  refresh tokens with the service role. `tests/agent-hidden.test.ts` fails on a
+  new query that does this, so that class is closed by default. Plain database
+  reads stay open by default, because roles already limit them (Q4).
 - `/.well-known/oauth-protected-resource` for MCP auth discovery.
 - Server `instructions`, kept under 300 words: what MGR is, volumes are
   stored in bbl, the inventory ledger is append-only and corrections are

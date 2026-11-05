@@ -24,7 +24,7 @@ defineCommand({
 });
 
 defineQuery({
-  name: "get_pos_integration_health", description: "Get redacted Square seller connection health",
+  name: "get_pos_integration_health", agentHidden: true, description: "Get redacted Square seller connection health",
   input: z.object({}), roles: ["admin"],
   handler: async (ctx) => (await import("@/lib/supabase/integration-tokens")).getSquareHealth(ctx),
 });

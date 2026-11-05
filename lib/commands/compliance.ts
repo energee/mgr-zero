@@ -98,7 +98,7 @@ defineQuery({
 export type ColaSearch = { permit: string; rows: ColaRecord[] };
 
 defineQuery({
-  name: "search_colas", description: "Search TTB's public COLA registry for the label approvals under the brewery's TTB registry number, completed in the last 15 years, newest first; name keeps only rows whose fanciful or brand name contains it (ignoring case); refused when the brewery has no registry number; nothing is stored",
+  name: "search_colas", agentHidden: true, description: "Search TTB's public COLA registry for the label approvals under the brewery's TTB registry number, completed in the last 15 years, newest first; name keeps only rows whose fanciful or brand name contains it (ignoring case); refused when the brewery has no registry number; nothing is stored",
   roles: [...ROLES],
   input: z.object({ name: z.string().optional() }),
   handler: async (ctx, i): Promise<ColaSearch> => {
@@ -127,7 +127,7 @@ function colaUpstreamError(error: unknown): never {
 }
 
 defineQuery({
-  name: "get_cola_details",
+  name: "get_cola_details", agentHidden: true,
   description: "Retrieve an approved COLA's label image identifiers from TTB; refused unless its principal permit matches the brewery's TTB registry number; images render through get_cola_image",
   roles: [...ROLES],
   input: z.object({ ttbId: colaId }),

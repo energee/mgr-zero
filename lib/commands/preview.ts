@@ -31,13 +31,13 @@ defineCommand({
 });
 
 defineQuery({
-  name: "list_chat_conversations", description: "List the current author's composer conversations in this brewery",
+  name: "list_chat_conversations", agentHidden: true, description: "List the current author's composer conversations in this brewery",
   input: z.object({}), roles: STAFF_ROLES,
   handler: (ctx) => unwrap(ctx.db.rpc("list_chat_conversations", { p_brewery: ctx.breweryId })),
 });
 
 defineQuery({
-  name: "get_chat_history", description: "Read one composer conversation and its messages for the current author and brewery; recentTurns returns only that many newest text turns, oldest first",
+  name: "get_chat_history", agentHidden: true, description: "Read one composer conversation and its messages for the current author and brewery; recentTurns returns only that many newest text turns, oldest first",
   input: z.object({ conversationId, recentTurns: z.number().int().min(1).max(MAX_HISTORY_MESSAGES).optional() }), roles: STAFF_ROLES,
   handler: (ctx, input) => unwrap(ctx.db.rpc("get_chat_history", {
     p_brewery: ctx.breweryId, p_conversation: input.conversationId, p_recent_turns: input.recentTurns,

@@ -121,13 +121,13 @@ export type ChatPreferences = { preferences: { reason: typeof REASONS[number]; e
 export type ChatLinkIntent = { brewery: string; mgrIdentity: string; slackIdentity: string; workspace: string; expiresAt: string };
 export type ChatLinkedPerson = { id: string; name: string; roles: StaffRole[]; slackIdentity: string; linkedAt: string };
 
-defineQuery({ name: "get_chat_integration_health", description: "Read bounded, redacted Slack integration health for brewery admins",
+defineQuery({ name: "get_chat_integration_health", agentHidden: true, description: "Read bounded, redacted Slack integration health for brewery admins",
   input: z.object({}), roles: ["admin"], handler: (ctx) => unwrap(ctx.db.rpc("get_chat_integration_health", { p_brewery: ctx.breweryId })) as Promise<ChatHealth>,
 });
-defineQuery({ name: "list_chat_user_links", description: "List currently linked staff in this brewery, without link proofs",
+defineQuery({ name: "list_chat_user_links", agentHidden: true, description: "List currently linked staff in this brewery, without link proofs",
   input: z.object({}), roles: ["admin"], handler: (ctx) => unwrap(ctx.db.rpc("list_chat_user_links", { p_brewery: ctx.breweryId })) as Promise<ChatLinkedPerson[]>,
 });
-defineQuery({ name: "get_chat_link_intent", description: "Preview both identities and the brewery before explicit account-link consent; does not consume the proof",
+defineQuery({ name: "get_chat_link_intent", agentHidden: true, description: "Preview both identities and the brewery before explicit account-link consent; does not consume the proof",
   input: z.object({ proof: z.string().min(1).max(256) }), roles: STAFF_ROLES,
   handler: (ctx, i) => unwrap(ctx.db.rpc("get_chat_link_intent", { p_brewery: ctx.breweryId, p_proof_hash: sha256(i.proof) })) as Promise<ChatLinkIntent | null>,
 });
@@ -153,7 +153,7 @@ defineQuery({ name: "get_notification_preferences", description: "Read your own 
       installationActive: installation.active, breweryQuietHours: installation.quietHours };
   },
 });
-defineQuery({ name: "list_chat_channels", description: "List private active Slack channels with the bot present and no sharing",
+defineQuery({ name: "list_chat_channels", agentHidden: true, description: "List private active Slack channels with the bot present and no sharing",
   input: z.object({ installationId: z.string().uuid() }), roles: ["admin"],
   handler: async (ctx, i) => (await import("@/lib/chat/jobs")).listChatChannels(ctx, i.installationId),
 });

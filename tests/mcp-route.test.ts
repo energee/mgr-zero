@@ -90,6 +90,10 @@ describe("/api/mcp", () => {
     expect(body.code).toBe("agent_not_allowed");
   });
 
+  it.each(["list_qbo_customers", "list_chat_channels", "search_colas", "get_chat_history"])("refuses %s, which reaches past the person's database access", async (name) => {
+    expect((await tool(token, "run_query", { name, input: {} })).body.code).toBe("agent_not_allowed");
+  });
+
   it("refuses a command", async () => {
     expect((await tool(token, "run_query", { name: "record_movement", input: {} })).body.code).toBe("agent_not_allowed");
   });
