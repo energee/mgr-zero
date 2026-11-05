@@ -1,17 +1,18 @@
 // lib/mgr/order-sheet.ts — the address of a record sheet: `?order=<id>` on the
-// list that is open (Today, Work, Orders), or `?customer=<id>` on Customers, so
+// list that is open (Today, Work, Orders), `?customer=<id>` on Customers, or `?brand=<id>` on Catalog, so
 // the list's own filters survive, and a refresh or a shared link reopens the
 // same sheet over the same list.
 // A query parameter rather than an intercepted /orders/<id> route: the order's
 // own pages (Confirm, Edit draft, Put back, Ship) navigate to /orders/<id> after
 // they finish, and those must keep opening the full page.
 // Each list page reads its parameter (app/(app)/orders/order-sheet.tsx,
-// app/(app)/customers/customer-sheet.tsx); components/mgr/order-sheet-link.tsx writes it.
+// app/(app)/customers/customer-sheet.tsx, app/(app)/catalog/brand-sheet.tsx); components/mgr/order-sheet-link.tsx writes it.
 
 import { isUuid } from "@/lib/uuid";
 
 export const ORDER_SHEET_PARAM = "order";
 export const CUSTOMER_SHEET_PARAM = "customer";
+export const BRAND_SHEET_PARAM = "brand";
 
 /** The address's record id when it is one well-formed uuid; anything else opens no sheet. */
 export function sheetId(value: string | string[] | undefined): string | undefined {

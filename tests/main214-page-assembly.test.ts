@@ -12,7 +12,7 @@ vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery"
 // answers each role the way it does live.
 vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ breweryId: "brewery", roles: state.roles }) }));
 vi.mock("@/lib/uuid", () => ({ isUuid: () => true }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh() {} }), usePathname: () => "/customers", useSearchParams: () => new URLSearchParams(), notFound() { throw new Error("not found"); } }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh() {} }), usePathname: () => "/catalog", useSearchParams: () => new URLSearchParams(), notFound() { throw new Error("not found"); } }));
 vi.mock("@/lib/commands/use-command-form", () => ({ useCommandAction: () => ({ busy: false, error: "", fieldErrors: {}, run() {} }), useCommandForm: () => ({ open: false, setOpen() {}, busy: false, error: "", fieldErrors: {}, submit() {} }) }));
 vi.mock("@/lib/mgr/page-query", () => ({ runPageQuery: query }));
 const brand = { id: "brand", name: "Hazy", abv: 6.8, description: "Juicy", category: "Core", price_group_id: "group", hops: "Citra", styles: { name: "IPA" }, skus: [{ id: "sku", name: "Hazy keg", format_id: "keg", active: false, upc: "123456" }] };
@@ -83,7 +83,8 @@ it("assembles shared Catalog with the brand link and the shared format list", as
   expect(state.brandInput).toEqual({ q: "", sort: "name", category: "" });
   const html = render(page);
   // Packages and pours are one tap further, on the brand's SKU list.
-  for (const text of ["/catalog/brands/brand", "/catalog/formats/keg"]) expect(html).toContain(text);
+  // A brand opens in a sheet over Catalog (?brand=); a format opens its page.
+  for (const text of ["/catalog?brand=brand", "/catalog/formats/keg"]) expect(html).toContain(text);
   for (const text of ["Edit brand", "Edit SKU", "UPC 123456", "New pour", "Edit pour"]) expect(html).not.toContain(text);
   expect(html).not.toContain("/catalog/formats/pour");
 });
@@ -103,9 +104,9 @@ it.each([
 // #1062: Catalog links a brand, Price groups and Water profiles only for a role
 // that page lets in (upsert_brand, the /pricing reads, list_water_profiles).
 it.each([
-  ["admin", ["/catalog/brands/brand", "/pricing", "/catalog/water-profiles"], []],
-  ["sales", ["/catalog/brands/brand", "/pricing"], ["/catalog/water-profiles"]],
-  ["warehouse", [], ["/catalog/brands/", "/pricing", "/catalog/water-profiles"]],
+  ["admin", ["/catalog?brand=brand", "/pricing", "/catalog/water-profiles"], []],
+  ["sales", ["/catalog?brand=brand", "/pricing"], ["/catalog/water-profiles"]],
+  ["warehouse", [], ["brand=", "/catalog/brands/", "/pricing", "/catalog/water-profiles"]],
 ])("Catalog links for %s only the pages that role may open", async (role, linked, inert) => {
   state.roles = [role];
   const html = render(await CatalogPage());
@@ -116,6 +117,14 @@ it.each([
   if (role === "warehouse") expect(html).not.toMatch(/\sdata-tap[\s>=]/);
   // Every role that reaches Catalog may open a format.
   expect(html).toContain('href="/catalog/formats/keg"');
+});
+// A ?brand= link opened by a role that may not open Brand leaves the list as it is,
+// rather than sending the viewer to No access.
+it("Catalog opens no brand sheet for a role that may not open Brand", async () => {
+  state.roles = ["warehouse"];
+  const html = render(await CatalogPage({ searchParams: Promise.resolve({ brand: "00000000-0000-4000-8000-0000000000b1" }) }));
+  expect(html).toContain(">Hazy<");
+  expect(html).not.toContain('role="dialog"');
 });
 // #1062: the Price groups gate is the reads /pricing runs, so the two cannot drift
 // apart. The real registry answers canRun for each staff role.

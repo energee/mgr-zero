@@ -1,6 +1,7 @@
-// Catalog draws one row per brand in the shared RecordTable: live, the name
-// links to the brand for a role that may open it, with its alias under it, and
-// the COLA column reads its recorded approvals; the latest approved label
+// Catalog draws one row per brand in the shared RecordTable, its alias under
+// the name. Live, the name opens the brand in a sheet over the list (?brand=,
+// lib/mgr/order-sheet.ts) for a role that may open it; the page passes the
+// open sheet. The COLA column reads its recorded approvals; the latest approved label
 // leads the row as a thumbnail. What a brand sells (packages
 // and pours) lives under its Sells as.
 // Price groups and Water profiles rows follow, then Formats under the
@@ -9,6 +10,7 @@
 // inventory, which passes no links, keeps every row an inert tap.
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { BRAND_SHEET_PARAM } from "@/lib/mgr/order-sheet";
 import { NOT_SET, type CatalogViewModel } from "@/lib/mgr/catalog-view";
 import { WATER_PROFILES_CAPTION } from "@/lib/mgr/water-profiles-view";
 import { FormatsView, type FormatsViewModel } from "@/components/mgr/views/formats";
@@ -28,6 +30,7 @@ export function CatalogView({
   formats,
   formatAction,
   controls,
+  sheet,
 }: {
   model: CatalogViewModel;
   /** The search, Sort and Category strip (components/mgr/list-controls.tsx). */
@@ -39,6 +42,8 @@ export function CatalogView({
   links?: { brands: boolean; priceGroups: boolean; waterProfiles: boolean };
   formats?: FormatsViewModel;
   formatAction?: ReactNode;
+  /** Live: the brand sheet the page opened from ?brand= (app/(app)/catalog/brand-sheet.tsx), drawn over the list. */
+  sheet?: ReactNode;
 }) {
   // Each `links && (...)` below gives undefined (no links: the inventory's inert tap) or, live, the path or null (denied: drawn plain).
   const brandAction = createAction !== undefined ? createAction : E.btn("New brand");
@@ -64,12 +69,14 @@ export function CatalogView({
             // A style or ABV that is not set sorts last, not as the words.
             sort: [brand.name, brand.style === NOT_SET ? null : brand.style, brand.abv === NOT_SET ? null : brand.abv, brand.skus, brand.cola],
             note: brand.alias,
+            sheet: links?.brands ? { param: BRAND_SHEET_PARAM, id: brand.key } : undefined,
             href: links && (links.brands ? brand.href : null),
           }))}
         />}
       {navRow("Price groups", model.priceGroups, links && (links.priceGroups ? model.priceGroupsHref : null))}
       {navRow("Water profiles", WATER_PROFILES_CAPTION, links && (links.waterProfiles ? model.waterProfilesHref : null))}
       {formats && <FormatsView model={formats} header={<div id="formats" className="flex scroll-m-20 flex-col gap-2 md:flex-row md:items-center md:justify-between">{E.group("Formats")}{formatAction !== undefined ? formatAction : E.btn("New format")}</div>} />}
+      {sheet}
     </>
   );
 }

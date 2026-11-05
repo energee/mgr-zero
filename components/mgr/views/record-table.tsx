@@ -40,7 +40,7 @@ export type RecordTableRow = {
    *  inert tap). null: the live viewer may not open it, so the name is plain text. */
   href?: string | null;
   /** Live only: the name opens this record in a sheet over the list (an order
-   *  under ?order=, a customer under ?customer=; lib/mgr/order-sheet.ts)
+   *  under ?order=, a customer under ?customer=, a brand under ?brand=; lib/mgr/order-sheet.ts)
    *  instead of leaving it for the record's page. */
   sheet?: { param: string; id: string };
   /** The screen the name opens, when the name is a record rather than a
@@ -75,7 +75,7 @@ export const RECORD_LINK = "inline-flex min-h-6 min-w-0 max-w-full shrink items-
 const ABOVE_COVER = "[&_a]:relative [&_a]:z-10 [&_button]:relative [&_button]:z-10";
 const said = (cell: ReactNode) => cell != null && cell !== false;
 
-/** The name as a link (live), a record sheet's link (a live order or customer row), or a tap (inventory); it covers its whole record.
+/** The name as a link (live), a record sheet's link (a live order, customer or brand row), or a tap (inventory); it covers its whole record.
  *  A live name without a link is plain text, so nothing looks tappable.
  *  A link to a record page is not prefetched (lib/mgr/row-link-prefetch.ts). */
 function name(row: RecordTableRow) {
