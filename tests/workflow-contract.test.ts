@@ -272,6 +272,14 @@ describe("production-readiness workflow contract", () => {
     expect(review).toContain("github.event.pull_request.user.type != 'Bot'");
   });
 
+  it("waits for this commit's CI run before reading the checks", () => {
+    const landPr = readFileSync(resolve(__dirname, "..", "scripts", "land-pr.sh"), "utf8");
+    const wait = landPr.indexOf("--workflow ci.yml --branch");
+    expect(wait).toBeGreaterThan(landPr.indexOf('echo "pushed $head"'));
+    expect(wait).toBeLessThan(landPr.indexOf('gh pr checks "$n" --watch'));
+    expect(landPr).toContain('{ echo "no CI run for $head"; exit 8; }');
+  });
+
   it("runs /simplify before the code review, and land-pr requires both", () => {
     const landPr = readFileSync(resolve(__dirname, "..", "scripts", "land-pr.sh"), "utf8");
     const jobs = parse(review).jobs;
