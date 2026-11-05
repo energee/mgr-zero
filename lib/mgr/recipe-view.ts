@@ -88,7 +88,7 @@ export type RecipeViewModel = {
 };
 
 /** What get_recipe returns: the recipe, its selected version (null before the
- * first), all version numbers, that version's ingredients and water additions, and the prediction.
+ * first), all version numbers, that version's ingredients in brewing order, its water additions, and the prediction.
  * Postgres numerics may arrive as strings, so readers coerce with Number. */
 export type RecipeSnapshot = {
   recipe: { id: string; name: string; brand_id: string | null; note: string | null };

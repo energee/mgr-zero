@@ -203,9 +203,19 @@ defineQuery({
 // which the page hides) rather than have a made-up potential move the OG.
 const num = (v: unknown) => Number(v ?? 0);
 
+/** Brewing order: stage by stage, as INGREDIENT_STAGES lists them. Boil and whirlpool time counts down to the end of the
+ *  stage, so 60 comes before 10; other stages count up from their start. A line with no time closes its stage. Equal lines
+ *  compare as 0, so a stable sort keeps them in the brewer's order. */
+function byBrewingOrder(a: { stage: string; timing_minutes: number | null }, b: { stage: string; timing_minutes: number | null }) {
+  const stages: readonly string[] = INGREDIENT_STAGES;
+  if (a.stage !== b.stage) return stages.indexOf(a.stage) - stages.indexOf(b.stage);
+  if (a.timing_minutes === null || b.timing_minutes === null) return Number(a.timing_minutes === null) - Number(b.timing_minutes === null);
+  return a.stage === "boil" || a.stage === "whirlpool" ? b.timing_minutes - a.timing_minutes : a.timing_minutes - b.timing_minutes;
+}
+
 defineQuery({
   name: "get_recipe",
-  description: "One recipe with its requested version (latest by default), all version numbers, that version's ingredients, and the OG/FG/ABV they predict",
+  description: "One recipe with its requested version (latest by default), all version numbers, that version's ingredients in brewing order, and the OG/FG/ABV they predict",
   input: z.object({ recipeId: z.string().uuid(), version: z.number().int().positive().optional() }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {
     const versionQuery = ctx.db.from("recipe_versions").select("*").eq("recipe_id", i.recipeId);
@@ -226,7 +236,7 @@ defineQuery({
     const [ingredients, waterAdditions] = await Promise.all([
       unwrap(ctx.db.from("recipe_ingredients")
         .select("id, material_id, per_bbl_qty, stage, timing_minutes, sort, extract_snapshot, materials(base_uom)")
-        .eq("recipe_version_id", version.id).order("sort")).then((r) => r ?? []),
+        .eq("recipe_version_id", version.id).order("sort")).then((r) => (r ?? []).sort(byBrewingOrder)),
       unwrap(ctx.db.from("recipe_water_additions").select("material_id, qty, unit, stage").eq("recipe_version_id", version.id).order("sort")).then((r) => r ?? []),
     ]);
 
