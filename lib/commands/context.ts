@@ -128,6 +128,13 @@ export async function buildContextFromBearer(breweryId: string | undefined, acce
     auth: { persistSession: false, autoRefreshToken: false },
     accessToken: async () => accessToken,
   });
+  // getClaims only checks the signature, which outlives a revoked grant, so an
+  // agent token with no live session is a 401: the client must connect again.
+  const clientId: unknown = data?.claims.client_id;
+  const agent = typeof clientId === "string" ? { clientId } : undefined;
+  if (agent && !(await unwrap(discoveryDb.rpc("agent_session_is_live")))) {
+    throw new CommandError("unauthenticated", 401, "unauthenticated");
+  }
   const discovered = breweryId === undefined
     ? ({ db: discoveryDb, userId, breweryId: null, roles: [] } satisfies PreTenantCtx)
     : await ctxForBearer(discoveryDb, userId, breweryId, expected?.customerId);
@@ -137,5 +144,5 @@ export async function buildContextFromBearer(breweryId: string | undefined, acce
     accessToken: async () => accessToken,
     global: { headers: scopeHeaders(discovered) },
   });
-  return { ...discovered, db };
+  return { ...discovered, db, agent };
 }

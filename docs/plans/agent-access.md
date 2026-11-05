@@ -55,7 +55,8 @@ were checked against `main` at `40278052a`.
 - **Q2 Who may connect.** Off per brewery until an Admin turns it on. Each
   person then consents per agent.
 - **Q3 What a token may do.** An agent token reads and proposes. It never
-  commits; a person's own session does. Supabase scopes cannot enforce this:
+  commits, though a preview may write its own preview token. A person's own
+  session commits. Supabase scopes cannot enforce this:
   its token guide says scopes "do not control access to your database tables
   or API endpoints". MGR defines no scopes and gates on the `client_id` claim
   instead (Phase 1).
@@ -82,43 +83,54 @@ start on day one.
 ### Phase 1 — Agent identity and the write guard
 
 An OAuth access token is an ordinary Supabase JWT with `role: authenticated`.
-Without a guard it could call `/api/command` or any granted RPC directly and
-commit with no approval. The guards live in the database so they also hold for
-a token sent straight to the Supabase API.
+Without guards it could call `/api/command` or any granted RPC directly and
+commit with no approval. It could also call Supabase Auth, set the person's
+password, and sign in as them. The guards live in the database and in an Auth
+hook, so they hold for a token sent straight to Supabase.
 
 **Test first:** a token issued through the real OAuth flow resolves to the
 same roles as that person's session and carries the client id. That token
-cannot commit, through `/api/command` or by calling an RPC directly. In a
+cannot commit, through `/api/command` or by calling an RPC directly. It cannot
+change the account through Supabase Auth, before or after a refresh. In a
 brewery with agents off, it reads no rows, even straight from the REST API.
-A revoked grant stops working; the test records how soon.
+A revoked grant stops working at once.
 
 **Modify:**
 - New migration:
   - `breweries.agents_enabled boolean not null default false`.
-  - A `BEFORE INSERT` trigger on `private.command_requests` that refuses a JWT
-    with a `client_id`. Every ledgered write inserts there, including
-    `begin_qbo_invoice_sync` and `begin_square_catalog_sync`, which skip
-    `claim_command_request`.
-  - The same refusal for the writers outside the ledger:
-    `complete_invite_membership`, `record_invite_failure` and
-    `record_submitted_order_occurrence`.
-  - `private.request_scope_allows` denies a `client_id` JWT for a brewery with
-    agents off. Every RLS helper calls it, so this is the one off switch.
-- A catalog test that lists every volatile function `authenticated` can run
-  outside the ledger, so a new one fails until someone reviews it.
-- `lib/commands/context.ts`: `buildContextFromBearer` reads `client_id` and
-  sets `ctx.agent`.
+  - `private.agent_access_token_hook`, a custom access token hook. It moves the
+    real `session_id` to `agent_session_id` and sets `session_id` to a random
+    UUID. Auth then answers `session_not_found` on its account endpoints, and
+    PostgREST never checks. `secure_password_change` does not help: a new
+    agent session counts as recent.
+  - `public.agent_session_is_live`, because revoke deletes the session but the
+    token keeps a valid signature until `exp`.
+  - `private.refuse_agent_token`, a statement trigger. It fires on insert or
+    update of `private.command_requests`, which also covers the retry path in
+    `begin_qbo_invoice_sync`, and on `private.invite_requests` and
+    `public.notification_occurrences`, which are written outside the ledger.
+  - `private.request_scope_allows` denies an agent token for a brewery with
+    agents off or a dead session. The RLS helpers and `private.assert_staff`
+    call it.
+  - `private.assert_order_staff` now calls that check too.
+    `public.list_my_invitations` returns nothing to an agent, and
+    `public.consume_command_admission` refuses a dead agent session.
+- A test that lists the volatile functions `authenticated` can run with no
+  ledger claim, so a new one fails until someone reviews it.
+- `lib/commands/context.ts`: `buildContextFromBearer` reads `client_id`, checks
+  the session is live, and sets `ctx.agent`.
+- `lib/auth/request-context.ts`: an agent token in a cookie is not signed in.
 - `lib/commands/registry.ts`: an agent context runs only `aiExposed` queries.
 - `supabase/config.toml` and `tests/supabase/supabase/config.toml`: enable the
-  OAuth server locally. Hosted is ask-first.
+  OAuth server and the hook locally. Hosted is ask-first.
 - New consent page at `/oauth/consent`: client name, publisher domain, the
   brewery, a plain statement that the agent's model will read brewery data,
-  and Deny.
+  and Deny. It must call `getAuthorizationDetails` before approving.
 - `app/(app)/settings/`: an Admin switch to allow agents, and a Connected
   agents list where each person sees and revokes their grants.
 
-**Acceptance:** an agent cannot exceed its person's roles, cannot commit, and
-cannot read a brewery that has agents off.
+**Acceptance:** an agent cannot exceed its person's roles, cannot commit,
+cannot change the account, and cannot read a brewery that has agents off.
 
 ### Phase 2 — MCP endpoint and orientation
 
@@ -261,7 +273,17 @@ needs a clearer effect.
 - A token sent straight to the Supabase API can read anything its person's
   roles can read, not only the `aiExposed` set. Q4 holds on MGR's own
   surfaces; the person's roles are the hard ceiling.
-- Supabase's guide does not say how fast a revoked grant takes effect. Access
-  tokens may stay valid until `exp` (`jwt_expiry` is 3600 seconds).
-- ID tokens need asymmetric signing keys. Check the hosted project before
-  turning the OAuth server on there.
+- A revoked grant's access token keeps a valid signature until `exp`
+  (`jwt_expiry` is 3600 seconds). MGR checks the session instead, which is one
+  extra RPC per agent request.
+- The hook rests on how Auth loads a token's session, not on a documented
+  promise. `tests/agent-access.test.ts` pins it, but only against the local Auth
+  image. Re-run that test whenever Auth is upgraded.
+- If the hook errors, every sign-in fails, not only agents'. It touches only the
+  JSON to keep that unlikely. Local stacks need the migration before they start
+  with the hook on.
+- Hosted order matters: apply the migration, turn the hook on, confirm the test
+  against hosted, and only then turn the OAuth server on. With the OAuth server
+  on and the hook off, the account takeover is open. The reads fail closed.
+- The project must use asymmetric signing keys. With HS256, `getClaims` falls
+  back to Auth, which refuses an agent token, so agents could not connect.

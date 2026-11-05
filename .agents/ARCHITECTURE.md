@@ -9,7 +9,7 @@ never copy it into a second place.
 | Path | Owns |
 | --- | --- |
 | `supabase/migrations/*.sql` | Schema, RLS policies, triggers, grants, and the transactional command-request ledger. The only source of truth for data rules. Every file is immutable once committed — `supabase db push` applies a version once and never rereads it, so a schema change is a new migration and `supabase/migrations.lock.json` pins the rest (see `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md`). Application roles have read-only table access; every mutation enters through an explicitly granted, idempotent `security definer` RPC with `search_path = ''`, database-derived actor/tenant/role checks, and a canonical request hash. Private helpers and implementation functions are not executable by application roles. |
-| `lib/commands/registry.ts` | `defineCommand` / `defineQuery`, `Ctx`, role checks, `CommandError`. Every domain operation the app performs is registered here. |
+| `lib/commands/registry.ts` | `defineCommand` / `defineQuery`, `Ctx`, role checks, the limit on `ctx.agent`, `CommandError`. Every domain operation the app performs is registered here. |
 | `lib/commands/<area>.ts` | Business logic per area (catalog, inventory, orders, customers, portal; `import.ts` owns independent, atomic CSV rows with durable batch and row outcomes). Handlers read through the RLS-bound `ctx.db`; public-schema writes call the narrow RPC boundary and forward `CommandExecution.requestId`. `orders.ts` owns order lifecycle (create/submit/confirm/adjust/cancel), allocations, pick/ship, per-shipment invoices, credit memos, and replenishment. `customers.ts` owns customer/ship-to/price-list CRUD and the portal fulfillment source. `catalog.ts` owns products, SKUs, locations and their bins (`list_bins`, `create_bin`, `update_bin`, `delete_bin`); `inventory.ts` owns the movement ledger at bin grain (`record_movement` needs a `binId`; `get_bin_on_hand`). `portal.ts` owns the customer-role commands, including `portal_create_order`, `portal_update_draft_order`, `portal_submit_order`, `portal_quote_order`, `portal_submit_quote`, `portal_catalog`, `portal_schedule`, `portal_orders`, `portal_order`, `portal_invoices`, `portal_invoice`, `raise_invoice_question`, and `get_portal_account` — the only commands a `customer` role may call. |
 | `lib/commands/purchasing.ts` | Vendors, materials, contracts, purchase orders (create/send/receive/cancel/close-short), material requirements/planning, and material counts. `send_purchase_order` is an attestation (`sent_via` mailto/external, never `direct` until a provider is approved) — transport is a property, never a `po_status` fork. Lead time is an observed, never-stored vendor view (`ordered_on → received_on`); a contract's remaining commitment is four numbers (committed, received, on order, available). |
 | `lib/commands/packaging.ts` | Packaging runs: schedule (brand-first, no tank required), start against one exact source occupancy, close (lot + output movements + BOM consumption, first-expiring-first for lot-tracked materials), and repack (breakdown only, admin/warehouse). |
@@ -49,7 +49,7 @@ never copy it into a second place.
 | `lib/commands/chat.ts`, `lib/commands/today.ts` | Staff chat linking and notification settings; the role-filtered Today projection. |
 | `app/api/chat/`, `app/api/webhooks/slack/` | Thin Slack OAuth, scheduled-job, and events/App Home routes that delegate to `lib/chat/`. |
 | `app/(app)/settings/chat/` | Admin connection settings, health, linked people and disconnect confirmation; personal preferences for every staff role; read-only link identity preview followed by explicit command consent. `chat-settings-client.tsx` owns forms and the ten provider-free fixture previews. |
-| `lib/commands/context.ts`, `lib/auth/request-context.ts` | `buildContext`: the command caller's verified identity and brewery membership; the request-scoped Supabase identity and membership lookups shared by layouts and commands. A command reads its role array (`staffRolesAt`: one `brewery_users` row, shared by the cookie and bearer paths, each rejecting a non-UUID brewery as not_member first); pages read full memberships with the `staff_brewery` name and timezone (`getActiveBrewery`), and a later `getStaffRoles` reuses them. |
+| `lib/commands/context.ts`, `lib/auth/request-context.ts` | `buildContext`: the command caller's verified identity and brewery membership; `ctx.agent` and the live-session check for an agent's bearer token; the request-scoped Supabase identity and membership lookups shared by layouts and commands. A command reads its role array (`staffRolesAt`: one `brewery_users` row, shared by the cookie and bearer paths, each rejecting a non-UUID brewery as not_member first); pages read full memberships with the `staff_brewery` name and timezone (`getActiveBrewery`), and a later `getStaffRoles` reuses them. |
 | `lib/env/{public,server,server-parser}.ts` | Runtime configuration: the only Supabase values permitted in browser bundles; the server-only environment singleton; and the parser (incl. optional `VERCEL_ENV`, and `readAppUrl` — the public origin for links and OAuth redirects, never taken from a request Host) shared by server code, scripts, and tests. |
 | `lib/commands/movement-input.ts` | `movementInput`, the `record_movement` command's input schema. It registers no command, so the client-side Composer can import it; `lib/commands/inventory.ts`, `lib/commands/preview.ts`, and the inventory page share it. |
 | `lib/composer/state.ts` | The Composer drawer's `record_movement` proposal: the `composerProposal` schema that `lib/chat/messages.ts` parses the newest assistant message's proposal against. A malformed or non-movement proposal returns an operator error instead of reaching the commit button. |
@@ -129,7 +129,8 @@ a gap to close, not a convention to trust.
 1. **Every domain operation is a command.** All public-schema mutations and
    queries go through `lib/commands/registry.ts` via
    `defineCommand`/`defineQuery` and the single
-   endpoint `app/api/command/route.ts` (cookie session or Bearer access token).
+   endpoint `app/api/command/route.ts` (cookie session or Bearer access token;
+   an agent's OAuth token is Bearer only and runs AI-exposed queries only).
    No route handler or page contains
    inline business logic. There is no resource REST API and no API-key table —
    new operations are registered commands, not new routes. Handlers signal user-facing failures by throwing
@@ -159,7 +160,16 @@ a gap to close, not a convention to trust.
    `my_customer_ids()` and `my_staff_brewery_ids(roles)`. Staff membership stores a
    nonempty canonical array; authorization uses overlap with explicitly allowed
    roles, not a primary role. Cross-tenant FKs are composite so a row can't reference
-   another brewery's data. Portal customers never `SELECT` the `breweries` base
+   another brewery's data. An outside agent's OAuth token is an ordinary
+   `authenticated` JWT with a `client_id` claim, so the guards are in the database:
+   `private.request_scope_allows` hides a brewery with `agents_enabled` off or a
+   revoked session, and `private.refuse_agent_token` stops it committing.
+   `private.agent_access_token_hook` gives the token a session id that does not
+   exist, so Supabase Auth refuses it on `/auth/v1/user`; without that hook an
+   agent could set the person's password. A new write outside
+   `private.command_requests` needs the trigger too, and a new read that skips the
+   scope check needs one of its own. Portal customers never
+   `SELECT` the `breweries` base
    table (`ttb_registry_no`, `settings` stay staff-only); they
    read `portal_brewery` (`id`, `name`, `timezone`, `portal_fulfillment_location_id`).
    Staff and customers share one table grant, so the same holds for
@@ -213,7 +223,8 @@ a gap to close, not a convention to trust.
    `tests/rls-tenancy.test.ts`, `tests/rls-portal-columns.test.ts` and `tests/rls-portal-order-columns.test.ts`; `tests/schema-rules.test.ts` reads `pg_catalog`
    to assert RLS on every table, `security_invoker` on every view,
    `search_path` on every function, and an `RLS-EXCEPTION:` comment on any
-   permissive policy.
+   permissive policy; `tests/agent-access.test.ts` for agent tokens, including a
+   reviewed list of volatile functions with no ledger claim.
 4. **`createAdminClient()` is restricted to `lib/supabase/integration-tokens.ts`,
    `lib/supabase/invites.ts`, `lib/supabase/provision.ts`, `lib/supabase/public-menu.ts`,
    `lib/supabase/cola-label-images.ts`,

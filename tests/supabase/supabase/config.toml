@@ -53,6 +53,10 @@ jwt_expiry = 3600
 enable_signup = false
 minimum_password_length = 6
 
+[auth.hook.custom_access_token]
+enabled = true
+uri = "pg-functions://postgres/private/agent_access_token_hook"
+
 [auth.oauth_server]
 enabled = true
 authorization_url_path = "/oauth/consent"

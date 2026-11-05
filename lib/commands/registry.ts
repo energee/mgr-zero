@@ -12,9 +12,11 @@ import type { InputIssue } from "./field-errors";
 
 export type StaffRole = (typeof STAFF_ROLES)[number];
 export { STAFF_ROLES } from "@/lib/mgr/enums";
-export type PreTenantCtx = { db: SupabaseClient<Database>; userId: string; breweryId: null; roles: [] };
+/** Set when an outside agent's OAuth token made this request; it acts for `userId`. */
+type AgentClient = { clientId: string };
+export type PreTenantCtx = { db: SupabaseClient<Database>; userId: string; breweryId: null; roles: []; agent?: AgentClient };
 export type OperationCtx = Ctx | PreTenantCtx;
-export type Ctx = { db: SupabaseClient<Database>; userId: string; breweryId: string; roles: (StaffRole | "customer")[]; customerId?: string };
+export type Ctx = { db: SupabaseClient<Database>; userId: string; breweryId: string; roles: (StaffRole | "customer")[]; customerId?: string; agent?: AgentClient };
 
 /** Distinguishes side-effect-free reads from write operations that require idempotency metadata. */
 export type OperationKind = "query" | "command";
@@ -430,6 +432,7 @@ export async function previewCommand(name: string, rawInput: unknown, ctx: Ctx, 
 export async function runCommand(name: string, rawInput: unknown, ctx: OperationCtx, execution?: CommandExecution): Promise<unknown> {
   const def = registry.get(name);
   if (!def) throw new CommandError(`unknown command: ${name}`, 404, "unknown_command");
+  if (ctx.agent && !(def.kind === "query" && def.aiExposed)) throw new CommandError(`agents cannot run ${name}`, 403, "agent_not_allowed");
   const allowed = canRun(ctx, name);
   if (!allowed) throw new CommandError(`permission denied: ${name} requires ${JSON.stringify(def.roles)}`, 403, "permission_denied");
   const parsed = def.input.safeParse(rawInput);

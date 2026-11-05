@@ -365,14 +365,14 @@ isOneToOne: false
                   ]
                 },"breweries": {
                   Row: {
-                    "books_opened_on": string | null,"closed_at": string | null,"created_at": string,"customer_phone": string | null,"days_to_package": number,"fermentation_reading_due_hours": number,"gravity_unit": string,"id": string,"name": string,"one_way_keg_fee_cents": number,"portal_fulfillment_location_id": string | null,"settings": NonNullable<Json>,"timezone": string,"ttb_registry_no": string | null
+                    "agents_enabled": boolean,"books_opened_on": string | null,"closed_at": string | null,"created_at": string,"customer_phone": string | null,"days_to_package": number,"fermentation_reading_due_hours": number,"gravity_unit": string,"id": string,"name": string,"one_way_keg_fee_cents": number,"portal_fulfillment_location_id": string | null,"settings": NonNullable<Json>,"timezone": string,"ttb_registry_no": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "books_opened_on"?: string | null,"closed_at"?: string | null,"created_at"?: string,"customer_phone"?: string | null,"days_to_package"?: number,"fermentation_reading_due_hours"?: number,"gravity_unit"?: string,"id"?: string,"name": string,"one_way_keg_fee_cents"?: number,"portal_fulfillment_location_id"?: string | null,"settings"?: NonNullable<Json>,"timezone"?: string,"ttb_registry_no"?: string | null
+                    "agents_enabled"?: boolean,"books_opened_on"?: string | null,"closed_at"?: string | null,"created_at"?: string,"customer_phone"?: string | null,"days_to_package"?: number,"fermentation_reading_due_hours"?: number,"gravity_unit"?: string,"id"?: string,"name": string,"one_way_keg_fee_cents"?: number,"portal_fulfillment_location_id"?: string | null,"settings"?: NonNullable<Json>,"timezone"?: string,"ttb_registry_no"?: string | null
                   }
                   Update: {
-                    "books_opened_on"?: string | null,"closed_at"?: string | null,"created_at"?: string,"customer_phone"?: string | null,"days_to_package"?: number,"fermentation_reading_due_hours"?: number,"gravity_unit"?: string,"id"?: string,"name"?: string,"one_way_keg_fee_cents"?: number,"portal_fulfillment_location_id"?: string | null,"settings"?: NonNullable<Json>,"timezone"?: string,"ttb_registry_no"?: string | null
+                    "agents_enabled"?: boolean,"books_opened_on"?: string | null,"closed_at"?: string | null,"created_at"?: string,"customer_phone"?: string | null,"days_to_package"?: number,"fermentation_reading_due_hours"?: number,"gravity_unit"?: string,"id"?: string,"name"?: string,"one_way_keg_fee_cents"?: number,"portal_fulfillment_location_id"?: string | null,"settings"?: NonNullable<Json>,"timezone"?: string,"ttb_registry_no"?: string | null
                   }
                   Relationships: [
                     {
@@ -4745,6 +4745,9 @@ isOneToOne: false
                            },
 "advance_square_sales_sync":
 { Args: { "p_actor": string,"p_brewery": string,"p_connection": string,"p_expected_version": number,"p_next_version": number,"p_request_id": string }; Returns: boolean
+                           },
+"agent_session_is_live":
+{ Args: Record<PropertyKey, never>; Returns: boolean
                            },
 "append_chat_message":
 { Args: { "p_brewery": string,"p_content": string,"p_conversation": string,"p_request_id": string,"p_role": string }; Returns: Json

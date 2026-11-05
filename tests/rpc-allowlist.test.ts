@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { sql } from "./helpers";
 
 const AUTHENTICATED_RPCS = [
+  "agent_session_is_live()",
   "consume_command_admission()",
   "get_beer_overview_aggregates(uuid)",
   "get_keg_report_aging(uuid)",
