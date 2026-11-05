@@ -53,6 +53,11 @@ jwt_expiry = 3600
 enable_signup = false
 minimum_password_length = 6
 
+[auth.oauth_server]
+enabled = true
+authorization_url_path = "/oauth/consent"
+allow_dynamic_registration = true
+
 [auth.email]
 # Must stay true: false disables the email provider (password sign-in).
 enable_signup = true
