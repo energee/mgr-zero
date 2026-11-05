@@ -3,7 +3,8 @@
 // stocked in pounds. Units are the materials' uom enum plus the water
 // addition units (g, mL, oz); case does not matter. Factors are exact.
 
-const GRAMS: Record<string, number> = { g: 1, kg: 1000, oz: 28.349523125, lb: 453.59237 };
+export const GRAMS_PER_LB = 453.59237;
+const GRAMS: Record<string, number> = { g: 1, kg: 1000, oz: 28.349523125, lb: GRAMS_PER_LB };
 const MILLILITERS: Record<string, number> = { ml: 1, l: 1000, gal: 3785.411784 };
 
 /** `qty` in `from` expressed in `to`, or null when the two are not the same kind (mass to volume, or "each"). */

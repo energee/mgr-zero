@@ -1,6 +1,7 @@
 // lib/volume.ts — the one place that turns a stored barrel figure into the
 // unit a brewer reads (brewing-domain.md § units). Storage and TTB stay bbl.
 export const GALLONS_PER_BBL = 31;
+export const LITERS_PER_BBL = GALLONS_PER_BBL * 3.785411784;
 export const OUNCES_PER_BBL = 3_968;
 
 export function parseVolumeToBbl(value: string, unit: "oz" | "gal" | "bbl") {

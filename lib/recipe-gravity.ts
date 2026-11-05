@@ -65,7 +65,7 @@ export type RecipeGravityResult = {
 
 const BBL_TO_GALLONS = 31;
 /** Pounds per one of each mass unit in public.uom. */
-const LB_PER: Record<string, number> = { lb: 1, kg: 2.20462, oz: 1 / 16, g: 0.00220462 };
+export const LB_PER: Record<string, number> = { lb: 1, kg: 2.20462, oz: 1 / 16, g: 0.00220462 };
 
 /**
  * ASBC cubic approximation converting specific gravity to degrees Plato.
