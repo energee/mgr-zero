@@ -1,6 +1,7 @@
 // app/(app)/customers/page.tsx — Customers (screen record): every account
-// with its type, state and channel, each opening Customer detail; Add
-// customer opens customer-form.tsx. Customer detail owns portal-user invites.
+// with its type, state and channel; a name opens Customer detail in a sheet
+// over the list (?customer=, customer-sheet.tsx). Add customer opens
+// customer-form.tsx. Customer detail owns portal-user invites.
 // ?q= narrows list_customers by name or alias, as Catalog's search does.
 import { z } from "zod";
 import { CustomersView } from "@/components/mgr/views/customers";
@@ -13,6 +14,8 @@ import { CustomerForm } from "./customer-form";
 import { ListControls } from "@/components/mgr/list-controls";
 import { listParams, searchQuery } from "@/lib/mgr/list-params";
 import { navTitle } from "@/lib/mgr/nav";
+import { CUSTOMER_SHEET_PARAM, sheetId } from "@/lib/mgr/order-sheet";
+import { CustomerSheetFromAddress } from "./customer-sheet";
 
 export const metadata = { title: navTitle("/customers") };
 
@@ -25,7 +28,9 @@ const customersParams = z.object({
 });
 
 export default async function CustomersPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> } = {}) {
-  const { params, queryWith } = listParams(customersParams, (await searchParams) ?? {});
+  const given = (await searchParams) ?? {};
+  const { params, queryWith } = listParams(customersParams, given);
+  const sheet = sheetId(given[CUSTOMER_SHEET_PARAM]);
   const missingPortalEmail = params.missingEmail === "1";
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
@@ -39,5 +44,6 @@ export default async function CustomersPage({ searchParams }: { searchParams?: P
     search={customers.length || params.q ? <ListControls resultCount={customers.length} search={{ label: "Search customers", value: params.q, keep, path: "/customers" }} /> : undefined}
     linkRows
     backHref="/more"
+    sheet={sheet && <CustomerSheetFromAddress id={sheet} />}
   />;
 }

@@ -1,5 +1,6 @@
 // app/(app)/catalog/page.tsx — Catalog (screen record): the brand list, then
-// formats. A brand's name opens Brand (brands/[id]); its packages are one tap
+// formats. A brand's name opens Brand in a sheet over the list (?brand=,
+// brand-sheet.tsx; the full page is brands/[id]); its packages are one tap
 // further, switched on and off under Brand's Sells as — Catalog no longer nests
 // them. Add format opens format-form.tsx; a format's name links to its components and Package BOM.
 // A brand, Price groups and Water profiles link only for a role whose page lets
@@ -24,6 +25,8 @@ import { BRAND_SORTS } from "@/lib/mgr/enums";
 import { navTitle } from "@/lib/mgr/nav";
 import { ColaReview } from "./cola-review";
 import { ColaImage } from "./cola-image";
+import { BRAND_SHEET_PARAM, sheetId } from "@/lib/mgr/order-sheet";
+import { BrandSheetFromAddress } from "./brand-sheet";
 
 export const metadata = { title: navTitle("/catalog") };
 
@@ -44,10 +47,14 @@ const catalogParams = z.object({
 });
 
 export default async function CatalogPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> } = {}) {
-  const { params, queryWith, hrefWith } = listParams(catalogParams, (await searchParams) ?? {});
+  const given = (await searchParams) ?? {};
+  const { params, queryWith, hrefWith } = listParams(catalogParams, given);
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const canWrite = brewery.roles.includes("admin") || brewery.roles.includes("sales");
+  const canOpenBrand = canRun(ctx, "upsert_brand"); // the brand page requires it
+  // Only a role that may open Brand gets its sheet; anyone else would be sent to No access.
+  const sheet = canOpenBrand ? sheetId(given[BRAND_SHEET_PARAM]) : undefined;
   const [brands, formats, groups, categories] = await Promise.all([
     runCommand("list_brands", params, ctx) as Promise<Brand[]>, runCommand("list_formats", { basis: "packaged" }, ctx) as Promise<Format[]>, runCommand("list_price_groups", {}, ctx) as Promise<PriceGroup[]>,
     runCommand("list_catalog_categories", {}, ctx) as Promise<{ name: string }[]>,
@@ -66,11 +73,12 @@ export default async function CatalogPage({ searchParams }: { searchParams?: Pro
       controls={controls}
       createAction={canWrite ? E.btn("New brand", "p", "/catalog/brands/new") : null}
       links={{
-        brands: canRun(ctx, "upsert_brand"), // the brand page requires it
+        brands: canOpenBrand,
         priceGroups: PRICING_READS.every(name => canRun(ctx, name)),
         waterProfiles: canRun(ctx, "list_water_profiles"),
       }}
       formats={toFormatsViewProps({ formats, formatHref: format => `/catalog/formats/${format.id}` })}
+      sheet={sheet && <BrandSheetFromAddress id={sheet} />}
       formatAction={canWrite ? <FormatForm componentOptions={formats.filter(format => format.bbl_per_unit !== null)} takenNames={formats.map(format => format.name)} /> : null}
     />
   );

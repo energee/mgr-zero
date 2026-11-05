@@ -9,6 +9,7 @@ import { E } from "@/components/mgr/e";
 import { ScopePick } from "@/components/mgr/scope-pick";
 import type { OrdersListRowView, OrdersListViewModel } from "@/lib/mgr/orders-list-view";
 import { ORDER_STATUSES } from "@/lib/mgr/order-status";
+import { ORDER_SHEET_PARAM } from "@/lib/mgr/order-sheet";
 import { WORK_CHIPS, WORK_TABS } from "@/lib/mgr/work-view";
 import { HistoryNavigation, type HistoryNavigationProps } from "./history-navigation";
 import { CustomerScope } from "./customer-scope";
@@ -41,7 +42,7 @@ function Register({ rows, scoped }: { rows: OrdersListRowView[]; scoped: boolean
         key: row.key,
         href: row.href,
         // A live row (one with an order page) opens in the order sheet; its key is the order id.
-        orderSheet: row.href ? row.key : undefined,
+        sheet: row.href ? { param: ORDER_SHEET_PARAM, id: row.key } : undefined,
         to: "Order",
         cells: shown([
           row.orderNo,
