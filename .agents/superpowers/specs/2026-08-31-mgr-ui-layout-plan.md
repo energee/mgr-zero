@@ -368,8 +368,8 @@ recorded. It is an audit surface, not decoration, and never implies a row can be
 
 | Token | Light | Dark | Role |
 |---|---|---|---|
-| `--background` | `#FAFAF7` | `#102040` | Page ground |
-| `--card` / `--popover` | `#FFFFFF` | `#152a50` / `#1a3058` | Cards, sheets, menus |
+| `--background` | `#FAFAF7` | `#050a16` | Page ground |
+| `--card` / `--popover` | `#FFFFFF` | `#152a50` / `#08101f` | Cards, sheets, menus |
 | `--foreground` | `#1E1F1A` | `#dddddd` | Text |
 | `--primary` | `#6453B3` | `#60a4ec` | Mutable primary action, active nav, progress |
 | `--irreversible` | `#0F6B78` | `#60b6cb` | Append-only, filed, external, sign-out actions only |
