@@ -3,7 +3,9 @@
 // get_recipe result shape (RecipeSnapshot), the copy of a saved version a new
 // draft starts from (versionToDraft), why a draft cannot be saved yet
 // (draftBlocker), the read page's model of a saved version (toRecipePageModel)
-// and why a prediction is missing (gravityBlockerText, noMashText). A brew-day
+// and why a prediction is missing (gravityBlockerText, noMashText). The read
+// page prints the IBU get_recipe estimated; a draft previews it (draftIbuText).
+// A brew-day
 // line also totals in packs at the batch size typed into Show totals at
 // (ingredientPack, batchTotalText), and the draft offers rounding it to whole
 // packs (packRounding). Batch actuals is the text of get_recipe_outcomes: one
@@ -13,6 +15,7 @@ import type { ReactNode } from "react";
 import type { EmptyState } from "./empty-state";
 import { formatDate } from "@/lib/date-format";
 import { gravityBlockers, type GravityBlocker, type RecipeGravityResult } from "@/lib/recipe-gravity";
+import { ibuText, recipeIbu, type RecipeIbu } from "@/lib/recipe-ibu";
 import { batNo } from "./doc-no";
 import { formatGravity, type GravityUnit } from "./gravity-unit";
 import { splitPacks, withPacks } from "./pack-qty";
@@ -83,13 +86,15 @@ export type RecipeViewModel = {
   water?: RecipeScheduleView;
   notes?: string;
   predicted?: string;
+  /** The IBU line (ibuText), drawn under `predicted`. */
+  bitterness?: string;
   /** Batch actuals: one row per brewed batch of any version, then the gap for the shown version. */
   tape?: [string, string][];
   actualsNote?: string;
 };
 
 /** What get_recipe returns: the recipe, its selected version (null before the
- * first), all version numbers, that version's ingredients in brewing order, its water additions, and the prediction.
+ * first), all version numbers, that version's ingredients in brewing order, its water additions, the prediction and the IBU.
  * Postgres numerics may arrive as strings, so readers coerce with Number. */
 export type RecipeSnapshot = {
   recipe: { id: string; name: string; brand_id: string | null; note: string | null };
@@ -101,7 +106,7 @@ export type RecipeSnapshot = {
   }) | null;
   ingredients: { id: string; material_id: string; per_bbl_qty: number; stage: string; timing_minutes: number | null; sort: number; extract_snapshot: number | null; materials: { base_uom: string } | null }[];
   waterAdditions: { material_id: string; qty: number; unit: string; stage: string }[];
-  ogPlato: number | null; fgPlato: number | null; abv: number | null;
+  ogPlato: number | null; fgPlato: number | null; abv: number | null; ibu: RecipeIbu;
 };
 type SnapshotVersion = NonNullable<RecipeSnapshot["version"]>;
 
@@ -197,6 +202,19 @@ export function gravityBlockerText(blockers: GravityBlocker[], nameOf: (index: n
  * yet recipeGravity predicts nothing. Null with no lines, since draftBlocker already asks for one. */
 export function noMashText(stages: string[]): string | null {
   return stages.length > 0 && !stages.includes("mash") ? "No mash ingredient, so nothing is predicted." : null;
+}
+
+/** The draft's IBU line, from each material's current alpha acid, which saving freezes. Undefined with no lines, since
+ *  draftBlocker already asks for one. A line whose material the picker hides (an inactive one) reads as a hop with neither
+ *  alpha acid nor a unit, so the preview shows the gap instead of silently dropping the line. */
+export function draftIbuText(lines: IngredientLine[], ogPlato: number | null, materials: RecipeMaterial[]): string | undefined {
+  if (lines.length === 0) return undefined;
+  const material = materialLookup(materials);
+  const ibuLines = lines.map((l) => ({
+    name: material.name(l.materialId), category: material.get(l.materialId)?.category ?? "hop", stage: l.stage, perBblQty: Number(l.perBblQty),
+    unit: material.unit(l.materialId), timingMinutes: l.timingMinutes ? Number(l.timingMinutes) : null, alphaAcid: material.get(l.materialId)?.alpha_acid ?? null,
+  }));
+  return ibuText(recipeIbu({ ogPlato, lines: ibuLines }), { saved: false });
 }
 
 /** The pack a line totals with: brew-day stages only, a positive amount, and a known material; else none. */
@@ -331,6 +349,7 @@ export function toRecipePageModel(
     },
     notes: v.note ?? "",
     predicted,
+    bitterness: ibuText(s.ibu, { saved: true }),
     tape: outcomeTape(ctx.outcomes, ctx.unit),
     actualsNote: outcomeSummary(ctx.outcomes, v.version),
   };

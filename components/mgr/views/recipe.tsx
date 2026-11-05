@@ -112,9 +112,9 @@ export function RecipeView({
         </nav>
       ) : null}
       {model.historical ? E.note("Older version · read only. Open the current version to make changes.") : null}
-      {/* Always mounted and polite: the prediction changes as the draft is typed,
+      {/* Always mounted and polite: the prediction and IBU change as the draft is typed,
           and an alert (E.info is one) would interrupt the screen reader on every keystroke. */}
-      <div role="status">{E.polite(model.predicted)}</div>
+      <div role="status">{E.polite(model.predicted)}{E.polite(model.bitterness)}</div>
     </>
   );
   const body = model.empty ? (

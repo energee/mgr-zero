@@ -3,9 +3,10 @@
 // is a name; how it is brewed lives on a version, and a version is never
 // edited: `create_recipe_version` writes the next one (version = max+1) with
 // its ingredients in a single RPC, snapshotting each material's extract
-// potential so an old version's predicted gravity cannot move when the
-// material is retyped. `get_recipe` predicts OG/FG/ABV here in TypeScript
-// (lib/recipe-gravity.ts) — the schema stores assumptions, never results.
+// potential and alpha acid so an old version's predicted gravity and IBU cannot
+// move when the material is retyped. `get_recipe` predicts OG/FG/ABV and IBU
+// here in TypeScript (lib/recipe-gravity.ts, lib/recipe-ibu.ts) — the schema
+// stores assumptions, never results.
 // `get_recipe_outcomes` measures each brewed batch the same way, on read.
 import { z } from "zod";
 import { historyInput, historyResult, newestFirst, type HistoryRow } from "./history";
@@ -17,6 +18,7 @@ import { fermentationReadingInput, fermentationReadingOfflinePolicy, MASH_PH_BOU
 import { isoDate, completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, CommandError, type Ctx, latestOf } from "./registry";
 import { brandNames } from "./packaging";
 import { measuredGravity, potentialPointsPerBbl, recipeGravity, type RecipeGravityIngredient } from "@/lib/recipe-gravity";
+import { recipeIbu, type IbuLine } from "@/lib/recipe-ibu";
 import { escapeRegex } from "@/lib/escape-regex";
 import { MASH_STEP_KINDS, FERMENTATION_STAGE_KINDS, WATER_ADDITION_STAGES, WATER_ADDITION_UNITS } from "@/lib/mgr/enums";
 
@@ -212,6 +214,13 @@ const gravityLines = (lines: SavedLine[]): RecipeGravityIngredient[] => lines.ma
   perBblQty: num(l.per_bbl_qty), extractPotential: l.extract_snapshot == null ? null : num(l.extract_snapshot), stage: l.stage, unit: l.materials?.base_uom,
 }));
 
+type SavedHopLine = { per_bbl_qty: unknown; alpha_snapshot: unknown; stage: string; timing_minutes: number | null; materials: { base_uom: string; name: string; category: string } };
+/** A saved version's lines as recipe-ibu reads them: the frozen alpha acid, never the material's current one. A null snapshot stays null, so it is a gap. */
+const ibuLines = (lines: SavedHopLine[]): IbuLine[] => lines.map((l) => ({
+  name: l.materials.name, category: l.materials.category, stage: l.stage, perBblQty: num(l.per_bbl_qty), unit: l.materials.base_uom,
+  timingMinutes: l.timing_minutes, alphaAcid: l.alpha_snapshot == null ? null : num(l.alpha_snapshot),
+}));
+
 /** Brewing order: stage by stage, as INGREDIENT_STAGES lists them. Boil and whirlpool time counts down to the end of the
  *  stage, so 60 comes before 10; other stages count up from their start. A line with no time closes its stage. Equal lines
  *  compare as 0, so a stable sort keeps them in the brewer's order. */
@@ -224,7 +233,7 @@ function byBrewingOrder(a: { stage: string; timing_minutes: number | null }, b: 
 
 defineQuery({
   name: "get_recipe",
-  description: "One recipe with its requested version (latest by default), all version numbers, that version's ingredients in brewing order, and the OG/FG/ABV they predict",
+  description: "One recipe with its requested version (latest by default), all version numbers, that version's ingredients in brewing order, the OG/FG/ABV they predict, and its estimated IBU or why there is none",
   input: z.object({ recipeId: z.string().uuid(), version: z.number().int().positive().optional() }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {
     const versionQuery = ctx.db.from("recipe_versions").select("*").eq("recipe_id", i.recipeId);
@@ -240,22 +249,24 @@ defineQuery({
     if (!recipe) throw new CommandError("recipe not found", 404, "not_found");
     if (!version && i.version !== undefined) throw new CommandError("recipe version not found", 404, "not_found");
     const versions = versionRows.map((row) => row.version);
-    if (!version) return { recipe, version: null, versions, ingredients: [], waterAdditions: [], ogPlato: null, fgPlato: null, abv: null };
+    if (!version) return { recipe, version: null, versions, ingredients: [], waterAdditions: [], ogPlato: null, fgPlato: null, abv: null, ibu: recipeIbu({ ogPlato: null, lines: [] }) };
 
     const [ingredients, waterAdditions] = await Promise.all([
       unwrap(ctx.db.from("recipe_ingredients")
-        .select("id, material_id, per_bbl_qty, stage, timing_minutes, sort, extract_snapshot, materials(base_uom)")
+        .select("id, material_id, per_bbl_qty, stage, timing_minutes, sort, extract_snapshot, alpha_snapshot, materials(base_uom, name, category)")
         .eq("recipe_version_id", version.id).order("sort")).then((r) => (r ?? []).sort(byBrewingOrder)),
       unwrap(ctx.db.from("recipe_water_additions").select("material_id, qty, unit, stage").eq("recipe_version_id", version.id).order("sort")).then((r) => r ?? []),
     ]);
 
+    const predicted = recipeGravity({
+      brewhouseEfficiency: num(version.brewhouse_efficiency),
+      yeastAttenuation: num(version.yeast_attenuation),
+      ingredients: gravityLines(ingredients),
+    });
     return {
       recipe, version, versions, ingredients, waterAdditions,
-      ...(recipeGravity({
-        brewhouseEfficiency: num(version.brewhouse_efficiency),
-        yeastAttenuation: num(version.yeast_attenuation),
-        ingredients: gravityLines(ingredients),
-      }) ?? { ogPlato: null, fgPlato: null, abv: null }),
+      ...(predicted ?? { ogPlato: null, fgPlato: null, abv: null }),
+      ibu: recipeIbu({ ogPlato: predicted?.ogPlato ?? null, lines: ibuLines(ingredients) }),
     };
   },
 });

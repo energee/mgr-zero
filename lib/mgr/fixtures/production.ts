@@ -11,6 +11,7 @@ import { DEMO_TIME_ZONE } from "@/lib/mgr/fixtures/settings";
 import type { ScheduleBatchViewModel } from "@/lib/mgr/schedule-batch-view";
 import type { VesselDetailViewModel } from "@/lib/mgr/vessel-detail-view";
 import type { CellarMapViewModel } from "@/lib/mgr/cellar-map-view";
+import { ibuText, recipeIbu } from "@/lib/recipe-ibu";
 import { fermentationSummary, ingredientDetail, mashRowSummary, waterRowSummary, type FermentationStage, type MashStep, type WaterDraft } from "@/lib/mgr/recipe-process-view";
 import { plural } from "@/lib/mgr/plural";
 import { waterProfiles } from "./catalog";
@@ -276,6 +277,13 @@ const HAZY_OUTCOMES: RecipeOutcome[] = [
   { ...HAZY_V4, batchId: "b-0398", batchNo: 398, brewedOn: "2026-09-12", ogPlato: 15.1, fgPlato: 3.4, abv: 6.3, apparentAttenuation: 0.78, brewhouseEfficiency: 0.71 },
 ];
 
+/** Its hop lines as get_recipe reads them, with the alpha acid frozen on v4; the page text is computed from these. */
+const HAZY_HOP = { name: "Citra", category: "hop", unit: "lb", alphaAcid: 12.5 };
+const HAZY_IBU = recipeIbu({
+  ogPlato: HAZY_V4.predicted.ogPlato,
+  lines: [{ ...HAZY_HOP, stage: "boil", perBblQty: 0.4, timingMinutes: 10 }, { ...HAZY_HOP, stage: "dry_hop", perBblQty: 1.2, timingMinutes: null }],
+});
+
 export const recipeHazyV4: RecipeViewModel = {
   title: "Hazy IPA v4",
   saved: "Aug 28, 2026",
@@ -304,6 +312,7 @@ export const recipeHazyV4: RecipeViewModel = {
   water: { title: "Water", detail: waterRowSummary(waterProfiles.find((p) => p.id === WATER_HAZY.targetProfileId)?.name, WATER_HAZY.additions.length) },
   notes: "Whirlpool hard, knock out cold.",
   predicted: "Predicted: OG 15.2 °P · FG 3.5 °P · ABV 6.3%",
+  bitterness: ibuText(HAZY_IBU, { saved: true }),
   tape: outcomeTape(HAZY_OUTCOMES, "plato"),
   actualsNote: outcomeSummary(HAZY_OUTCOMES, 4),
 };

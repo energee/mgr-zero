@@ -1,11 +1,13 @@
 // tests/production.test.ts — recipes and their immutable versions: a version
 // snapshots materials.extract_potential onto every ingredient, so editing the
 // material later never moves an old version's predicted gravity. get_recipe
-// computes OG/FG/ABV in TypeScript (lib/recipe-gravity.ts), never in SQL.
+// computes OG/FG/ABV in TypeScript (lib/recipe-gravity.ts), never in SQL. Alpha
+// acid freezes the same way, and IBU comes only from lib/recipe-ibu.ts.
 import { beforeAll, describe, expect, it } from "vitest";
 import { admin, makeBrewery, makeStaffCtx, seedCatalog, seedMaterial, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import { recipeGravity } from "@/lib/recipe-gravity";
+import { recipeIbu, type RecipeIbu } from "@/lib/recipe-ibu";
 import "@/lib/commands/all";
 
 let b: { id: string };
@@ -40,6 +42,25 @@ describe("recipes and immutable versions", () => {
 
     expect(await snapshots(v1.id)).toEqual([{ alpha_snapshot: null }, { alpha_snapshot: 12.5 }]);
     expect(await snapshots(v2.id)).toEqual([{ alpha_snapshot: null }, { alpha_snapshot: 9 }]);
+
+    // get_recipe reads the version's frozen value, not the material's current 9%.
+    const first = (await runCommand("get_recipe", { recipeId: recipe.id, version: 1 }, ctx)) as { ogPlato: number; ibu: RecipeIbu };
+    const hopLine = { name: "Frozen alpha hop", category: "hop", stage: "boil", perBblQty: 1, unit: "lb", timingMinutes: 60 };
+    expect(first.ibu).toEqual(recipeIbu({ ogPlato: first.ogPlato, lines: [{ ...hopLine, alphaAcid: 12.5 }] }));
+    expect(first.ibu).not.toEqual(recipeIbu({ ogPlato: first.ogPlato, lines: [{ ...hopLine, alphaAcid: 9 }] }));
+  });
+
+  it("get_recipe names the hop that has no alpha acid, and has no IBU before a version exists", async () => {
+    const recipe = (await runCommand("create_recipe", { name: "No alpha IPA" }, ctx)) as { id: string };
+    const empty = (await runCommand("get_recipe", { recipeId: recipe.id }, ctx)) as { ibu: RecipeIbu };
+    expect(empty.ibu).toEqual({ kind: "none", reason: "no predicted OG" });
+
+    await runCommand("create_recipe_version", {
+      recipeId: recipe.id, mashSchedule: [{ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 }], brewhouseEfficiency: 0.75, yeastAttenuation: 0.78,
+      ingredients: [{ materialId: malt, perBblQty: 60, stage: "mash" }, { materialId: hop, perBblQty: 1, stage: "whirlpool" }],
+    }, ctx);
+    const got = (await runCommand("get_recipe", { recipeId: recipe.id }, ctx)) as { ibu: RecipeIbu };
+    expect(got.ibu).toEqual({ kind: "gaps", gaps: [{ name: "Citra", reason: "no alpha acid" }] });
   });
 
   it("creates a recipe, then two versions whose ingredients snapshot extract potential", async () => {

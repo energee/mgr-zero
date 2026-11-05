@@ -457,7 +457,10 @@ observed `ordered_on → received_on` dates are keyed by the PO's vendor.
 `name, category material_category, base_uom uom, purchase_uom uom, purchase_uom_factor
 numeric > 0 default 1` (base units per purchase unit: a 50 lb bag = `each`→`lb`, 50),
 `lot_tracked bool default false`, `default_vendor_id → vendors`,
-`reorder_point numeric` (base uom), `active bool`. unique `(brewery_id, name)`.
+`reorder_point numeric` (base uom), `active bool`,
+`extract_potential numeric` (SG-style, 1.037 = 37 PPG; recipe gravity reads it),
+`alpha_acid numeric(5,2) check (> 0 and <= 30)` (percent, as on the bag; recipe
+IBU reads it). unique `(brewery_id, name)`.
 
 ### `material_lots`
 `material_id → materials, lot_code text, vendor_id → vendors, received_on date, best_by
@@ -559,7 +562,10 @@ created_by`. unique `(recipe_id, version)`. Revoke update/delete.
 ### `recipe_ingredients` — immutable
 `recipe_version_id → recipe_versions, material_id → materials, per_bbl_qty numeric > 0`
 (base uom per bbl; scaled at brew time), `stage ingredient_stage, timing_minutes int,
-sort int`. idx `(recipe_version_id)`, `(material_id)`. Revoke update/delete.
+sort int`, `extract_snapshot numeric` and `alpha_snapshot numeric(5,2)` (the
+material's `extract_potential` and `alpha_acid` when the version was saved, so a
+material edit moves no saved version's gravity or IBU). idx `(recipe_version_id)`,
+`(material_id)`. Revoke update/delete.
 
 ### View `recipe_version_costs` — `sum(per_bbl_qty × material_last_cost)` per bbl.
 

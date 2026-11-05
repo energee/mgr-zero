@@ -89,6 +89,13 @@ describe("SCREENS", () => {
     expect(drawn).not.toMatch(/Lower the assumption/);
   });
 
+  it("draws the recipe's IBU beside its prediction, and states what a gap reads", () => {
+    const recipe = SCREENS.find((s) => s.name === "Recipe")!;
+    expect(text("Recipe")).toContain("IBU 15");
+    expect(recipe.states?.map(([name]) => name)).toEqual(expect.arrayContaining(["some hops lack alpha acid", "no IBU"]));
+    expect(String(recipe.writes)).toMatch(/alpha acid snapshot/);
+  });
+
   it("draws the Recipe frame from the shared schedule helpers, with its saved date and no gate", () => {
     const recipe = SCREENS.find((s) => s.name === "Recipe")!;
     const drawn = text("Recipe");

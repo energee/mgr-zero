@@ -615,6 +615,10 @@ describe("Recipes view", () => {
     expect(recipeHazyV4.predicted).toBe("Predicted: OG 15.2 °P · FG 3.5 °P · ABV 6.3%");
   });
 
+  it("the fixture's IBU is computed from its boil hop, and its dry hop adds nothing", () => {
+    expect(recipeHazyV4.bitterness).toBe("IBU 15");
+  });
+
   it("the live Recipe page reads the outcomes and hands them to the page model", () => {
     const page = src("app/(app)/recipes/[id]/page.tsx");
     expect(page).toMatch(/runCommand\("get_recipe_outcomes", \{ recipeId: id \}, ctx\)/);
