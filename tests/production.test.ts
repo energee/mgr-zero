@@ -25,6 +25,23 @@ beforeAll(async () => {
 });
 
 describe("recipes and immutable versions", () => {
+  it("freezes a hop's alpha acid on each version, so a material edit moves no saved version", async () => {
+    const alphaHop = await seedMaterial(b.id, { name: "Frozen alpha hop", category: "hop", alphaAcid: 12.5 });
+    const recipe = (await runCommand("create_recipe", { name: "Frozen alpha IPA" }, ctx)) as { id: string };
+    const version = () => runCommand("create_recipe_version", {
+      recipeId: recipe.id, mashSchedule: [{ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 }], brewhouseEfficiency: 0.75, yeastAttenuation: 0.78,
+      ingredients: [{ materialId: malt, perBblQty: 60, stage: "mash" }, { materialId: alphaHop, perBblQty: 1, stage: "boil", timingMinutes: 60 }],
+    }, ctx) as Promise<{ id: string }>;
+    const snapshots = async (id: string) => (await admin.from("recipe_ingredients").select("alpha_snapshot").eq("recipe_version_id", id).order("sort")).data;
+
+    const v1 = await version();
+    await admin.from("materials").update({ alpha_acid: 9 }).eq("id", alphaHop);
+    const v2 = await version();
+
+    expect(await snapshots(v1.id)).toEqual([{ alpha_snapshot: null }, { alpha_snapshot: 12.5 }]);
+    expect(await snapshots(v2.id)).toEqual([{ alpha_snapshot: null }, { alpha_snapshot: 9 }]);
+  });
+
   it("creates a recipe, then two versions whose ingredients snapshot extract potential", async () => {
     const recipe = (await runCommand("create_recipe", { name: "Flagship IPA", note: "house pale" }, ctx)) as { id: string };
     expect(recipe.id).toBeTruthy();

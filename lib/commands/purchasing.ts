@@ -41,7 +41,7 @@ defineCommand({
 
 defineCommand({
   name: "upsert_material",
-  description: "Create or edit a material definition: kind, base and purchase units with the factor between them, lot tracking, default vendor, extract potential. Units are refused once movements, recipe ingredients, format BOM lines, PO lines, contracts or transfer lines use the material",
+  description: "Create or edit a material definition: kind, base and purchase units with the factor between them, lot tracking, default vendor, extract potential, alpha acid. Units are refused once movements, recipe ingredients, format BOM lines, PO lines, contracts or transfer lines use the material",
   input: z.object({
     id: z.string().uuid().optional(),
     name: z.string().trim().min(1),
@@ -61,13 +61,16 @@ defineCommand({
     // allowed for a mash ingredient that carries no extract (rice hulls).
     // Omitted on an edit keeps the potential the material had.
     extractPotential: z.number().min(1).max(1.05).optional(),
+    // Percent, as printed on the hop bag; recipe IBU reads it (lib/recipe-ibu.ts).
+    // Omitted on an edit keeps the alpha acid the material had.
+    alphaAcid: z.number().gt(0).max(30).optional(),
   }),
   roles: [...PURCHASING],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_material", {
     p_brewery: ctx.breweryId, p_material: i.id ?? null, p_name: i.name, p_category: i.category, p_base_uom: i.baseUom,
     p_purchase_uom: i.purchaseUom, p_purchase_uom_factor: i.purchaseUomFactor ?? null, p_lot_tracked: i.lotTracked ?? null,
     p_default_vendor: i.defaultVendorId ?? null, p_reorder_point: i.reorderPoint ?? null, p_active: i.active ?? null,
-    p_extract_potential: i.extractPotential ?? null, p_alpha_acid: null, p_request_id: execution.requestId,
+    p_extract_potential: i.extractPotential ?? null, p_alpha_acid: i.alphaAcid ?? null, p_request_id: execution.requestId,
   })),
 });
 
@@ -164,11 +167,12 @@ defineQuery({
 });
 
 // Serves the Materials list, the recipe ingredient picker (extract_potential:
-// a null one contributes no gravity), PO/count line pickers and the vendor
+// a null one contributes no gravity; alpha_acid: a null one leaves a gap in the
+// IBU preview), PO/count line pickers and the vendor
 // page's default materials (#1586). Inactive materials are hidden unless asked
 // for: history keeps them, pickers do not.
 defineQuery({
-  name: "list_materials", description: "Materials, alphabetical, with kind, units, lot tracking, default vendor, and extract potential; optionally only one kind, one default vendor, or those whose name contains q",
+  name: "list_materials", description: "Materials, alphabetical, with kind, units, lot tracking, default vendor, extract potential and alpha acid; optionally only one kind, one default vendor, or those whose name contains q",
   input: z.object({
     includeInactive: z.boolean().optional(),
     q: z.string().trim().max(100).optional().describe("Only materials whose name contains this text"),
@@ -177,7 +181,7 @@ defineQuery({
   }), roles: [...PURCHASING],
   handler: (ctx, i) => {
     let q = ctx.db.from("materials")
-      .select("id, name, category, base_uom, purchase_uom, purchase_uom_factor, lot_tracked, default_vendor_id, reorder_point, extract_potential, active")
+      .select("id, name, category, base_uom, purchase_uom, purchase_uom_factor, lot_tracked, default_vendor_id, reorder_point, extract_potential, alpha_acid, active")
       .eq("brewery_id", ctx.breweryId).order("name");
     if (!i.includeInactive) q = q.eq("active", true);
     if (i.q) q = q.regexIMatch("name", escapeRegex(i.q));

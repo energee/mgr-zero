@@ -142,12 +142,12 @@ export async function ins<T = { id: string }>(table: string, row: Record<string,
 
 /** A material row (malt, hop, packaging); returns its id. */
 export async function seedMaterial(breweryId: string, o: {
-  name: string; category: string; uom?: string; extractPotential?: number | null; lotTracked?: boolean;
+  name: string; category: string; uom?: string; extractPotential?: number | null; alphaAcid?: number | null; lotTracked?: boolean;
 }) {
   const uom = o.uom ?? "lb";
   return (await ins("materials", {
     brewery_id: breweryId, name: o.name, category: o.category, base_uom: uom, purchase_uom: uom,
-    extract_potential: o.extractPotential ?? null, lot_tracked: o.lotTracked ?? false,
+    extract_potential: o.extractPotential ?? null, alpha_acid: o.alphaAcid ?? null, lot_tracked: o.lotTracked ?? false,
   })).id;
 }
 

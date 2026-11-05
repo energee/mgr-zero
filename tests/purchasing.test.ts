@@ -371,6 +371,20 @@ describe("purchase orders: draft, mark sent, receive", () => {
     await expect(runCommand("upsert_material", { name: "Typo malt", ...base, extractPotential: 37 }, ctx)).rejects.toThrow();
   });
 
+  it("stores a hop's alpha acid, lists it, keeps it on an edit that omits it, and bounds it", async () => {
+    const base = { category: "hop", baseUom: "lb", purchaseUom: "lb" } as const;
+    const m = (await runCommand("upsert_material", { name: "Alpha test hop", ...base, alphaAcid: 12.5 }, ctx)) as { id: string; alpha_acid: number };
+    expect(Number(m.alpha_acid)).toBe(12.5);
+    const edited = (await runCommand("upsert_material", { id: m.id, name: "Alpha test hop 2", ...base }, ctx)) as { alpha_acid: number };
+    expect(Number(edited.alpha_acid)).toBe(12.5);
+    const changed = (await runCommand("upsert_material", { id: m.id, name: "Alpha test hop 2", ...base, alphaAcid: 11 }, ctx)) as { alpha_acid: number };
+    expect(Number(changed.alpha_acid)).toBe(11);
+    const listed = (await runCommand("list_materials", { q: "Alpha test hop 2" }, ctx)) as { alpha_acid: number }[];
+    expect(listed.map((row) => Number(row.alpha_acid))).toEqual([11]);
+    await expect(runCommand("upsert_material", { name: "Typo hop", ...base, alphaAcid: 40 }, ctx)).rejects.toThrow();
+    await expect(runCommand("upsert_material", { name: "Typo hop", ...base, alphaAcid: 0 }, ctx)).rejects.toThrow();
+  });
+
   // #452: stock recorded without a lot cannot be counted, consumed, or moved
   // once the material is lot-tracked, so the switch waits until it is gone.
   it("lot tracking cannot turn on while unlotted stock is on hand; with none it can", async () => {
