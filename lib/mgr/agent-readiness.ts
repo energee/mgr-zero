@@ -1,0 +1,33 @@
+// lib/mgr/agent-readiness.ts — counts the registry-backed rows of the readiness
+// scorecard in docs/plans/agent-access.md: how much an agent can learn about each
+// operation from the operation itself. scripts/agent-readiness.ts prints them.
+import type { $ZodType } from "zod/v4/core";
+import { leafFields } from "@/lib/mgr/api-schema";
+
+export type ReadinessTool = {
+  kind: "query" | "command";
+  description: string;
+  inputSchema: $ZodType;
+  compensation?: string | null;
+};
+
+/** Below this, a description rarely says more than the operation's name. */
+const MIN_DESCRIPTION_WORDS = 7;
+
+const isIdField = (name: string) => name === "id" || /Ids?$/.test(name);
+
+export function measureReadiness(tools: ReadinessTool[]) {
+  const commands = tools.filter(tool => tool.kind === "command");
+  const fields = tools.flatMap(tool => leafFields(tool.inputSchema));
+  return {
+    operations: tools.length,
+    queries: tools.length - commands.length,
+    commands: commands.length,
+    describedOperations: tools.filter(tool => tool.description.trim().split(/\s+/).length >= MIN_DESCRIPTION_WORDS).length,
+    fieldUses: fields.length,
+    fieldUsesWithMeaning: fields.filter(field => field.described).length,
+    // `compensation` defaults to null, which says nothing, so only written text counts.
+    commandsWithUndo: commands.filter(command => command.compensation).length,
+    commandIdFieldUses: commands.flatMap(command => leafFields(command.inputSchema)).filter(field => isIdField(field.name)).length,
+  };
+}

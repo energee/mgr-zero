@@ -147,6 +147,28 @@ export function fieldsOf(schema: $ZodType): ApiField[] {
     .sort((a, b) => (a.required === b.required ? 0 : a.required ? -1 : 1));
 }
 
+/** Every value an operation's input takes, at any depth, and whether its schema says what it means. */
+export function leafFields(node: $ZodType, name = "", described = false): { name: string; described: boolean }[] {
+  const def = definition(node);
+  const hasMeaning = described || Boolean(core.globalRegistry.get(node)?.description);
+  switch (def.type) {
+    case "object":
+      return Object.entries(def.shape).flatMap(([key, field]) => leafFields(field, key));
+    case "array":
+      return leafFields(def.element, name, hasMeaning);
+    case "optional": case "nullable": case "nonoptional": case "default": case "prefault": case "readonly": case "catch":
+      return leafFields(def.innerType, name, hasMeaning);
+    case "pipe":
+      return leafFields(def.in, name, hasMeaning);
+    case "union":
+      // A union of objects is alternative shapes; a union of values is one field.
+      if (def.options.some(option => definition(option).type === "object")) {
+        return def.options.flatMap(option => leafFields(option, name, hasMeaning));
+      }
+  }
+  return [{ name, described: hasMeaning }];
+}
+
 /** An example input: required fields, plus one optional field when a cross-field rule requires it. */
 export function sampleInput(schema: $ZodType): Record<string, unknown> {
   const def = definition(schema);
