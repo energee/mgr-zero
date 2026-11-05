@@ -1,7 +1,8 @@
 # Outside agents use MGR (agent access)
 
-Status: approved by the owner, 2026-11-04. Tracked in #1766. Paths and counts
-were checked against `main` at `40278052a`.
+Status: approved by the owner, 2026-11-04. Q4 and Phases 2 and 3 were rewritten
+at the owner's request on 2026-11-05, so that agents reach every operation with
+nothing maintained twice. Tracked in #1766.
 
 ## Goal
 
@@ -21,10 +22,12 @@ were checked against `main` at `40278052a`.
 | Need | Already built |
 | --- | --- |
 | One governed entry point | `lib/commands/registry.ts` and `app/api/command/route.ts` (iron rule 1). About 175 commands and 135 queries. |
-| Tools for a model | `listTools({ aiOnly: true, ctx })`; `createComposerTools` in `lib/chat/agent.ts`; `boundToolResult`. 10 definitions are `aiExposed` today. |
+| Tools for a model | `listTools({ ctx })` and `canRun` filter by role; `boundToolResult` bounds results. All 314 operations declare a name, description, input schema and roles. |
 | Authorization | Security definer RPCs and RLS (iron rules 3 and 5). They apply to any token the caller holds. |
 | Replay and audit of writes | `private.command_requests`: actor, request id, command, payload hash, result, `origin`, preview token. Pruned after 90 days. |
-| Human approval of AI writes | `preview_command` plus a version token, stale revalidation at commit, and a card that renders only server output. Only `record_inventory_movement` takes an origin today. |
+| Human approval of AI writes | `preview_command` and its card, for `record_movement` only. Every other command has no preview hook. |
+| Describing an operation's input | `lib/mgr/api-schema.ts` already builds field tables for `/docs/api`. |
+| Turning an id into a name | `search_entities` in `lib/commands/search.ts` has label queries for about 16 entity types. |
 | Rate limits | `consumeAdmission` (one budget per user). |
 | Generated API reference | `lib/mgr/api-operations.ts`, `lib/mgr/api-schema.ts`, `bun run docs:api`. |
 | Findings issue from a job | `scripts/file-doc-findings.sh`: fixed title, at most 20 findings, `@` defused. |
@@ -33,6 +36,9 @@ were checked against `main` at `40278052a`.
 
 - **One registry, two transports.** MCP and `/api/command` both serve
   `listTools`. Neither holds business logic.
+- **A registered operation is an agent tool.** A new `defineCommand` or
+  `defineQuery` reaches agents with no agent-specific work. Roles decide who may
+  run it, through the same `canRun` the app uses.
 - **The plainest client must work.** Approval, sessions and errors must work
   in an MCP client with no elicitation, no Tasks and no MCP Apps. Those
   features are enhancements.
@@ -60,9 +66,11 @@ were checked against `main` at `40278052a`.
   its token guide says scopes "do not control access to your database tables
   or API endpoints". MGR defines no scopes and gates on the `client_id` claim
   instead (Phase 1).
-- **Q4 What agents see.** The role-filtered `aiExposed` set. Grow reads by
-  marking more queries `aiExposed`, in batches chosen from Phase 5 data.
-  Writes grow only by adding preview contracts.
+- **Q4 What agents see (revised 2026-11-05).** Every operation the person's
+  roles allow, minus a short hide list (`agentHidden` on the definition). Reads
+  run directly. Writes become proposals through one generic flow, so a command
+  needs no preview hook to be reachable. `aiExposed` protected nothing for reads,
+  because a token can already read what its roles allow straight from Supabase.
 - **Q5 Approval surface.** An inbox on Today first. Slack waits for the
   trust and replay gates in `.agents/MEMORY.md`.
 - **Q6 Retention.** 90 days for sessions, steps and proposals, matching
@@ -73,6 +81,9 @@ were checked against `main` at `40278052a`.
   serves the 2025 protocol and 2026-07-28 from one endpoint.
 - **Q9 Limits.** Keep the per-user budget. Add a per-client budget only if
   Phase 5 shows one client crowding out a person's own use.
+- **Q10 Who approves.** Only the person the agent acts for, on their own
+  session. Their roles are checked again when the command runs.
+- **Q11 Proposal life.** 24 hours, then `expired`.
 
 ## Phases
 
@@ -121,6 +132,7 @@ A revoked grant stops working at once.
   the session is live, and sets `ctx.agent`.
 - `lib/auth/request-context.ts`: an agent token in a cookie is not signed in.
 - `lib/commands/registry.ts`: an agent context runs only `aiExposed` queries.
+  Phase 2 widens this to every query its roles allow.
 - `supabase/config.toml` and `tests/supabase/supabase/config.toml`: enable the
   OAuth server and the hook locally. Hosted is ask-first.
 - New consent page at `/oauth/consent`: client name, publisher domain, the
@@ -132,27 +144,37 @@ A revoked grant stops working at once.
 **Acceptance:** an agent cannot exceed its person's roles, cannot commit,
 cannot change the account, and cannot read a brewery that has agents off.
 
-### Phase 2 — MCP endpoint and orientation
+### Phase 2 — MCP endpoint, every read, and orientation
 
 **Test first:** a contract test drives the local route with the official MCP
-SDK client, under both protocol versions. It lists tools per role, calls a
-query, gets a structured error, and reads the orientation result.
+SDK client, under both protocol versions. It finds an operation, describes it,
+runs a query, gets a structured error, and reads the orientation result. A
+warehouse token finds no invoice query; an admin token does. A hidden operation
+cannot be found or run. A query registered in the test is found with no other
+change.
 
 **Modify:**
-- New `app/api/mcp/` route (thin, like `app/api/chat/`).
-- Extract one registry-to-tool adapter from `createComposerTools` that both
-  Ask MGR and MCP call. A second copy is a defect.
+- New `app/api/mcp/` route (thin, like `app/api/chat/`). It serves four tools,
+  not one per operation, so a client's context stays small:
+  - `find_operations`: match the person's allowed operations by text.
+  - `describe_operation`: description, field table from
+    `lib/mgr/api-schema.ts`, and whether it runs or needs approval.
+  - `run_query`: run an allowed query through `runCommand`, bounded by
+    `boundToolResult`.
+  - `propose_command`: added in Phase 3.
+- `lib/commands/registry.ts`: `agentHidden` on a definition. `listTools` filters
+  on it and `canRun`, and the agent gate in `runCommand` becomes "a query the
+  person's roles allow and not hidden".
+- Review all 137 queries once for the hide list. Start with `get_qbo_connection`,
+  `get_cola_image` and `preview_command`.
 - `/.well-known/oauth-protected-resource` for MCP auth discovery.
 - Server `instructions`, kept under 300 words: what MGR is, volumes are
   stored in bbl, the inventory ledger is append-only and corrections are
   compensating commands, writes are proposals a person approves, and call
   `get_started` first.
-- New `get_started` query (`aiExposed`). It returns who the agent acts for
-  (person, brewery, roles, timezone), its tools grouped by area with the ones
-  that need approval marked, `get_today`'s items, links to `/docs`, and a
-  `conversationId` the agent sends back on later calls.
-- Tool annotations: map `risk` to `readOnlyHint` and `destructiveHint` as
-  hints only. Safety never depends on them.
+- New `get_started` query. It returns who the agent acts for (person, brewery,
+  roles, timezone), what it can do by area, `get_today`'s items, links to
+  `/docs`, and a `conversationId` the agent sends back on later calls.
 - Errors: `CommandError` code, message, and the failing input path, so a
   model can correct and retry.
 - `/llms.txt` for `/docs`; `fumadocs-core` ships a `remark-llms` plugin to
@@ -160,36 +182,56 @@ query, gets a structured error, and reads the orientation result.
 - The Phase 4 step recorder, wrapped around every MCP tool call.
 
 **Acceptance:** a fresh agent with no prior knowledge answers "what's on
-today and what's below par at the taproom?" in two tool calls.
+today and what's below par at the taproom?" in a few tool calls.
 
-### Phase 3 — Proposals approved out of band
+### Phase 3 — Every write, as a proposal a person approves
 
-**Test first:** an agent's proposal can be approved only by a cookie session
-(a bearer approval returns 403); a stale proposal fails at commit and is
-marked `stale`; an expired one cannot be approved; a double approval commits
-once.
+**Test first:** any registered command can be proposed, with no code for that
+command, and a command registered in the test works unchanged. A bad input or a
+role the person lacks is refused when proposing. Only the person's own session
+can approve: a bearer approval returns 403, and so does another staff member. An
+expired proposal cannot be approved. A double approval commits once. Every id
+field in every command's schema has a label, or the test fails.
 
 **Modify:**
-- New migration: allow `'agent'` in `command_requests_origin_check`, add
-  `agent_client_id text`, and let `record_inventory_movement` accept
-  `p_origin = 'agent'` with the same preview-token rule as `'chat'`. The
-  commit runs on the approver's session, so the guard in Phase 1 still holds.
-- `lib/commands/registry.ts`: `CommandOrigin` gains `"agent"`; the chat
-  preview rule applies to it.
 - New migration: `agent_proposals` (tenant, RLS): actor, client, command,
-  canonical input, preview, preview token, status (`pending`, `approved`,
-  `declined`, `expired`, `committed`, `stale`), approver, request id,
-  created and expiry times.
-- An agent write runs `preview_command`, stores the proposal, and returns
+  canonical input, status (`pending`, `approved`, `declined`, `expired`,
+  `committed`, `failed`), request id, and created and expiry times.
+  `create_agent_proposal` is the one write an agent token may make, so it joins
+  the reviewed list in `tests/agent-access.test.ts`. It must not touch the ledger.
+- `propose_command`: validate the input against the command's schema and check
+  `canRun`, store the proposal, and return
   `{ status: "awaiting_approval", proposalId, approveUrl, expiresAt }`.
-- New `get_proposal_status` query (`aiExposed`).
-- Today inbox card that renders only the stored preview. Approve commits
-  through the existing path with `origin = 'agent'` and the preview token.
+- New `get_proposal_status` query.
+- New `approve_agent_proposal` and `decline_agent_proposal` commands. Approve
+  runs the stored command through `runCommand` on the person's session, with the
+  proposal's request id. The command's own checks are the staleness check; a
+  refusal marks the proposal `failed` and shows why.
+- Attribution needs no ledger change. The person's session commits, so `ui` is
+  the true origin, and `agent_proposals.request_id` links the agent to the
+  ledger row. No RPC changes.
+- New `lib/mgr/proposal-labels.ts`: turn a proposal's input into readable fields.
+  A person must not approve `skuId: 8f3a…`.
+  - One map from id field name to entity, not one per command. 150 of 177
+    commands carry ids, across 87 field names. Many are aliases: `toBinId` and
+    `fromBinId` are both bins. 21 names cover about two-thirds of the uses.
+  - Build on the label queries in `lib/commands/search.ts`; extract them rather
+    than copy them.
+  - Two awkward cases: the generic `id` field on 12 commands maps by command, and
+    line ids such as `lineId` need their parent record.
+  - `lib/mgr/api-schema.ts` reads top-level fields today. Extend it to walk
+    nested fields such as order lines.
+  - An id with no label shows as an unrecognised record with a warning. It is
+    never hidden.
+- Today inbox card that shows the command's description and labelled fields, and
+  the effects from its preview hook where one exists. Add a hook only where the
+  input alone does not say what will happen.
+- Once this ships, move Ask MGR onto the same tools and delete `aiExposed`.
 - Enhancements: wrap a proposal in an MCP Task where the client supports
   Tasks; offer `approveUrl` through URL-mode elicitation where supported.
 
 **Acceptance:** the full round trip works in a client that supports none of
-the enhancements.
+the enhancements, for a command that has no preview hook.
 
 ### Phase 4 — Session log and notes
 
@@ -210,7 +252,7 @@ over the length cap is rejected.
   callback errors itself, so the recorder must log its own (Negative 5).
 - `leave_note` tool: kind `friction` or `handoff`, 500 characters. Stored
   as untrusted text and always shown labelled with the client.
-- `list_agent_sessions` query (`aiExposed`) and an Admin Agent activity page
+- `list_agent_sessions` query and an Admin Agent activity page
   over sessions, steps and the `command_requests` they caused.
 - Session notes stay deterministic: built from steps. A model-written
   summary waits until someone asks for it (Negative 1).
@@ -238,9 +280,9 @@ a `leave_note` text fails the test.
 
 **What the harness does with it:** a high `invalid_request` rate on one
 input path means the tool description or schema needs work. A frequent
-`leave_note` theme or an unreachable task means a query to mark
-`aiExposed`. A frequently declined or stale proposal means its preview
-needs a clearer effect.
+`leave_note` theme or an unreachable task means a hidden operation to revisit or
+a description to sharpen. A frequently declined proposal means its card needs a
+preview hook.
 
 ### Phase 6 — Guides and release check
 
@@ -259,6 +301,7 @@ needs a clearer effect.
 - Shared agent memory, Mem0 and similar providers: durable facts belong on
   records through registered commands.
 - Slack approvals (Q5).
+- Steps that need a browser, such as connecting QuickBooks or uploading a file.
 
 ## Risks
 
@@ -268,10 +311,19 @@ needs a clearer effect.
   year.
 - An agent's model reads tenant data under its own provider's terms. The
   consent page states this, and Admins can turn agents off.
-- Only `record_movement` can be proposed today. Agents start mostly
-  read-only until more preview contracts land.
+- A generic card shows a command's input, not its effect. A person may approve
+  something they do not fully picture. Preview hooks stay the upgrade where that
+  matters.
+- A generic proposal has no version token, so the check at commit is whatever the
+  command already does.
+- Many more reads mean more brewery data reaches the agent's model provider,
+  including invoices and customers for the roles that can see them. The consent
+  page says so, and Admins can turn agents off.
+- `risk` metadata is not usable yet: 174 of 177 commands say `mutable` and none
+  says `external`, though MGR pushes to QuickBooks. It does not matter while every
+  write needs approval. Skipping approval for any write needs an honest pass first.
 - A token sent straight to the Supabase API can read anything its person's
-  roles can read, not only the `aiExposed` set. Q4 holds on MGR's own
+  roles can read, including hidden operations. `agentHidden` holds on MGR's own
   surfaces; the person's roles are the hard ceiling.
 - A revoked grant's access token keeps a valid signature until `exp`
   (`jwt_expiry` is 3600 seconds). MGR checks the session instead, which is one
