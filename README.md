@@ -113,7 +113,7 @@ Browser setup is explicit in each worktree: after the frozen install, run
 locked npm tarball; do not trust or manually run its postinstall download hook.
 
 ```bash
-bun run dev   # http://localhost:3000
+bun run dev   # main checkout: http://localhost:3000; a worktree: its fixed port (scripts/dev.sh)
 ```
 
 ## Tests

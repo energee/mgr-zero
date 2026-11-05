@@ -302,7 +302,7 @@ describe("Work view", () => {
     const model = workFromQuery([{ ...common, kind: "orders", label: "An invoice question" }, { ...common, kind: "batches", label: "A reading", href: "/cellar/actual/reading" }], ["orders"]);
     expect(model.rows.map(row => row.key)).toEqual(["orders:same", "batches:same"]);
     expect(filterWorkRows(model, "all").map(row => row.verb)).toEqual(["Answer"]);
-    expect(filterWorkRows(model, "batches")[0]).toMatchObject({ href: "/cellar/actual/reading", icon: "thermometer", warning: true });
+    expect(filterWorkRows(model, "batches")[0]).toMatchObject({ href: "/cellar/actual/reading", icon: "thermo", warning: true });
     expect(filterWorkRows(model, "routes")).toEqual([]);
     expect(filterWorkRows(toWorkViewProps(workWarehouse), "all")).toHaveLength(4);
     expect(workWarehouse.rows.every(row => row.href === undefined)).toBe(true);

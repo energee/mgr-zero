@@ -7,7 +7,7 @@ import { parseOrderStatus } from "@/lib/mgr/order-status";
 import { OrdersClient } from "./orders-client";
 import "@/lib/commands/all";
 import { OrderSheetFromAddress } from "./order-sheet";
-import { orderSheetId } from "@/lib/mgr/order-sheet";
+import { sheetId } from "@/lib/mgr/order-sheet";
 import { navTitle } from "@/lib/mgr/nav";
 
 export const metadata = { title: navTitle("/orders") };
@@ -19,7 +19,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   // The filter names its customer even when no order matches, so the name
   // comes from get_customer rather than the first listed row.
   const customer = params.customerId ? await optionalPageQuery<{ customer: { name: string } }>("get_customer", { customerId: params.customerId }, ctx) : undefined;
-  const sheet = orderSheetId(params.order);
+  const sheet = sheetId(params.order);
   // ?order= (lib/mgr/order-sheet.ts) opens that order in a sheet over the list. It rides in a
   // slot so the page's root stays OrdersClient: opening the sheet never remounts the list.
   return <OrdersClient roles={brewery.roles} timeZone={brewery.timeZone} status={parseOrderStatus(params.status)} customerId={params.customerId} customerName={customer?.customer.name} cursor={pageCursor(params.cursor)} sheet={sheet && <OrderSheetFromAddress id={sheet} />} />;
