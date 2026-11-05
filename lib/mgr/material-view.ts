@@ -16,6 +16,9 @@ export type MaterialViewModel = {
   /** SG-style (1.037 = 37 PPG); asked on malt and adjunct only, where recipe
    * predictions read it (lib/recipe-gravity.ts). Empty means none typed. */
   extractPotential?: string;
+  /** Percent, as on the bag; asked on hops only, where recipe IBU reads it
+   * (lib/recipe-ibu.ts). Empty means none typed. */
+  alphaAcid?: string;
   lotTracked: boolean;
   active: boolean;
 };

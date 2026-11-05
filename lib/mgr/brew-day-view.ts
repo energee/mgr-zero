@@ -1,4 +1,4 @@
-import { BREW_DAY_STAGES, isBrewDayStage, type IngredientStage } from "./recipe-process-view";
+import { BREW_DAY_STAGES, isBrewDayStage, type FermentationStage, type IngredientStage } from "./recipe-process-view";
 import { materialSourceKey, restoreSources } from "./material-source";
 import { fromTicks, toTicks } from "./quantity-input";
 // lib/mgr/brew-day-view.ts — view-model for Brew day.
@@ -13,12 +13,13 @@ export type BrewMaterialSource = { material_id: string; material_name: string; u
 /** A saved Prep line (brew_pulls): the exact source and the amount pulled for a recipe line; qty is pulled, not on hand. */
 export type BrewPull = BrewMaterialSource & { id: string; recipe_ingredient_id: string | null };
 export type BrewActualDraft = { key: string; source: string; recipeIngredientId?: string; stage: IngredientStage; qty: string };
-/** purchaseUomFactor is the material's pack size; plan snapshots frozen before it existed lack it, read as 1. */
-export type BrewPlanIngredient = { id: string; material_id: string; materialName: string; unit: string; stage: IngredientStage; per_bbl_qty: number; purchaseUomFactor?: number };
+/** purchaseUomFactor is the material's pack size; plan snapshots frozen before it existed lack it, read as 1.
+ *  timing_minutes is the recipe line's timing (ingredientDetail reads it); null when the line has none. */
+export type BrewPlanIngredient = { id: string; material_id: string; materialName: string; unit: string; stage: IngredientStage; per_bbl_qty: number; purchaseUomFactor?: number; timing_minutes?: number | null };
 /** version is the pinned recipe_versions row (to_jsonb); a snapshot frozen before a process column existed lacks it. */
 export type BrewPlan = { recipe?: string; version?: { version?: number; mash_schedule?: { name: string; temp_f?: number; tempF?: number; minutes: number }[];
     mash_temp_f?: number | null; target_mash_ph?: number | null; pre_boil_bbl?: number | null; boil_minutes?: number | null;
-    whirlpool_temp_f?: number | null; whirlpool_minutes?: number | null; knockout_temp_f?: number | null } | null;
+    whirlpool_temp_f?: number | null; whirlpool_minutes?: number | null; knockout_temp_f?: number | null; fermentation_schedule?: FermentationStage[] } | null;
   ingredients?: BrewPlanIngredient[];
   waterAdditions?: BrewWaterAddition[] };
 /** A pinned plan's water addition (recipe_water_additions): an absolute amount in its own unit (g, mL or oz) and stage
@@ -125,7 +126,7 @@ export function brewRecordPayload(values: BrewDayViewModel, batchId: string): [s
 }
 
 /** Only the latest revision of each turn contributes to confirmed totals. */
-export function currentBrewRecords(records: BrewRecordView[]): BrewRecordView[] {
+export function currentBrewRecords<T extends { id: string; corrects_id: string | null }>(records: T[]): T[] {
   const corrected = new Set(records.map(record => record.corrects_id));
   return records.filter(record => !corrected.has(record.id));
 }

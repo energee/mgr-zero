@@ -13,7 +13,7 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { WorkList } from "./work-list";
 import { navTitle } from "@/lib/mgr/nav";
-import { ORDER_SHEET_PARAM, orderSheetId } from "@/lib/mgr/order-sheet";
+import { ORDER_SHEET_PARAM, sheetId } from "@/lib/mgr/order-sheet";
 import { OrderSheetFromAddress } from "../orders/order-sheet";
 
 export const metadata = { title: navTitle("/work") };
@@ -22,7 +22,7 @@ export default async function WorkPage({ searchParams }: { searchParams: Promise
   const brewery = await getActiveBrewery();
   const rows = (await runCommand("list_work", {}, await buildContext(brewery.id))) as WorkRow[];
   const canCreate = brewery.roles.includes("admin") || brewery.roles.includes("sales");
-  const sheet = orderSheetId((await searchParams)[ORDER_SHEET_PARAM]);
+  const sheet = sheetId((await searchParams)[ORDER_SHEET_PARAM]);
   return (
     <>
       <WorkList

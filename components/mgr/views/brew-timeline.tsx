@@ -7,7 +7,8 @@
 // desk. On a phone the stages fold so one is open at a time, each heading
 // saying how many of its ingredients are confirmed; from md up all show. Confirm
 // all confirms every row at once; Record brew day stays in reach at the foot of
-// a phone (BrewFooter), and Change plan is folded below. The live batch page
+// a phone (BrewFooter), and Change plan is folded below. What happens after
+// knockout (CellarPlan) follows the stages, for reading only. The live batch page
 // mounts it for a planned batch; ./brew-day.tsx still draws recorded and
 // cancelled batches (history, corrections, brew turns). Planned water additions
 // are rows like any ingredient (waterAdditionRows); only one whose unit cannot
@@ -25,7 +26,7 @@ import { anyPulled, confirmAll, currentStage, isShort, knockoutReady, processErr
 import { vesselOptions } from "@/lib/mgr/brew-day-view";
 import { packs } from "@/lib/mgr/pack-qty";
 import { processFields } from "./brew-day";
-import { BrewFooter, BrewTabs, ChangePlanFold, DetailParts, PackQuantity, PlannedLine, SourcePick } from "./brew-prep";
+import { BrewFooter, BrewTabs, CellarPlan, ChangePlanFold, DetailParts, PackQuantity, PlannedLine, SourcePick } from "./brew-prep";
 
 const processLabel = Object.fromEntries(processFields) as Record<string, string>;
 
@@ -96,6 +97,7 @@ export function BrewTimelineView({ model, busy = false, error, onChange, onRecor
           </> : stage.process.length > 0 && <div className="md:max-w-2xl">{E.cols(...stage.process.map(reading))}</div>}
         </div>
       </details>)}
+      <section className="rounded border p-3"><CellarPlan rows={value.later} /></section>
       {!anyPulled(value) && <fieldset disabled={busy}><label className="flex items-center gap-2">{E.sw(Boolean(value.confirmEmpty), "Confirm no ingredients used", confirmEmpty => change({ confirmEmpty }))}Confirm no ingredients used</label></fieldset>}
       <CommandFormMessage error={error} />
       <BrewFooter>

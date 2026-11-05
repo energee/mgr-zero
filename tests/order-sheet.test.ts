@@ -1,32 +1,36 @@
-// tests/order-sheet.test.ts — the order sheet's address (lib/mgr/order-sheet.ts):
-// ?order=<id> on whatever list is open, so filters survive and a refresh or a
-// shared link reopens the same sheet; Today and Work rows carry the order id only
-// when their subject is an order.
+// tests/order-sheet.test.ts — the record sheet's address (lib/mgr/order-sheet.ts):
+// ?order=<id> (or ?customer=<id> on Customers) on whatever list is open, so
+// filters survive and a refresh or a shared link reopens the same sheet; Today
+// and Work rows carry the order id only when their subject is an order.
 import { describe, expect, it } from "vitest";
-import { orderSheetHref, orderSheetId } from "../lib/mgr/order-sheet";
+import { CUSTOMER_SHEET_PARAM, ORDER_SHEET_PARAM, sheetHref, sheetId } from "../lib/mgr/order-sheet";
 import { toTodayViewProps } from "../lib/mgr/today-view";
 import { workFromQuery } from "../lib/mgr/work-view";
 import type { TodayItem } from "../lib/commands/today";
 
-describe("orderSheetId", () => {
+describe("sheetId", () => {
   it("takes one well-formed order id from the address, and nothing else", () => {
     const id = "b060b9b6-13ba-4da8-8e01-20f9db77d11d";
-    expect(orderSheetId(id)).toBe(id);
-    expect(orderSheetId(undefined)).toBeUndefined();
-    expect(orderSheetId("ORD-0218")).toBeUndefined();
-    expect(orderSheetId([id, id])).toBeUndefined();
+    expect(sheetId(id)).toBe(id);
+    expect(sheetId(undefined)).toBeUndefined();
+    expect(sheetId("ORD-0218")).toBeUndefined();
+    expect(sheetId([id, id])).toBeUndefined();
   });
 });
 
-describe("orderSheetHref", () => {
+describe("sheetHref", () => {
   it("adds the order to the current list address and keeps its filters", () => {
-    expect(orderSheetHref("/orders", "status=picked", "o1")).toBe("/orders?status=picked&order=o1");
-    expect(orderSheetHref("/", "", "o1")).toBe("/?order=o1");
+    expect(sheetHref("/orders", "status=picked", ORDER_SHEET_PARAM, "o1")).toBe("/orders?status=picked&order=o1");
+    expect(sheetHref("/", "", ORDER_SHEET_PARAM, "o1")).toBe("/?order=o1");
   });
   it("replaces an open order, and closing drops only the order", () => {
-    expect(orderSheetHref("/orders", "order=o1&status=picked", "o2")).toBe("/orders?status=picked&order=o2");
-    expect(orderSheetHref("/orders", "status=picked&order=o1", null)).toBe("/orders?status=picked");
-    expect(orderSheetHref("/", "order=o1", null)).toBe("/");
+    expect(sheetHref("/orders", "order=o1&status=picked", ORDER_SHEET_PARAM, "o2")).toBe("/orders?status=picked&order=o2");
+    expect(sheetHref("/orders", "status=picked&order=o1", ORDER_SHEET_PARAM, null)).toBe("/orders?status=picked");
+    expect(sheetHref("/", "order=o1", ORDER_SHEET_PARAM, null)).toBe("/");
+  });
+  it("opens a customer under its own parameter, leaving other parameters alone", () => {
+    expect(sheetHref("/customers", "q=al", CUSTOMER_SHEET_PARAM, "c1")).toBe("/customers?q=al&customer=c1");
+    expect(sheetHref("/customers", "q=al&customer=c1", CUSTOMER_SHEET_PARAM, null)).toBe("/customers?q=al");
   });
 });
 

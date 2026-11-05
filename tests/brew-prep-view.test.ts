@@ -1,7 +1,7 @@
 // tests/brew-prep-view.test.ts — the brew prep pull list and the brew-day
 // timeline's pure rules (lib/mgr/brew-prep-view.ts).
 import { describe, expect, it } from "vitest";
-import { anyPulled, brewIngredients, confirmAll, brewPullsPayload, brewTargets, currentStage, isShort, laterAdditions, needsSource, noStockNote, openBrewTab, prepReason, processErrors, pullDetail, pullTone, sourceChoices, showsPacks, stageProgress, startAtPlan, timelineReason, timelineRecordPayload, timelineStages, timelineTone, waterAdditionRows, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
+import { anyPulled, brewIngredients, confirmAll, brewPullsPayload, brewTargets, cellarPlanRows, currentStage, isShort, needsSource, noStockNote, openBrewTab, prepReason, processErrors, pullDetail, pullTone, sourceChoices, showsPacks, stageProgress, startAtPlan, timelineReason, timelineRecordPayload, timelineStages, timelineTone, waterAdditionRows, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import type { BrewMaterialSource, BrewPlan, BrewPull } from "@/lib/mgr/brew-day-view";
 
 const chit: BrewIngredient = startAtPlan({ key: "chit", name: "Chit Malt", materialId: "chit", stage: "mash", plan: 220, unit: "lb", packSize: 50, source: null });
@@ -46,7 +46,7 @@ describe("pull lines", () => {
 const onHand = (material: string, location: string, bin: string, lot: string | null): BrewMaterialSource =>
   ({ material_id: material, material_name: material, unit: "lb", location_id: location, location_name: location, bin_id: bin, bin_name: bin, lot_id: lot, lot_code: lot, qty: 300 });
 const timeline: BrewTimelineViewModel = {
-  title: "BAT-1", ingredients: [{ ...chit, confirmed: true }, { ...hops, confirmed: true }], targets: {}, process: {},
+  title: "BAT-1", ingredients: [{ ...chit, confirmed: true }, { ...hops, confirmed: true }], targets: {}, later: [], process: {},
   vesselId: "fv1", vessels: [{ id: "fv1", name: "FV1", kind: "fermenter", capacity_bbl: 25.5 }], initialBbl: "22", brewedOn: "2026-10-22",
   sources: [onHand("ns", "freezer", "f1", "ns-1"), onHand("oats", "dry", "d1", null)],
 };
@@ -258,17 +258,34 @@ describe("sourceChoices", () => {
   });
 });
 
-describe("laterAdditions", () => {
-  it("counts the cellar-stage lines by stage, in stage order", () => {
-    expect(laterAdditions(plan)).toBe("Fermentation 1 · Dry hop 2");
+describe("cellarPlanRows", () => {
+  const stages = [{ name: "Primary", kind: "primary", tempF: 68, days: 4 }, { name: "Cold crash", kind: "cold crash", tempF: 34, days: 1 }];
+  const malt = { id: "malt", material_id: "malt", materialName: "Pale malt", unit: "lb", stage: "mash", per_bbl_qty: 45 } as const;
+  const dryHop = { id: "dh", material_id: "citra", materialName: "Citra", unit: "lb", stage: "dry_hop", per_bbl_qty: 1.2, timing_minutes: 4 * 1440 } as const;
+  const cellar: BrewPlan = { version: { fermentation_schedule: stages }, ingredients: [malt, dryHop] };
+
+  it("lists each fermentation stage, then each later line with its day, rate and total", () => {
+    expect(cellarPlanRows(cellar, 14.6)).toEqual([
+      ["Primary", "68 °F · 4 days"],
+      ["Cold crash", "34 °F · 1 day"],
+      ["Citra", "Dry hop · day 4 · 1.2 lb / bbl · 17.5 lb for 14.6 bbl"],
+    ]);
   });
-  it("reads None when the recipe plans nothing later", () => {
-    expect(laterAdditions({ ingredients: plan.ingredients!.filter(r => r.stage === "mash") })).toBe("None");
-    expect(laterAdditions({})).toBe("None");
+  it("leaves the day off a line with no timing", () => {
+    const untimed = { ...dryHop, timing_minutes: null };
+    expect(cellarPlanRows({ ingredients: [untimed] }, 10)).toEqual([["Citra", "Dry hop · 1.2 lb / bbl · 12 lb for 10 bbl"]]);
+    expect(cellarPlanRows({ ingredients: [{ ...untimed, timing_minutes: undefined }] }, 10)).toEqual([["Citra", "Dry hop · 1.2 lb / bbl · 12 lb for 10 bbl"]]);
+  });
+  it("prints no total at zero or NaN barrels", () => {
+    for (const bbl of [0, Number.NaN]) expect(cellarPlanRows({ ingredients: [dryHop] }, bbl)).toEqual([["Citra", "Dry hop · day 4 · 1.2 lb / bbl"]]);
+  });
+  it("reads None when the plan has no later lines, keeping any stages", () => {
+    expect(cellarPlanRows({}, 14.6)).toEqual([["Additions", "None"]]);
+    expect(cellarPlanRows({ version: { fermentation_schedule: stages.slice(0, 1) }, ingredients: [malt] }, 14.6)).toEqual([["Primary", "68 °F · 4 days"], ["Additions", "None"]]);
   });
 });
 
-const prep: BrewPrepViewModel = { title: "BAT-1", vesselId: "fv1", vessels: [], ingredients: [hops, oats], later: "None" };
+const prep: BrewPrepViewModel = { title: "BAT-1", vesselId: "fv1", vessels: [], ingredients: [hops, oats], later: [] };
 
 describe("prepReason", () => {
   it("saves when every line has a source", () => {

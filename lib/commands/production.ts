@@ -3,17 +3,22 @@
 // is a name; how it is brewed lives on a version, and a version is never
 // edited: `create_recipe_version` writes the next one (version = max+1) with
 // its ingredients in a single RPC, snapshotting each material's extract
-// potential so an old version's predicted gravity cannot move when the
-// material is retyped. `get_recipe` predicts OG/FG/ABV here in TypeScript
-// (lib/recipe-gravity.ts) — the schema stores assumptions, never results.
+// potential and alpha acid so an old version's predicted gravity and IBU cannot
+// move when the material is retyped. `get_recipe` predicts OG/FG/ABV and IBU
+// here in TypeScript (lib/recipe-gravity.ts, lib/recipe-ibu.ts) — the schema
+// stores assumptions, never results.
+// `get_recipe_outcomes` measures each brewed batch the same way, on read.
 import { z } from "zod";
 import { historyInput, historyResult, newestFirst, type HistoryRow } from "./history";
 import type { VesselReading } from "@/lib/mgr/vessel-detail-view";
+import { currentBrewRecords } from "@/lib/mgr/brew-day-view";
 import { INGREDIENT_STAGES, scheduleDays, timedInDays, timingLimitMinutes } from "@/lib/mgr/recipe-process-view";
+import type { RecipeOutcome } from "@/lib/mgr/recipe-view";
 import { fermentationReadingInput, fermentationReadingOfflinePolicy, MASH_PH_BOUNDS, READING_BOUNDS } from "@/lib/composer/offline-policy";
 import { isoDate, completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, CommandError, type Ctx, latestOf } from "./registry";
 import { brandNames } from "./packaging";
-import { recipeGravity } from "@/lib/recipe-gravity";
+import { measuredGravity, potentialPointsPerBbl, recipeGravity, type RecipeGravityIngredient } from "@/lib/recipe-gravity";
+import { recipeIbu, type IbuLine } from "@/lib/recipe-ibu";
 import { escapeRegex } from "@/lib/escape-regex";
 import { MASH_STEP_KINDS, FERMENTATION_STAGE_KINDS, WATER_ADDITION_STAGES, WATER_ADDITION_UNITS } from "@/lib/mgr/enums";
 
@@ -203,9 +208,32 @@ defineQuery({
 // which the page hides) rather than have a made-up potential move the OG.
 const num = (v: unknown) => Number(v ?? 0);
 
+type SavedLine = { per_bbl_qty: unknown; extract_snapshot: unknown; stage: string; materials: { base_uom: string } | null };
+/** A saved version's lines as recipe-gravity reads them. A null snapshot stays null, so nothing is predicted (#430). */
+const gravityLines = (lines: SavedLine[]): RecipeGravityIngredient[] => lines.map((l) => ({
+  perBblQty: num(l.per_bbl_qty), extractPotential: l.extract_snapshot == null ? null : num(l.extract_snapshot), stage: l.stage, unit: l.materials?.base_uom,
+}));
+
+type SavedHopLine = { per_bbl_qty: unknown; alpha_snapshot: unknown; stage: string; timing_minutes: number | null; materials: { base_uom: string; name: string; category: string } };
+/** A saved version's lines as recipe-ibu reads them: the frozen alpha acid, never the material's current one. A null snapshot stays null, so it is a gap. */
+const ibuLines = (lines: SavedHopLine[]): IbuLine[] => lines.map((l) => ({
+  name: l.materials.name, category: l.materials.category, stage: l.stage, perBblQty: num(l.per_bbl_qty), unit: l.materials.base_uom,
+  timingMinutes: l.timing_minutes, alphaAcid: l.alpha_snapshot == null ? null : num(l.alpha_snapshot),
+}));
+
+/** Brewing order: stage by stage, as INGREDIENT_STAGES lists them. Boil and whirlpool time counts down to the end of the
+ *  stage, so 60 comes before 10; other stages count up from their start. A line with no time closes its stage. Equal lines
+ *  compare as 0, so a stable sort keeps them in the brewer's order. */
+function byBrewingOrder(a: { stage: string; timing_minutes: number | null }, b: { stage: string; timing_minutes: number | null }) {
+  const stages: readonly string[] = INGREDIENT_STAGES;
+  if (a.stage !== b.stage) return stages.indexOf(a.stage) - stages.indexOf(b.stage);
+  if (a.timing_minutes === null || b.timing_minutes === null) return Number(a.timing_minutes === null) - Number(b.timing_minutes === null);
+  return a.stage === "boil" || a.stage === "whirlpool" ? b.timing_minutes - a.timing_minutes : a.timing_minutes - b.timing_minutes;
+}
+
 defineQuery({
   name: "get_recipe",
-  description: "One recipe with its requested version (latest by default), all version numbers, that version's ingredients, and the OG/FG/ABV they predict",
+  description: "One recipe with its requested version (latest by default), all version numbers, that version's ingredients in brewing order, the OG/FG/ABV they predict, and its estimated IBU or why there is none",
   input: z.object({ recipeId: z.string().uuid(), version: z.number().int().positive().optional() }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {
     const versionQuery = ctx.db.from("recipe_versions").select("*").eq("recipe_id", i.recipeId);
@@ -221,27 +249,83 @@ defineQuery({
     if (!recipe) throw new CommandError("recipe not found", 404, "not_found");
     if (!version && i.version !== undefined) throw new CommandError("recipe version not found", 404, "not_found");
     const versions = versionRows.map((row) => row.version);
-    if (!version) return { recipe, version: null, versions, ingredients: [], waterAdditions: [], ogPlato: null, fgPlato: null, abv: null };
+    if (!version) return { recipe, version: null, versions, ingredients: [], waterAdditions: [], ogPlato: null, fgPlato: null, abv: null, ibu: recipeIbu({ ogPlato: null, lines: [] }) };
 
     const [ingredients, waterAdditions] = await Promise.all([
       unwrap(ctx.db.from("recipe_ingredients")
-        .select("id, material_id, per_bbl_qty, stage, timing_minutes, sort, extract_snapshot, materials(base_uom)")
-        .eq("recipe_version_id", version.id).order("sort")).then((r) => r ?? []),
+        .select("id, material_id, per_bbl_qty, stage, timing_minutes, sort, extract_snapshot, alpha_snapshot, materials(base_uom, name, category)")
+        .eq("recipe_version_id", version.id).order("sort")).then((r) => (r ?? []).sort(byBrewingOrder)),
       unwrap(ctx.db.from("recipe_water_additions").select("material_id, qty, unit, stage").eq("recipe_version_id", version.id).order("sort")).then((r) => r ?? []),
     ]);
 
+    const predicted = recipeGravity({
+      brewhouseEfficiency: num(version.brewhouse_efficiency),
+      yeastAttenuation: num(version.yeast_attenuation),
+      ingredients: gravityLines(ingredients),
+    });
     return {
       recipe, version, versions, ingredients, waterAdditions,
-      ...(recipeGravity({
-        brewhouseEfficiency: num(version.brewhouse_efficiency),
-        yeastAttenuation: num(version.yeast_attenuation),
-        ingredients: ingredients.map((l) => ({
-          // A null snapshot stays null: recipeGravity then predicts nothing
-          // rather than defaulting its potential or printing OG 0 (#430).
-          perBblQty: num(l.per_bbl_qty), extractPotential: l.extract_snapshot == null ? null : num(l.extract_snapshot), stage: l.stage as string,
-          unit: l.materials?.base_uom,
-        })),
-      }) ?? { ogPlato: null, fgPlato: null, abv: null }),
+      ...(predicted ?? { ogPlato: null, fgPlato: null, abv: null }),
+      ibu: recipeIbu({ ogPlato: predicted?.ogPlato ?? null, lines: ibuLines(ingredients) }),
+    };
+  },
+});
+
+// Every brewed batch of a recipe, measured on read. OG is the first gravity
+// reading and FG the last. Knockout sums each turn's current revision, and only
+// a closed batch gets it: nothing records how many turns an open batch will
+// have, so turn 1 of two would read about half its true efficiency. A cancelled
+// batch never has brewed_on (batches check), so that filter covers it.
+defineQuery({
+  name: "get_recipe_outcomes",
+  description: "Each brewed batch of a recipe, newest first: OG, FG, ABV, apparent attenuation and brewhouse efficiency from its gravity readings and knockout, beside what its own version predicted and assumed. A figure is null when an input is missing, and efficiency is null until the batch closes. Computed on read, never stored",
+  input: z.object({ recipeId: z.string().uuid() }), roles: ["admin", "brewer"],
+  handler: async (ctx, i): Promise<{ batches: RecipeOutcome[] }> => {
+    const [recipe, versions, batches] = await Promise.all([
+      unwrap(ctx.db.from("recipes").select("id").eq("brewery_id", ctx.breweryId).eq("id", i.recipeId).maybeSingle()),
+      completeRows("Recipe versions", start => ctx.db.from("recipe_versions")
+        .select("id, version, brewhouse_efficiency, yeast_attenuation, recipe_ingredients(per_bbl_qty, extract_snapshot, stage, materials(base_uom))", { count: "exact" })
+        .eq("recipe_id", i.recipeId).order("version").range(start, start + PAGE_SIZE - 1)),
+      completeRows("Batches", start => ctx.db.from("batches")
+        .select("id, batch_no, recipe_version_id, planned_bbl, brewed_on, closed_at, recipe_version:recipe_versions!inner(recipe_id)", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).eq("recipe_version.recipe_id", i.recipeId).not("brewed_on", "is", null)
+        .order("brewed_on", { ascending: false }).order("batch_no", { ascending: false }).range(start, start + PAGE_SIZE - 1)),
+    ]);
+    if (!recipe) throw new CommandError("recipe not found", 404, "not_found");
+
+    const batchIds = batches.map((b) => b.id);
+    const [readings, records] = await Promise.all([
+      inChunks(batchIds, chunk => completeRows("Fermentation readings", start => ctx.db.from("fermentation_readings")
+        .select("batch_id, gravity_plato", { count: "exact" }).in("batch_id", chunk).not("gravity_plato", "is", null)
+        .order("at").order("id").range(start, start + PAGE_SIZE - 1))),
+      inChunks(batchIds, chunk => completeRows("Brew records", start => ctx.db.from("brew_records")
+        .select("id, batch_id, initial_bbl, corrects_id", { count: "exact" }).in("batch_id", chunk)
+        .order("id").range(start, start + PAGE_SIZE - 1))),
+    ]);
+
+    const gravities = new Map<string, number[]>();
+    for (const r of readings) gravities.set(r.batch_id, [...(gravities.get(r.batch_id) ?? []), num(r.gravity_plato)]);
+    const knockouts = new Map<string, number>();
+    for (const r of currentBrewRecords(records)) knockouts.set(r.batch_id, (knockouts.get(r.batch_id) ?? 0) + num(r.initial_bbl));
+    const byVersion = new Map(versions.map((v) => {
+      const ingredients = gravityLines(v.recipe_ingredients);
+      const assumptions = { brewhouseEfficiency: num(v.brewhouse_efficiency), yeastAttenuation: num(v.yeast_attenuation) };
+      return [v.id, { version: v.version, assumptions, potential: potentialPointsPerBbl(ingredients), predicted: recipeGravity({ ...assumptions, ingredients }) }];
+    }));
+
+    return {
+      batches: batches.map((b) => {
+        const { version, assumptions, potential, predicted } = byVersion.get(b.recipe_version_id!)!;
+        const gravity = gravities.get(b.id) ?? [];
+        const ogPlato = gravity[0] ?? null;
+        const fgPlato = gravity.length > 1 ? gravity[gravity.length - 1] : null;
+        const knockoutBbl = b.closed_at ? knockouts.get(b.id) ?? null : null;
+        return {
+          batchId: b.id, batchNo: b.batch_no, version, brewedOn: b.brewed_on!, closed: b.closed_at !== null, ogPlato, fgPlato,
+          ...measuredGravity({ ogPlato, fgPlato, potentialPointsPerBbl: potential, plannedBbl: num(b.planned_bbl), knockoutBbl }),
+          predicted, assumedEfficiency: assumptions.brewhouseEfficiency, assumedAttenuation: assumptions.yeastAttenuation,
+        };
+      }),
     };
   },
 });

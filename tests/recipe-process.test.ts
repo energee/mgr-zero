@@ -57,6 +57,20 @@ describe("recipe process spec", () => {
     await expect(runCommand("create_recipe_version", { recipeId, mashTempF: 152, brewhouseEfficiency: 0.75, yeastAttenuation: 0.78, ingredients: [{ materialId: malt, perBblQty: 60, stage: "mash" }] }, ctx)).rejects.toMatchObject({ code: "invalid_input" });
   });
 
+  it("get_recipe returns ingredients in brewing order, whatever order they were typed", async () => {
+    const hop = await seedMaterial(ctx.breweryId, { name: "Order hop", category: "hop" });
+    const line = (stage: string, timingMinutes?: number) => ({ materialId: stage === "mash" ? malt : hop, perBblQty: 1, stage, timingMinutes });
+    const { id: orderRecipe } = (await runCommand("create_recipe", { name: "Brewing order" }, ctx)) as { id: string };
+    await runCommand("create_recipe_version", {
+      recipeId: orderRecipe, brewhouseEfficiency: 0.75, yeastAttenuation: 0.78, boilMinutes: 60, mashSchedule: mash, fermentationSchedule: fermentation,
+      ingredients: [line("dry_hop", 2 * 1440), line("fermentation"), line("boil"), line("boil", 10), line("dry_hop", 1440), line("boil", 60), line("mash")],
+    }, ctx);
+    const { ingredients } = (await runCommand("get_recipe", { recipeId: orderRecipe }, ctx)) as { ingredients: { stage: string; timing_minutes: number | null }[] };
+    expect(ingredients.map((i) => [i.stage, i.timing_minutes])).toEqual([
+      ["mash", null], ["boil", 60], ["boil", 10], ["boil", null], ["fermentation", null], ["dry_hop", 1440], ["dry_hop", 2880],
+    ]);
+  });
+
   it("keeps a version immutable: the additions table has no update path", () => {
     expect(sql(`select count(*) from pg_policies where tablename = 'recipe_water_additions' and cmd in ('UPDATE','DELETE')`)).toEqual(["0"]);
   });

@@ -7,9 +7,11 @@ import { bblExact } from "@/lib/volume";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { DatePicker } from "@/components/mgr/date-picker";
-import { brewCorrectionModel, brewTurnModel, currentBrewRecords, showsTurnKnockout, brewSourceKey, canRecordBrewDay, vesselOptions, type BrewActualDraft, type BrewDayViewModel, type BrewPlan } from "@/lib/mgr/brew-day-view";
+import { brewCorrectionModel, brewDayLines, brewTurnModel, currentBrewRecords, showsTurnKnockout, brewSourceKey, canRecordBrewDay, vesselOptions, type BrewActualDraft, type BrewDayViewModel, type BrewPlan } from "@/lib/mgr/brew-day-view";
 
+import { brewTargets, cellarPlanRows } from "@/lib/mgr/brew-prep-view";
 import { perBblDisplay, type IngredientStage } from "@/lib/mgr/recipe-process-view";
+import { CellarPlan } from "./brew-prep";
 import { INGREDIENT_STAGE_OPTIONS } from "./ingredient";
 
 /** record_brew_day process keys and their labels; the Brew day timeline (./brew-timeline) regroups them by stage. */
@@ -55,7 +57,7 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord, ac
         {E.ttl(`Turn ${record.turn} · ${record.corrects_id ? "Corrected brew record" : "Original brew record"}`)}
         {showsTurnKnockout(model.records ?? [], model.initialBbl) && E.fld("Confirmed knockout", `${record.initial_bbl} bbl`)}
         {record.correction_reason && E.fld("Correction reason", record.correction_reason)}
-        <BrewPlanSheet plan={record.plan_snapshot} frozen />
+        <BrewPlanSheet plan={record.plan_snapshot} bbl={record.initial_bbl} frozen />
         {record.additions.map(row => <Fragment key={row.id}>{E.fld(row.material_name, `${row.confirmed_qty} ${row.unit} · ${sentenceCase(row.stage)} · ${row.lot_code ?? "Untracked"} · ${row.location_name} / ${row.bin_name}`)}</Fragment>)}
         {!record.additions.length && E.note("Confirmed no ingredients used.")}
         {processFields.map(([key, label]) => record.process[key] === undefined ? null : <Fragment key={key}>{E.fld(label, String(record.process[key]))}</Fragment>)}
@@ -70,7 +72,7 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord, ac
       <fieldset disabled={busy || Boolean(value.correctionRecordId)}><DatePicker label="Brewed on" value={value.brewedOn} onChange={brewedOn => change({ brewedOn })} /></fieldset>
       {E.fld("Knockout baseline", knockoutBaseline)}
       {value.correctionRecordId && E.edit("Correction reason", value.correctionReason ?? "", "text", undefined, { onChange: correctionReason => change({ correctionReason }), required: true, disabled: busy })}
-      <BrewPlanSheet plan={value.plan} frozen={Boolean(value.correctionRecordId)} />
+      <BrewPlanSheet plan={value.plan} bbl={Number(value.initialBbl)} frozen={Boolean(value.correctionRecordId)} />
       {E.ttl("Confirm actual ingredients")}
       {E.note("Mash, boil and whirlpool quantities start from the plan. Confirm each exact source and amount. Later fermentation, dry-hop and packaging additions stay planned. For water additions, enter actual use in the material's stock unit.")}
       {(value.actuals ?? []).map((row, index) => <fieldset key={row.key} disabled={busy} className="flex flex-col gap-2 rounded border p-3">
@@ -91,15 +93,23 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord, ac
   </>;
 }
 
-function BrewPlanSheet({ plan, frozen }: { plan?: BrewPlan; frozen: boolean }) {
-  const version = plan?.version?.version;
-  const recipe = plan?.recipe && version ? `${plan.recipe} v${version}` : plan?.recipe;
+/** The stages the sheet prints a brewTargets row for; the mash reads as its own steps above them. */
+const SHEET_TARGETS = ["boil", "whirlpool", "knockout"] as const;
+
+/** A plan as a folded read-out: brew-day lines and targets, then what happens after knockout. `bbl` is this turn's own
+ *  barrels, its knockout once recorded, so cellar totals never read planned barrels. */
+function BrewPlanSheet({ plan = {}, bbl, frozen }: { plan?: BrewPlan; bbl: number; frozen: boolean }) {
+  const version = plan.version?.version;
+  const recipe = plan.recipe && version ? `${plan.recipe} v${version}` : plan.recipe;
+  const targets = brewTargets(plan);
   return <>
       <details><summary className="font-medium">{frozen ? "Frozen recipe plan" : "Pinned recipe plan"}</summary>
         {E.fld("Recipe", recipe ?? "No recipe")}
-        {(plan?.ingredients ?? []).map(row => <Fragment key={row.id}>{E.fld(row.materialName, `${perBblDisplay(row.per_bbl_qty)} ${row.unit} per bbl · ${sentenceCase(row.stage)}`)}</Fragment>)}
-        {(plan?.version?.mash_schedule ?? []).map((row, index) => <Fragment key={index}>{E.fld(row.name, `${row.temp_f ?? row.tempF ?? "—"} °F · ${row.minutes} min`)}</Fragment>)}
-        {(plan?.waterAdditions ?? []).map((row, index) => <Fragment key={index}>{E.fld(row.materialName, `${row.qty} ${row.unit} planned; confirm actual use in ${row.baseUnit}`)}</Fragment>)}
+        {brewDayLines(plan).map(row => <Fragment key={row.id}>{E.fld(row.materialName, `${perBblDisplay(row.per_bbl_qty)} ${row.unit} per bbl · ${sentenceCase(row.stage)}`)}</Fragment>)}
+        {(plan.version?.mash_schedule ?? []).map((row, index) => <Fragment key={index}>{E.fld(row.name, `${row.temp_f ?? row.tempF ?? "—"} °F · ${row.minutes} min`)}</Fragment>)}
+        {(plan.waterAdditions ?? []).map((row, index) => <Fragment key={index}>{E.fld(row.materialName, `${row.qty} ${row.unit} planned; confirm actual use in ${row.baseUnit}`)}</Fragment>)}
+        {SHEET_TARGETS.map(stage => targets[stage] && <Fragment key={stage}>{E.fld(sentenceCase(stage), targets[stage])}</Fragment>)}
+        <CellarPlan rows={cellarPlanRows(plan, bbl)} />
       </details>
   </>;
 }

@@ -37,6 +37,9 @@ import { toSkuViewProps, skuUpdateCommand, skuCreateCommand } from "../lib/mgr/s
 import { resolveTap } from "../lib/mgr/screen-links";
 import { formatVolume } from "../lib/volume";
 
+// A live brand name is a SheetLink, which reads the current address.
+vi.mock("next/navigation", () => ({ usePathname: () => "/catalog", useSearchParams: () => new URLSearchParams("q=ip"), useRouter: () => ({ replace: vi.fn() }) }));
+
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const brandOf = (sku: { name: string }) => sku.name.split(" · ")[0];
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
@@ -110,12 +113,13 @@ describe("Catalog view", () => {
     expect(inert.match(/<button\b[^>]*data-tap[^>]*>Hazy IPA<\/button>/g)).toHaveLength(2);
     const html = htmlOf(createElement(CatalogView, { model, links: { brands: true, priceGroups: true, waterProfiles: true } }));
     expect([...html.matchAll(/<th\b[^>]*>(.*?)<\/th>/g)].map((m) => m[1].replace(/<[^>]*>/g, ""))).toEqual(["Brand", "Style", "ABV", "SKUs", "COLA"]);
-    // One link per brand in the desktop table, then one in the phone list; the
+    // One link per brand in the desktop table, then one in the phone list; each
+    // opens the brand in a sheet over the list, keeping the list's search. The
     // positioned link covers the record without adding another focus target.
     const links = [...html.matchAll(/<a\b([^>]*)>(.*?)<\/a>/g)]
       .map((m) => [m[1].match(/href="([^"]+)"/)?.[1], m[2]])
-      .filter(([href]) => href?.startsWith("/catalog/brands/"));
-    expect(links).toEqual([...model.brands, ...model.brands].map((b) => [b.href, b.name]));
+      .filter(([href]) => href?.includes("brand="));
+    expect(links).toEqual([...model.brands, ...model.brands].map((b) => [`/catalog?q=ip&amp;brand=${b.key}`, b.name]));
     expect(html.match(/Field Notes #14/g)).toHaveLength(2);
     // The phone list labels every fact under its header and draws no box per record.
     const records = html.split(/data-slot="item"(?=[\s>])/).slice(1).filter((chunk) => /^[^>]*role="listitem"/.test(chunk));
@@ -293,7 +297,7 @@ describe("Catalog view", () => {
     expect(html).toContain(brandOf(SKU_PILS));
     expect(html).toContain(">3<");
     expect(html).not.toMatch(/New pour|never a SKU/);
-    expect(html).toMatch(/href="\/catalog\/brands\//);
+    expect(html).toMatch(/href="\/catalog\?q=ip&amp;brand=/);
   });
 
   it("still blanks an empty catalog", () => {

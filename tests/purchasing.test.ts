@@ -69,7 +69,7 @@ describe("vendors, materials, contracts", () => {
     const { error } = await ctx.db.rpc("upsert_material", {
       p_brewery: ctx.breweryId, p_material: mosaic.id, p_name: hop.name, p_category: hop.category, p_base_uom: hop.baseUom,
       p_purchase_uom: hop.purchaseUom, p_purchase_uom_factor: 453.59237, p_lot_tracked: null, p_default_vendor: null,
-      p_reorder_point: null, p_active: null, p_extract_potential: null, p_request_id: crypto.randomUUID(),
+      p_reorder_point: null, p_active: null, p_extract_potential: null, p_alpha_acid: null, p_request_id: crypto.randomUUID(),
     });
     expect(error?.message).toMatch(/materials_purchase_uom_factor_four_decimals/);
   });
@@ -369,6 +369,20 @@ describe("purchase orders: draft, mark sent, receive", () => {
     const changed = (await runCommand("upsert_material", { id: m.id, name: "Pale ale malt 2", ...base, extractPotential: 1.036 }, ctx)) as { extract_potential: number };
     expect(Number(changed.extract_potential)).toBe(1.036);
     await expect(runCommand("upsert_material", { name: "Typo malt", ...base, extractPotential: 37 }, ctx)).rejects.toThrow();
+  });
+
+  it("stores a hop's alpha acid, lists it, keeps it on an edit that omits it, and bounds it", async () => {
+    const base = { category: "hop", baseUom: "lb", purchaseUom: "lb" } as const;
+    const m = (await runCommand("upsert_material", { name: "Alpha test hop", ...base, alphaAcid: 12.5 }, ctx)) as { id: string; alpha_acid: number };
+    expect(Number(m.alpha_acid)).toBe(12.5);
+    const edited = (await runCommand("upsert_material", { id: m.id, name: "Alpha test hop 2", ...base }, ctx)) as { alpha_acid: number };
+    expect(Number(edited.alpha_acid)).toBe(12.5);
+    const changed = (await runCommand("upsert_material", { id: m.id, name: "Alpha test hop 2", ...base, alphaAcid: 11 }, ctx)) as { alpha_acid: number };
+    expect(Number(changed.alpha_acid)).toBe(11);
+    const listed = (await runCommand("list_materials", { q: "Alpha test hop 2" }, ctx)) as { alpha_acid: number }[];
+    expect(listed.map((row) => Number(row.alpha_acid))).toEqual([11]);
+    await expect(runCommand("upsert_material", { name: "Typo hop", ...base, alphaAcid: 40 }, ctx)).rejects.toThrow();
+    await expect(runCommand("upsert_material", { name: "Typo hop", ...base, alphaAcid: 0 }, ctx)).rejects.toThrow();
   });
 
   // #452: stock recorded without a lot cannot be counted, consumed, or moved

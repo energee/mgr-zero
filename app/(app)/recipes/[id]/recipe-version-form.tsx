@@ -8,7 +8,8 @@
 // there is no recipe to key it by yet. The ingredient, mash, fermentation and
 // water rows open their sheets (schedule-sheets.tsx), and the OG/FG/ABV preview
 // comes from the same pure recipeGravity the server uses (lib/recipe-gravity.ts),
-// or names why there is none (gravityBlockerText, noMashText). With a recipeId
+// or names why there is none (gravityBlockerText, noMashText). The IBU preview
+// (draftIbuText) reads each material's current alpha acid. With a recipeId
 // the bottom button runs create_recipe_version, disabled with draftBlocker's
 // reason until the draft is complete; without one (recipes/new) the
 // shared parent fields sit on top and one save runs create_recipe then
@@ -29,7 +30,7 @@ import { useCommandContext } from "@/lib/brewery-provider";
 import { gravityBlockers, recipeGravity } from "@/lib/recipe-gravity";
 import { plural } from "@/lib/mgr/plural";
 import { readRecipeDraft, recipeDraftKey, shouldKeepDraft, writeRecipeDraft } from "@/lib/mgr/recipe-draft";
-import { draftBlocker, gravityBlockerText, ingredientPack, noMashText, RECIPE_NUMBERS, type RecipeDraft, type RecipeNumberKey } from "@/lib/mgr/recipe-view";
+import { draftBlocker, draftIbuText, gravityBlockerText, ingredientPack, noMashText, RECIPE_NUMBERS, type RecipeDraft, type RecipeNumberKey } from "@/lib/mgr/recipe-view";
 import { EMPTY_WATER, fermentationSummary, ingredientDetail, lineReady, mashRowSummary, materialLookup, optionalNumber as num, removeAt, scheduleDays, upsertAt, waterRowSummary, type RecipeMaterial, type MashStep, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 import { FermentationScheduleSheet, IngredientSheet, MashScheduleSheet, WaterSheet } from "./schedule-sheets";
 
@@ -164,6 +165,7 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
         })),
         mash: mashRow, fermentation: fermentationRow, water: waterRow,
         predicted: preview ? `Predicted: OG ${formatGravity(preview.ogPlato, unit)} · FG ${formatGravity(preview.fgPlato, unit)} · ABV ${preview.abv.toFixed(1)}%` : gravityWhy ?? undefined,
+        bitterness: draftIbuText(validLines, preview?.ogPlato ?? null, materials),
       }}
       parentForm={creating ? <>
         <NewRecipeFieldsView brands={brands} values={parent} onChange={setParent} busy={action.busy || parentLocked} />

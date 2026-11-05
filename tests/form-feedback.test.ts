@@ -186,7 +186,7 @@ describe("per-form reasons", () => {
   const maltStock = { material_id: "malt", material_name: "Pils malt", unit: "lb", location_id: "l", location_name: "Malt room", bin_id: "b", bin_name: "A1", lot_id: null, lot_code: null, qty: 300 };
 
   it("Done pulling names the ingredient without a source or with a bad amount (#1122)", () => {
-    const prep = { title: "B1", vesselId: "", vessels: [], ingredients: [malt], later: "None" };
+    const prep = { title: "B1", vesselId: "", vessels: [], ingredients: [malt], later: [] };
     expect(prepReason(prep)).toBe("Still needed: a source for Pils malt.");
     expect(prepReason({ ...prep, ingredients: [{ ...sourcedMalt, packs: "-1" }] })).toBe("Still needed: pulled amounts of zero or more for Pils malt.");
     expect(prepReason({ ...prep, ingredients: [sourcedMalt] })).toBeNull();
@@ -195,7 +195,7 @@ describe("per-form reasons", () => {
 
   it("Record brew day names unconfirmed and unsourced rows, the stock, the empty confirmation and the knockout fields (#1122)", () => {
     const timeline: BrewTimelineViewModel = {
-      title: "B1", ingredients: [{ ...sourcedMalt, confirmed: true }], targets: {}, process: {}, sources: [maltStock],
+      title: "B1", ingredients: [{ ...sourcedMalt, confirmed: true }], targets: {}, later: [], process: {}, sources: [maltStock],
       vesselId: "fv1", vessels: [{ id: "fv1", name: "FV1", kind: "fermenter", capacity_bbl: 20 }], initialBbl: "10", brewedOn: "2026-10-25",
     };
     expect(timelineReason(timeline)).toBeNull();

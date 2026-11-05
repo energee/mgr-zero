@@ -3,14 +3,19 @@
 // get_recipe result shape (RecipeSnapshot), the copy of a saved version a new
 // draft starts from (versionToDraft), why a draft cannot be saved yet
 // (draftBlocker), the read page's model of a saved version (toRecipePageModel)
-// and why a prediction is missing (gravityBlockerText, noMashText). A brew-day
-// line also totals in packs at the batch size typed into Show totals at
-// (ingredientPack, batchTotalText), and the draft offers rounding it to whole
-// packs (packRounding).
+// and why a prediction is missing (gravityBlockerText, noMashText). The read
+// page prints the IBU get_recipe estimated; a draft previews it (draftIbuText).
+// A brew-day line also totals in packs at the batch size typed into Show totals
+// at (ingredientPack, batchTotalText), and the draft offers rounding it to whole
+// packs (packRounding). Batch actuals is the text of get_recipe_outcomes: one
+// row per brewed batch (outcomeTape) and the gap for the shown version
+// (outcomeSummary).
 import type { ReactNode } from "react";
 import type { EmptyState } from "./empty-state";
 import { formatDate } from "@/lib/date-format";
-import { gravityBlockers, type GravityBlocker } from "@/lib/recipe-gravity";
+import { gravityBlockers, type GravityBlocker, type RecipeGravityResult } from "@/lib/recipe-gravity";
+import { ibuText, recipeIbu, type RecipeIbu } from "@/lib/recipe-ibu";
+import { batNo } from "./doc-no";
 import { formatGravity, type GravityUnit } from "./gravity-unit";
 import { splitPacks, withPacks } from "./pack-qty";
 import { plural } from "./plural";
@@ -19,7 +24,7 @@ import { sentenceCase } from "./labels";
 import { submitReason } from "./submit-reason";
 import { READING_BOUNDS } from "@/lib/composer/offline-policy";
 import {
-  fermentationSummary, ingredientDetail, isBrewDayStage, lineReady, mashRowSummary, mashStepDetail, materialLookup, perBblDisplay, processReadout, scheduleDays, timingOutOfRange, toIngredientFields, waterAdditionDetail,
+  fermentationStageDetail, fermentationSummary, ingredientDetail, isBrewDayStage, lineReady, mashRowSummary, mashStepDetail, materialLookup, perBblDisplay, processReadout, scheduleDays, timingOutOfRange, toIngredientFields, waterAdditionDetail,
   type FermentationStage, type IngredientLine, type IngredientStage, type MashStep, type ProcessColumns, type RecipeMaterial, type WaterDraft,
 } from "./recipe-process-view";
 /** A brew-day line's per-bbl amount, its material's pack size (base units per pack; 1 = no pack) and base unit. */
@@ -80,12 +85,15 @@ export type RecipeViewModel = {
   water?: RecipeScheduleView;
   notes?: string;
   predicted?: string;
+  /** The IBU line (ibuText), drawn under `predicted`. */
+  bitterness?: string;
+  /** Batch actuals: one row per brewed batch of any version, then the gap for the shown version. */
   tape?: [string, string][];
   actualsNote?: string;
 };
 
 /** What get_recipe returns: the recipe, its selected version (null before the
- * first), all version numbers, that version's ingredients and water additions, and the prediction.
+ * first), all version numbers, that version's ingredients in brewing order, its water additions, the prediction and the IBU.
  * Postgres numerics may arrive as strings, so readers coerce with Number. */
 export type RecipeSnapshot = {
   recipe: { id: string; name: string; brand_id: string | null; note: string | null };
@@ -97,7 +105,7 @@ export type RecipeSnapshot = {
   }) | null;
   ingredients: { id: string; material_id: string; per_bbl_qty: number; stage: string; timing_minutes: number | null; sort: number; extract_snapshot: number | null; materials: { base_uom: string } | null }[];
   waterAdditions: { material_id: string; qty: number; unit: string; stage: string }[];
-  ogPlato: number | null; fgPlato: number | null; abv: number | null;
+  ogPlato: number | null; fgPlato: number | null; abv: number | null; ibu: RecipeIbu;
 };
 type SnapshotVersion = NonNullable<RecipeSnapshot["version"]>;
 
@@ -195,6 +203,22 @@ export function noMashText(stages: string[]): string | null {
   return stages.length > 0 && !stages.includes("mash") ? "No mash ingredient, so nothing is predicted." : null;
 }
 
+/** The draft's IBU line, from each material's current alpha acid, which saving freezes. Undefined with no lines, since
+ *  draftBlocker already asks for one. A line whose material the picker hides (an inactive one) reads as a hop with neither
+ *  alpha acid nor a unit, so the preview shows the gap instead of silently dropping the line. */
+export function draftIbuText(lines: IngredientLine[], ogPlato: number | null, materials: RecipeMaterial[]): string | undefined {
+  if (lines.length === 0) return undefined;
+  const material = materialLookup(materials);
+  const ibuLines = lines.map((l) => {
+    const m = material.get(l.materialId);
+    return {
+      name: material.name(l.materialId), category: m?.category ?? "hop", stage: l.stage, perBblQty: Number(l.perBblQty),
+      unit: m?.base_uom, timingMinutes: l.timingMinutes ? Number(l.timingMinutes) : null, alphaAcid: m?.alpha_acid ?? null,
+    };
+  });
+  return ibuText(recipeIbu({ ogPlato, lines: ibuLines }), { saved: false });
+}
+
 /** The pack a line totals with: brew-day stages only, a positive amount, and a known material; else none. */
 export function ingredientPack(stage: string, perBbl: number, material: Pick<RecipeMaterial, "base_uom" | "purchase_uom_factor"> | undefined): RecipePack | undefined {
   if (!isBrewDayStage(stage) || !(perBbl > 0) || !material) return undefined;
@@ -219,6 +243,60 @@ export function packRounding(p: RecipePack, bbl: number): { whole: boolean; choi
   return { whole: false, choices: counts.map((n) => ({ label: `Round to ${n} × ${p.factor} ${p.unit}`, perBbl: Number((n * p.factor / bbl).toFixed(6)) })) };
 }
 
+/** What get_recipe_outcomes returns for one brewed batch: its measured figures beside what its own version predicted
+ *  and assumed. A measured figure is null when an input is missing. Efficiency is null until the batch closes, because
+ *  nothing records how many turns it will have. The fractions (attenuation, efficiency) run 0 to 1; ABV is a percent. */
+export type RecipeOutcome = {
+  batchId: string; batchNo: number | null; version: number; brewedOn: string; closed: boolean;
+  ogPlato: number | null; fgPlato: number | null; abv: number | null; apparentAttenuation: number | null; brewhouseEfficiency: number | null;
+  predicted: RecipeGravityResult | null; assumedEfficiency: number; assumedAttenuation: number;
+};
+
+const wholePercent = (fraction: number) => `${Math.round(fraction * 100)}%`;
+
+/** One batch's figures with the prediction in brackets, then what is missing or can still move. */
+function outcomeDetail(o: RecipeOutcome, unit: GravityUnit): string {
+  const { predicted } = o;
+  // The heading says the brackets are predictions, so a Plato bracket drops its unit: "OG 14.8 °P (15.2)".
+  const bracket = (plato: number) => formatGravity(plato, unit).replace(" °P", "");
+  const parts = [
+    o.ogPlato !== null && `OG ${formatGravity(o.ogPlato, unit)}${predicted ? ` (${bracket(predicted.ogPlato)})` : ""}`,
+    o.fgPlato !== null && `FG ${formatGravity(o.fgPlato, unit)}${predicted ? ` (${bracket(predicted.fgPlato)})` : ""}`,
+    o.abv !== null && `ABV ${o.abv.toFixed(1)}%${predicted ? ` (${predicted.abv.toFixed(1)}%)` : ""}`,
+    o.apparentAttenuation !== null && `attenuation ${wholePercent(o.apparentAttenuation)} (${wholePercent(o.assumedAttenuation)})`,
+    o.brewhouseEfficiency !== null && `efficiency ${wholePercent(o.brewhouseEfficiency)} (${wholePercent(o.assumedEfficiency)})`,
+    o.ogPlato === null && "no gravity readings yet",
+    o.ogPlato !== null && o.fgPlato === null && "FG needs a second reading",
+    !o.closed && "still open",
+  ];
+  return parts.filter(Boolean).join(" · ");
+}
+
+/** Batch actuals' rows, one per batch in the order given: label, then figures. Undefined with no batches, so no section is drawn. */
+export function outcomeTape(outcomes: RecipeOutcome[], unit: GravityUnit): [string, string][] | undefined {
+  if (outcomes.length === 0) return undefined;
+  return outcomes.map((o) => [`${batNo(o.batchNo)} · v${o.version} · ${formatDate(o.brewedOn)}`, outcomeDetail(o, unit)]);
+}
+
+/** "68–71%", or "68%" when the lowest and highest round alike. */
+function percentRange(fractions: number[]): string {
+  const [low, high] = [Math.min(...fractions), Math.max(...fractions)].map((n) => Math.round(n * 100));
+  return low === high ? `${low}%` : `${low}–${high}%`;
+}
+
+/** The gap between what `version` assumes and what its closed batches measured, or undefined under two such batches.
+ *  An open batch is skipped because it has no efficiency and its FG can still move. It states the gap and gives no advice:
+ *  the brewer decides what to do with it. */
+export function outcomeSummary(outcomes: RecipeOutcome[], version: number): string | undefined {
+  const measured = outcomes.filter((o) => o.version === version && o.closed && o.brewhouseEfficiency !== null);
+  if (measured.length < 2) return undefined;
+  const { assumedEfficiency, assumedAttenuation } = measured[0];
+  const attenuations = measured.flatMap((o) => o.apparentAttenuation ?? []);
+  const efficiency = `efficiency ${percentRange(measured.map((o) => o.brewhouseEfficiency!))} against ${wholePercent(assumedEfficiency)} assumed`;
+  const attenuation = attenuations.length >= 2 ? `; attenuation ${percentRange(attenuations)} against ${wholePercent(assumedAttenuation)} assumed` : "";
+  return `${plural(measured.length, "batch", "batches")}: ${efficiency}${attenuation}.`;
+}
+
 /** A recipe with no version; New recipe version in the title row is the next step. */
 const NO_VERSION: EmptyState = { title: "No version yet" };
 
@@ -233,7 +311,7 @@ const IMPORT_ID = /\s+[0-9a-f]{24}$/;
 /** The read page's selected saved version, or the empty state before the first version. */
 export function toRecipePageModel(
   s: RecipeSnapshot,
-  ctx: { materials: RecipeMaterial[]; profiles: { id: string; name: string }[]; unit: GravityUnit; timeZone: string },
+  ctx: { materials: RecipeMaterial[]; profiles: { id: string; name: string }[]; unit: GravityUnit; timeZone: string; outcomes: RecipeOutcome[] },
 ): RecipeViewModel {
   const { recipe, version: v, ingredients, waterAdditions } = s;
   const material = materialLookup(ctx.materials);
@@ -265,7 +343,7 @@ export function toRecipePageModel(
     fermentation: {
       title: `Fermentation schedule · ${plural(v.fermentation_schedule.length, "stage")}`,
       detail: v.fermentation_schedule.length ? fermentationSummary(v.fermentation_schedule) : "No stages yet",
-      rows: v.fermentation_schedule.map((f) => ({ title: f.name, detail: `${f.tempF} °F · ${plural(f.days, "day")}` })),
+      rows: v.fermentation_schedule.map((f) => ({ title: f.name, detail: fermentationStageDetail(f) })),
     },
     water: {
       title: "Water", detail: "",
@@ -273,5 +351,8 @@ export function toRecipePageModel(
     },
     notes: v.note ?? "",
     predicted,
+    bitterness: ibuText(s.ibu, { saved: true }),
+    tape: outcomeTape(ctx.outcomes, ctx.unit),
+    actualsNote: outcomeSummary(ctx.outcomes, v.version),
   };
 }

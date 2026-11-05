@@ -414,6 +414,7 @@ omitted. They have no roles until they are built.
 | `get_qbo_connection` | Team & brewery settings | ✓ | ✓ |  |  |  |  |
 | `get_qbo_sync_status` | Team & brewery settings | ✓ | ✓ |  |  |  |  |
 | `get_recipe` | Production | ✓ |  |  | ✓ |  |  |
+| `get_recipe_outcomes` | Production | ✓ |  |  | ✓ |  |  |
 | `get_shortfalls` | Today & notifications | ✓ | ✓ | ✓ |  |  |  |
 | `get_square_connected` | Team & brewery settings | ✓ |  | ✓ |  |  |  |
 | `get_stock_transfer` | Inventory & locations | ✓ | ✓ | ✓ |  |  |  |
@@ -799,8 +800,8 @@ operation's field table rather than assuming a volume field takes a string.
 **An `upsert_*` edit replaces the whole record.** Send every field you want to
 keep. An optional field you leave out may be cleared or set back to its
 default. A few fields keep their saved value when omitted instead:
-`upsert_material`'s `active`, `purchaseUomFactor`, `lotTracked`, `reorderPoint`, and
-`extractPotential`; `upsert_vendor`'s `paymentTerms` and `active`;
+`upsert_material`'s `active`, `purchaseUomFactor`, `lotTracked`, `reorderPoint`,
+`extractPotential`, and `alphaAcid`; `upsert_vendor`'s `paymentTerms` and `active`;
 `upsert_customer`'s `paymentTerms`; and `upsert_ship_to`'s `isDefault`. Sending
 a field is the only way to be sure. `upsert_brand_approval`,
 `upsert_state_registration`, and `upsert_brewery_state_license` keep any
