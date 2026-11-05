@@ -10,7 +10,7 @@ import { KEG_SIZES } from "@/lib/mgr/enums";
 export const stockLine = z.object({
   skuId: z.string().uuid().optional(), materialId: z.string().uuid().optional(),
   kegPoolId: z.string().uuid().optional(), kegSize: z.enum(KEG_SIZES).optional(),
-  qty: z.number().positive(), fromBinId: z.string().uuid(), toBinId: z.string().uuid(), note: z.string().optional(),
+  qty: z.number().positive().describe("How much to move: units of the SKU, the material's base units, or whole kegs"), fromBinId: z.string().uuid(), toBinId: z.string().uuid(), note: z.string().optional(),
 }).refine(i => [i.skuId, i.materialId, i.kegPoolId].filter(Boolean).length === 1, "Choose exactly one stock kind")
   .refine(i => Boolean(i.kegPoolId) === Boolean(i.kegSize), "Keg size is required only for empty kegs")
   .refine(i => !i.kegPoolId || Number.isInteger(i.qty), "Empty kegs must be whole units");

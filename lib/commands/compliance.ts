@@ -31,7 +31,7 @@ defineCommand({
   name: "upsert_brand_approval", description: "Record or edit one brand's COLA or formula approval: ttbId is a COLA's TTB-assigned ID or a formula's number, and serialNumber is a COLA's own applicant serial (a formula takes none); imageUrl selects an official TTB label attachment and requires an approved COLA date; the same kind and ttbId on the same brand is one record; an edit keeps a field left out and clears one sent as null; changing kind or TTB ID clears an omitted image",
   roles: [...ROLES],
   // Both identifiers are text: a TTB ID or serial may carry leading zeros.
-  input: z.object({ id: z.string().uuid().optional(), brandId: z.string().uuid(), kind: z.enum(["cola", "formula"]), ttbId: z.string().min(1), serialNumber: text, approvedOn: day, expiresOn: day, note: text, imageUrl: z.string().refine(isColaImageUrl, "Select an official TTB label image").nullable().optional() })
+  input: z.object({ id: z.string().uuid().optional().describe("The approval to edit"), brandId: z.string().uuid(), kind: z.enum(["cola", "formula"]).describe("Whether this approval is a COLA or a formula"), ttbId: z.string().min(1).describe("A COLA's TTB-assigned ID, or a formula's number"), serialNumber: text, approvedOn: day, expiresOn: day, note: text, imageUrl: z.string().refine(isColaImageUrl, "Select an official TTB label image").nullable().optional() })
     .refine((i) => i.kind === "cola" || i.serialNumber == null, { path: ["serialNumber"], message: "Only a COLA has an applicant serial number" })
     .refine((i) => i.imageUrl == null || (i.kind === "cola" && i.approvedOn != null), { path: ["imageUrl"], message: "A selected label image requires an approved COLA with its approval date" }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_brand_approval", {
@@ -55,7 +55,7 @@ defineCommand({
 defineCommand({
   name: "upsert_brewery_state_license", description: "Record or edit one of the brewery's state licenses by state and kind (kind is stored lower-case and trimmed); an edit keeps a field left out and clears one sent as null",
   roles: [...ROLES],
-  input: z.object({ state: stateCode, kind: z.string().trim().min(1), licenseNo: text, expiresOn: day, note: text }),
+  input: z.object({ state: stateCode, kind: z.string().trim().min(1).describe("The license type; it is stored lower-case and trimmed"), licenseNo: text, expiresOn: day, note: text }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_brewery_state_license", {
     p_brewery: ctx.breweryId, p_state: i.state, p_kind: i.kind, p_license_no: i.licenseNo ?? null,
     p_expires_on: i.expiresOn ?? null, p_note: i.note ?? null, p_request_id: execution.requestId,
@@ -64,7 +64,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "delete_brewery_state_license", description: "Delete a brewery state license",
+  name: "delete_brewery_state_license", description: "Delete a brewery state license that no longer applies; use upsert_brewery_state_license to change one instead",
   roles: [...ROLES],
   input: z.object({ licenseId: z.string().uuid() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("delete_brewery_state_license", {
@@ -100,7 +100,7 @@ export type ColaSearch = { permit: string; rows: ColaRecord[] };
 defineQuery({
   name: "search_colas", description: "Search TTB's public COLA registry for the label approvals under the brewery's TTB registry number, completed in the last 15 years, newest first; name keeps only rows whose fanciful or brand name contains it (ignoring case); refused when the brewery has no registry number; nothing is stored",
   roles: [...ROLES],
-  input: z.object({ name: z.string().optional() }),
+  input: z.object({ name: z.string().optional().describe("Only rows whose fanciful or brand name contains this text") }),
   handler: async (ctx, i): Promise<ColaSearch> => {
     const brewery = await unwrap(ctx.db.from("breweries").select("ttb_registry_no").eq("id", ctx.breweryId).single());
     const permit = brewery?.ttb_registry_no?.trim();
@@ -113,7 +113,7 @@ defineQuery({
   },
 });
 
-const colaId = z.string().regex(/^\d{14}$/, "A TTB ID has exactly 14 digits");
+const colaId = z.string().regex(/^\d{14}$/, "A TTB ID has exactly 14 digits").describe("A COLA's 14-digit TTB ID");
 
 async function colaPermit(ctx: Ctx): Promise<string> {
   const brewery = await unwrap(ctx.db.from("breweries").select("ttb_registry_no").eq("id", ctx.breweryId).single());
@@ -247,7 +247,7 @@ defineCommand({
   name: "correct_reporting_basis",
   description: "Admin correction after filing: record immutable old/new books-opened basis, actor, time and reason, and flag every affected filed period as needing amendment; original snapshots stay unchanged",
   roles: ["admin"],
-  input: z.object({ booksOpenedOn: isoDate.nullable(), expectedBooksOpenedOn: isoDate.nullable(), reason: z.string().trim().min(1) }),
+  input: z.object({ booksOpenedOn: isoDate.nullable(), expectedBooksOpenedOn: isoDate.nullable(), reason: z.string().trim().min(1).describe("Why the reporting basis is corrected") }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("correct_reporting_basis", {
     p_brewery: ctx.breweryId, p_books_opened_on: i.booksOpenedOn, p_expected_books_opened_on: i.expectedBooksOpenedOn,
     p_reason: i.reason, p_request_id: execution.requestId,
@@ -343,7 +343,7 @@ type LotMovement = { id: string; type: string; qty: number; bbl: number; sku_id:
 defineQuery({
   name: "trace_lot", description: "One finished-goods lot: its packaging run, member batches and recorded transfers before packaging, every ledger movement that names the lot, and units still on hand; membership is not a proportional share",
   roles: [...ROLES],
-  input: z.object({ lotId: z.string().uuid() }),
+  input: z.object({ lotId: z.string().uuid().describe("The finished-goods lot to trace") }),
   handler: async (ctx, i) => {
     // All four reads need only the lot id, so they start together (#1491).
     const [lot, sources, movements, ingredients] = await Promise.all([

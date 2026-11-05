@@ -3,6 +3,7 @@
 // operation from the operation itself. scripts/agent-readiness.ts prints them.
 import type { $ZodType } from "zod/v4/core";
 import { leafFields } from "@/lib/mgr/api-schema";
+import { FIELD_VOCABULARY } from "@/lib/mgr/field-vocabulary";
 
 export type ReadinessTool = {
   kind: "query" | "command";
@@ -14,7 +15,8 @@ export type ReadinessTool = {
 /** Below this, a description rarely says more than the operation's name. */
 const MIN_DESCRIPTION_WORDS = 7;
 
-const isIdField = (name: string) => name === "id" || /Ids?$/.test(name);
+/** True for a field that holds a record's id, which an agent cannot read without looking up its name. */
+export const isIdField = (name: string) => name === "id" || /Ids?$/.test(name);
 
 export function measureReadiness(tools: ReadinessTool[]) {
   const commands = tools.filter(tool => tool.kind === "command");
@@ -25,7 +27,8 @@ export function measureReadiness(tools: ReadinessTool[]) {
     commands: commands.length,
     describedOperations: tools.filter(tool => tool.description.trim().split(/\s+/).length >= MIN_DESCRIPTION_WORDS).length,
     fieldUses: fields.length,
-    fieldUsesWithMeaning: fields.filter(field => field.described).length,
+    // A field means something when its schema says so or its name is in the vocabulary.
+    fieldUsesWithMeaning: fields.filter(field => field.described || Object.hasOwn(FIELD_VOCABULARY, field.name)).length,
     // `compensation` defaults to null, which says nothing, so only written text counts.
     commandsWithUndo: commands.filter(command => command.compensation).length,
     commandIdFieldUses: commands.flatMap(command => leafFields(command.inputSchema)).filter(field => isIdField(field.name)).length,

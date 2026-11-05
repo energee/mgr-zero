@@ -8,7 +8,7 @@ import { CommandError, definePreTenantCommand } from "./registry";
 definePreTenantCommand({
   name: "provision_brewery",
   description: "Create a brewery and join it as its first admin.",
-  input: z.object({ name: z.string().trim().min(1), timezone: z.string().min(1), ttb: z.string().trim().nullable().optional() }),
+  input: z.object({ name: z.string().trim().min(1).describe("The new brewery's name"), timezone: z.string().min(1), ttb: z.string().trim().nullable().optional() }),
   handler: async (ctx, input, execution) => {
     if ((await import("@/lib/env/server")).getServerEnv().dedicated) {
       throw new CommandError("Brewery creation is disabled on this deployment", 403, "permission_denied");

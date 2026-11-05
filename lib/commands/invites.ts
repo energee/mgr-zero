@@ -6,15 +6,15 @@ import { definePreTenantCommand, definePreTenantQuery, defineCommand, defineQuer
 
 defineCommand({
   name: "invite_staff",
-  description: "Invite staff",
-  input: z.object({ email, role: z.enum(STAFF_ROLES) }),
+  description: "Invite a person by email to join this brewery's staff with one role; use update_staff_role to change an existing member's roles",
+  input: z.object({ email, role: z.enum(STAFF_ROLES).describe("The role the new member gets") }),
   roles: ["admin"],
   handler: async (ctx, input, execution) => (await import("@/lib/supabase/invites")).inviteStaff(ctx, input, execution),
 });
 
 defineCommand({
   name: "invite_customer_user",
-  description: "Invite a customer portal user",
+  description: "Invite a buyer by email to the customer portal for one customer; use revoke_customer_user to end that access",
   input: z.object({ email, customerId: z.string().uuid() }),
   roles: ["admin", "sales"],
   handler: async (ctx, input, execution) => (await import("@/lib/supabase/invites")).inviteCustomerUser(ctx, input, execution),
@@ -93,7 +93,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "revoke_account_invitation", description: "Revoke a pending existing-account invitation.",
+  name: "revoke_account_invitation", description: "Revoke a pending existing-account invitation so it can no longer be accepted; use resend_account_invitation to replace it with a new one.",
   roles: ["admin", "sales"], input: z.object({ inviteId: z.uuid() }),
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("revoke_account_invitation", {
     p_brewery: ctx.breweryId, p_invite: input.inviteId, p_request_id: execution.requestId,

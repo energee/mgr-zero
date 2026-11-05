@@ -29,8 +29,8 @@ import { MASH_STEP_KINDS, FERMENTATION_STAGE_KINDS, WATER_ADDITION_STAGES, WATER
 // Process temperatures share the reading range, so a typo such as -500 °F is refused, not frozen into a recipe version
 // or brew record (#1476, #1478).
 const processTempF = z.number().min(READING_BOUNDS.tempF.min).max(READING_BOUNDS.tempF.max);
-const mashStep = z.object({ name: z.string().trim().min(1), kind: z.enum(MASH_STEP_KINDS), tempF: processTempF, minutes: z.number().int().positive() });
-const fermentationStage = z.object({ name: z.string().trim().min(1), kind: z.enum(FERMENTATION_STAGE_KINDS), tempF: processTempF, days: z.number().positive() });
+const mashStep = z.object({ name: z.string().trim().min(1).describe("The mash step's name"), kind: z.enum(MASH_STEP_KINDS).describe("The mash step's method"), tempF: processTempF, minutes: z.number().int().positive() });
+const fermentationStage = z.object({ name: z.string().trim().min(1).describe("The fermentation stage's name"), kind: z.enum(FERMENTATION_STAGE_KINDS).describe("The fermentation stage's type"), tempF: processTempF, days: z.number().positive() });
 const processInput = z.object({
   preBoilBbl: z.number().positive().optional(), whirlpoolMinutes: z.number().int().nonnegative().optional(), whirlpoolTempF: processTempF.optional(),
   whirlpoolRestMinutes: z.number().int().nonnegative().optional(), knockoutTempF: processTempF.optional(),
@@ -38,7 +38,7 @@ const processInput = z.object({
 const waterInput = z.object({
   targetProfileId: z.string().uuid().optional(), sourceProfileId: z.string().uuid().optional(),
   mashGal: z.number().positive().optional(), spargeGal: z.number().nonnegative().optional(), targetMashPh: z.number().min(MASH_PH_BOUNDS.min).max(MASH_PH_BOUNDS.max).optional(),
-  additions: z.array(z.object({ materialId: z.string().uuid(), qty: z.number().positive(), unit: z.enum(WATER_ADDITION_UNITS), stage: z.enum(WATER_ADDITION_STAGES) })).default([]),
+  additions: z.array(z.object({ materialId: z.string().uuid(), qty: z.number().positive().describe("How much of this water addition, in its unit"), unit: z.enum(WATER_ADDITION_UNITS).describe("The unit of this water addition's qty"), stage: z.enum(WATER_ADDITION_STAGES) })).default([]),
 });
 
 // Efficiency and attenuation are fractions (0.75), never percents: the column
@@ -48,7 +48,7 @@ const fraction = z.number().gt(0).lte(1);
 
 defineCommand({
   name: "create_recipe", description: "Create a recipe: a name, optionally the brand it brews, and a note; its brewing facts live on versions",
-  input: z.object({ name: z.string().trim().min(1), brandId: z.string().uuid().optional(), note: z.string().optional() }),
+  input: z.object({ name: z.string().trim().min(1).describe("The recipe's name"), brandId: z.string().uuid().optional(), note: z.string().optional() }),
   roles: ["admin", "brewer"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_recipe", {
     p_brewery: ctx.breweryId, p_brand: i.brandId ?? null, p_name: i.name, p_note: i.note ?? null,
@@ -127,7 +127,7 @@ defineCommand({
   description: "Add a post-knockout material (dry hop, fruit, adjunct) to an open occupancy: one batch_additions row plus its consumption movement from the bin holding the most of it; lot required when the material is lot-tracked",
   input: z.object({
     occupancyId: z.string().uuid(), materialId: z.string().uuid(), stage: z.enum(INGREDIENT_STAGES),
-    qty: z.number().positive(), lotId: z.string().uuid().optional(), note: z.string().optional(),
+    qty: z.number().positive().describe("How much was added, in the material's base units"), lotId: z.string().uuid().optional().describe("The material lot added; required when the material is lot-tracked"), note: z.string().optional(),
   }),
   roles: ["admin", "brewer"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_batch_addition", {
@@ -168,7 +168,7 @@ defineQuery({
 defineCommand({
   name: "upsert_water_profile", description: "Create a water profile, or edit one by profileId: its name, six ions in ppm, and optional alkalinity as CaCO3, water pH and notes",
   input: z.object({
-    profileId: z.string().uuid().optional(), name: z.string().trim().min(1),
+    profileId: z.string().uuid().optional(), name: z.string().trim().min(1).describe("The water profile's name"),
     calciumPpm: ppm, magnesiumPpm: ppm, sodiumPpm: ppm, sulfatePpm: ppm, chloridePpm: ppm, bicarbonatePpm: ppm,
     alkalinityPpm: ppm.optional().describe("Total alkalinity as CaCO3, in ppm"),
     waterPh: z.number().min(0).max(14).optional().describe("The water's own pH, not a recipe's target mash pH"),
@@ -338,9 +338,9 @@ const bbl = z.number().positive().max(9_999_999.999);
 defineCommand({
   name: "upsert_vessel", description: "Create or rename a vessel: its name, kind and capacity. Contents are never stored here — they are derived from the open occupancy",
   input: z.object({
-    id: z.string().uuid().optional(),
-    name: z.string().trim().min(1),
-    kind: z.enum(VESSEL_KINDS),
+    id: z.string().uuid().optional().describe("The vessel to edit; omit to create one"),
+    name: z.string().trim().min(1).describe("The vessel's name"),
+    kind: z.enum(VESSEL_KINDS).describe("What type of vessel this is"),
     // Keep historical raw payloads replayable; the RPC enforces new-write
     // precision only after checking the durable request identity.
     capacityBbl: bbl,
@@ -392,8 +392,8 @@ defineCommand({
 
 const brewActual = z.object({
   materialId: z.string().uuid(), recipeIngredientId: z.string().uuid().optional(), stage: z.enum(INGREDIENT_STAGES),
-  locationId: z.string().uuid(), binId: z.string().uuid(), lotId: z.string().uuid().nullable().optional(),
-  qty: z.number().positive().multipleOf(0.0001),
+  locationId: z.string().uuid(), binId: z.string().uuid(), lotId: z.string().uuid().nullable().optional().describe("The material lot used; null or omitted for an untracked material"),
+  qty: z.number().positive().multipleOf(0.0001).describe("How much was used, in the material's base units"),
 });
 const brewProcess = processInput.extend({
   boilMinutes: z.number().int().nonnegative().optional(), mashWaterGal: z.number().positive().optional(),
@@ -401,7 +401,7 @@ const brewProcess = processInput.extend({
 });
 // A Prep pull is a brew actual before brew day: no stage, and zero is allowed
 // (nothing pulled yet).
-const brewPull = brewActual.omit({ stage: true }).extend({ qty: z.number().nonnegative().multipleOf(0.0001) });
+const brewPull = brewActual.omit({ stage: true }).extend({ qty: z.number().nonnegative().multipleOf(0.0001).describe("How much is pulled, in the material's base units; 0 means nothing yet") });
 function brewPullRow(a: z.infer<typeof brewPull>) {
   return { material_id: a.materialId, recipe_ingredient_id: a.recipeIngredientId ?? null,
     location_id: a.locationId, bin_id: a.binId, lot_id: a.lotId ?? null, qty: a.qty };
@@ -453,7 +453,7 @@ defineCommand({
 
 defineCommand({
   name: "correct_brew_record", description: "Correct a brew turn's ingredients and process after later additions, transfers or packaging using linked material compensation and replacement actuals; volume changes require an open occupancy with sufficient volume and unfiled books",
-  input: z.object({ recordId: z.string().uuid(), reason: z.string().trim().min(1), initialBbl: z.number().positive().multipleOf(0.001),
+  input: z.object({ recordId: z.string().uuid().describe("The brew record to correct"), reason: z.string().trim().min(1).describe("Why the brew record is corrected"), initialBbl: z.number().positive().multipleOf(0.001),
     actuals: z.array(brewActual), process: brewProcess.default({}), confirmEmpty: z.boolean().default(false) }),
   roles: ["admin", "brewer"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("correct_brew_record", {
@@ -574,7 +574,7 @@ defineQuery({
 
 defineQuery({
   name: "list_batch_history", description: "One page of completed or cancelled batches, newest created first, with brand and embedded recipe",
-  input: z.object({ status: z.enum(["completed", "cancelled"]), ...historyInput }), roles: ["admin", "brewer"],
+  input: z.object({ status: z.enum(["completed", "cancelled"]).describe("Which finished batches to list"), ...historyInput }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {
     let q = ctx.db.from("batches").select(`${BATCH_COLUMNS}, created_at`)
       .eq("brewery_id", ctx.breweryId).limit(i.limit + 1);

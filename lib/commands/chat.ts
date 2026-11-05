@@ -14,7 +14,7 @@ const REASONS = ["submitted_order", "pick_due", "restock_due", "delivery_next", 
 defineCommand({
   name: "set_notification_preference",
   description: "Mute/unmute one notification reason for yourself and optionally override your quiet hours (chat delivery only; MGR Today is unaffected)",
-  input: z.object({ reason: z.enum(REASONS), enabled: z.boolean(), quietHours: notificationQuietHoursSchema.nullable().optional() }),
+  input: z.object({ reason: z.enum(REASONS).describe("The notification reason this setting applies to"), enabled: z.boolean(), quietHours: notificationQuietHoursSchema.nullable().optional() }),
   roles: STAFF_ROLES,
   handler: async (ctx, i, execution) => {
     if (onlyRoles(ctx.roles, ["taproom"]) && i.quietHours !== undefined) throw new CommandError("permission denied", 403, "permission_denied");
@@ -41,7 +41,7 @@ defineCommand({
 defineCommand({
   name: "set_notification_destination",
   description: "Provide reason + personalDestinationId to choose your verified personal destination, or as admin provide installationId + externalDestinationId for the private operations channel",
-  input: z.union([z.object({ reason: z.enum(REASONS), personalDestinationId: z.string().uuid() }), z.object({ installationId: z.string().uuid(), externalDestinationId: z.string().min(1) })]),
+  input: z.union([z.object({ reason: z.enum(REASONS).describe("The notification reason this setting applies to"), personalDestinationId: z.string().uuid() }), z.object({ installationId: z.string().uuid(), externalDestinationId: z.string().min(1) })]),
   roles: STAFF_ROLES,
   handler: async (ctx, i, execution) => {
     if ("personalDestinationId" in i) return await unwrap(ctx.db.rpc("set_personal_notification_destination", {
@@ -91,7 +91,7 @@ defineQuery({
 defineCommand({
   name: "snooze_notification",
   description: "Delay one personal chat reminder for up to seven days; Today due state is unchanged",
-  input: z.object({ deliveryId: z.string().uuid(), until: z.iso.datetime({ offset: true }) }),
+  input: z.object({ deliveryId: z.string().uuid().describe("The chat notification delivery to snooze, not a delivery stop"), until: z.iso.datetime({ offset: true }) }),
   roles: ["admin", "sales", "warehouse", "brewer"],
   handler: async (ctx, i, execution) => await unwrap(ctx.db.rpc("snooze_notification", {
     p_brewery: ctx.breweryId, p_delivery: i.deliveryId, p_until: i.until, p_request_id: execution.requestId,

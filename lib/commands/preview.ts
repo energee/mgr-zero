@@ -7,7 +7,7 @@ const conversationId = z.string().uuid();
 
 defineQuery({
   name: "preview_command", description: "Canonicalize one supported command into server-owned effects and a bound preview token without running its write handler",
-  input: z.object({ name: z.literal("record_movement"), input: movementInput, conversationId }), roles: STAFF_ROLES,
+  input: z.object({ name: z.literal("record_movement").describe("The command to preview; only record_movement is supported"), input: movementInput, conversationId }), roles: STAFF_ROLES,
   handler: (ctx, input) => previewCommand(input.name, input.input, ctx, input.conversationId),
 });
 
@@ -22,7 +22,7 @@ defineCommand({
 
 defineCommand({
   name: "append_chat_message", description: "Append one message to the current author's composer conversation",
-  input: z.object({ conversationId, role: z.enum(["user", "assistant"]), content: z.string().trim().min(1).max(4000) }), roles: STAFF_ROLES,
+  input: z.object({ conversationId, role: z.enum(["user", "assistant"]).describe("Who wrote the message"), content: z.string().trim().min(1).max(4000) }), roles: STAFF_ROLES,
   idempotency: "dedupe",
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("append_chat_message", {
     p_brewery: ctx.breweryId, p_conversation: input.conversationId, p_role: input.role,
