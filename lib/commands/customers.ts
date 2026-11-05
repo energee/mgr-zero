@@ -32,10 +32,10 @@ defineCommand({
   input: z.object({
     // Keep the historical raw name through request lookup; SQL trims and
     // rejects blank names only after returning any completed replay.
-    id: z.string().uuid().optional(), name: z.string().min(1, "a customer name is required"),
+    id: z.string().uuid().optional().describe("The customer to edit; omit to create one"), name: z.string().min(1, "a customer name is required").describe("The customer's name"),
     // Staff only, like a brand alias; an edit without it clears it.
     alias: z.string().trim().min(1).optional(),
-    type: z.enum(CUSTOMER_TYPES),
+    type: z.enum(CUSTOMER_TYPES).describe("What kind of business the customer is"),
     country,
     state: stateCode.optional(), // home state, required for a US customer only
     // The channel is the customer's row into the price grid (§16.3) and is required.
@@ -62,7 +62,7 @@ defineCommand({
   // TTB destination (user, 2026-10-15). Street, city and ZIP stay optional until
   // known; a US ZIP, when given, must be valid.
   input: z.object({
-    id: z.string().uuid().optional(), customerId: z.string().uuid(), label: z.string().min(1),
+    id: z.string().uuid().optional().describe("The ship-to to edit; omit to create one"), customerId: z.string().uuid(), label: z.string().min(1).describe("A short name for this address, unique per customer"),
     country,
     address1: z.string().min(1).optional(), address2: z.string().optional(),
     city: z.string().min(1).optional(), state: stateCode.optional(), zip: z.string().trim().min(1).optional(),

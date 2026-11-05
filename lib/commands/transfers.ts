@@ -34,7 +34,7 @@ defineCommand({
 defineCommand({
   name: "record_stock_transfer_pick", description: "Record picked quantities per transfer line; the transfer becomes picked",
   roles: [...roles],
-  input: z.object({ transferId: z.string().uuid(), picks: z.array(z.object({ lineId: z.string().uuid(), qty: z.number().nonnegative() })).min(1) }),
+  input: z.object({ transferId: z.string().uuid(), picks: z.array(z.object({ lineId: z.string().uuid().describe("The stock transfer line picked"), qty: z.number().nonnegative().describe("How much was picked: units of the SKU, the material's base units, or whole kegs") })).min(1) }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_stock_transfer_pick", {
     p_transfer: i.transferId, p_picks: i.picks.map((p) => ({ line_id: p.lineId, qty: p.qty })), p_request_id: execution.requestId,
   })),
@@ -43,7 +43,7 @@ defineCommand({
 defineCommand({
   name: "receive_stock_transfer", description: "Receive a picked transfer: paired volume-neutral ledger rows per line (FG, material or kegs) in one transaction; the transfer becomes received",
   roles: [...roles], requiresConfirmation: true,
-  input: z.object({ transferId: z.string().uuid(), lines: z.array(z.object({ lineId: z.string().uuid(), qty: z.number().nonnegative(), sources: z.array(z.object({ lotId: z.string().uuid().nullable(), qty: z.number().positive() })).optional() })) }),
+  input: z.object({ transferId: z.string().uuid(), lines: z.array(z.object({ lineId: z.string().uuid().describe("The stock transfer line received"), qty: z.number().nonnegative().describe("How much was received: units of the SKU, the material's base units, or whole kegs"), sources: z.array(z.object({ lotId: z.string().uuid().nullable().describe("The lot received: finished goods on a SKU line, material on a material line; null for no lot"), qty: z.number().positive().describe("How much came from this lot, in the line's units") })).optional() })) }),
   handler: async (ctx, i, execution) => {
     const r = await unwrap(ctx.db.rpc("receive_stock_transfer", {
       p_transfer: i.transferId, p_lines: i.lines.map((l) => ({ line_id: l.lineId, qty: l.qty, ...(l.sources === undefined ? {} : { sources: l.sources.map(s => ({ lot_id: s.lotId, qty: s.qty })) }) })), p_request_id: execution.requestId,
@@ -55,7 +55,7 @@ defineCommand({
 defineCommand({
   name: "cancel_stock_transfer", description: "Cancel an unreceived stock transfer with a reason; its picks are released and no stock moves, since a pick never left the source bin",
   roles: [...roles], requiresConfirmation: true,
-  input: z.object({ transferId: z.string().uuid(), reason: z.string().trim().min(1).max(500) }),
+  input: z.object({ transferId: z.string().uuid(), reason: z.string().trim().min(1).max(500).describe("Why the transfer is cancelled") }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("cancel_stock_transfer", { p_transfer: i.transferId, p_reason: i.reason, p_request_id: execution.requestId })),
 });
 
@@ -78,7 +78,7 @@ defineQuery({
 defineQuery({
   name: "list_stock_transfers", description: "Stock transfers, newest first, with their lines",
   roles: [...readRoles],
-  input: z.object({ status: z.enum(["submitted", "picked", "in_transit", "received", "cancelled"]).optional() }),
+  input: z.object({ status: z.enum(["submitted", "picked", "in_transit", "received", "cancelled"]).optional().describe("Only transfers in this status") }),
   // Paged past PostgREST's 1000-row cap (#759); id breaks created_at ties so pages never overlap.
   handler: (ctx, i) => completeRows("Stock transfers", start => {
     let q = ctx.db.from("stock_transfers").select("*, stock_transfer_lines(*)", { count: "exact" }).eq("brewery_id", ctx.breweryId);

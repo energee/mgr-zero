@@ -19,7 +19,7 @@ defineCommand({
   name: "save_route", description: "Create or edit a delivery route and replace its stops (shipments or stock transfers) in one step; delivered stops must be kept and a departed route cannot change",
   roles: [...ROLES],
   input: z.object({
-    id: z.string().uuid().optional(), name: z.string().optional(), deliveryDate: isoDate,
+    id: z.string().uuid().optional().describe("The route to edit; omit to create one"), name: z.string().optional().describe("The route's name"), deliveryDate: isoDate,
     driverUserId: z.string().uuid().optional(), vehicle: z.string().optional(), note: z.string().optional(), stops: z.array(stop),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("save_route", {
@@ -49,7 +49,7 @@ const transferDoc = (t: TransferRow): StopDoc => ({ id: t.id, kind: "transfer", 
 defineQuery({
   name: "list_routes", description: "Delivery routes (one route by id, one day, or by status: open, the default, is every route not yet returned; returned is every returned route, newest first) with their stops and their driver's roster email (null when no driver is assigned or the driver has left the team); whether any route has been returned; the shipped orders and picked transfers on no route; and the members who may drive, with their emails",
   roles: [...READ],
-  input: z.object({ id: z.string().uuid().optional(), date: isoDate.optional(), status: z.enum(ROUTE_STATUSES).optional() }),
+  input: z.object({ id: z.string().uuid().optional().describe("Only this route"), date: isoDate.optional().describe("Only routes running on this day"), status: z.enum(ROUTE_STATUSES).optional().describe("open, the default, is every route not yet returned; returned is every returned route") }),
   handler: async (ctx, i) => {
     const returned = i.status === "returned";
     let q = ctx.db.from("routes").select("*").eq("brewery_id", ctx.breweryId)
@@ -108,7 +108,7 @@ defineQuery({
 defineQuery({
   name: "get_delivery_stop", description: "One delivery stop: route, ship-to or destination, its lines (shipped or picked quantities), invoice timing, whether it is signed, and the names that signed earlier deliveries to its ship-to, newest first",
   roles: [...READ],
-  input: z.object({ deliveryId: z.string().uuid() }),
+  input: z.object({ deliveryId: z.string().uuid().describe("The delivery stop to read") }),
   handler: async (ctx, i) => {
     const delivery = await unwrap(ctx.db.from("deliveries")
       .select("id, stop_no, delivered_at, signed_by, outcome, refusal_reason, refusal_note, routes(id, name, delivery_date, driver_user_id, departed_at), shipments(id, invoice_timing, orders(id, order_no, ship_to_id, customers(name), ship_tos(label, country, address1, address2, city, state, zip))), stock_transfers(id, transfer_no, to_location:locations!stock_transfers_to_location_id_brewery_id_fkey(name))")
@@ -145,7 +145,7 @@ defineCommand({
 
 defineCommand({
   name: "leave_delivery_for_later", description: "Take an open stop off a departed route when it could not be attempted; its shipment or transfer becomes unassigned without refusal, invoicing, or restocking",
-  roles: [...ROLES], input: z.object({ routeId: z.string().uuid(), deliveryId: z.string().uuid() }),
+  roles: [...ROLES], input: z.object({ routeId: z.string().uuid(), deliveryId: z.string().uuid().describe("The open stop to take off the route") }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("leave_delivery_for_later", {
     p_route: i.routeId, p_delivery: i.deliveryId, p_request_id: execution.requestId,
   })),
@@ -160,8 +160,8 @@ defineCommand({
 defineCommand({
   name: "check_in_refused_return", description: "Full returnable kegs coming back with beer also post Returned shells. Physically check in refused on-delivery beer at its shipped source lot; damaged quantities also post loss, without a credit",
   roles: [...ROLES],
-  input: z.object({ deliveryId: z.string().uuid(), locationId: z.string().uuid(), lines: z.array(z.object({
-    orderLineId: z.string().uuid(), sources: z.array(z.object({ movementId: z.string().uuid(), binId: z.string().uuid(), qty: z.number().int().positive(), damaged: z.boolean() })).min(1),
+  input: z.object({ deliveryId: z.string().uuid().describe("The delivery stop the refused beer came back from"), locationId: z.string().uuid(), lines: z.array(z.object({
+    orderLineId: z.string().uuid(), sources: z.array(z.object({ movementId: z.string().uuid(), binId: z.string().uuid(), qty: z.number().int().positive().describe("Whole units checked in from this shipped movement"), damaged: z.boolean() })).min(1),
   })).min(1) }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("check_in_refused_return", {
     p_delivery: i.deliveryId, p_location: i.locationId, p_request_id: execution.requestId,
@@ -171,7 +171,7 @@ defineCommand({
 
 defineQuery({
   name: "list_refused_returns", description: "Outstanding refused beer, including returned routes, awaiting physical check-in or Return and credit",
-  roles: [...READ], input: z.object({ deliveryId: z.string().uuid().optional(), routeId: z.string().uuid().optional() }),
+  roles: [...READ], input: z.object({ deliveryId: z.string().uuid().optional().describe("Only this delivery stop"), routeId: z.string().uuid().optional() }),
   handler: (ctx, i) => completeRows("Refused beer", (start) => {
     let q = ctx.db.from("refused_delivery_returns").select("*", { count: "exact" }).eq("brewery_id", ctx.breweryId).gt("outstanding_qty", 0);
     if (i.deliveryId) q = q.eq("delivery_id", i.deliveryId);

@@ -11,7 +11,7 @@ import { hasAnyRole } from "@/lib/mgr/roles";
 import { PAYMENT_METHODS, REFUSAL_REASONS, type PaymentMethod } from "@/lib/mgr/enums";
 import { isoDate, completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, runCommand, CommandError } from "./registry";
 
-const lines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive() })).min(1);
+const lines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive().describe("Units of the SKU on this line") })).min(1);
 const readRoles = ["admin", "sales", "warehouse"] as const;
 const toLines = (ls: z.infer<typeof lines>) => ls.map(l => ({ sku_id: l.skuId, qty: l.qty }));
 
@@ -19,7 +19,7 @@ defineCommand({
   name: "create_order", description: "Create a draft order (wholesale or taproom transfer) with price-snapshot lines",
   roles: [...salesRoles],
   input: z.object({
-    kind: z.enum(["wholesale", "taproom_transfer"]),
+    kind: z.enum(["wholesale", "taproom_transfer"]).describe("wholesale sells to a customer; taproom_transfer moves stock to a taproom"),
     customerId: z.string().uuid().optional(), shipToId: z.string().uuid().optional(),
     fromLocationId: z.string().uuid(), toLocationId: z.string().uuid().optional(),
     requestedShipDate: isoDate.optional(), poNumber: z.string().optional(), note: z.string().optional(),
@@ -54,7 +54,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "submit_order", description: "Submit a draft order for confirmation",
+  name: "submit_order", description: "Submit a draft order for confirmation; it holds no allocations until confirm_order",
   roles: [...salesRoles],
   input: z.object({ orderId: z.string().uuid() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("submit_order", { p_order: i.orderId, p_request_id: execution.requestId })),
@@ -71,7 +71,7 @@ defineCommand({
   name: "adjust_order_lines", description: "Replace lines on a submitted/confirmed/picked order; a submitted order holds no allocations until confirm, otherwise re-syncs allocations and returnable-keg deposits; on a picked order, an added or raised line sends it back to confirmed for a re-pick, and staged excess flags a restock; returns ATP soft warnings",
   roles: [...salesRoles], requiresConfirmation: true,
   // Keep raw reasons replayable; the RPC trims and validates new writes after its request lookup.
-  input: z.object({ orderId: z.string().uuid(), reason: z.string().min(1), lines }),
+  input: z.object({ orderId: z.string().uuid(), reason: z.string().min(1).describe("Why the lines changed"), lines }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("adjust_order_lines", { p_order: i.orderId, p_lines: toLines(i.lines), p_reason: i.reason, p_request_id: execution.requestId })),
 });
 
@@ -87,7 +87,7 @@ defineCommand({
 defineCommand({
   name: "cancel_order", description: "Cancel an unshipped order and release its allocations",
   roles: [...salesRoles], requiresConfirmation: true,
-  input: z.object({ orderId: z.string().uuid(), reason: z.string().min(1) }),
+  input: z.object({ orderId: z.string().uuid(), reason: z.string().min(1).describe("Why the order is cancelled") }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("cancel_order", { p_order: i.orderId, p_reason: i.reason, p_request_id: execution.requestId })),
 });
 
@@ -102,8 +102,8 @@ defineCommand({
   name: "resolve_short_pick", description: "Resolve one line counted below ordered after any pending put-back by adjusting the order down to the count; the missing quantity is cancelled, not backordered",
   roles: [...warehouseRoles],
   input: z.object({
-    orderId: z.string().uuid(), lineId: z.string().uuid(), qtyPicked: z.number().nonnegative(),
-    reason: z.string().trim().min(1), resolution: z.literal("adjust_down"),
+    orderId: z.string().uuid(), lineId: z.string().uuid().describe("The short order line"), qtyPicked: z.number().nonnegative(),
+    reason: z.string().trim().min(1).describe("Why the line came up short"), resolution: z.literal("adjust_down"),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("resolve_short_pick", {
     p_order: i.orderId, p_line: i.lineId, p_qty_picked: i.qtyPicked, p_reason: i.reason, p_resolution: i.resolution, p_request_id: execution.requestId,
@@ -113,10 +113,10 @@ defineCommand({
 defineCommand({
   name: "confirm_delivery", description: "Close a stop with accepted and refused quantities; invoice only accepted goods on delivery, never restore stock",
   roles: [...warehouseRoles], requiresConfirmation: true,
-  input: z.object({ deliveryId: z.string().uuid(), signedBy: z.string().trim().optional(),
-    refused: z.array(z.object({ orderLineId: z.string().uuid(), qty: z.number().int().positive() })).default([]),
+  input: z.object({ deliveryId: z.string().uuid().describe("The delivery stop to close"), signedBy: z.string().trim().optional(),
+    refused: z.array(z.object({ orderLineId: z.string().uuid(), qty: z.number().int().positive().describe("Whole units of this line the customer refused") })).default([]),
     // Compatibility only: SQL replays completed old closed refusals, then rejects fresh ones.
-    reason: z.enum([...REFUSAL_REASONS, "closed"]).optional(),
+    reason: z.enum([...REFUSAL_REASONS, "closed"]).optional().describe("Why goods were refused; closed only replays an old request"),
     note: z.string().optional(), transferRefused: z.boolean().default(false),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("confirm_delivery", {
@@ -126,7 +126,7 @@ defineCommand({
   })),
 });
 
-const pickLines = z.array(z.object({ lineId: z.string().uuid(), qty: z.number().nonnegative() })).min(1);
+const pickLines = z.array(z.object({ lineId: z.string().uuid().describe("The order line picked"), qty: z.number().nonnegative().describe("Units of the SKU counted as picked") })).min(1);
 
 defineCommand({
   name: "record_pick", description: "Record picked quantities per line after any pending put-back; order becomes picked once all lines are counted",
@@ -142,8 +142,8 @@ defineCommand({
   roles: [...warehouseRoles], requiresConfirmation: true,
   input: z.object({
     orderId: z.string().uuid(), carrier: z.string().optional(), tracking: z.string().optional(),
-    ship: z.array(z.object({ lineId: z.string().uuid(), qty: z.number().nonnegative().multipleOf(0.01),
-      sources: z.array(z.object({ binId: z.string().uuid(), lotId: z.string().uuid().nullable(), qty: z.number().positive().multipleOf(0.01), toBinId: z.string().uuid().optional() })).optional(),
+    ship: z.array(z.object({ lineId: z.string().uuid().describe("The order line shipped"), qty: z.number().nonnegative().multipleOf(0.01).describe("Units of the SKU shipped on this line"),
+      sources: z.array(z.object({ binId: z.string().uuid(), lotId: z.string().uuid().nullable().describe("The finished-goods lot shipped; null for stock with no lot"), qty: z.number().positive().multipleOf(0.01).describe("Units shipped from this bin and lot"), toBinId: z.string().uuid().optional() })).optional(),
       shortReason: z.string().trim().min(1).optional(),
     })).min(1), invoiceTiming: z.enum(["now", "on_delivery"]).default("now"),
   }),
@@ -213,9 +213,9 @@ defineCommand({
   name: "return_shipment", description: "Return shipped beer at invoice prices and its destination, posting damaged beer to loss and full-keg shells as Returned. Deposit-only refunds need no location or reason; returnEmptyKegs optionally checks empties into locationId and binId with the refund atomically. With refusedDeliveryId, the credit memo also credits the one-way keg fee for the refused kegs",
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({
-    invoiceId: z.string().uuid(), refusedDeliveryId: z.string().uuid().optional(), locationId: z.string().uuid().optional(), reason: z.enum(["damaged", "wrong_item", "unsold"]).optional(),
+    invoiceId: z.string().uuid(), refusedDeliveryId: z.string().uuid().optional(), locationId: z.string().uuid().optional(), reason: z.enum(["damaged", "wrong_item", "unsold"]).optional().describe("Why the beer came back; a deposit-only refund needs none"),
     returnEmptyKegs: z.boolean().default(false), binId: z.string().uuid().optional(),
-    lines: z.array(z.object({ invoiceLineId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01), sources: z.array(z.object({ movementId: z.string().uuid(), binId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01) })).optional() })).min(1),
+    lines: z.array(z.object({ invoiceLineId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01).describe("Units returned on this invoice line"), sources: z.array(z.object({ movementId: z.string().uuid(), binId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01).describe("Units returned from this shipped movement into this bin") })).optional() })).min(1),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("return_shipment", {
     p_invoice: i.invoiceId, p_lines: i.lines.map(l => ({ invoice_line_id: l.invoiceLineId, qty: l.qty, ...(l.sources === undefined ? {} : { sources: l.sources.map(a => ({ movement_id: a.movementId, bin_id: a.binId, qty: a.qty })) }) })),
@@ -234,8 +234,8 @@ defineCommand({
   name: "create_credit_memo", description: "Full returnable kegs coming back with beer also post Returned shells; deposit-only refunds do not. Credit an invoice: negative lines at original prices + return_in movements",
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({
-    invoiceId: z.string().uuid(), locationId: z.string().uuid(), reason: z.string().min(1),
-    lines: z.array(z.object({ invoiceLineId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01), sources: z.array(z.object({ movementId: z.string().uuid(), binId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01) })).optional() })).min(1),
+    invoiceId: z.string().uuid(), locationId: z.string().uuid(), reason: z.string().min(1).describe("Why the invoice is credited"),
+    lines: z.array(z.object({ invoiceLineId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01).describe("Units returned on this invoice line"), sources: z.array(z.object({ movementId: z.string().uuid(), binId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01).describe("Units returned from this shipped movement into this bin") })).optional() })).min(1),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_credit_memo", {
     p_invoice: i.invoiceId, p_lines: i.lines.map(l => ({ invoice_line_id: l.invoiceLineId, qty: l.qty, ...(l.sources === undefined ? {} : { sources: l.sources.map(a => ({ movement_id: a.movementId, bin_id: a.binId, qty: a.qty })) }) })),
@@ -257,7 +257,7 @@ defineCommand({
   roles: ["admin"],
   input: z.object({
     customerId: z.string().uuid(), shipToId: z.string().uuid(), pickedUpOn: isoDate, note: z.string().optional(),
-    lines: z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01), unitPriceCents: z.number().int().min(0) })).min(1),
+    lines: z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01).describe("Units of the SKU picked up"), unitPriceCents: z.number().int().min(0) })).min(1),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_historical_order", {
     p_brewery: ctx.breweryId, p_customer: i.customerId, p_ship_to: i.shipToId, p_picked_up_on: i.pickedUpOn,
@@ -271,7 +271,7 @@ defineCommand({
 defineQuery({
   name: "list_orders", description: "Orders newest-first with each one's delivery stop outcome, optionally by status (delivered: shipped orders whose stop closed delivered or partly delivered) and customer",
   roles: [...readRoles],
-  input: z.object({ customerId: z.string().uuid().optional(), status: z.enum(ORDER_FILTERS).optional(), ...historyInput }),
+  input: z.object({ customerId: z.string().uuid().optional(), status: z.enum(ORDER_FILTERS).optional().describe("Only orders in this status; delivered means shipped with the stop closed delivered or partly delivered"), ...historyInput }),
   handler: async (ctx, i) => {
     // Delivered is not an orders.status; it is a shipped order whose stop closed delivered or partial (#1483).
     let q = ctx.db.from("orders").select(i.status === "delivered" ? "*, customers(name), shipments!inner(deliveries!inner(outcome))" : "*, customers(name), shipments(deliveries(outcome))")
@@ -378,7 +378,7 @@ defineCommand({
 defineCommand({
   name: "void_invoice_payment", description: "Void a payment recorded in MGR with a reason, the only correction; the payment row is kept, and an invoice that drops below its total is no longer paid; returns the balance",
   roles: [...salesRoles], requiresConfirmation: true,
-  input: z.object({ paymentId: z.string().uuid(), reason: z.string().trim().min(1).max(500) }),
+  input: z.object({ paymentId: z.string().uuid(), reason: z.string().trim().min(1).max(500).describe("Why the payment is voided") }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("void_invoice_payment", {
     p_brewery: ctx.breweryId, p_payment: i.paymentId, p_reason: i.reason, p_request_id: execution.requestId,
   })),
@@ -387,7 +387,7 @@ defineCommand({
 defineQuery({
   name: "daily_pick_sheet", description: "Confirmed/picked orders grouped by requested ship date with lines (each SKU with its brand name and staff alias, and format name)",
   roles: [...readRoles],
-  input: z.object({ date: isoDate.optional() }),
+  input: z.object({ date: isoDate.optional().describe("Only orders requested to ship on this day") }),
   // Paged past PostgREST's 1000-row cap (#759); without a date this is every
   // confirmed/picked order. id breaks ship-date ties so pages never overlap.
   handler: (ctx, i) => completeRows("Pick sheet", start => {
@@ -535,7 +535,7 @@ defineQuery({
 export type ReturnSource = { id: string; sku_id: string; qty: number; lot_id: string | null; location_id: string; lots: { code: string } | null; bins: { name: string } | null };
 defineQuery({
   name: "get_invoice_return_sources", description: "Original shipped movements available as explicit return identities",
-  roles: ["admin", "warehouse", "sales"], input: z.object({ invoiceId: z.string().uuid().optional(), deliveryId: z.string().uuid().optional() }).refine((i) => Boolean(i.invoiceId) !== Boolean(i.deliveryId), "Choose an invoice or delivery"),
+  roles: ["admin", "warehouse", "sales"], input: z.object({ invoiceId: z.string().uuid().optional(), deliveryId: z.string().uuid().optional().describe("The delivery stop whose shipment to read; send this or invoiceId") }).refine((i) => Boolean(i.invoiceId) !== Boolean(i.deliveryId), "Choose an invoice or delivery"),
   handler: async (ctx, i) => {
     const invoice = i.deliveryId
       ? await unwrap(ctx.db.from("deliveries").select("shipment_id").eq("id", i.deliveryId).eq("brewery_id", ctx.breweryId).single())

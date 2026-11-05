@@ -59,7 +59,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Add a bin to a location
+Add a bin to a location when stock needs another storage spot there
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -167,7 +167,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-On-hand quantity per SKU/location/bin
+On-hand quantity per SKU, location and bin, optionally for one SKU or location; use it to see which bin holds stock, and get_on_hand for totals by location
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -426,7 +426,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Rename a bin
+Rename a bin; its stock and movement history are unchanged
 
 | Field | Type | Required |
 | --- | --- | --- |

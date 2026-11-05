@@ -32,7 +32,7 @@ defineQuery({
 defineCommand({
   name: "set_brewery_gravity_unit",
   description: "Set the brewery-wide default unit gravity is shown and entered in (storage stays degrees Plato)",
-  input: z.object({ unit: z.enum(GRAVITY_UNITS) }),
+  input: z.object({ unit: z.enum(GRAVITY_UNITS).describe("The unit gravity is shown and entered in") }),
   roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_brewery_gravity_unit", {
     p_brewery: ctx.breweryId, p_unit: i.unit, p_request_id: execution.requestId,
@@ -42,7 +42,7 @@ defineCommand({
 defineCommand({
   name: "set_my_gravity_unit",
   description: "Set your own gravity display unit, or null to follow the brewery default",
-  input: z.object({ unit: z.enum(GRAVITY_UNITS).nullable() }),
+  input: z.object({ unit: z.enum(GRAVITY_UNITS).nullable().describe("Your gravity unit; null follows the brewery default") }),
   roles: STAFF_ROLES,
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_my_gravity_unit", {
     p_brewery: ctx.breweryId, p_unit: i.unit, p_request_id: execution.requestId,
@@ -65,7 +65,7 @@ defineCommand({
   description: "Edit the brewery's basics from Settings (admin): name, timezone, TTB registry number, the customer-facing phone the portal prints, and how many hours until a fermentation reading is overdue",
   roles: ["admin"],
   input: z.object({
-    name: z.string().trim().min(1), timezone: z.string().trim().min(1),
+    name: z.string().trim().min(1).describe("The brewery's name"), timezone: z.string().trim().min(1),
     ttbRegistryNo: z.string().trim().optional(), customerPhone: phone.optional(),
     readingDueHours,
   }),

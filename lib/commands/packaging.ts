@@ -77,7 +77,7 @@ defineCommand({
 });
 
 const packagingActual = z.object({
-  materialId: z.string().uuid(), locationId: z.string().uuid(), binId: z.string().uuid(), lotId: z.string().uuid().nullable(),
+  materialId: z.string().uuid(), locationId: z.string().uuid(), binId: z.string().uuid(), lotId: z.string().uuid().nullable().describe("The material lot used; null for an untracked material"),
   used: z.number().nonnegative(), loss: z.number().nonnegative(), unused: z.number().nonnegative(),
 });
 const actualRows = (rows: z.infer<typeof packagingActual>[]) => rows.map(row => ({
@@ -100,7 +100,7 @@ defineCommand({
     batchId: z.string().uuid(),
     packagedOn: isoDate,
     lotCode: z.string().trim().min(1),
-    outputs: z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive() })).min(1),
+    outputs: z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive().describe("Units of the SKU packaged") })).min(1),
   }),
   roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_historical_packaging_run", {
@@ -154,7 +154,7 @@ defineQuery({
 });
 defineCommand({
   name: "correct_packaging_material_record", description: "Replace unused packaging material actuals with a reason; preserves history, finished outputs and tank draw",
-  input: z.object({ recordId: z.string().uuid(), reason: z.string().trim().min(1), actuals: z.array(packagingActual) }),
+  input: z.object({ recordId: z.string().uuid().describe("The packaging material record to correct"), reason: z.string().trim().min(1).describe("Why the material record is corrected"), actuals: z.array(packagingActual) }),
   roles: ["admin", "brewer", "warehouse"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("correct_packaging_material_record", {
     p_brewery: ctx.breweryId, p_record: i.recordId, p_reason: i.reason, p_actuals: actualRows(i.actuals), p_request_id: execution.requestId,
@@ -175,7 +175,7 @@ defineCommand({
   input: z.object({
     runId: z.string().uuid(),
     previousCorrectionId: z.string().uuid().nullable().describe("Latest output correction ID; null for the first correction"),
-    reason: z.string().trim().min(1),
+    reason: z.string().trim().min(1).describe("Why the run's outputs are corrected"),
     bblDrawn: z.number().nonnegative(),
     outputs: z.array(z.object({ skuId: z.string().uuid(), qtyActual: z.number().nonnegative().max(9_999_999_999.99) })),
     locationId: z.string().uuid(),
@@ -215,7 +215,7 @@ defineCommand({
     childQty: z.number().positive(),
     // The finished-goods lot the cases come out of; the child units keep it.
     // Omit only for lot-less stock: a bin holding lotted cases refuses a repack without one.
-    lotId: z.string().uuid().optional(),
+    lotId: z.string().uuid().optional().describe("The finished-goods lot the cases come out of; omit only for stock with no lot"),
   }),
   handler: async (ctx, i, execution) => {
     const r = (await unwrap(ctx.db.rpc("record_repack", {

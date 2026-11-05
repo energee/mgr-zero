@@ -21,7 +21,7 @@ const ROLES: ("admin" | "warehouse")[] = ["admin", "warehouse"];
 defineCommand({
   name: "create_keg_pool", description: "Add a keg pool: owned, leased from a vendor, or pay-per-fill, with its per-keg deposit",
   input: z.object({
-    name: z.string().trim().min(1), kind: z.enum(KEG_POOL_KINDS), vendorId: z.string().uuid().optional(),
+    name: z.string().trim().min(1).describe("The keg pool's name"), kind: z.enum(KEG_POOL_KINDS).describe("How the brewery holds these kegs: owned, leased or pay per fill"), vendorId: z.string().uuid().optional(),
     perFillCents: cents.optional(), depositCents: cents.optional(),
   }),
   roles: ROLES,
@@ -34,7 +34,7 @@ defineCommand({
 defineCommand({
   name: "update_keg_pool", description: "Rename a keg pool, change its vendor, per-fill cost or deposit, or take it out of service; omitted fields keep their value",
   input: z.object({
-    poolId: z.string().uuid(), name: z.string().trim().min(1).optional(), vendorId: z.string().uuid().optional(),
+    poolId: z.string().uuid(), name: z.string().trim().min(1).optional().describe("The keg pool's new name; omit to keep it"), vendorId: z.string().uuid().optional(),
     perFillCents: cents.optional(), depositCents: cents.optional(), active: z.boolean().optional(),
   }),
   roles: ROLES,
@@ -49,7 +49,7 @@ defineCommand({
   name: "record_keg_event",
   description: "Record kegs acquired, retired, shipped to or returned from a customer, lost or found, at a location and bin; shipped and returned need the customer, found never has one; retired, shipped, or lost at the bin cannot exceed what the bin holds, and returned or lost at a customer cannot exceed what the customer holds",
   input: z.object({
-    poolId: z.string().uuid(), kegSize: z.enum(KEG_SIZES), qty: z.number().int().positive(), reason: z.enum(KEG_EVENT_REASONS),
+    poolId: z.string().uuid(), kegSize: z.enum(KEG_SIZES), qty: z.number().int().positive().describe("How many whole kegs"), reason: z.enum(KEG_EVENT_REASONS).describe("What happened to the kegs"),
     locationId: z.string().uuid(), binId: z.string().uuid(), customerId: z.string().uuid().optional(), note: z.string().optional(),
   }),
   roles: ROLES,
@@ -235,7 +235,7 @@ defineQuery({
 defineCommand({
   name: "record_taproom_count", description: "Save today's complete explicit-bucket count of remaining whole packaged units using the prepared revision; partial kegs count as one until gone. Persist matching counts without movements; shortages post sold depletion by default or destruction when explicitly classified. Stale, incomplete, duplicate and overcounts are refused",
   input: z.object({ locationId: z.string().uuid(), countedOn: isoDate, revision: z.string().min(1),
-    lines: z.array(z.object({ binId: z.string().uuid(), skuId: z.string().uuid(), lotId: z.string().uuid().nullable(), qtyCounted: z.number().int().nonnegative(), disposition: z.enum(["sold", "destroyed"]).optional() })) }),
+    lines: z.array(z.object({ binId: z.string().uuid(), skuId: z.string().uuid(), lotId: z.string().uuid().nullable().describe("The finished-goods lot counted; null for stock with no lot"), qtyCounted: z.number().int().nonnegative().describe("Whole units left in this bin for this SKU and lot"), disposition: z.enum(["sold", "destroyed"]).optional().describe("What happened to missing units: sold by default, or destroyed") })) }),
   roles: [...COUNT_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_taproom_count", {
     p_brewery: ctx.breweryId, p_location: i.locationId, p_counted_on: i.countedOn, p_revision: i.revision,
@@ -245,7 +245,7 @@ defineCommand({
 });
 defineCommand({
   name: "correct_taproom_count", description: "Admin-only replacement for the latest uncorrected Taproom count. Send changed root-line quantities in either direction plus a reason; the original stays immutable and linked depletion entries preserve reporting",
-  input: z.object({ countId: z.string().uuid(), corrections: z.array(z.object({ lineId: z.string().uuid(), qtyCounted: z.number().int().nonnegative() })).min(1), reason: z.string().trim().min(1) }),
+  input: z.object({ countId: z.string().uuid(), corrections: z.array(z.object({ lineId: z.string().uuid().describe("The root count line to correct"), qtyCounted: z.number().int().nonnegative().describe("The corrected count, in whole units") })).min(1), reason: z.string().trim().min(1).describe("Why the count is corrected") }),
   roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("correct_taproom_count", {
     p_brewery: ctx.breweryId, p_count: i.countId,
@@ -257,8 +257,8 @@ defineCommand({
 const openingFill = z.union([z.literal(.25), z.literal(.5), z.literal(.6), z.literal(1)]);
 const closingFill = z.union([z.literal(0), z.literal(.25), z.literal(.5)]);
 const kegIdentity = z.union([
-  z.object({ skuId: z.string().uuid(), label: z.never().optional(), nominalBbl: z.never().optional() }),
-  z.object({ skuId: z.never().optional(), label: z.string().trim().min(1).max(200), nominalBbl: z.number().positive().finite() }),
+  z.object({ skuId: z.string().uuid(), label: z.never().optional().describe("Not used for an own keg"), nominalBbl: z.never().optional() }),
+  z.object({ skuId: z.never().optional(), label: z.string().trim().min(1).max(200).describe("The guest keg's name"), nominalBbl: z.number().positive().finite() }),
 ]);
 // Preserve the old input contract so committed requests can reach replay.
 // The database validates new tap numbers only after claiming/replaying them.
@@ -271,13 +271,13 @@ defineCommand({
 });
 defineCommand({
   name: "kick_keg", description: "Close an open keg interval with estimated remaining fill (empty, quarter or half) and a reason. An already-closed conflict returns its safe closer label and timestamp. Does not change inventory",
-  input: z.object({ openIntervalId: z.string().uuid(), closeFill: closingFill, reason: z.string().trim().min(1).max(200) }), roles: [...COUNT_ROLES],
+  input: z.object({ openIntervalId: z.string().uuid(), closeFill: closingFill, reason: z.string().trim().min(1).max(200).describe("Why the keg came off tap") }), roles: [...COUNT_ROLES],
   handler: (ctx,i,e) => unwrap(ctx.db.rpc("kick_keg", { p_brewery: ctx.breweryId, p_interval: i.openIntervalId, p_closing_fill: i.closeFill, p_reason: i.reason, p_request_id: e.requestId })),
 });
 defineCommand({
   name: "swap_keg", description: "Atomically close the outgoing interval and open its replacement at the same location. incomingKeg is {skuId} or {label, nominalBbl}; omission defaults to the outgoing own SKU, while guests require explicit identity. Exact retries return the original pair; an already-closed conflict returns its safe closer label and timestamp. Does not change inventory",
   input: z.object({ openIntervalId: z.string().uuid(), incomingKeg: kegIdentity.optional(), tapNumber, incomingOpeningFill: openingFill,
-    closeFill: closingFill, reason: z.string().trim().min(1).max(200) }), roles: [...COUNT_ROLES],
+    closeFill: closingFill, reason: z.string().trim().min(1).max(200).describe("Why the keg came off tap") }), roles: [...COUNT_ROLES],
   handler: (ctx,i,e) => unwrap(ctx.db.rpc("swap_keg", { p_brewery: ctx.breweryId, p_interval: i.openIntervalId, p_closing_fill: i.closeFill, p_reason: i.reason,
     p_sku: i.incomingKeg?.skuId ?? null, p_label: i.incomingKeg?.label ?? null, p_nominal_bbl: i.incomingKeg?.nominalBbl ?? null,
     p_tap_number: i.tapNumber ?? null, p_opening_fill: i.incomingOpeningFill, p_request_id: e.requestId })),

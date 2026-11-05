@@ -23,8 +23,8 @@ const SENT_VIA = ["mailto", "external"] as const;
 defineCommand({
   name: "upsert_vendor", description: "Create or edit a supplier: contact, payment terms, and the typed lead time Planning dates a buy-by from",
   input: z.object({
-    id: z.string().uuid().optional(),
-    name: z.string().trim().min(1),
+    id: z.string().uuid().optional().describe("The vendor to edit; omit to create one"),
+    name: z.string().trim().min(1).describe("The vendor's name"),
     email: email.optional(),
     phone: phone.optional(),
     leadTimeDays: z.number().int().nonnegative().max(PG_INT_MAX).optional(),
@@ -43,9 +43,9 @@ defineCommand({
   name: "upsert_material",
   description: "Create or edit a material definition: kind, base and purchase units with the factor between them, lot tracking, default vendor, extract potential, alpha acid. Units are refused once movements, recipe ingredients, format BOM lines, PO lines, contracts or transfer lines use the material",
   input: z.object({
-    id: z.string().uuid().optional(),
-    name: z.string().trim().min(1),
-    category: z.enum(MATERIAL_CATEGORIES),
+    id: z.string().uuid().optional().describe("The material to edit; omit to create one"),
+    name: z.string().trim().min(1).describe("The material's name"),
+    category: z.enum(MATERIAL_CATEGORIES).describe("What kind of material this is"),
     baseUom: z.enum(UOMS),
     purchaseUom: z.enum(UOMS),
     // Omitted on an edit keeps the factor the material had (#589); a new material defaults to 1.
@@ -78,7 +78,7 @@ defineCommand({
   name: "upsert_material_contract",
   description: "Create or edit a purchasing commitment for one material with one vendor; releases are ordered against it all year, and it never gates ordering; endsOn cannot precede startsOn",
   input: z.object({
-    id: z.string().uuid().optional(),
+    id: z.string().uuid().optional().describe("The contract to edit; omit to create one"),
     vendorId: z.string().uuid(),
     materialId: z.string().uuid(),
     qtyCommitted: z.number().positive().max(MATERIAL_QTY_MAX), // numeric(14,4)
@@ -254,7 +254,7 @@ defineCommand({
   })),
 });
 
-const closureInput = z.object({ poId: z.string().uuid(), reason: z.string().trim().min(1) });
+const closureInput = z.object({ poId: z.string().uuid(), reason: z.string().trim().min(1).describe("Why the purchase order is cancelled or closed short") });
 
 defineCommand({
   name: "cancel_purchase_order", description: "Cancel a draft or sent purchase order without receipts, recording the reason and releasing its unreceived remainder",
@@ -273,7 +273,7 @@ defineCommand({
 });
 
 const receiptCountLine = z.object({
-  poLineId: z.string().uuid(), qtyCounted: z.number().nonnegative().multipleOf(0.0001, "A count takes at most four decimal places."),
+  poLineId: z.string().uuid(), qtyCounted: z.number().nonnegative().multipleOf(0.0001, "A count takes at most four decimal places.").describe("How much was counted, in purchase units"),
   lotCode: z.string().trim().optional(), bestBy: isoDate.optional(),
   unitCostCents: cents.optional().describe("Actual cost per purchase unit; omitted keeps the PO price on receive or the frozen receipt price on correction"),
 });
@@ -281,7 +281,7 @@ const receiptCountLine = z.object({
 defineCommand({
   name: "correct_purchase_receipt",
   description: "Correct a purchase receipt with a reason and receiving bin: preserve the original facts and downstream lot provenance, compensate its movements, and append replacement counts and actual unit costs while preventing negative stock",
-  input: z.object({ receiptId: z.string().uuid(), reason: z.string().trim().min(1), locationId: z.string().uuid().optional(), binId: z.string().uuid().optional(), lines: z.array(receiptCountLine).min(1) }),
+  input: z.object({ receiptId: z.string().uuid(), reason: z.string().trim().min(1).describe("Why the receipt is corrected"), locationId: z.string().uuid().optional(), binId: z.string().uuid().optional(), lines: z.array(receiptCountLine).min(1) }),
   roles: [...PO_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("correct_purchase_receipt", {
     p_brewery: ctx.breweryId, p_receipt: i.receiptId, p_reason: i.reason,
@@ -421,7 +421,7 @@ defineCommand({
 
 const materialCountInput = z.object({
   locationId: z.string().uuid(), binId: z.string().uuid(),
-  lines: z.array(z.object({ materialId: z.string().uuid(), qty: z.number().nonnegative() })).min(1),
+  lines: z.array(z.object({ materialId: z.string().uuid(), qty: z.number().nonnegative().describe("How much is in this bin, in the material's base units") })).min(1),
 });
 
 defineQuery({

@@ -277,7 +277,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin
 
-Get redacted Square seller connection health
+Get redacted Square seller connection health: its state, last error and how far sales have synced
 
 Takes no input.
 
@@ -408,7 +408,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin
 
-Invite staff
+Invite a person by email to join this brewery's staff with one role; use update_staff_role to change an existing member's roles
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -640,7 +640,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Revoke a pending existing-account invitation.
+Revoke a pending existing-account invitation so it can no longer be accepted; use resend_account_invitation to replace it with a new one.
 
 | Field | Type | Required |
 | --- | --- | --- |
