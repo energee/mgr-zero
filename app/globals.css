@@ -142,7 +142,8 @@
   --irreversible-foreground: #FFFFFF;
 }
 
-/* Aardvark Blue: ground #102040, text #dddddd, muted #bebebe (ANSI 7), black
+/* Aardvark Blue: scheme ground #102040 (kept as ink on primary fills; the
+   page ground and sidebar are darker navy), text #dddddd, muted #bebebe (ANSI 7), black
    #191919 for ink on bright fills, and the scheme's bright ANSI hues, except
    --destructive, lifted from red #f05b50 to #ff7a70 to pass AA as text on
    card and popover. Card, popover, muted, accent, border and the tint
