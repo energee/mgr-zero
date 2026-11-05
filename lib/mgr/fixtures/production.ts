@@ -2,15 +2,16 @@
 // snapshots. Views own no sample data.
 import type { BatchesSnapshot } from "@/lib/mgr/batches-view";
 import type { BrewDayViewModel } from "@/lib/mgr/brew-day-view";
-import { startAtPlan, waterAdditionRows, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
+import { cellarPlanRows, startAtPlan, waterAdditionRows, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import type { ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
-import type { RecipeViewModel } from "@/lib/mgr/recipe-view";
+import { outcomeSummary, outcomeTape, type RecipeOutcome, type RecipeViewModel } from "@/lib/mgr/recipe-view";
 import type { RecipesSnapshot } from "@/lib/mgr/recipes-view";
 import type { RunClosedViewModel } from "@/lib/mgr/run-closed-view";
 import { DEMO_TIME_ZONE } from "@/lib/mgr/fixtures/settings";
 import type { ScheduleBatchViewModel } from "@/lib/mgr/schedule-batch-view";
 import type { VesselDetailViewModel } from "@/lib/mgr/vessel-detail-view";
 import type { CellarMapViewModel } from "@/lib/mgr/cellar-map-view";
+import { ibuText, recipeIbu } from "@/lib/recipe-ibu";
 import { fermentationSummary, ingredientDetail, mashRowSummary, waterRowSummary, type FermentationStage, type MashStep, type WaterDraft } from "@/lib/mgr/recipe-process-view";
 import { plural } from "@/lib/mgr/plural";
 import { waterProfiles } from "./catalog";
@@ -73,10 +74,23 @@ export const scheduleBatchHazy: ScheduleBatchViewModel = {
   note: "Dry hop on day 4",
 };
 
+/** The fermentation stages the Brew day and Prep frames list under Later, in cellar. */
+const cellarStages: FermentationStage[] = [
+  { name: "Primary", kind: "primary", tempF: 68, days: 4 },
+  { name: "Cold crash", kind: "cold crash", tempF: 34, days: 2 },
+];
+
 export const brewDayHazy: BrewDayViewModel = {
   sources: [{ material_id: "malt", material_name: "Pale malt", unit: "lb", location_id: "brewery", location_name: "Brewery", bin_id: "stock", bin_name: "Stock", lot_id: "malt-lot", lot_code: "M-24", qty: 800 }],
   actuals: [{ key: "malt", source: "malt/brewery/stock/malt-lot", stage: "mash", qty: "660" }], process: { knockoutTempF: "68" },
-  plan: { recipe: "Hazy v4", ingredients: [{ id: "malt", material_id: "malt", materialName: "Pale malt", unit: "lb", stage: "mash", per_bbl_qty: 45.2 }] },
+  plan: {
+    recipe: "Hazy v4",
+    version: { boil_minutes: 60, whirlpool_temp_f: 180, whirlpool_minutes: 20, knockout_temp_f: 66, fermentation_schedule: cellarStages },
+    ingredients: [
+      { id: "malt", material_id: "malt", materialName: "Pale malt", unit: "lb", stage: "mash", per_bbl_qty: 45.2 },
+      { id: "dry-hop", material_id: "citra", materialName: "Citra", unit: "lb", stage: "dry_hop", per_bbl_qty: 1.2, timing_minutes: 4 * 1440 },
+    ],
+  },
   title: "B-0416 · Hazy",
   lots: [
     { key: "malt", title: "2-row", detail: "lot L-0821 · 660 lb" },
@@ -116,6 +130,15 @@ const quarryIngredients: BrewIngredient[] = ([
 
 const quarryVessels = [1, 2, 3, 4, 5, 6].map(n => ({ id: `fv${n}`, name: `FV${n}`, kind: "fermenter", capacity_bbl: 25.5 }));
 
+/** Quarry's plan after knockout at 22 bbl: its stages, a yeast pitch on day 0 and a dry hop on day 4. */
+const quarryLater = cellarPlanRows({
+  version: { fermentation_schedule: cellarStages },
+  ingredients: [
+    { id: "yeast", material_id: "yeast", materialName: "House ale yeast", unit: "each", stage: "fermentation", per_bbl_qty: 0.1, timing_minutes: 0 },
+    { id: "dry-hop", material_id: "nelson", materialName: "Valley Hops Nelson Sauvin 2026", unit: "lb", stage: "dry_hop", per_bbl_qty: 1.2, timing_minutes: 4 * 1440 },
+  ],
+}, 22);
+
 /** Prep mid-pull: Fieldstone Pilsen came up 7.5 sacks, so it reads short. */
 export const brewPrepQuarry: BrewPrepViewModel = {
   title: "BAT-202 · Quarry #6 v1 · 22 bbl",
@@ -123,7 +146,7 @@ export const brewPrepQuarry: BrewPrepViewModel = {
   vesselId: "fv3",
   vessels: quarryVessels,
   ingredients: quarryIngredients.map(row => row.key === "pilsen" ? { ...row, packs: "7.5", loose: "0" } : row),
-  later: "Fermentation 1 · Dry hop 6",
+  later: quarryLater,
 };
 
 /** Chit Malt sits in two bins, so Prep could not pick its source alone: Edit offers both. */
@@ -149,6 +172,7 @@ export const brewTimelineQuarry: BrewTimelineViewModel = {
   sources: [...lineStock, ...chitStock, ...gypsumStock],
   ingredients: [...brewPrepQuarry.ingredients.map(row => ({ ...row, confirmed: row.key === "malted-oats" || row.key === "pilsen" })), ...quarryWater],
   targets: { mash: "152 °F · 60 min · pH 5.3", lauter: "pre-boil 25 bbl", boil: "60 min", whirlpool: "180 °F · 20 min", knockout: "66 °F" },
+  later: quarryLater,
   process: { mashWaterGal: "620", targetMashPh: "5.3" },
   vesselId: "fv3",
   vessels: quarryVessels,
@@ -246,6 +270,20 @@ export const WATER_HAZY: WaterDraft = {
   additions: [{ materialId: "gypsum", qty: 4, unit: "g", stage: "mash" }, { materialId: "cacl", qty: 6, unit: "g", stage: "mash" }, { materialId: "lactic", qty: 3, unit: "mL", stage: "sparge" }],
 };
 
+/** Two closed batches of v4, as get_recipe_outcomes returns them. The page text is computed from these. */
+const HAZY_V4 = { version: 4, closed: true, predicted: { ogPlato: 15.2, fgPlato: 3.5, abv: 6.3 }, assumedEfficiency: 0.72, assumedAttenuation: 0.78 };
+const HAZY_OUTCOMES: RecipeOutcome[] = [
+  { ...HAZY_V4, batchId: "b-0413", batchNo: 413, brewedOn: "2026-10-03", ogPlato: 14.8, fgPlato: 3.5, abv: 6.1, apparentAttenuation: 0.77, brewhouseEfficiency: 0.68 },
+  { ...HAZY_V4, batchId: "b-0398", batchNo: 398, brewedOn: "2026-09-12", ogPlato: 15.1, fgPlato: 3.4, abv: 6.3, apparentAttenuation: 0.78, brewhouseEfficiency: 0.71 },
+];
+
+/** Hazy IPA v4's hop lines as get_recipe reads them, with the alpha acid frozen on v4. The page text is computed from these. */
+const HAZY_HOP = { name: "Citra", category: "hop", unit: "lb", alphaAcid: 12.5 };
+const HAZY_IBU = recipeIbu({
+  ogPlato: HAZY_V4.predicted.ogPlato,
+  lines: [{ ...HAZY_HOP, stage: "boil", perBblQty: 0.4, timingMinutes: 10 }, { ...HAZY_HOP, stage: "dry_hop", perBblQty: 1.2, timingMinutes: null }],
+});
+
 export const recipeHazyV4: RecipeViewModel = {
   title: "Hazy IPA v4",
   saved: "Aug 28, 2026",
@@ -269,17 +307,14 @@ export const recipeHazyV4: RecipeViewModel = {
   efficiency: "72",
   attenuation: "78",
   mash: { title: `Mash schedule · ${plural(MASH_STEPS.length, "step")}`, detail: mashRowSummary(MASH_STEPS) },
-  // PR D drops the dry-hop day argument with the dry-hop row.
-  fermentation: { title: `Fermentation schedule · ${plural(FERM_STAGES.length, "stage")}`, detail: fermentationSummary(FERM_STAGES, 4) },
+  fermentation: { title: `Fermentation schedule · ${plural(FERM_STAGES.length, "stage")}`, detail: fermentationSummary(FERM_STAGES) },
   // The live draft's Water row: target and addition count (recipe-version-form.tsx); the Water frame names the source.
   water: { title: "Water", detail: waterRowSummary(waterProfiles.find((p) => p.id === WATER_HAZY.targetProfileId)?.name, WATER_HAZY.additions.length) },
   notes: "Whirlpool hard, knock out cold.",
-  predicted: "Predicted: OG 15.2 °P · FG 3.3 °P · ABV 6.5%",
-  tape: [
-    ["B-0413 · OG 14.8 · FG 3.5 · ABV 6.0%", "eff 68% · att 76%"],
-    ["B-0398 · OG 15.1 · FG 3.4 · ABV 6.3%", "eff 71% · att 77%"],
-  ],
-  actualsNote: "Actuals run −0.4 °P OG vs predicted (eff 68–71% vs 72% assumed). Lower the assumption on v5?",
+  predicted: "Predicted: OG 15.2 °P · FG 3.5 °P · ABV 6.3%",
+  bitterness: ibuText(HAZY_IBU, { saved: true }),
+  tape: outcomeTape(HAZY_OUTCOMES, "plato"),
+  actualsNote: outcomeSummary(HAZY_OUTCOMES, 4),
 };
 export const cellarTransferPils = {
   fromId: "fv1-occupancy", toId: "bt1", volume: "3.0", loss: "",

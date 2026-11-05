@@ -4,7 +4,8 @@ import { isUuid } from "@/lib/uuid";
 // default: Brew day once Prep pulls are saved, else Prep). Prep (PrepForm →
 // BrewPrepView) saves the pull list; Brew day (BrewTimelineView) starts each
 // ingredient from its saved pull (already confirmed), else plan, and adds the
-// planned water additions as rows; vessel and date sit in Knockout.
+// planned water additions as rows; vessel and date sit in Knockout. Both tabs
+// list what happens after knockout, totalled for the planned barrels.
 // A recorded batch (history, Correct turn, Add brew turn; once completed, its
 // completion day, packaged volume and write-off) and a cancelled one keep BrewDayView; the
 // timeline does not model corrections or turns. Every state is titled with the
@@ -16,7 +17,7 @@ import { isUuid } from "@/lib/uuid";
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import { brewedAsPlanned, brewPlanActuals, currentBrewRecords, type BrewPlan, type BrewMaterialSource, type BrewPull, type BrewRecordView } from "@/lib/mgr/brew-day-view";
-import { brewIngredients, brewTargets, laterAdditions, openBrewTab, waterAdditionRows } from "@/lib/mgr/brew-prep-view";
+import { brewIngredients, brewTargets, cellarPlanRows, openBrewTab, waterAdditionRows } from "@/lib/mgr/brew-prep-view";
 import { getActiveBrewery } from "@/lib/brewery";
 import { formatDate } from "@/lib/date-format";
 import { buildContext } from "@/lib/commands/context";
@@ -71,9 +72,9 @@ export default async function BatchPage({ params, searchParams }: { params: Prom
     // A planned tank retired since Prep is not in list_vessels: start with none chosen rather than a hidden id save_batch_pulls refuses.
     const plannedVessel = vessels.find(vessel => vessel.id === plan.batch.planned_vessel_id)?.id ?? "";
     const tabHrefs = { Prep: `/batches/${batch.id}?tab=prep`, "Brew day": `/batches/${batch.id}?tab=brew-day` };
-    const shared = { title, backHref: "/batches", overdue: batch.planned_on < today, ingredients: brewIngredients(plan.plan, plan.pulls, plan.sources, plannedBbl), sources: plan.sources, vesselId: plannedVessel, vessels, planned, note: batch.note ?? undefined };
+    const shared = { title, backHref: "/batches", overdue: batch.planned_on < today, ingredients: brewIngredients(plan.plan, plan.pulls, plan.sources, plannedBbl), sources: plan.sources, vesselId: plannedVessel, vessels, planned, note: batch.note ?? undefined, later: cellarPlanRows(plan.plan, plannedBbl) };
     const planActions = <ChangePlan kind="batch" id={batch.id} plannedOn={batch.planned_on} />;
-    if (openBrewTab(tab, plan.pulls.length > 0) === "prep") return <PrepForm batchId={batch.id} tabHrefs={tabHrefs} planActions={planActions} model={{ ...shared, later: laterAdditions(plan.plan) }} />;
+    if (openBrewTab(tab, plan.pulls.length > 0) === "prep") return <PrepForm batchId={batch.id} tabHrefs={tabHrefs} planActions={planActions} model={shared} />;
     // Water additions are confirmed on Brew day only: Prep pulls recipe lines (#1508).
     const water = waterAdditionRows(plan.plan, plan.sources);
     return <RecordBrewTimelineForm batchId={batch.id} tabHrefs={tabHrefs} planActions={planActions} model={{

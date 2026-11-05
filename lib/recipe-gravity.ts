@@ -1,7 +1,8 @@
 // lib/recipe-gravity.ts — the one pure gravity calculation recipe RPCs and
 // the editor preview call: given a recipe version's assumption columns
 // (brewhouseEfficiency, yeastAttenuation) and its ingredients'
-// per-bbl quantities and extract potentials, predicts OG/FG/ABV.
+// per-bbl quantities and extract potentials, predicts OG/FG/ABV. Also what a
+// brewed batch measured against that prediction (measuredGravity).
 //
 // Only `stage: "mash"` ingredients contribute extract here. That is a
 // simplification this implementation makes, NOT a fact about brewing: kettle
@@ -30,7 +31,8 @@
 // Not duplicated in SQL.
 //
 // Formula (extractPotential is SG-style, e.g. 1.037 = 37 PPG; 1 bbl = 31 US gal):
-//   GU        = sum(perBblQty * (extractPotential - 1) * 1000 * brewhouseEfficiency) / 31
+//   Potential = sum(perBblQty * (extractPotential - 1) * 1000) / 31
+//   GU        = Potential * brewhouseEfficiency
 //   OG (SG)   = 1 + GU / 1000
 //   FG (SG)   = 1 + (OG - 1) * (1 - yeastAttenuation)
 //   Plato(SG) = max(0, -616.868 + 1111.14*SG - 630.272*SG^2 + 135.997*SG^3)  (ASBC cubic, clamped at water)
@@ -63,7 +65,7 @@ export type RecipeGravityResult = {
 
 const BBL_TO_GALLONS = 31;
 /** Pounds per one of each mass unit in public.uom. */
-const LB_PER: Record<string, number> = { lb: 1, kg: 2.20462, oz: 1 / 16, g: 0.00220462 };
+export const LB_PER: Record<string, number> = { lb: 1, kg: 2.20462, oz: 1 / 16, g: 0.00220462 };
 
 /**
  * ASBC cubic approximation converting specific gravity to degrees Plato.
@@ -118,28 +120,69 @@ export function gravityBlockers(ingredients: RecipeGravityIngredient[]): Gravity
 }
 
 /**
+ * The gravity points one barrel of wort would hold at 100% efficiency, from a
+ * version's mash-stage lines, or null when nothing honest can be said: no mash
+ * ingredient, or any gravityBlockers entry. A mash ingredient that truly bears
+ * no extract (rice hulls) is given 1.000.
+ */
+export function potentialPointsPerBbl(ingredients: RecipeGravityIngredient[]): number | null {
+  const mash = ingredients.filter((ingredient) => ingredient.stage === "mash");
+  if (mash.length === 0 || gravityBlockers(ingredients).length > 0) return null;
+  return mash.reduce((sum, ingredient) => sum + ingredient.perBblQty * LB_PER[ingredient.unit!] * (ingredient.extractPotential! - 1) * 1000, 0) / BBL_TO_GALLONS;
+}
+
+const abvFromSg = (og: number, fg: number) => (og - fg) * 131.25;
+
+/**
  * Predicts OG/FG/ABV from a recipe version's mash-stage ingredients, or null
- * when there is nothing honest to predict: no mash ingredient, or any
- * gravityBlockers entry. Callers hide the prediction on null rather than print
- * 0.0 (#430). A mash ingredient that truly bears no extract (rice hulls) is
- * given 1.000.
+ * when potentialPointsPerBbl is. Callers hide the prediction on null rather
+ * than print 0.0 (#430).
  */
 export function recipeGravity(input: RecipeGravityInput): RecipeGravityResult | null {
-  const mash = input.ingredients.filter((ingredient) => ingredient.stage === "mash");
-  if (mash.length === 0 || gravityBlockers(input.ingredients).length > 0) return null;
-  const gravityUnits =
-    mash.reduce(
-      (sum, ingredient) =>
-        sum + ingredient.perBblQty * LB_PER[ingredient.unit!] * (ingredient.extractPotential! - 1) * 1000 * input.brewhouseEfficiency,
-      0,
-    ) / BBL_TO_GALLONS;
+  const potential = potentialPointsPerBbl(input.ingredients);
+  if (potential === null) return null;
 
-  const og = 1 + gravityUnits / 1000;
+  const og = 1 + (potential * input.brewhouseEfficiency) / 1000;
   const fg = 1 + (og - 1) * (1 - input.yeastAttenuation);
 
   return {
     ogPlato: sgToPlato(og),
     fgPlato: sgToPlato(fg),
-    abv: (og - fg) * 131.25,
+    abv: abvFromSg(og, fg),
+  };
+}
+
+export type MeasuredGravityInput = {
+  ogPlato: number | null;
+  fgPlato: number | null;
+  potentialPointsPerBbl: number | null;
+  plannedBbl: number;
+  knockoutBbl: number | null;
+};
+
+export type MeasuredGravity = {
+  abv: number | null;
+  apparentAttenuation: number | null;
+  brewhouseEfficiency: number | null;
+};
+
+/**
+ * What a batch's readings say, as fractions and a percent ABV. Grain follows
+ * planned barrels and the wort is the knockout, so efficiency needs both: a
+ * short knockout concentrates the same extract and must not read as higher
+ * efficiency. A metric is null, never 0, when an input is missing. An OG of
+ * water (a first reading of 0 °P) and a bill with no extract have nothing to
+ * divide by, so those are null too.
+ */
+export function measuredGravity(input: MeasuredGravityInput): MeasuredGravity {
+  const og = input.ogPlato === null ? null : platoToSg(input.ogPlato);
+  const fg = input.fgPlato === null ? null : platoToSg(input.fgPlato);
+  const finished = og !== null && fg !== null;
+  return {
+    abv: finished ? abvFromSg(og, fg) : null,
+    apparentAttenuation: finished && og > 1 ? (og - fg) / (og - 1) : null,
+    brewhouseEfficiency: og !== null && input.potentialPointsPerBbl && input.knockoutBbl !== null
+      ? ((og - 1) * 1000 * input.knockoutBbl) / (input.potentialPointsPerBbl * input.plannedBbl)
+      : null,
   };
 }

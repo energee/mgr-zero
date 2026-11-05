@@ -124,6 +124,7 @@ const pureTests = [
   "tests/app-screen-parity.test.ts",
   "tests/screen-view-composition.test.ts",
   "tests/production-view.test.ts",
+  "tests/recipe-outcomes-view.test.ts",
   "tests/inventory-view.test.ts",
   "tests/inventory-detail-view.test.ts",
   "tests/order-view.test.ts",

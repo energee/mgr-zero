@@ -78,6 +78,29 @@ describe("SCREENS", () => {
     expect(gate).toMatch(/schedules/);
   });
 
+  it("draws Batch actuals from a live read, computed from the outcomes", () => {
+    const recipe = SCREENS.find((s) => s.name === "Recipe")!;
+    expect(String(recipe.reads)).toMatch(/get_recipe_outcomes \[(?!design)/);
+    expect(recipe.states?.map(([name]) => name)).toContain("no batches");
+    const drawn = text("Recipe");
+    expect(drawn).toContain("Batch actuals · predicted in brackets");
+    expect(drawn).toContain("B-0413 · v4 · Oct 3, 2026");
+    expect(drawn).toContain("2 batches: efficiency 68–71% against 72% assumed; attenuation 77–78% against 78% assumed.");
+    expect(drawn).not.toMatch(/Lower the assumption/);
+  });
+
+  it("asks for alpha acid on the hop the Edit material frame draws", () => {
+    expect(text("Edit material")).toContain("Alpha acid % · optional");
+    expect(SCREENS.find((s) => s.name === "Edit material")!.states?.map(([name]) => name)).toContain("hop");
+  });
+
+  it("draws the recipe's IBU beside its prediction, and states what a gap reads", () => {
+    const recipe = SCREENS.find((s) => s.name === "Recipe")!;
+    expect(text("Recipe")).toContain("IBU 15");
+    expect(recipe.states?.map(([name]) => name)).toEqual(expect.arrayContaining(["some hops lack alpha acid", "no IBU"]));
+    expect(String(recipe.writes)).toMatch(/alpha acid snapshot/);
+  });
+
   it("draws the Recipe frame from the shared schedule helpers, with its saved date and no gate", () => {
     const recipe = SCREENS.find((s) => s.name === "Recipe")!;
     const drawn = text("Recipe");
@@ -128,11 +151,11 @@ describe("SCREENS", () => {
     expect(mash).toContain("Add step");
   });
 
-  it("draws a fermentation schedule that places the dry hop", () => {
+  it("draws a fermentation schedule with its total, leaving dry-hop days to the recipe's lines", () => {
     const ferm = text("Fermentation schedule");
     expect(ferm).toContain("Diacetyl rest");
     expect(ferm).toContain("Total 18 days");
-    expect(ferm).toMatch(/dry hop day 4 falls in Primary/);
+    expect(ferm).not.toMatch(/falls in Primary/);
     expect(ferm).toContain("Add stage");
   });
 

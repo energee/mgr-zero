@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { bblExact, bblFixed, formatVolume, parseVolumeToBbl } from "@/lib/volume";
+import { bblExact, bblFixed, formatVolume, LITERS_PER_BBL, parseVolumeToBbl } from "@/lib/volume";
+
+describe("LITERS_PER_BBL", () => {
+  it("is 31 US gallons in liters", () => {
+    expect(LITERS_PER_BBL).toBeCloseTo(117.3478, 4);
+  });
+});
 
 describe("parseVolumeToBbl", () => {
   it("converts supported display units and preserves an empty composed volume", () => {

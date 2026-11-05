@@ -1,10 +1,9 @@
 // lib/mgr/format-view.ts — view-model for one Format sheet. upsert_format
 // plus replace_format_bom lines paint name, basis, package, volume, and BOM.
-import { GALLONS_PER_BBL, OUNCES_PER_BBL, parseVolumeToBbl, formatVolume } from "@/lib/volume";
+import { GALLONS_PER_BBL, LITERS_PER_BBL, OUNCES_PER_BBL, parseVolumeToBbl, formatVolume } from "@/lib/volume";
 
 import { SIZE_LABEL } from "@/lib/mgr/keg-labels";
 
-const LITERS_PER_BBL = GALLONS_PER_BBL * 3.785411784;
 export const KEG_BBL: Record<string, number> = {
   half_bbl: 0.5, quarter_bbl: 0.25, sixth_bbl: 1 / 6,
   fifty_l: 50 / LITERS_PER_BBL, thirty_l: 30 / LITERS_PER_BBL, twenty_l: 20 / LITERS_PER_BBL,

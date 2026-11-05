@@ -1493,14 +1493,14 @@ isOneToOne: false
                   ]
                 },"materials": {
                   Row: {
-                    "active": boolean,"base_uom": Database["public"]['Enums']["uom"],"brewery_id": string,"category": Database["public"]['Enums']["material_category"],"created_at": string,"default_vendor_id": string | null,"extract_potential": number | null,"id": string,"lot_tracked": boolean,"name": string,"purchase_uom": Database["public"]['Enums']["uom"],"purchase_uom_factor": number,"reorder_point": number | null
+                    "active": boolean,"alpha_acid": number | null,"base_uom": Database["public"]['Enums']["uom"],"brewery_id": string,"category": Database["public"]['Enums']["material_category"],"created_at": string,"default_vendor_id": string | null,"extract_potential": number | null,"id": string,"lot_tracked": boolean,"name": string,"purchase_uom": Database["public"]['Enums']["uom"],"purchase_uom_factor": number,"reorder_point": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "active"?: boolean,"base_uom": Database["public"]['Enums']["uom"],"brewery_id": string,"category": Database["public"]['Enums']["material_category"],"created_at"?: string,"default_vendor_id"?: string | null,"extract_potential"?: number | null,"id"?: string,"lot_tracked"?: boolean,"name": string,"purchase_uom": Database["public"]['Enums']["uom"],"purchase_uom_factor"?: number,"reorder_point"?: number | null
+                    "active"?: boolean,"alpha_acid"?: number | null,"base_uom": Database["public"]['Enums']["uom"],"brewery_id": string,"category": Database["public"]['Enums']["material_category"],"created_at"?: string,"default_vendor_id"?: string | null,"extract_potential"?: number | null,"id"?: string,"lot_tracked"?: boolean,"name": string,"purchase_uom": Database["public"]['Enums']["uom"],"purchase_uom_factor"?: number,"reorder_point"?: number | null
                   }
                   Update: {
-                    "active"?: boolean,"base_uom"?: Database["public"]['Enums']["uom"],"brewery_id"?: string,"category"?: Database["public"]['Enums']["material_category"],"created_at"?: string,"default_vendor_id"?: string | null,"extract_potential"?: number | null,"id"?: string,"lot_tracked"?: boolean,"name"?: string,"purchase_uom"?: Database["public"]['Enums']["uom"],"purchase_uom_factor"?: number,"reorder_point"?: number | null
+                    "active"?: boolean,"alpha_acid"?: number | null,"base_uom"?: Database["public"]['Enums']["uom"],"brewery_id"?: string,"category"?: Database["public"]['Enums']["material_category"],"created_at"?: string,"default_vendor_id"?: string | null,"extract_potential"?: number | null,"id"?: string,"lot_tracked"?: boolean,"name"?: string,"purchase_uom"?: Database["public"]['Enums']["uom"],"purchase_uom_factor"?: number,"reorder_point"?: number | null
                   }
                   Relationships: [
                     {
@@ -2911,14 +2911,14 @@ isOneToOne: false
                   ]
                 },"recipe_ingredients": {
                   Row: {
-                    "brewery_id": string,"extract_snapshot": number | null,"id": string,"material_id": string,"per_bbl_qty": number,"recipe_version_id": string,"sort": number,"stage": Database["public"]['Enums']["ingredient_stage"],"timing_minutes": number | null
+                    "alpha_snapshot": number | null,"brewery_id": string,"extract_snapshot": number | null,"id": string,"material_id": string,"per_bbl_qty": number,"recipe_version_id": string,"sort": number,"stage": Database["public"]['Enums']["ingredient_stage"],"timing_minutes": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "brewery_id": string,"extract_snapshot"?: number | null,"id"?: string,"material_id": string,"per_bbl_qty": number,"recipe_version_id": string,"sort"?: number,"stage": Database["public"]['Enums']["ingredient_stage"],"timing_minutes"?: number | null
+                    "alpha_snapshot"?: number | null,"brewery_id": string,"extract_snapshot"?: number | null,"id"?: string,"material_id": string,"per_bbl_qty": number,"recipe_version_id": string,"sort"?: number,"stage": Database["public"]['Enums']["ingredient_stage"],"timing_minutes"?: number | null
                   }
                   Update: {
-                    "brewery_id"?: string,"extract_snapshot"?: number | null,"id"?: string,"material_id"?: string,"per_bbl_qty"?: number,"recipe_version_id"?: string,"sort"?: number,"stage"?: Database["public"]['Enums']["ingredient_stage"],"timing_minutes"?: number | null
+                    "alpha_snapshot"?: number | null,"brewery_id"?: string,"extract_snapshot"?: number | null,"id"?: string,"material_id"?: string,"per_bbl_qty"?: number,"recipe_version_id"?: string,"sort"?: number,"stage"?: Database["public"]['Enums']["ingredient_stage"],"timing_minutes"?: number | null
                   }
                   Relationships: [
                     {
@@ -5841,7 +5841,7 @@ isOneToOne: false
 { Args: { "p_basis": Database["public"]['Enums']["format_basis"],"p_bbl_per_unit": number,"p_brewery": string,"p_id": string,"p_keg_size": Database["public"]['Enums']["keg_size"],"p_name": string,"p_ounces"?: number,"p_package_type": Database["public"]['Enums']["package_type"],"p_price_group"?: string,"p_request_id": string,"p_units_per_case": number }; Returns: Json
                            },
 "upsert_material":
-{ Args: { "p_active": boolean,"p_base_uom": Database["public"]['Enums']["uom"],"p_brewery": string,"p_category": Database["public"]['Enums']["material_category"],"p_default_vendor": string,"p_extract_potential": number,"p_lot_tracked": boolean,"p_material": string,"p_name": string,"p_purchase_uom": Database["public"]['Enums']["uom"],"p_purchase_uom_factor": number,"p_reorder_point": number,"p_request_id": string }; Returns: Json
+{ Args: { "p_active": boolean,"p_alpha_acid": number,"p_base_uom": Database["public"]['Enums']["uom"],"p_brewery": string,"p_category": Database["public"]['Enums']["material_category"],"p_default_vendor": string,"p_extract_potential": number,"p_lot_tracked": boolean,"p_material": string,"p_name": string,"p_purchase_uom": Database["public"]['Enums']["uom"],"p_purchase_uom_factor": number,"p_reorder_point": number,"p_request_id": string }; Returns: Json
                            },
 "upsert_material_contract":
 { Args: { "p_brewery": string,"p_contract": string,"p_contract_no": string,"p_ends_on": string,"p_material": string,"p_qty_committed": number,"p_request_id": string,"p_starts_on": string,"p_unit_cost_cents": number,"p_vendor": string }; Returns: Json
