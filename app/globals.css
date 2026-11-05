@@ -149,11 +149,11 @@
    surfaces are navy steps derived from the ground, since the scheme defines
    only one. */
 .dark {
-  --background: #102040;
+  --background: #050a16;
   --foreground: #dddddd;
   --card: #152a50;
   --card-foreground: #dddddd;
-  --popover: #1a3058;
+  --popover: #08101f;
   --popover-foreground: #dddddd;
   --primary: #60a4ec;
   --primary-foreground: #102040;
@@ -169,7 +169,7 @@
   --control-border: #798fac;
   --input: var(--control-border);
   --ring: #60a4ec;
-  --sidebar: #0c1a35;
+  --sidebar: #03060e;
   --sidebar-foreground: #bebebe;
   --sidebar-primary: #60a4ec;
   --sidebar-primary-foreground: #102040;
