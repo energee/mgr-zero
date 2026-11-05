@@ -304,7 +304,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   expect(catalog.filter(c => ownNames.includes(c.name)).map(c => c.signature).sort()).toEqual([...ownSignatures].sort());
   // #467: brewery bootstrap is service-role only; the server passes the verified actor.
   expect(catalog.filter(c => c.name === "provision_brewery")).toEqual([]);
-  expect(catalog.filter(c => infrastructureNames.includes(c.name)).map(c => c.signature)).toEqual(["agent_session_is_live()", "consume_command_admission()"]);
+  expect(catalog.filter(c => infrastructureNames.includes(c.name)).map(c => c.signature).sort()).toEqual(["agent_session_is_live()", "consume_command_admission()"]);
   await expect(db.rpc("consume_command_admission")).resolves.toMatchObject({ data: [{ allowed: true, retry_after: 0 }], error: null });
   for (const name of new Set(existing)) expect(catalog.filter(c => c.name === name), `${name} existing lifecycle case`).toHaveLength(1);
   const sharedDestination = await db.rpc("set_notification_destination", { p_brewery: B, p_installation: I, p_external_destination_id: "shared", p_request_id: R(), p_actor: f.owner.id, p_version: now });
