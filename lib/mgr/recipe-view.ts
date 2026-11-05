@@ -5,9 +5,8 @@
 // (draftBlocker), the read page's model of a saved version (toRecipePageModel)
 // and why a prediction is missing (gravityBlockerText, noMashText). The read
 // page prints the IBU get_recipe estimated; a draft previews it (draftIbuText).
-// A brew-day
-// line also totals in packs at the batch size typed into Show totals at
-// (ingredientPack, batchTotalText), and the draft offers rounding it to whole
+// A brew-day line also totals in packs at the batch size typed into Show totals
+// at (ingredientPack, batchTotalText), and the draft offers rounding it to whole
 // packs (packRounding). Batch actuals is the text of get_recipe_outcomes: one
 // row per brewed batch (outcomeTape) and the gap for the shown version
 // (outcomeSummary).
@@ -210,10 +209,13 @@ export function noMashText(stages: string[]): string | null {
 export function draftIbuText(lines: IngredientLine[], ogPlato: number | null, materials: RecipeMaterial[]): string | undefined {
   if (lines.length === 0) return undefined;
   const material = materialLookup(materials);
-  const ibuLines = lines.map((l) => ({
-    name: material.name(l.materialId), category: material.get(l.materialId)?.category ?? "hop", stage: l.stage, perBblQty: Number(l.perBblQty),
-    unit: material.unit(l.materialId), timingMinutes: l.timingMinutes ? Number(l.timingMinutes) : null, alphaAcid: material.get(l.materialId)?.alpha_acid ?? null,
-  }));
+  const ibuLines = lines.map((l) => {
+    const m = material.get(l.materialId);
+    return {
+      name: material.name(l.materialId), category: m?.category ?? "hop", stage: l.stage, perBblQty: Number(l.perBblQty),
+      unit: m?.base_uom, timingMinutes: l.timingMinutes ? Number(l.timingMinutes) : null, alphaAcid: m?.alpha_acid ?? null,
+    };
+  });
   return ibuText(recipeIbu({ ogPlato, lines: ibuLines }), { saved: false });
 }
 

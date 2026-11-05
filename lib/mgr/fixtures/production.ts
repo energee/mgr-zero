@@ -277,7 +277,7 @@ const HAZY_OUTCOMES: RecipeOutcome[] = [
   { ...HAZY_V4, batchId: "b-0398", batchNo: 398, brewedOn: "2026-09-12", ogPlato: 15.1, fgPlato: 3.4, abv: 6.3, apparentAttenuation: 0.78, brewhouseEfficiency: 0.71 },
 ];
 
-/** Its hop lines as get_recipe reads them, with the alpha acid frozen on v4; the page text is computed from these. */
+/** Hazy IPA v4's hop lines as get_recipe reads them, with the alpha acid frozen on v4. The page text is computed from these. */
 const HAZY_HOP = { name: "Citra", category: "hop", unit: "lb", alphaAcid: 12.5 };
 const HAZY_IBU = recipeIbu({
   ogPlato: HAZY_V4.predicted.ogPlato,

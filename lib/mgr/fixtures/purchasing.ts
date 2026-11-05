@@ -187,6 +187,7 @@ export const materialCitra: MaterialViewModel = {
     { id: "hop-supply", label: "Fictional Hop Supply" },
     { id: "cm", label: "Fictional Malt Supply" },
   ],
+  alphaAcid: "12.5",
   lotTracked: true,
   active: true,
 };

@@ -89,6 +89,11 @@ describe("SCREENS", () => {
     expect(drawn).not.toMatch(/Lower the assumption/);
   });
 
+  it("asks for alpha acid on the hop the Edit material frame draws", () => {
+    expect(text("Edit material")).toContain("Alpha acid % · optional");
+    expect(SCREENS.find((s) => s.name === "Edit material")!.states?.map(([name]) => name)).toContain("hop");
+  });
+
   it("draws the recipe's IBU beside its prediction, and states what a gap reads", () => {
     const recipe = SCREENS.find((s) => s.name === "Recipe")!;
     expect(text("Recipe")).toContain("IBU 15");
