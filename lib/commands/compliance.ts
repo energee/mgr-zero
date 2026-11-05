@@ -142,7 +142,7 @@ defineQuery({
 });
 
 defineQuery({
-  name: "get_cola_image",
+  name: "get_cola_image", agentHidden: true,
   description: "Render one official approved COLA label as a bounded image data URL; a label saved on a brand is fetched from TTB once with a fresh session and served from MGR's copy afterwards; admin/sales may preview brewery-owned labels, other staff may view only an approved image saved on a brand",
   roles: STAFF_ROLES,
   input: z.object({ ttbId: colaId, url: z.string().refine(isColaImageUrl, "Use an official TTB label image URL") }),

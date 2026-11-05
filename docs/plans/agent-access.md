@@ -355,6 +355,11 @@ preview hook.
 
 ## Closing the gap
 
+Step 1 is done (2026-11-05). `mcp-remote`, a third-party client, found the server,
+registered itself, signed in through the consent page and ran `get_started` and
+`get_today`. The hook did not get in its way. Claude, ChatGPT, the 2026-07-28
+protocol and custom-scheme redirects are still untested.
+
 Each task starts with a failing test, except writing and by-hand checks. Each
 says which scorecard rows it moves. Tasks in one group can run in parallel unless
 a dependency is named. Run `scripts/agent-readiness.ts` after every task and

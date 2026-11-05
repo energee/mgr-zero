@@ -6,7 +6,7 @@ import { MAX_HISTORY_MESSAGES } from "@/lib/chat/model-messages";
 const conversationId = z.string().uuid();
 
 defineQuery({
-  name: "preview_command", description: "Canonicalize one supported command into server-owned effects and a bound preview token without running its write handler",
+  name: "preview_command", agentHidden: true, description: "Canonicalize one supported command into server-owned effects and a bound preview token without running its write handler",
   input: z.object({ name: z.literal("record_movement"), input: movementInput, conversationId }), roles: STAFF_ROLES,
   handler: (ctx, input) => previewCommand(input.name, input.input, ctx, input.conversationId),
 });

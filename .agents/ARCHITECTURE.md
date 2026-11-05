@@ -130,7 +130,8 @@ a gap to close, not a convention to trust.
    queries go through `lib/commands/registry.ts` via
    `defineCommand`/`defineQuery` and the single
    endpoint `app/api/command/route.ts` (cookie session or Bearer access token;
-   an agent's OAuth token is Bearer only and runs AI-exposed queries only).
+   an agent's OAuth token is Bearer only and runs queries only, through
+   `/api/command` or `app/api/mcp/route.ts`, unless a query sets `agentHidden`).
    No route handler or page contains
    inline business logic. There is no resource REST API and no API-key table —
    new operations are registered commands, not new routes. Handlers signal user-facing failures by throwing

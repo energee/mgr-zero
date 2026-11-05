@@ -1,65 +1,15 @@
 // tests/agent-access.test.ts — an OAuth token acts as its person for reads only:
 // it cannot commit, cannot change the account, cannot read a brewery with agents
 // off, and stops at revoke.
-import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { createClient } from "@supabase/supabase-js";
+import { randomUUID } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
 import { POST } from "@/app/api/command/route";
 import { createRequestAuthContext } from "@/lib/auth/request-context";
 import { buildContextFromBearer } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
-import type { Database } from "@/lib/supabase/database";
-import { admin, asUser, ins, makeBrewery, makeStaff, makeStaffCtx, seedCustomer, seedLocation, sql } from "./helpers";
-
-const API = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const ANON = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
-const REDIRECT = "http://127.0.0.1:9/callback";
-
-const client = (accessToken?: string) => createClient<Database>(API, ANON, {
-  auth: { persistSession: false },
-  ...(accessToken ? { accessToken: async () => accessToken } : {}),
-});
-
-/** Runs the real authorization-code flow: register a client, approve as the person, exchange the code. */
-async function connectAgent(email: string) {
-  const { data: registered, error } = await admin.auth.admin.oauth.createClient({ client_name: "Test agent", redirect_uris: [REDIRECT] });
-  if (error || !registered) throw error ?? new Error("no client");
-  const person = client();
-  const signedIn = await person.auth.signInWithPassword({ email, password: "test-password-1" });
-  if (signedIn.error) throw signedIn.error;
-
-  const verifier = randomBytes(32).toString("base64url");
-  const authorize = await fetch(`${API}/auth/v1/oauth/authorize?${new URLSearchParams({
-    response_type: "code", client_id: registered.client_id, redirect_uri: REDIRECT, scope: "email",
-    code_challenge: createHash("sha256").update(verifier).digest("base64url"), code_challenge_method: "S256",
-  })}`, { redirect: "manual" });
-  const authorizationId = new URL(authorize.headers.get("location")!).searchParams.get("authorization_id")!;
-  // Reading the details binds the request to this person; approval fails without it.
-  await person.auth.oauth.getAuthorizationDetails(authorizationId);
-  const approved = await person.auth.oauth.approveAuthorization(authorizationId, { skipBrowserRedirect: true });
-  if (approved.error) throw approved.error;
-
-  const requestToken = async (grant: Record<string, string>) => {
-    const response = await fetch(`${API}/auth/v1/oauth/token`, {
-      method: "POST",
-      headers: {
-        apikey: ANON, "content-type": "application/x-www-form-urlencoded",
-        authorization: `Basic ${Buffer.from(`${registered.client_id}:${registered.client_secret}`).toString("base64")}`,
-      },
-      body: new URLSearchParams(grant),
-    });
-    return await response.json() as { access_token: string; refresh_token: string };
-  };
-  const issued = await requestToken({ grant_type: "authorization_code", code: new URL(approved.data.redirect_url).searchParams.get("code")!, redirect_uri: REDIRECT, code_verifier: verifier });
-  return {
-    token: issued.access_token,
-    clientId: registered.client_id,
-    userId: signedIn.data.user.id,
-    refresh: async () => (await requestToken({ grant_type: "refresh_token", refresh_token: issued.refresh_token })).access_token,
-    revoke: () => person.auth.oauth.revokeGrant({ clientId: registered.client_id }),
-  };
-}
+import { API, ANON, client, connectAgent } from "./agent-oauth";
+import { asUser, ins, makeBrewery, makeStaff, makeStaffCtx, seedCustomer, seedLocation, sql } from "./helpers";
 
 const updateAccount = (token: string, change: Record<string, unknown>) => fetch(`${API}/auth/v1/user`, {
   method: "PUT",
@@ -95,13 +45,17 @@ describe("agent tokens", () => {
     expect(ctx.agent).toEqual({ clientId: agent.clientId });
   });
 
-  it("runs an AI-exposed read", async () => {
+  it("runs a read", async () => {
     const response = await call(agent.token, { breweryId, name: "get_today", input: {} });
     expect(response.status).toBe(200);
   });
 
-  it("refuses a read that is not AI-exposed", async () => {
-    const response = await call(agent.token, { breweryId, name: "list_invoices", input: {} });
+  it("runs a read its roles allow, even one not marked for AI", async () => {
+    expect((await call(agent.token, { breweryId, name: "list_invoices", input: {} })).status).toBe(200);
+  });
+
+  it("refuses a hidden read", async () => {
+    const response = await call(agent.token, { breweryId, name: "get_qbo_connection", input: {} });
     expect(response.status).toBe(403);
     expect((await response.json()).error.code).toBe("agent_not_allowed");
   });
