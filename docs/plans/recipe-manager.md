@@ -1,7 +1,7 @@
 # Recipe manager
 
-Status: Phase 1 plan, awaiting approval, 2026-11-04. No build starts until the
-owner approves it. This replaces plans B, C and D from the recipe page review
+Status: approved to build, 2026-11-04. PRs 1 to 3 below ship together in #1767, and PR 4
+waits. This replaces plans B, C and D from the recipe page review
 (`brew-day-recipe-targets`, `recipe-outcomes`, `recipe-ibu-pitch`). Their full
 text is in commit 9de3f81e3 and on those local branches.
 
@@ -280,9 +280,13 @@ PR 1 and PR 2 run in parallel. PR 3 follows PR 1. PR 4 is last. Every PR is base
 - Hop category is read live rather than frozen, because category changes are rare.
 - Open batches keep plan C's latest-reading FG, are labelled, and stay out of the summary line.
 
-## Questions for the owner
+## Decisions for the build
 
-1. Should whirlpool hops count toward IBU at a flat 5%? This decides whether most recipes show an IBU at all.
-2. May the local importer fill alpha acid on imported versions, as described under Existing recipes?
-3. Is PR 4 worth building? Pitch rate has source data, but it adds the most surface for the least daily use.
-4. Should the summary line stay a plain statement, or also suggest lowering the assumption, as the fixture once did?
+The owner approved the build without answering these questions, so each one takes the plan's recommendation:
+
+| Question | Decision |
+|---|---|
+| Do whirlpool hops count toward IBU? | Yes, at a flat 5%. |
+| Does the summary line suggest lowering the assumption? | No. It stays a plain statement. |
+| Is PR 4 built now? | No. Decide after PRs 1 to 3. |
+| Does the local importer fill alpha acid on imported versions? | Not yet. That needs its own go-ahead per database. |
