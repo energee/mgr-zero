@@ -33,7 +33,7 @@ export function QboMappingsView({ title, backLabel, backHref, context = "account
       {!section.rows.length && section.empty && E.blank(section.empty)}
       {section.rows.map(row => <div key={row.id}>{E.row(row.label, row.currentId ? `QuickBooks ${recordNames[row.kind]} ${row.currentId}` : row.detail ?? "Not mapped", connected ? row.action !== undefined ? row.action : <QboMappingSheetView context={context} currentId={row.currentId}><QboMappingView kind={row.kind} label={row.label} defaultValue={row.currentId ?? ""} companyConflict={context === "accounting"} /></QboMappingSheetView> : "", row.currentId ? "ok" : "w")}</div>)}
     </div>)}
-    {depositHref && E.row("Returnable-keg deposit", "Configured from Accounting", E.act("Open Accounting mappings", "attention", depositHref))}
+    {depositHref && E.row("Deposit and one-way keg fee items", "Configured from Accounting", E.act("Open Accounting mappings", "attention", depositHref))}
   </>;
 }
 

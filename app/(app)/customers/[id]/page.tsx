@@ -6,7 +6,7 @@ import { getCustomerPageData } from "../customer-data";
 import { InviteForm } from "../../settings/team/invite-form";
 import type { TaxTreatment } from "../customer-form";
 import type { CustomerType } from "@/lib/mgr/enums";
-import { ShipToForm } from "../ship-to-form";
+import { ShipToForm, type ShipToEditData } from "../ship-to-form";
 import { DeleteCommandButton } from "../../delete-command-button";
 import { DeleteCustomerControl } from "@/components/mgr/views/delete-customer";
 import { DeleteShipToControl } from "@/components/mgr/views/delete-ship-to";
@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 }
 
 type Customer = { id: string; name: string; alias: string | null; type: CustomerType; country: string; state: string | null; sale_channel_id: string; license_no: string | null; payment_terms: string; tax_treatment: TaxTreatment | null; sale_channels: { name: string } };
-type ShipTo = { id: string; label: string; country: string; address1: string | null; address2: string | null; city: string | null; state: string | null; zip: string | null; is_default: boolean };
+type ShipTo = ShipToEditData;
 type SaleChannel = { id: string; name: string };
 
 /** Every unpaid invoice of the customer, page by page, so the open balance never sums a truncated list. */

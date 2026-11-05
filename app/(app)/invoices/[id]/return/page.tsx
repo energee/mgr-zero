@@ -14,7 +14,7 @@ import "@/lib/commands/all";
 import { navTitle } from "@/lib/mgr/nav";
 
 type Invoice = { id: string; invoice_no: number | null; shipment_id: string | null; kind: string };
-type Line = { id: string; kind: string; sku_id: string | null; keg_size: string | null; qty: number; unit_price_cents: number; description: string; skus: { name: string } | null };
+type Line = { id: string; kind: string; sku_id: string | null; keg_size: string | null; qty: number; unit_price_cents: number; description: string; skus: { name: string } | null; order_lines: { sku_id: string } | null };
 
 type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ refusedDeliveryId?: string | string[] }> };
 
@@ -54,9 +54,11 @@ export default async function ReturnPage({ params, searchParams }: Props) {
     refusedDeliveryId ? runPageQuery("list_refused_returns", { deliveryId: refusedDeliveryId }, ctx) as Promise<{ sku_id: string; outstanding_qty: number }[]> : undefined,
   ]);
   const refusedQuantities: Record<string, number> | undefined = outstanding && Object.fromEntries(outstanding.map(line => [line.sku_id, Number(line.outstanding_qty)]));
+  // A beer line and its one-way fee line share a SKU; only the fee line names its order line.
+  const oneWayFees = new Map(lines.flatMap(line => line.kind === "one_way_keg_fee" && line.order_lines ? [[line.order_lines.sku_id, Number(line.unit_price_cents)] as const] : []));
   return <CreditMemoForm refusedDeliveryId={refusedDeliveryId} refusedQuantities={refusedQuantities} invoiceId={invoice.id} invoiceNo={invoice.invoice_no} shipmentId={invoice.shipment_id}
-    lines={lines.flatMap((line): (ReturnLine & { unitPriceCents: number })[] => line.kind === "sku" && line.sku_id
-      ? [{ id: line.id, kind: "sku", skuId: line.sku_id, label: line.skus?.name ?? line.description, qty: Number(line.qty), unitPriceCents: Number(line.unit_price_cents) }]
+    lines={lines.flatMap((line): (ReturnLine & { unitPriceCents: number; oneWayFeeCents?: number })[] => line.kind === "sku" && line.sku_id
+      ? [{ id: line.id, kind: "sku", skuId: line.sku_id, label: line.skus?.name ?? line.description, qty: Number(line.qty), unitPriceCents: Number(line.unit_price_cents), oneWayFeeCents: oneWayFees.get(line.sku_id) }]
       : line.kind === "keg_deposit"
         ? [{ id: line.id, kind: "keg_deposit", skuId: null, label: line.keg_size ? `${line.description} · ${SIZE_LABEL[line.keg_size] ?? line.keg_size}` : line.description, qty: Number(line.qty), unitPriceCents: Number(line.unit_price_cents) }]
         : [])}

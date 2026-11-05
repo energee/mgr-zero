@@ -95,7 +95,7 @@ money cents.
 | `order_kind` | `wholesale, taproom_transfer` | |
 | `order_status` | `draft, submitted, confirmed, picked, shipped, cancelled` | `invoiced`/`paid` derive from invoices (§14) |
 | `invoice_kind` | `invoice, credit_memo` | |
-| `invoice_line_kind` | `sku, keg_deposit, keg_deposit_refund, adjustment, one_way_keg_fee` | deposits are a line type, not SKU price; `one_way_keg_fee`: the never-refunded fee per one-way keg shipped |
+| `invoice_line_kind` | `sku, keg_deposit, keg_deposit_refund, adjustment, one_way_keg_fee` | deposits are a line type, not SKU price; `one_way_keg_fee`: the fee per one-way keg shipped; a negative line credits it only on a refused-delivery credit memo (`20261105025007`) |
 | `qbo_sync_status` | `pending, pushed, push_failed, not_synced` | `not_synced`: a historical invoice (record_historical_order, before books_opened_on), never pushed |
 | `material_category` | `malt, hop, yeast, adjunct, chemical, packaging, other` | |
 | `uom` | `lb, kg, oz, g, each, l, gal, ml` | mass↔mass and vol↔vol convert by constant; each↔mass is per-material |

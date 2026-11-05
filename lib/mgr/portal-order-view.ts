@@ -4,7 +4,7 @@ import { plural } from "@/lib/mgr/plural";
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { orderLineCents } from "./order-view";
-import { shipToAddress } from "./ship-to-view";
+import { shipToLine } from "./ship-to-view";
 import { buyerStatus } from "./order-status";
 import { invoiceCurrentState, invoiceCurrentTotalCents, invoiceIsSettledWithoutPayment } from "./invoice-state";
 
@@ -94,7 +94,7 @@ export function toPortalOrderViewProps({ order, lines, events, shipment, backHre
     backHref,
     title: docNo("ORD", order.order_no, "Order"),
     status: buyerStatus(order.status, order.requested_ship_date),
-    shipTo: ship ? [ship.label, shipToAddress(ship)].filter(Boolean).join(" · ") : undefined,
+    shipTo: ship ? shipToLine(ship) : undefined,
     po: order.po_number ?? undefined,
     requested: order.requested_ship_date ?? undefined,
     note: order.note ?? undefined,

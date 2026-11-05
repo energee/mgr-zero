@@ -182,7 +182,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Return shipped beer at invoice prices and its destination, posting damaged beer to loss and full-keg shells as Returned. Deposit-only refunds need no location or reason; returnEmptyKegs optionally checks empties into locationId and binId with the refund atomically
+Return shipped beer at invoice prices and its destination, posting damaged beer to loss and full-keg shells as Returned. Deposit-only refunds need no location or reason; returnEmptyKegs optionally checks empties into locationId and binId with the refund atomically. With refusedDeliveryId, the credit memo also credits the one-way keg fee for the refused kegs
 
 | Field | Type | Required |
 | --- | --- | --- |

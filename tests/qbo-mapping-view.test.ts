@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -25,6 +26,14 @@ it("keeps unavailable connections and explicit null actions from exposing save c
   const offline = renderToStaticMarkup(createElement(QboMappingsView, { ...props, connected: false }));
   expect(offline).toContain("Connect QuickBooks before saving mappings");
   expect(offline).not.toContain(">Map<");
+});
+
+it("sends a missing deposit or one-way fee item to Accounting mappings, where both are set", () => {
+  const html = renderToStaticMarkup(createElement(QboMappingsView, { title: "Fix QuickBooks mapping", backLabel: "Invoice", sections: [], depositHref: "/settings/accounting/mappings" }));
+  expect(html).toContain("Deposit and one-way keg fee items");
+  expect(html).toContain('href="/settings/accounting/mappings"');
+  const page = readFileSync("app/(app)/invoices/[id]/mapping/page.tsx", "utf8");
+  expect(page).toMatch(/keg_deposit\|one_way_keg_fee/);
 });
 
 it("keeps fixture mapping controls safe and does not invent ambiguity", () => {

@@ -9,7 +9,7 @@ import { CommandFormFooter } from "@/components/mgr/command-form";
 import { IRREVERSIBLE } from "@/components/mgr/irreversible-submit";
 import { deliveryOutcomeState, type ConfirmDeliveryViewModel } from "@/lib/mgr/confirm-delivery-view";
 import { REFUSAL_REASONS } from "@/lib/mgr/enums";
-import { shipToAddress } from "@/lib/mgr/ship-to-view";
+import { shipToLine } from "@/lib/mgr/ship-to-view";
 
 const REFUSAL_LABEL: Record<(typeof REFUSAL_REASONS)[number], string> = {
   customer_refused: "Customer refused", damaged: "Damaged in transit", wrong_item: "Wrong item", other: "Other",
@@ -51,7 +51,7 @@ export function ConfirmDeliveryView({
     <>
       {E.back(model.backTo ?? "Driver route", model.title, undefined, model.backHref)}
       {E.ttl(model.heading)}
-      {model.shipTo !== undefined && E.fld("Ship to", model.shipTo ? [model.shipTo.label, shipToAddress(model.shipTo)].filter(Boolean).join(" · ") : "Not recorded")}
+      {model.shipTo !== undefined && E.fld("Ship to", model.shipTo ? shipToLine(model.shipTo) : "Not recorded")}
       {missingAddress.length > 0 && E.note(`${missingAddress.join(" · ")}. Confirm the destination before travelling.`, "alert")}
       {E.fld("Invoice timing", model.invoiceTiming)}
       {model.lines.map((row) => (

@@ -5,7 +5,7 @@ import { sentenceCase } from "./labels";
 // amounts and the before-tax order amount, from the order's own frozen facts.
 import { docNo } from "./doc-no";
 import { money } from "./money";
-import { shipToAddress } from "./ship-to-view";
+import { shipToLine } from "./ship-to-view";
 import { shownState, stagedOnOpenOrder, type DeliveryOutcome, type OrderStatus } from "./order-status";
 import { formatDate, formatDateTime } from "@/lib/date-format";
 import { stagedQty } from "./put-back-view";
@@ -255,7 +255,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, deliver
   const lineNames = new Map(lines.map((l) => [l.id, l.skus?.name ?? "Line"]));
   const source = order.from_location_id ? locations?.find((l) => l.id === order.from_location_id)?.name : undefined;
   const state = shownState(order.status, order.needs_restock, deliveryOutcome ?? null, Boolean(order.pickup));
-  const shipTo = order.pickup ? "Pickup" : order.ship_tos ? [order.ship_tos.label, shipToAddress(order.ship_tos)].filter(Boolean).join(" · ") : undefined;
+  const shipTo = order.pickup ? "Pickup" : order.ship_tos ? shipToLine(order.ship_tos) : undefined;
   return {
     backHref,
     title: docNo("ORD", order.order_no, "Order"),

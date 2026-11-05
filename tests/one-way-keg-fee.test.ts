@@ -1,6 +1,7 @@
 // tests/one-way-keg-fee.test.ts — a one-way keg (a keg SKU with no container
 // source) carries the brewery's one-way keg fee on its invoice, never a
-// deposit, and the fee is never refunded (docs/plans/lolev-orders.md task 6).
+// deposit, and the fee is refunded only on a refused-delivery credit
+// (docs/plans/lolev-orders.md task 6).
 // The fee is frozen onto the order line at submit, like a keg deposit, so the
 // staff order page and either invoice writer (ship_order now, confirm_delivery
 // on delivery) show and bill the price the order was submitted with.
@@ -106,6 +107,40 @@ describe("one-way keg fee", () => {
     const fee = await admin.from("invoice_lines").select("id").eq("invoice_id", s.invoiceId!).eq("kind", "one_way_keg_fee").single();
     await expect(runCommand("return_shipment", { invoiceId: s.invoiceId, locationId: f.wh.id, reason: "unsold", lines: [{ invoiceLineId: fee.data!.id, qty: 1 }] }, f.adminCtx))
       .rejects.toThrow(/cannot credit/i);
+  });
+
+  it("ships one-way kegs only in whole kegs", async () => {
+    const f = await setup(1000);
+    await expect(ship(f, [{ skuId: f.oneWaySku, qty: 1.5 }])).rejects.toThrow(/whole kegs/i);
+  });
+
+  it("credits the fee for kegs refused at the stop when the invoice was written at ship", async () => {
+    const f = await setup(1000);
+    const s = await ship(f, [{ skuId: f.oneWaySku, qty: 3 }], "now");
+    const shipment = await admin.from("shipments").select("id").eq("order_id", s.orderId).single();
+    const { routeId } = await runCommand("save_route", { deliveryDate: "2026-10-20", stops: [{ shipmentId: shipment.data!.id, stopNo: 1 }] }, f.adminCtx) as { routeId: string };
+    await runCommand("depart_route", { routeId }, f.adminCtx);
+    const stop = await admin.from("deliveries").select("id").eq("route_id", routeId).single();
+    await runCommand("confirm_delivery", {
+      deliveryId: stop.data!.id, signedBy: "Pat", reason: "customer_refused", refused: [{ orderLineId: s.lineFor(f.oneWaySku), qty: 1 }],
+    }, f.adminCtx);
+    const beer = await admin.from("invoice_lines").select("id").eq("invoice_id", s.invoiceId!).eq("kind", "sku").single();
+    // The return form matches a fee to its beer through the fee line's order line.
+    const { lines } = await runCommand("get_invoice", { invoiceId: s.invoiceId }, f.adminCtx) as { lines: { kind: string; order_lines: { sku_id: string } | null }[] };
+    expect(lines.find(line => line.kind === "one_way_keg_fee")?.order_lines?.sku_id).toBe(f.oneWaySku);
+    const { credit_memo_id: memo } = await runCommand("return_shipment", {
+      invoiceId: s.invoiceId, refusedDeliveryId: stop.data!.id, locationId: f.wh.id, reason: "unsold", lines: [{ invoiceLineId: beer.data!.id, qty: 1 }],
+    }, f.adminCtx) as { credit_memo_id: string };
+    // The customer now pays the fee only for the two kegs kept, as an on-delivery invoice would bill.
+    expect((await invoiceLines(memo)).map(l => [l.kind, l.qty, l.unit_price_cents])).toEqual([["sku", -1, 9000], ["one_way_keg_fee", -1, 1000]]);
+    const totals = await admin.from("invoice_totals").select("local_credit_cents").eq("invoice_id", s.invoiceId!).single();
+    expect(totals.data).toEqual({ local_credit_cents: 10000 });
+    expect((await admin.from("qbo_connections").insert({ brewery_id: f.brewery.id, realm_id: `realm-${crypto.randomUUID()}`, realm_label: "Books", state: "connected" })).error).toBeNull();
+    await runCommand("set_qbo_customer_mapping", { customerId: f.customer.customerId, qboCustomerId: "customer-1" }, f.adminCtx);
+    await runCommand("set_qbo_item_mapping", { skuId: f.oneWaySku, qboItemId: "item-1" }, f.adminCtx);
+    await runCommand("set_qbo_one_way_fee_mapping", { qboItemId: "fee-item" }, f.adminCtx);
+    const pushed = await f.adminCtx.db.rpc("start_qbo_push", { p_brewery: f.brewery.id, p_invoice: memo, p_new_attempt_reason: null as never, p_request_id: crypto.randomUUID() });
+    expect(pushed.error).toBeNull();
   });
 
   it("adds no fee line when the fee is 0", async () => {
