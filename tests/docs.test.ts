@@ -90,6 +90,25 @@ describe("customer guides (MDX)", () => {
   });
 });
 
+// How MGR works is the one short explanation of the model, and outside agents
+// load it whole. docs/plans/agent-access.md scores it by these anchors: 16
+// concepts (U3) and 6 lifecycles (U4).
+const HOW_MGR_WORKS_ANCHORS = [
+  "roles", "brands-and-skus", "formats", "lots", "locations-and-bins", "movement-ledger", "reversals",
+  "batches-and-occupancy", "volumes", "allocation-and-atp", "shipping-and-invoicing", "price-groups",
+  "keg-pools", "purchase-orders-and-receipts", "compliance", "quickbooks",
+  "order-lifecycle", "purchase-order-lifecycle", "stock-transfer-lifecycle", "allocation-lifecycle",
+  "batch-lifecycle", "packaging-run-lifecycle",
+];
+
+describe("How MGR works guide", () => {
+  it("gives every concept and lifecycle a heading anchor and is linked from the chooser", () => {
+    const headings = [...read("content/docs/how-mgr-works.mdx").matchAll(/^#{2,3} .+ \[#([a-z0-9-]+)\]$/gm)].map((m) => m[1]);
+    expect(HOW_MGR_WORKS_ANCHORS.filter((anchor) => !headings.includes(anchor))).toEqual([]);
+    expect(read("content/docs/index.mdx")).toContain('href="/docs/how-mgr-works"');
+  });
+});
+
 // A guide section that describes a screen embeds it: <Screen name="…" /> draws
 // the inventory frame (components/mgr/screen-embed.tsx) under the prose.
 describe("guide screen embeds", () => {

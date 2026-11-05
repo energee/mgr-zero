@@ -1,0 +1,271 @@
+---
+icon: screens
+title: "How MGR works"
+description: "How MGR models a brewery: the ideas behind every screen and the states each record moves through."
+---
+
+This page explains how MGR models a brewery. For step-by-step instructions, use the [Staff guide](/docs/staff-guide).
+
+Three rules run through everything:
+
+- A balance is the sum of recorded entries. Nobody types in a balance.
+- A recorded entry is never edited. A correction is a new entry linked to the old one.
+- Facts that feed money or tax are frozen when recorded, so later edits never rewrite history.
+
+## Concepts [#concepts]
+
+### Roles [#roles]
+
+A role decides what a person can do. Staff hold one or more roles, and they get everything those roles allow together.
+
+| Role | What it covers |
+| --- | --- |
+| Admin | Every staff action, including team and settings. |
+| Sales | Catalog, customers, prices, orders, invoices, credits and compliance. |
+| Warehouse | Stock movements, picking, shipping, transfers, routes, keg fleet, purchase orders and packaging. |
+| Brewer | Recipes, batches, the cellar, packaging, vendors and materials. |
+| Taproom | The tap board, weekly count and variance at taproom locations. |
+
+A brewery always keeps at least one admin. A buyer is not staff. Buyers sign in to the portal, see only their own account, and place orders there.
+
+**Common mistake:** assuming one person can finish any job. Sales confirms an order and Warehouse ships it, so doing both takes Admin or both roles. A Brewer cannot read customers, orders, invoices, prices or filings. MGR checks roles when an action is submitted, so a visible button is not a promise.
+
+### Brands and SKUs [#brands-and-skus]
+
+A brand is the beer you sell, such as Hazy IPA. A SKU is one brand in one packaged format, such as Hazy IPA in a half-barrel keg. SKUs hold inventory and appear on orders. A brand has at most one SKU per format.
+
+Switching a format off makes its SKU inactive. The SKU is never deleted, so its stock and history stay.
+
+**Common mistake:** treating a batch as a brand. A batch is one production run. A batch can start with no brand, but packaging always names one. A batch planned as a brand can only be packaged as that brand.
+
+### Formats [#formats]
+
+A format is the physical package: a keg, a can, a bottle, or a case of them. Formats are shared across brands. The format owns the volume, so every SKU in that format uses the same barrel figure. A case can be built from smaller packages, and its volume is then calculated from them.
+
+A pour is not stock. It is a serving from the tap, set on the [price group](#price-groups). The keg is what MGR counts.
+
+**Common mistake:** editing a format to change its size. Once a format is in use, its volume is fixed. A different size needs a new format.
+
+### Lots [#lots]
+
+A lot is the beer from one closed packaging run. It has a unique code, a brand and a packaged date. One lot can cover several SKUs. Stock keeps its lot through shipping and returns, so a recall can find who received it. Stock with no lot reads as untracked.
+
+Ingredients have their own lots. A lot-tracked material needs a lot code when received, and the exact lot when used.
+
+**Common mistake:** using a batch number as a lot. A lot exists only once a run closes, and one batch can produce several lots. A lot trace names every batch blended in. It never states what share each one contributed.
+
+### Locations and bins [#locations-and-bins]
+
+A location is a place, such as a warehouse or taproom. One location can have several uses: warehouse, taproom and storage. A bin is a named spot inside a location, such as a walk-in. All finished stock sits in a bin, so on hand is known to the bin.
+
+A new location starts with three bins and always keeps at least one. A bin that ever held stock can be renamed, but not removed.
+
+**Common mistake:** treating a tank as a location. Beer in a tank is not inventory. It becomes stock when a packaging run closes, and the run names the location and bin.
+
+### The movement ledger [#movement-ledger]
+
+The movement ledger is the permanent record of every change to finished goods. On hand is the sum of its entries. Each entry names the SKU, bin, lot, signed quantity and type. Types include production in, sale, depletion, sample, festival removal, destruction, loss, return and adjustment.
+
+Each entry freezes its barrels when it posts. Sales and depletions also freeze their tax treatment. Editing a format, channel or customer later changes nothing already recorded. Materials and kegs have ledgers of their own that work the same way.
+
+**Common mistake:** choosing a type that makes the numbers work. Types are reported differently at tax time. An adjustment is only for a verified count difference.
+
+### Reversals [#reversals]
+
+MGR has no general undo. Each kind of record has its own correction, which adds linked entries and keeps the original.
+
+| What is wrong | How to correct it |
+| --- | --- |
+| A standalone adjustment or loss | Reverse movement posts the exact opposite entry. |
+| Shipped beer | Return on the invoice posts the stock and a credit memo together. |
+| A closed packaging run | Correct its counts or materials, within the limits under [Packaging run lifecycle](#packaging-run-lifecycle). |
+| A purchase receipt | Correct receipt replaces it and reverses its stock. |
+| Brew ingredients or knockout | Correct turn replaces that brew record. |
+| A saved taproom count | Correct count, by Admin, on the latest count only. |
+| A payment recorded in MGR | Void it with a reason, then record the right one. |
+| A keg event | Record the opposite event. |
+
+**Common mistake:** fixing a shipment with a stock adjustment. That breaks the link between the stock, the credit and the shipment. Only standalone adjustments and losses can be reversed directly.
+
+### Batches and occupancy [#batches-and-occupancy]
+
+A batch is one production run of beer. An occupancy is one stay of a batch in one vessel. MGR never stores what a tank holds. It works that out from knockout, transfers, packaging draws and adjustments.
+
+A vessel holds one batch at a time, up to its capacity. A partial transfer into an empty tank splits the batch across two tanks. A transfer into an occupied tank is a blend, and the beer joins the batch already there. A transfer that empties a tank frees it.
+
+**Common mistake:** expecting a blend to make a new batch. It never does. Also, batch loss runs from knockout to package, so normal shrinkage from trub, yeast and blow-off counts as loss.
+
+### Volumes in barrels [#volumes]
+
+MGR stores every beer volume in US beer barrels of 31 gallons. Screens show friendlier units, such as keg fractions, gallons or ounces. Reports always stay in barrels, whatever a screen shows. This matters because barrels drive the TTB report.
+
+**Common mistake:** reading an order or stock quantity as barrels. Those quantities count packages. MGR calculates the barrels from the format.
+
+### Allocation and available to promise [#allocation-and-atp]
+
+An allocation reserves a quantity of a SKU. Available to promise (ATP) is on hand minus open allocations. Confirming an order creates allocations. Sales can also hold stock for a taproom with a standing allocation.
+
+An allocation moves nothing, so on hand does not change. ATP covers the whole brewery. It is not tied to a location, bin or lot.
+
+**Common mistake:** treating ATP as a hard limit. ATP can go negative, and confirming an order warns but does not refuse. The real limit arrives at shipping, when the chosen bin and lot must hold the beer.
+
+### Shipping and invoice timing [#shipping-and-invoicing]
+
+Shipping is the moment beer leaves inventory. An invoice bills what shipped, not what was ordered, at the prices on the order. Its due date comes from the customer's payment terms.
+
+| Choice | When the invoice is raised |
+| --- | --- |
+| Invoice now | At shipping. |
+| On delivery | When the driver closes the stop, for accepted beer only. |
+| Pickup | Always at shipping. |
+| Taproom transfer | Never. It is not a sale. |
+
+**Common mistake:** assuming refused beer returns by itself. A refusal never restores stock. Someone must check the beer in, or use Return and credit when it was invoiced at shipping.
+
+### Price groups [#price-groups]
+
+Prices live in a grid. Each brand sits on one price group, and each customer sits on one sale channel. A SKU's price is the cell for its price group and format on that channel. MGR has no per-customer prices.
+
+An empty cell means unpriced, and an order for that SKU is refused. Zero is a valid price.
+
+**Common mistake:** expecting a new price to reach existing orders. An order line captures its price when saved. Editing a draft captures current prices again. After submission, existing lines keep their price, and only added lines take the current one. Credits use the invoice's prices, never today's.
+
+### Keg pools [#keg-pools]
+
+A keg pool is a group of returnable kegs counted together: owned, leased or pay per fill. MGR counts kegs by pool, size and bin, not by serial number. A customer's kegs out are shipped less returned less lost. This shows who to chase for empties.
+
+Shipping keg beer records the shells leaving. Full kegs returned with their beer record the shells coming back. One-way kegs are packaging materials, not a pool. They carry a one-way keg fee instead of a deposit.
+
+**Common mistake:** treating the deposit and the shell as one thing. They are separate records, so a refund without a check-in can leave them disagreeing, and MGR flags the mismatch. Beer still ships when the shell count is short. MGR warns instead of refusing.
+
+### Purchase orders and receipts [#purchase-orders-and-receipts]
+
+A purchase order is what you asked a vendor for. A receipt is what you counted when it arrived. A purchase order changes no stock until a receipt is saved. Each receipt lands in one bin and can record the actual unit cost. Over and short counts are both allowed and both recorded.
+
+**Common mistake:** reading "sent" as proof the vendor has it. MGR sends no email. Marking an order sent records that you sent it yourself. Planning counts a sent order as supply, but not a draft.
+
+### Compliance periods and filing [#compliance]
+
+MGR builds the TTB report for a calendar month, quarter or year from the ledgers. The figures stay live until you file. Each package class must balance: begin plus in, less out, equals end.
+
+MGR does not file with TTB. You file there yourself, then record the filing in MGR, which saves a snapshot that never changes. A period can be filed only once, only after it ends, and only when it balances. The first filing also locks the Books opened on date and the timezone.
+
+A shipment counts on the day it was recorded. Packaged beer counts on its Packaged on date, which cannot be after today, or in or before a filed period. On the default Taproom channel, a taproom sale is a taxable removal, like a wholesale sale.
+
+**Common mistake:** expecting MGR to amend a filing. A correction to the reporting basis marks affected periods Needs amendment. The original snapshot stays, and any amended report is filed outside MGR.
+
+### QuickBooks and money [#quickbooks]
+
+QuickBooks is the book of record for money. MGR creates each invoice and freezes its lines. Staff push it to QuickBooks, and a manual sync reads the results back. After a push, QuickBooks owns the current total, tax, balance and payment state. If an accountant edits the invoice there, MGR reports the change and does not overwrite it.
+
+MGR does not calculate sales tax. Bills post from a receipt, and vendor payments stay in QuickBooks.
+
+The exception is an invoice QuickBooks never received. Admin or Sales can record a payment on it in MGR. While that payment stands, the invoice cannot be pushed.
+
+**Common mistake:** recording a payment in MGR for an invoice QuickBooks has. Record it in QuickBooks instead. A blank balance means unknown, never zero.
+
+## Lifecycles [#lifecycles]
+
+Admin can take every step below that Sales, Warehouse or Brewer can.
+
+### Order lifecycle [#order-lifecycle]
+
+`draft` → `submitted` → `confirmed` → `picked` → `shipped`, or `cancelled` before shipping.
+
+| Step | What moves it |
+| --- | --- |
+| To submitted | Sales or the buyer submits. Keg deposits and one-way fees are set here. |
+| To confirmed | Sales confirms, which reserves stock. |
+| To picked | Warehouse has counted every line. |
+| Back to confirmed | Sales adds or raises a line on a picked order, so it needs another pick. |
+| To shipped | Warehouse ships. Stock leaves and the [invoice timing](#shipping-and-invoicing) applies. |
+| To cancelled | Sales cancels with a reason. Reservations are released. |
+
+A replenishment order for a taproom starts at `confirmed`. Delivered is not a state. A shipped order's stop reads Delivered, Partly delivered or Refused.
+
+MGR has no backorders. Whatever ships short is cancelled, and nothing stays owed.
+
+**Cannot be undone:** `shipped` and `cancelled` are final. Correct a shipped order with a return and credit memo. Picked beer left behind needs Put back, which moves no stock because it never left.
+
+### Purchase order lifecycle [#purchase-order-lifecycle]
+
+`draft` → `sent` → `partially_received` → `received`, or `cancelled`.
+
+| Step | What moves it |
+| --- | --- |
+| To sent | Warehouse marks it sent. |
+| To partially received | A receipt leaves at least one line still owed. |
+| To received | Receipts cover every line, or someone closes it short with a reason. |
+| Back to partially received | A receipt correction lowers a count, so a line is owed again. |
+| To cancelled | Warehouse cancels with a reason, only before any receipt. |
+
+An order closed short shows as Closed short. Its receipts and stock stay as they are.
+
+**Cannot be undone:** a sent order cannot return to draft or be edited. After a receipt it cannot be cancelled, only closed short. Cancelled and closed-short orders are final, and a receipt correction does not reopen them.
+
+### Stock transfer lifecycle [#stock-transfer-lifecycle]
+
+`submitted` → `picked` → `in_transit` → `received`, or `cancelled`.
+
+A stock transfer moves stock between two locations, with no price or invoice. Creating one submits it, so there is no draft.
+
+| Step | What moves it |
+| --- | --- |
+| To picked | Warehouse records the pick. Receiving a new transfer records its pick first. |
+| To in transit | The transfer rides a route and the route departs. Without a route, this state is skipped. |
+| To received | Warehouse receives it. Both sides of the move post together. |
+| To cancelled | Warehouse cancels with a reason. No stock moves. |
+
+Stock stays in the source bin until the transfer is received, even in transit. Receiving less than was picked leaves the rest in the source bin.
+
+A taproom transfer is a different record. It is an order that moves stock when it ships, and it has no receiving step. A move inside one location is a bin move, not a transfer.
+
+**Cannot be undone:** `received` and `cancelled` are final. To send stock back, create a new transfer.
+
+### Allocation lifecycle [#allocation-lifecycle]
+
+`open` → `fulfilled`, or `released`.
+
+| Step | What moves it |
+| --- | --- |
+| To open | Confirming an order opens one per line. Setting a standing allocation opens one. |
+| Stays open | Adjusting an order line changes the reserved quantity. |
+| To fulfilled | The order line ships more than zero. |
+| To released | The line ships zero or is removed, the order is cancelled, Sales releases it, or a standing allocation is set to zero. |
+
+A standing allocation is never fulfilled. It holds its quantity out of ATP until someone sets it to zero. A short shipment still fulfills its whole allocation, because the remainder is cancelled.
+
+**Cannot be undone:** `fulfilled` and `released` are final. Releasing an order's allocation does not change the order. Reserving again creates a new allocation.
+
+### Batch lifecycle [#batch-lifecycle]
+
+Planned → Active → Completed, or Cancelled.
+
+| Step | What moves it |
+| --- | --- |
+| To active | Brewer records brew day. This freezes the plan, takes ingredients from stock and fills the tank. |
+| To cancelled | Brewer cancels the plan, only before brew day. It moves no stock. |
+| To completed | Brewer completes the batch, which closes it and every tank it still holds. |
+
+Saving pulls on Prep moves no stock. Brew day is refused if the tank is occupied, the volume exceeds capacity, or stock is short.
+
+Completion is refused while a packaging run for the batch is open. MGR then works out what is unaccounted for: the baseline (knockout, adjusted for blends in and out), less packaged volume, less loss already attributed. A remainder of at least 0.05 bbl or 0.5% of the baseline, whichever is larger, posts as one loss. Beer still in a tank at that size needs an explicit confirmation, because it is written off. Admin or Sales can later reassign part of that loss to samples, taproom or destruction.
+
+**Cannot be undone:** Completed and Cancelled are final, and a batch never reopens. After brew day, the plan cannot be cancelled or rescheduled. Correct turn can still fix ingredients on a completed batch, but not its volume. A cellar transfer has no correction.
+
+### Packaging run lifecycle [#packaging-run-lifecycle]
+
+Planned → Started → Closed, or Cancelled.
+
+| Step | What moves it |
+| --- | --- |
+| To planned | Brewer or Warehouse schedules the brand, date and units. The tank can wait. Nothing is reserved. |
+| To started | Brewer or Warehouse picks the source tank and starts the run. A run draws from exactly one tank. |
+| To cancelled | Brewer or Warehouse cancels the plan, only before it starts. |
+| To closed | Brewer or Warehouse records the barrels drawn, units filled, lot code, Packaged on date, bin and materials used. |
+
+Closing is the moment beer becomes stock. One step creates the [lot](#lots), posts the finished goods and uses the packaging materials. Packages cannot hold more than the barrels drawn or the batch had.
+
+Closing does not empty the tank. Any beer left stays there until it is transferred or the batch completes. A started run blocks any transfer that would empty its tank.
+
+**Cannot be undone:** a started run cannot be cancelled, only closed. Closed is final, and a run never reopens. Counts and materials can be corrected with a reason, but not once the lot has been sold, transferred, repacked or adjusted. The same applies after the batch completes, or once a filed period ends on or after the Packaged on date.
