@@ -4,13 +4,14 @@
 // ingredients, counted in packs plus loose base units (./pack-qty). Open bags
 // are not inventory: a partial pull is just base units. Prep is saved as
 // brew_pulls through save_batch_pulls; nothing here moves stock.
-import { BREW_DAY_STAGES, INGREDIENT_STAGES, isBrewDayStage } from "./recipe-process-view";
-import { brewDayLines, brewSourceKey, fitsStock, observedProcess, plannedIngredientQty, soleSource, type BrewDayVessel, type BrewMaterialSource, type BrewPlan, type BrewPull, type BrewWaterAddition } from "./brew-day-view";
+import { BREW_DAY_STAGES, fermentationStageDetail, ingredientDetail, INGREDIENT_STAGES, isBrewDayStage, perBblDisplay } from "./recipe-process-view";
+import { brewDayLines, brewSourceKey, fitsStock, observedProcess, plannedIngredientQty, soleSource, type BrewDayVessel, type BrewMaterialSource, type BrewPlan, type BrewPlanIngredient, type BrewPull, type BrewWaterAddition } from "./brew-day-view";
 import { sentenceCase } from "./labels";
 import { materialSourceKey, type SourceIds } from "./material-source";
 import { fromPacks, splitPacks, withPacks } from "./pack-qty";
 import { fromTicks, isNumber, numberNotationError, toTicks } from "./quantity-input";
 import { convertUom } from "@/lib/uom";
+import { bblExact } from "@/lib/volume";
 import { MASH_PH_BOUNDS, READING_BOUNDS } from "@/lib/composer/offline-policy";
 import { totalMinutes } from "./recipe-schedule";
 import { andList, submitReason } from "./submit-reason";
@@ -153,6 +154,22 @@ export function laterAdditions(plan: BrewPlan): string {
     .map(stage => ({ stage, count: stages.filter(s => s === stage).length }))
     .filter(({ count }) => count > 0);
   return counts.map(({ stage, count }) => `${sentenceCase(stage)} ${count}`).join(" · ") || "None";
+}
+
+/** A later line's detail: "Dry hop · day 4 · 1.2 lb / bbl · 17.5 lb for 14.6 bbl". The total is left off unless `bbl` is above zero. */
+function laterLineDetail(row: BrewPlanIngredient, bbl: number): string {
+  const detail = ingredientDetail(row.stage, row.timing_minutes ?? null, perBblDisplay(row.per_bbl_qty), row.unit);
+  return bbl > 0 ? `${detail} · ${perBblDisplay(plannedIngredientQty(row, bbl))} ${row.unit} for ${bblExact(bbl, 8)}` : detail;
+}
+
+/** What happens after knockout, as [label, detail] rows: each fermentation stage, then each line not confirmed on brew
+ *  day, in plan order, or one "None" row when there are no such lines. `bbl` is the barrels the totals are for: the
+ *  planned barrels on a planned batch, a recorded turn's own knockout on its plan sheet. */
+export function cellarPlanRows(plan: BrewPlan, bbl: number): [string, string][] {
+  const stages: [string, string][] = (plan.version?.fermentation_schedule ?? []).map(stage => [stage.name, fermentationStageDetail(stage)]);
+  const lines: [string, string][] = (plan.ingredients ?? []).filter(row => !isBrewDayStage(row.stage)).map(row => [row.materialName, laterLineDetail(row, bbl)]);
+  const none: [string, string] = ["Additions", "None"];
+  return [...stages, ...(lines.length ? lines : [none])];
 }
 
 /** Base units pulled; a blank field counts as none. */

@@ -131,6 +131,9 @@ export function mashStepDetail(step: MashStep): string {
   return `${kind}${step.tempF} °F · ${step.minutes} min`;
 }
 
+/** A fermentation stage's row detail, "68 °F · 4 days": on the schedule sheet and in a batch's cellar plan. */
+export const fermentationStageDetail = (stage: FermentationStage) => `${stage.tempF} °F · ${plural(stage.days, "day")}`;
+
 /** Total days, and where a dry hop on day N lands: day 4 is the last day of a 4-day Primary. */
 export function fermentationSummary(stages: readonly FermentationStage[], dryHopDay?: number): string {
   const total = stages.reduce((n, s) => n + s.days, 0);

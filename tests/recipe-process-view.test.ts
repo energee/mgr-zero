@@ -1,6 +1,9 @@
 // tests/recipe-process-view.test.ts — draft helpers for the schedule sheets (issue #278).
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { fermentationSummary, fromIngredientFields, ingredientDetail, ingredientReason, mashStepReason, stageReason, toIngredientFields, ionReadout, mashRowSummary, mashStepDetail, mashSummary, moveItem, perBblDisplay, processReadout, profileIons, splitByStage, suggestAdditions, upsertAt, waterAdditionDetail, waterRowSummary, type FermentationStage, type MashStep, type SaltMaterial, type WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { FermentationScheduleView } from "../components/mgr/views/fermentation-schedule";
+import { fermentationStageDetail, fermentationSummary, fromIngredientFields, ingredientDetail, ingredientReason, mashStepReason, stageReason, toIngredientFields, ionReadout, mashRowSummary, mashStepDetail, mashSummary, moveItem, perBblDisplay, processReadout, profileIons, splitByStage, suggestAdditions, upsertAt, waterAdditionDetail, waterRowSummary, type FermentationStage, type MashStep, type SaltMaterial, type WaterDraft } from "@/lib/mgr/recipe-process-view";
 
 const mash: MashStep[] = [
   { name: "Mash-in", kind: "infusion", tempF: 104, minutes: 15 },
@@ -10,6 +13,12 @@ const mash: MashStep[] = [
 const ferm: FermentationStage[] = [{ name: "Primary", kind: "primary", tempF: 68, days: 4 }, { name: "Cold crash", kind: "cold crash", tempF: 34, days: 2 }];
 
 describe("schedule drafts", () => {
+  it("reads a fermentation stage as its temperature and days, on the schedule sheet too", () => {
+    expect(fermentationStageDetail(ferm[0])).toBe("68 °F · 4 days");
+    const oneDay = { ...ferm[1], days: 1 };
+    expect(fermentationStageDetail(oneDay)).toBe("34 °F · 1 day");
+    expect(renderToStaticMarkup(createElement(FermentationScheduleView, { stages: [oneDay], header: null }))).toContain("34 °F · 1 day");
+  });
   it("moves a step and keeps the rest in order", () => {
     expect(moveItem(mash, 2, -1).map((s) => s.name)).toEqual(["Mash-in", "Mash-out", "Saccharification"]);
     expect(moveItem(mash, 0, -1)).toBe(mash);
