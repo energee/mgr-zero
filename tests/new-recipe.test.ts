@@ -150,8 +150,10 @@ describe("Recipe creation", () => {
       expect(draft()).not.toMatch(/<button[^>]*type="submit"[^>]*disabled/);
     });
 
-    it("draws no tape list without a tape", () => {
-      expect(draw({ readOnly: true, model: versioned })).not.toMatch(/<ol\b/);
+    it("draws no tape list or Batch actuals heading without a tape", () => {
+      const html = draw({ readOnly: true, model: versioned });
+      expect(html).not.toMatch(/<ol\b/);
+      expect(html).not.toContain("Batch actuals");
       expect(draw({ model: recipeHazyV4 })).toMatch(/<ol\b/);
     });
 

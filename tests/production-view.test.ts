@@ -564,6 +564,22 @@ describe("Recipes view", () => {
   });
 
 
+  it("draws Batch actuals as a heading, the tape, then the summary", () => {
+    const html = htmlOf(createElement(RecipeView, { readOnly: true, model: { title: "Pale v3", tape: [["B-0413 · v4 · Oct 3, 2026", "no gravity readings yet"]], actualsNote: "2 batches: efficiency 68–71% against 72% assumed." } }));
+    expect(html).toMatch(/<h2[^>]*>Batch actuals · predicted in brackets<\/h2><ol[^]*no gravity readings yet[^]*<\/ol>[^]*2 batches: efficiency/);
+  });
+
+  it("the fixture's Batch actuals are computed, and its prediction agrees with their brackets", () => {
+    expect(recipeHazyV4.tape?.[0]).toEqual(["B-0413 · v4 · Oct 3, 2026", "OG 14.8 °P (15.2) · FG 3.5 °P (3.5) · ABV 6.1% (6.3%) · attenuation 77% (78%) · efficiency 68% (72%)"]);
+    expect(recipeHazyV4.predicted).toBe("Predicted: OG 15.2 °P · FG 3.5 °P · ABV 6.3%");
+  });
+
+  it("the live Recipe page reads the outcomes and hands them to the page model", () => {
+    const page = src("app/(app)/recipes/[id]/page.tsx");
+    expect(page).toMatch(/runCommand\("get_recipe_outcomes", \{ recipeId: id \}, ctx\)/);
+    expect(page).toMatch(/toRecipePageModel\(snapshot, \{[^}]*outcomes/);
+  });
+
   it("the live Recipes page mounts RecipesView and links New recipe to /recipes/new", () => {
     const page = src("app/(app)/recipes/page.tsx");
     expect(page).toMatch(/<RecipesView\b/);

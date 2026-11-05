@@ -83,6 +83,7 @@ export type RecipeViewModel = {
   water?: RecipeScheduleView;
   notes?: string;
   predicted?: string;
+  /** Batch actuals: one row per brewed batch of any version, then the gap for the shown version. */
   tape?: [string, string][];
   actualsNote?: string;
 };
@@ -290,7 +291,7 @@ const IMPORT_ID = /\s+[0-9a-f]{24}$/;
 /** The read page's selected saved version, or the empty state before the first version. */
 export function toRecipePageModel(
   s: RecipeSnapshot,
-  ctx: { materials: RecipeMaterial[]; profiles: { id: string; name: string }[]; unit: GravityUnit; timeZone: string },
+  ctx: { materials: RecipeMaterial[]; profiles: { id: string; name: string }[]; unit: GravityUnit; timeZone: string; outcomes: RecipeOutcome[] },
 ): RecipeViewModel {
   const { recipe, version: v, ingredients, waterAdditions } = s;
   const material = materialLookup(ctx.materials);
@@ -330,5 +331,7 @@ export function toRecipePageModel(
     },
     notes: v.note ?? "",
     predicted,
+    tape: outcomeTape(ctx.outcomes, ctx.unit),
+    actualsNote: outcomeSummary(ctx.outcomes, v.version),
   };
 }
