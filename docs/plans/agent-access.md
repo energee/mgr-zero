@@ -84,6 +84,12 @@ nothing maintained twice. Tracked in #1766.
 - **Q10 Who approves.** Only the person the agent acts for, on their own
   session. Their roles are checked again when the command runs.
 - **Q11 Proposal life.** 24 hours, then `expired`.
+- **Q12 Which brewery (open, settle before the consent page).** A token is not
+  tied to a brewery, but every tenant operation needs one, and a person can
+  belong to several. Either the person picks one at consent and it is stored
+  with the grant, or `get_started` lists their breweries and the agent passes one
+  on each call. Picking at consent is safer. Check first that Supabase can store
+  it with the grant.
 
 ## Phases
 
