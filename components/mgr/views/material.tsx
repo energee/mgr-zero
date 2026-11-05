@@ -6,7 +6,7 @@ import { sentenceCase } from "@/lib/mgr/labels";
 import type { ReactNode } from "react";
 import { Fragment } from "react";
 
-type Controls = Partial<Record<"name" | "kind" | "baseUnits" | "purchaseUnit" | "unit" | "defaultVendorId" | "extractPotential", (value: string) => void>> & {
+type Controls = Partial<Record<"name" | "kind" | "baseUnits" | "purchaseUnit" | "unit" | "defaultVendorId" | "extractPotential" | "alphaAcid", (value: string) => void>> & {
   lotTracked?: (value: boolean) => void;
   active?: (value: boolean) => void;
 };
@@ -24,6 +24,8 @@ const pick = (
 /** Kinds whose extract feeds the recipe OG/FG/ABV prediction (#430). */
 /** Kinds whose extract potential feeds recipe gravity. */
 export const EXTRACT_KINDS = new Set(["malt", "adjunct"]);
+/** Kinds whose alpha acid feeds the recipe IBU estimate. */
+export const ALPHA_KINDS = new Set(["hop"]);
 
 const UNIT_LABELS: Record<string, string> = {
   lb: "Pounds (lb)",
@@ -65,6 +67,9 @@ export function MaterialView({ model, controls = {}, messages, footer }: {
       {E.info("Base unit is what recipes and counts use. Purchase unit is how you order it. For hops bought in 44 lb boxes, set Base unit to lb, Purchase unit to each, and Base units per purchase unit to 44.")}
       {EXTRACT_KINDS.has(model.kind.toLowerCase())
         ? E.edit("Extract potential · optional", model.extractPotential ?? "", "number", undefined, { onChange: controls.extractPotential, min: 1, max: 1.05, step: 0.001, inputMode: "decimal" })
+        : null}
+      {ALPHA_KINDS.has(model.kind.toLowerCase())
+        ? E.edit("Alpha acid % · optional", model.alphaAcid ?? "", "number", undefined, { onChange: controls.alphaAcid, min: 0.01, max: 30, step: 0.01, inputMode: "decimal" })
         : null}
       {pick(
         "Default vendor · optional",

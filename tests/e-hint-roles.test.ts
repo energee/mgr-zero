@@ -135,6 +135,7 @@ describe("hint roles", () => {
   it("RecipeView renders Predicted inside a polite status region, not an alert", () => {
     const html = renderToStaticMarkup(createElement(RecipeView, { model: recipeHazyV4 }));
     expect(statusRegion(html)).toContain("Predicted: OG 15.2 °P");
+    expect(statusRegion(html)).toContain("IBU 15");
     expect(html).not.toMatch(/role="alert"[^>]*>(?:(?!<\/div>)[\s\S])*Predicted:/);
   });
 

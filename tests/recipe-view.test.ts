@@ -4,7 +4,7 @@
 // (toRecipePageModel) and why a prediction is missing (gravityBlockerText,
 // noMashText), and a brew-day line's batch total in packs at a typed batch
 // size with its whole-pack rounding (ingredientPack, batchTotalText,
-// packRounding). No DB.
+// packRounding), and the draft's IBU preview (draftIbuText). No DB.
 // The last block reads the page and brand picker sources: the page draws
 // toRecipePageModel, and the picker never disables itself while it saves.
 import { readFileSync } from "node:fs";
@@ -12,8 +12,9 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { describe, expect, it } from "vitest";
-import { batchTotalText, draftBlocker, gravityBlockerText, ingredientPack, noMashText, packRounding, recipePageTitle, toRecipePageModel, versionNumbers, versionToDraft, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
+import { batchTotalText, draftBlocker, draftIbuText, gravityBlockerText, ingredientPack, noMashText, packRounding, recipePageTitle, toRecipePageModel, versionNumbers, versionToDraft, type RecipeOutcome, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
 import type { IngredientLine, MashStep } from "@/lib/mgr/recipe-process-view";
+import { sgToPlato } from "@/lib/recipe-gravity";
 
 const version: NonNullable<RecipeSnapshot["version"]> = {
   id: "v1", version: 3, created_at: "2026-10-01T15:00:00Z", mash_temp_f: null,
@@ -32,7 +33,7 @@ const snapshot: RecipeSnapshot = {
     { id: "i2", material_id: "m-hop", per_bbl_qty: 0.5, stage: "boil", timing_minutes: 60, sort: 1, extract_snapshot: null, materials: { base_uom: "lb" } },
   ],
   waterAdditions: [{ material_id: "m-gypsum", qty: 40, unit: "g", stage: "mash" }],
-  ogPlato: null, fgPlato: null, abv: null,
+  ogPlato: null, fgPlato: null, abv: null, ibu: { kind: "none", reason: "no predicted OG" },
 };
 
 it("names recipe tabs with the same saved-version heading as the page (#1255)", () => {
@@ -123,14 +124,43 @@ describe("draftBlocker", () => {
   });
 });
 
+describe("draftIbuText", () => {
+  const hop = { id: "m-hop", name: "Citra", category: "hop", base_uom: "lb", extract_potential: null, alpha_acid: 10, purchase_uom_factor: 44 };
+  const line = { materialId: "m-hop", perBblQty: "1", stage: "boil" as const, timingMinutes: "60" };
+  const og = sgToPlato(1.05);
+
+  it("reads each material's current alpha acid, which saving will freeze", () => {
+    expect(draftIbuText([line], og, [hop])).toBe("IBU 89");
+    expect(draftIbuText([line, { ...line, stage: "whirlpool", timingMinutes: "" }], og, [hop])).toBe("IBU 108 · whirlpool hops at 5%");
+  });
+  it("says what is missing without the saved version's remedy", () => {
+    expect(draftIbuText([line], og, [{ ...hop, alpha_acid: null }])).toBe("IBU not estimated: no alpha acid: Citra");
+    expect(draftIbuText([{ ...line, timingMinutes: "" }], og, [hop])).toBe("IBU not estimated: no boil time: Citra");
+    expect(draftIbuText([line], null, [hop])).toBe("IBU not estimated: no predicted OG");
+  });
+  it("draws nothing before there is a line, because draftBlocker already asks for one", () => {
+    expect(draftIbuText([], og, [hop])).toBeUndefined();
+  });
+  it("shows a gap for a line whose material is hidden from the picker, instead of dropping it", () => {
+    const inactive = { ...line, materialId: "aaaaaaaa-gone" };
+    expect(draftIbuText([line, inactive], og, [hop])).toBe("IBU ≥ 89 · no alpha acid: aaaaaaaa · not by weight: aaaaaaaa");
+  });
+});
+
 describe("toRecipePageModel", () => {
   const materials = [
-    { id: "m-malt", name: "Fieldstone White Wheat", category: "malt", base_uom: "lb", extract_potential: 1.037, purchase_uom_factor: 50 },
-    { id: "m-hop", name: "Citra", category: "hop", base_uom: "lb", extract_potential: null, purchase_uom_factor: 44 },
-    { id: "m-gypsum", name: "Gypsum", category: "salt", base_uom: "g", extract_potential: null, purchase_uom_factor: 1 },
+    { id: "m-malt", name: "Fieldstone White Wheat", category: "malt", base_uom: "lb", extract_potential: 1.037, alpha_acid: null, purchase_uom_factor: 50 },
+    { id: "m-hop", name: "Citra", category: "hop", base_uom: "lb", extract_potential: null, alpha_acid: 12.5, purchase_uom_factor: 44 },
+    { id: "m-gypsum", name: "Gypsum", category: "salt", base_uom: "g", extract_potential: null, alpha_acid: null, purchase_uom_factor: 1 },
   ];
-  const ctx = { materials, profiles: [{ id: "p-target", name: "Pale ale" }], unit: "plato" as const, timeZone: "America/Los_Angeles" };
+  const ctx = { materials, profiles: [{ id: "p-target", name: "Pale ale" }], unit: "plato" as const, timeZone: "America/Los_Angeles", outcomes: [] as RecipeOutcome[] };
   const predicted = { ...snapshot, ogPlato: 12.5, fgPlato: 2.5, abv: 5.25 };
+
+  it("prints the IBU get_recipe estimated from the frozen alpha acid, with the fix for a saved version", () => {
+    expect(toRecipePageModel({ ...predicted, ibu: { kind: "estimate", ibu: 31, whirlpool: true } }, ctx).bitterness).toBe("IBU 31 · whirlpool hops at 5%");
+    const lowerBound = { kind: "lowerBound" as const, ibu: 31, gaps: [{ name: "Mosaic", reason: "no alpha acid" as const }] };
+    expect(toRecipePageModel({ ...predicted, ibu: lowerBound }, ctx).bitterness).toBe("IBU ≥ 31 · no alpha acid: Mosaic; set alpha acid under Materials, then create the next version");
+  });
 
   it("titles the page with the version and reads each ingredient per bbl to three significant digits", () => {
     const model = toRecipePageModel({ ...predicted, ingredients: [{ ...snapshot.ingredients[0], per_bbl_qty: 40.909091 }] }, ctx);
@@ -198,6 +228,22 @@ describe("toRecipePageModel", () => {
   it("says nothing is predicted when the version has no mash ingredient", () => {
     const model = toRecipePageModel({ ...snapshot, ingredients: [snapshot.ingredients[1]] }, ctx);
     expect(model.predicted).toBe("No mash ingredient, so nothing is predicted.");
+  });
+  it("lists every version's batches and summarizes only the shown version", () => {
+    const batch: RecipeOutcome = {
+      batchId: "b1", batchNo: 9, version: 3, brewedOn: "2026-10-03", closed: true, ogPlato: 12.5, fgPlato: 2.5, abv: 5.3, apparentAttenuation: 0.8, brewhouseEfficiency: 0.7,
+      predicted: null, assumedEfficiency: 0.725, assumedAttenuation: 0.07,
+    };
+    const outcomes = [batch, { ...batch, batchId: "b2", batchNo: 8, brewhouseEfficiency: 0.71 }, { ...batch, batchId: "b3", batchNo: 7, version: 2 }];
+    const model = toRecipePageModel(predicted, { ...ctx, unit: "sg", outcomes });
+    expect(model.tape?.map(([label]) => label)).toEqual(["B-0009 · v3 · Oct 3, 2026", "B-0008 · v3 · Oct 3, 2026", "B-0007 · v2 · Oct 3, 2026"]);
+    expect(model.tape?.[0]?.[1]).toContain("OG 1.050");
+    expect(model.actualsNote).toMatch(/^2 batches: efficiency 70–71% against 73% assumed/);
+  });
+  it("has no Batch actuals with no batches", () => {
+    const model = toRecipePageModel(predicted, ctx);
+    expect(model.tape).toBeUndefined();
+    expect(model.actualsNote).toBeUndefined();
   });
   it("draws the empty recipe with no invented numbers", () => {
     const model = toRecipePageModel({ ...snapshot, version: null, ingredients: [], waterAdditions: [] }, ctx);

@@ -585,6 +585,22 @@ describe("Materials", () => {
     expect(of("Hop")).not.toMatch(/Extract potential/);
   });
 
+  it("MaterialView asks for alpha acid on hops only, at the saved value", () => {
+    const of = (kind: string) => htmlOf(createElement(MaterialView, { model: { ...materialCitra, kind, alphaAcid: "12.5" } }));
+    expect(of("Hop")).toMatch(/Alpha acid % · optional/);
+    expect(of("hop")).toContain('value="12.5"');
+    expect(of("malt")).not.toMatch(/Alpha acid/);
+    expect(of("yeast")).not.toMatch(/Alpha acid/);
+  });
+
+  it("the live material form sends alpha acid only where the field shows, seeded from the saved row", () => {
+    const form = src("app/(app)/materials/material-form.tsx");
+    expect(form).toMatch(/alphaAcid: ALPHA_KINDS\.has\(category\) && Number\(alpha\) > 0 \? Number\(alpha\) : undefined/);
+    expect(form).toMatch(/material\?\.alpha_acid != null \? String\(material\.alpha_acid\) : ""/);
+    expect(form).toMatch(/alphaAcid: alpha/);
+    expect(form).toMatch(/alphaAcid: setAlpha/);
+  });
+
   it("the live material form mounts the shared controlled body", () => {
     const form = src("app/(app)/materials/material-form.tsx");
     expect(form).toMatch(/from "@\/components\/mgr\/views\/material"/);

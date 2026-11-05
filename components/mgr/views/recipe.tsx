@@ -11,6 +11,8 @@
 // note) at the top. Show totals at is a page-only batch size, never saved:
 // typed, each brew-day line shows its batch total in packs, and off the read
 // page each line not in whole packs offers "Round to N × size", down and up.
+// Batch actuals sits last: what brewed batches measured, predictions in
+// brackets, and the gap for the shown version. It is drawn only with a tape.
 "use client";
 import { Fragment, useState, type ReactNode } from "react";
 import Link from "next/link";
@@ -110,9 +112,9 @@ export function RecipeView({
         </nav>
       ) : null}
       {model.historical ? E.note("Older version · read only. Open the current version to make changes.") : null}
-      {/* Always mounted and polite: the prediction changes as the draft is typed,
+      {/* Always mounted and polite: the prediction and IBU change as the draft is typed,
           and an alert (E.info is one) would interrupt the screen reader on every keystroke. */}
-      <div role="status">{E.polite(model.predicted)}</div>
+      <div role="status">{E.polite(model.predicted)}{E.polite(model.bitterness)}</div>
     </>
   );
   const body = model.empty ? (
@@ -140,8 +142,8 @@ export function RecipeView({
       {schedule(model.fermentation, slots.fermentation)}
       {schedule(model.water, slots.water)}
       {versionNote}
-      {model.tape?.length ? E.tape(model.tape) : null}
-      {model.actualsNote ? E.note(model.actualsNote) : null}
+      {model.tape?.length ? <>{E.ttl("Batch actuals · predicted in brackets")}{E.tape(model.tape)}</> : null}
+      {model.actualsNote ? E.info(model.actualsNote) : null}
       {controls ? (
         <>
           <div role="status">{E.polite(controls.blockedReason)}</div>

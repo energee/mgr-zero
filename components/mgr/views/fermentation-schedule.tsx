@@ -6,16 +6,16 @@ import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { FERMENTATION_STAGE_KINDS } from "@/lib/mgr/enums";
 import { sentenceCase } from "@/lib/mgr/labels";
-import { fermentationSummary, type FermentationStage, type FermentationStageFields } from "@/lib/mgr/recipe-process-view";
+import { fermentationStageDetail, fermentationSummary, type FermentationStage, type FermentationStageFields } from "@/lib/mgr/recipe-process-view";
 import { listRow, type ListRowProps } from "./mash-schedule";
 
 /** `header` replaces the whole header row, as on MashScheduleView: undefined keeps the default E.back, null draws none. */
-export function FermentationScheduleView({ title = "Fermentation schedule", stages, dryHopDay, header, ...verbs }: { title?: string; stages: readonly FermentationStage[]; dryHopDay?: number; header?: ReactNode } & ListRowProps) {
+export function FermentationScheduleView({ title = "Fermentation schedule", stages, header, ...verbs }: { title?: string; stages: readonly FermentationStage[]; header?: ReactNode } & ListRowProps) {
   return <>
     {header !== undefined ? header : E.back("Recipe", title, E.btn("Add stage"))}
     {stages.length === 0 ? E.blank({ title: "No stages yet" })
-      : stages.map((s, i) => <Fragment key={`${i}-${s.name}`}>{listRow(s.name, `${s.tempF} °F · ${s.days} days`, i, stages.length, verbs)}</Fragment>)}
-    {stages.length > 0 && E.info(fermentationSummary(stages, dryHopDay))}
+      : stages.map((s, i) => <Fragment key={`${i}-${s.name}`}>{listRow(s.name, fermentationStageDetail(s), i, stages.length, verbs)}</Fragment>)}
+    {stages.length > 0 && E.info(fermentationSummary(stages))}
   </>;
 }
 

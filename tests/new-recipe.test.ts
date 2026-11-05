@@ -150,8 +150,10 @@ describe("Recipe creation", () => {
       expect(draft()).not.toMatch(/<button[^>]*type="submit"[^>]*disabled/);
     });
 
-    it("draws no tape list without a tape", () => {
-      expect(draw({ readOnly: true, model: versioned })).not.toMatch(/<ol\b/);
+    it("draws no tape list or Batch actuals heading without a tape", () => {
+      const html = draw({ readOnly: true, model: versioned });
+      expect(html).not.toMatch(/<ol\b/);
+      expect(html).not.toContain("Batch actuals");
       expect(draw({ model: recipeHazyV4 })).toMatch(/<ol\b/);
     });
 
@@ -262,7 +264,8 @@ describe("recipe form copy (#1139)", () => {
     const planned = html(createElement(BrewDayView, { model: {
       title: "Batch", vesselId: "v", vessels: [], initialBbl: "2", brewedOn: "2026-10-01", plan: { ingredients: [ingredient] },
     } }));
-    expect(planned).toContain("1.2 lb per bbl · Dry hop");
+    expect(planned).toContain(">Dry hop<");
+    expect(planned).toContain("1.2 lb / bbl");
     const recorded = html(createElement(BrewDayView, { model: {
       title: "Batch", vesselId: "", vessels: [], initialBbl: "2", brewedOn: "2026-10-01", recorded: true,
       records: [{ id: "r", turn: 1, initial_bbl: 2, brewed_on: "2026-10-01", created_at: "2026-10-01", correction_reason: null, corrects_id: null, plan_snapshot: {}, process: {},
