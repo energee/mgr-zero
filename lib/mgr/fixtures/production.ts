@@ -4,7 +4,7 @@ import type { BatchesSnapshot } from "@/lib/mgr/batches-view";
 import type { BrewDayViewModel } from "@/lib/mgr/brew-day-view";
 import { cellarPlanRows, startAtPlan, waterAdditionRows, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import type { ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
-import type { RecipeViewModel } from "@/lib/mgr/recipe-view";
+import { outcomeSummary, outcomeTape, type RecipeOutcome, type RecipeViewModel } from "@/lib/mgr/recipe-view";
 import type { RecipesSnapshot } from "@/lib/mgr/recipes-view";
 import type { RunClosedViewModel } from "@/lib/mgr/run-closed-view";
 import { DEMO_TIME_ZONE } from "@/lib/mgr/fixtures/settings";
@@ -269,6 +269,13 @@ export const WATER_HAZY: WaterDraft = {
   additions: [{ materialId: "gypsum", qty: 4, unit: "g", stage: "mash" }, { materialId: "cacl", qty: 6, unit: "g", stage: "mash" }, { materialId: "lactic", qty: 3, unit: "mL", stage: "sparge" }],
 };
 
+/** Two closed batches of v4, as get_recipe_outcomes returns them. The page text is computed from these. */
+const HAZY_V4 = { version: 4, closed: true, predicted: { ogPlato: 15.2, fgPlato: 3.5, abv: 6.3 }, assumedEfficiency: 0.72, assumedAttenuation: 0.78 };
+const HAZY_OUTCOMES: RecipeOutcome[] = [
+  { ...HAZY_V4, batchId: "b-0413", batchNo: 413, brewedOn: "2026-10-03", ogPlato: 14.8, fgPlato: 3.5, abv: 6.1, apparentAttenuation: 0.77, brewhouseEfficiency: 0.68 },
+  { ...HAZY_V4, batchId: "b-0398", batchNo: 398, brewedOn: "2026-09-12", ogPlato: 15.1, fgPlato: 3.4, abv: 6.3, apparentAttenuation: 0.78, brewhouseEfficiency: 0.71 },
+];
+
 export const recipeHazyV4: RecipeViewModel = {
   title: "Hazy IPA v4",
   saved: "Aug 28, 2026",
@@ -297,12 +304,9 @@ export const recipeHazyV4: RecipeViewModel = {
   // The live draft's Water row: target and addition count (recipe-version-form.tsx); the Water frame names the source.
   water: { title: "Water", detail: waterRowSummary(waterProfiles.find((p) => p.id === WATER_HAZY.targetProfileId)?.name, WATER_HAZY.additions.length) },
   notes: "Whirlpool hard, knock out cold.",
-  predicted: "Predicted: OG 15.2 °P · FG 3.3 °P · ABV 6.5%",
-  tape: [
-    ["B-0413 · OG 14.8 · FG 3.5 · ABV 6.0%", "eff 68% · att 76%"],
-    ["B-0398 · OG 15.1 · FG 3.4 · ABV 6.3%", "eff 71% · att 77%"],
-  ],
-  actualsNote: "Actuals run −0.4 °P OG vs predicted (eff 68–71% vs 72% assumed). Lower the assumption on v5?",
+  predicted: "Predicted: OG 15.2 °P · FG 3.5 °P · ABV 6.3%",
+  tape: outcomeTape(HAZY_OUTCOMES, "plato"),
+  actualsNote: outcomeSummary(HAZY_OUTCOMES, 4),
 };
 export const cellarTransferPils = {
   fromId: "fv1-occupancy", toId: "bt1", volume: "3.0", loss: "",

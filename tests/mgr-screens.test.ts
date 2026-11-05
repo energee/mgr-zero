@@ -78,6 +78,17 @@ describe("SCREENS", () => {
     expect(gate).toMatch(/schedules/);
   });
 
+  it("draws Batch actuals from a live read, computed from the outcomes", () => {
+    const recipe = SCREENS.find((s) => s.name === "Recipe")!;
+    expect(String(recipe.reads)).toMatch(/get_recipe_outcomes \[(?!design)/);
+    expect(recipe.states?.map(([name]) => name)).toContain("no batches");
+    const drawn = text("Recipe");
+    expect(drawn).toContain("Batch actuals · predicted in brackets");
+    expect(drawn).toContain("B-0413 · v4 · Oct 3, 2026");
+    expect(drawn).toContain("2 batches: efficiency 68–71% against 72% assumed; attenuation 77–78% against 78% assumed.");
+    expect(drawn).not.toMatch(/Lower the assumption/);
+  });
+
   it("draws the Recipe frame from the shared schedule helpers, with its saved date and no gate", () => {
     const recipe = SCREENS.find((s) => s.name === "Recipe")!;
     const drawn = text("Recipe");

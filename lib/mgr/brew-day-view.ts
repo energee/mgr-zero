@@ -126,7 +126,7 @@ export function brewRecordPayload(values: BrewDayViewModel, batchId: string): [s
 }
 
 /** Only the latest revision of each turn contributes to confirmed totals. */
-export function currentBrewRecords(records: BrewRecordView[]): BrewRecordView[] {
+export function currentBrewRecords<T extends { id: string; corrects_id: string | null }>(records: T[]): T[] {
   const corrected = new Set(records.map(record => record.corrects_id));
   return records.filter(record => !corrected.has(record.id));
 }

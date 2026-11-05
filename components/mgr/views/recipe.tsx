@@ -11,6 +11,8 @@
 // note) at the top. Show totals at is a page-only batch size, never saved:
 // typed, each brew-day line shows its batch total in packs, and off the read
 // page each line not in whole packs offers "Round to N × size", down and up.
+// Batch actuals sits last: what brewed batches measured, predictions in
+// brackets, and the gap for the shown version. It is drawn only with a tape.
 "use client";
 import { Fragment, useState, type ReactNode } from "react";
 import Link from "next/link";
@@ -140,7 +142,7 @@ export function RecipeView({
       {schedule(model.fermentation, slots.fermentation)}
       {schedule(model.water, slots.water)}
       {versionNote}
-      {model.tape?.length ? E.tape(model.tape) : null}
+      {model.tape?.length ? <>{E.ttl("Batch actuals · predicted in brackets")}{E.tape(model.tape)}</> : null}
       {model.actualsNote ? E.note(model.actualsNote) : null}
       {controls ? (
         <>

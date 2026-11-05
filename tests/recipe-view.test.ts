@@ -12,7 +12,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { describe, expect, it } from "vitest";
-import { batchTotalText, draftBlocker, gravityBlockerText, ingredientPack, noMashText, packRounding, recipePageTitle, toRecipePageModel, versionNumbers, versionToDraft, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
+import { batchTotalText, draftBlocker, gravityBlockerText, ingredientPack, noMashText, packRounding, recipePageTitle, toRecipePageModel, versionNumbers, versionToDraft, type RecipeOutcome, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
 import type { IngredientLine, MashStep } from "@/lib/mgr/recipe-process-view";
 
 const version: NonNullable<RecipeSnapshot["version"]> = {
@@ -129,7 +129,7 @@ describe("toRecipePageModel", () => {
     { id: "m-hop", name: "Citra", category: "hop", base_uom: "lb", extract_potential: null, purchase_uom_factor: 44 },
     { id: "m-gypsum", name: "Gypsum", category: "salt", base_uom: "g", extract_potential: null, purchase_uom_factor: 1 },
   ];
-  const ctx = { materials, profiles: [{ id: "p-target", name: "Pale ale" }], unit: "plato" as const, timeZone: "America/Los_Angeles" };
+  const ctx = { materials, profiles: [{ id: "p-target", name: "Pale ale" }], unit: "plato" as const, timeZone: "America/Los_Angeles", outcomes: [] as RecipeOutcome[] };
   const predicted = { ...snapshot, ogPlato: 12.5, fgPlato: 2.5, abv: 5.25 };
 
   it("titles the page with the version and reads each ingredient per bbl to three significant digits", () => {
@@ -198,6 +198,22 @@ describe("toRecipePageModel", () => {
   it("says nothing is predicted when the version has no mash ingredient", () => {
     const model = toRecipePageModel({ ...snapshot, ingredients: [snapshot.ingredients[1]] }, ctx);
     expect(model.predicted).toBe("No mash ingredient, so nothing is predicted.");
+  });
+  it("lists every version's batches and summarizes only the shown version", () => {
+    const batch: RecipeOutcome = {
+      batchId: "b1", batchNo: 9, version: 3, brewedOn: "2026-10-03", closed: true, ogPlato: 12.5, fgPlato: 2.5, abv: 5.3, apparentAttenuation: 0.8, brewhouseEfficiency: 0.7,
+      predicted: null, assumedEfficiency: 0.725, assumedAttenuation: 0.07,
+    };
+    const outcomes = [batch, { ...batch, batchId: "b2", batchNo: 8, brewhouseEfficiency: 0.71 }, { ...batch, batchId: "b3", batchNo: 7, version: 2 }];
+    const model = toRecipePageModel(predicted, { ...ctx, unit: "sg", outcomes });
+    expect(model.tape?.map(([label]) => label)).toEqual(["B-0009 · v3 · Oct 3, 2026", "B-0008 · v3 · Oct 3, 2026", "B-0007 · v2 · Oct 3, 2026"]);
+    expect(model.tape?.[0]?.[1]).toContain("OG 1.050");
+    expect(model.actualsNote).toMatch(/^2 batches: efficiency 70–71% against 73% assumed/);
+  });
+  it("has no Batch actuals with no batches", () => {
+    const model = toRecipePageModel(predicted, ctx);
+    expect(model.tape).toBeUndefined();
+    expect(model.actualsNote).toBeUndefined();
   });
   it("draws the empty recipe with no invented numbers", () => {
     const model = toRecipePageModel({ ...snapshot, version: null, ingredients: [], waterAdditions: [] }, ctx);

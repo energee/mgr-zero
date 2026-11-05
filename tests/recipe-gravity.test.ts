@@ -1,7 +1,7 @@
 // tests/recipe-gravity.test.ts — pins the one golden example for
 // recipeGravity by hand, per lib/recipe-gravity.ts's module comment. No DB.
 import { describe, expect, it } from "vitest";
-import { gravityBlockers, recipeGravity } from "../lib/recipe-gravity";
+import { gravityBlockers, measuredGravity, platoToSg, potentialPointsPerBbl, recipeGravity, sgToPlato } from "../lib/recipe-gravity";
 
 describe("recipeGravity", () => {
   it("computes OG/FG/ABV for a single mash-stage ingredient (hand-derived golden example)", () => {
@@ -122,5 +122,69 @@ describe("gravityBlockers", () => {
     const ingredients = [malt, boil];
     expect(gravityBlockers(ingredients)).toEqual([]);
     expect(gravity(ingredients)).not.toBeNull();
+  });
+});
+
+describe("potentialPointsPerBbl", () => {
+  it("is the mash bill's points per barrel at 100% efficiency", () => {
+    // 62 lb at 1.037: 62 * 37 / 31 = 74 points. Hops carry none; 16 oz is one pound.
+    expect(potentialPointsPerBbl([
+      { perBblQty: 62, extractPotential: 1.037, stage: "mash", unit: "lb" },
+      { perBblQty: 1, extractPotential: null, stage: "boil", unit: "lb" },
+    ])).toBeCloseTo(74, 6);
+    expect(potentialPointsPerBbl([{ perBblQty: 992, extractPotential: 1.037, stage: "mash", unit: "oz" }])).toBeCloseTo(74, 6);
+  });
+
+  it("is null with no mash line or any blocked line, as recipeGravity is", () => {
+    expect(potentialPointsPerBbl([])).toBeNull();
+    expect(potentialPointsPerBbl([{ perBblQty: 62, extractPotential: null, stage: "mash", unit: "lb" }])).toBeNull();
+    expect(potentialPointsPerBbl([{ perBblQty: 2, extractPotential: 1.037, stage: "mash", unit: "gal" }])).toBeNull();
+  });
+});
+
+describe("measuredGravity", () => {
+  const potential = 74;
+
+  it("reads a short knockout at its true efficiency: 28.5 of 30 bbl at 72%", () => {
+    // The grain for 30 bbl at 72% lands in 28.5 bbl of wort, so the OG runs high.
+    const ogSg = 1 + (potential * 30 * 0.72) / 28.5 / 1000;
+    const measured = measuredGravity({ ogPlato: sgToPlato(ogSg), fgPlato: null, potentialPointsPerBbl: potential, plannedBbl: 30, knockoutBbl: 28.5 });
+    // sgToPlato and platoToSg are approximations of each other, so the round trip costs a little.
+    expect(measured.brewhouseEfficiency).toBeCloseTo(0.72, 2);
+  });
+
+  it("computes ABV and apparent attenuation in SG", () => {
+    const measured = measuredGravity({ ogPlato: 14.8, fgPlato: 3.5, potentialPointsPerBbl: null, plannedBbl: 30, knockoutBbl: null });
+    const [og, fg] = [platoToSg(14.8), platoToSg(3.5)];
+    expect(measured.abv).toBeCloseTo((og - fg) * 131.25, 6);
+    expect(measured.apparentAttenuation).toBeCloseTo((og - fg) / (og - 1), 6);
+  });
+
+  it("keeps ABV under 20 from Plato inputs (v1 read Plato as SG and printed about 1508)", () => {
+    expect(measuredGravity({ ogPlato: 14.8, fgPlato: 3.3, potentialPointsPerBbl: null, plannedBbl: 30, knockoutBbl: null }).abv).toBeLessThan(20);
+  });
+
+  it("a null FG nulls ABV and attenuation and keeps efficiency", () => {
+    expect(measuredGravity({ ogPlato: 14.8, fgPlato: null, potentialPointsPerBbl: potential, plannedBbl: 30, knockoutBbl: 30 })).toEqual({
+      abv: null, apparentAttenuation: null, brewhouseEfficiency: expect.any(Number),
+    });
+  });
+
+  it("a null OG nulls every metric, never 0", () => {
+    expect(measuredGravity({ ogPlato: null, fgPlato: null, potentialPointsPerBbl: potential, plannedBbl: 30, knockoutBbl: 30 })).toEqual({
+      abv: null, apparentAttenuation: null, brewhouseEfficiency: null,
+    });
+  });
+
+  it("a null knockout or a null or zero potential nulls efficiency", () => {
+    const input = { ogPlato: 14.8, fgPlato: 3.5, plannedBbl: 30 };
+    expect(measuredGravity({ ...input, potentialPointsPerBbl: potential, knockoutBbl: null }).brewhouseEfficiency).toBeNull();
+    expect(measuredGravity({ ...input, potentialPointsPerBbl: null, knockoutBbl: 30 }).brewhouseEfficiency).toBeNull();
+    // A rice-hull-only bill bears no extract: dividing by it would print Infinity.
+    expect(measuredGravity({ ...input, potentialPointsPerBbl: 0, knockoutBbl: 30 }).brewhouseEfficiency).toBeNull();
+  });
+
+  it("an OG of water has no attenuation rather than a division by zero", () => {
+    expect(measuredGravity({ ogPlato: 0, fgPlato: 0, potentialPointsPerBbl: null, plannedBbl: 30, knockoutBbl: null }).apparentAttenuation).toBeNull();
   });
 });
