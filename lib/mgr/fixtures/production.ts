@@ -299,8 +299,7 @@ export const recipeHazyV4: RecipeViewModel = {
   efficiency: "72",
   attenuation: "78",
   mash: { title: `Mash schedule · ${plural(MASH_STEPS.length, "step")}`, detail: mashRowSummary(MASH_STEPS) },
-  // PR D drops the dry-hop day argument with the dry-hop row.
-  fermentation: { title: `Fermentation schedule · ${plural(FERM_STAGES.length, "stage")}`, detail: fermentationSummary(FERM_STAGES, 4) },
+  fermentation: { title: `Fermentation schedule · ${plural(FERM_STAGES.length, "stage")}`, detail: fermentationSummary(FERM_STAGES) },
   // The live draft's Water row: target and addition count (recipe-version-form.tsx); the Water frame names the source.
   water: { title: "Water", detail: waterRowSummary(waterProfiles.find((p) => p.id === WATER_HAZY.targetProfileId)?.name, WATER_HAZY.additions.length) },
   notes: "Whirlpool hard, knock out cold.",

@@ -41,8 +41,6 @@ describe("schedule drafts", () => {
     expect(mashSummary(mash)).toBe("Total 85 min. The 152 °F rest is recorded as the mash temperature.");
     expect(mashSummary([{ name: "Mash-out", kind: "direct heat", tempF: 168, minutes: 10 }])).toBe("Total 10 min. No rest falls between 144 and 162 °F, so no mash temperature is recorded.");
     expect(fermentationSummary(ferm)).toBe("Total 6 days.");
-    expect(fermentationSummary(ferm, 4)).toBe("Total 6 days · dry hop day 4 falls in Primary.");
-    expect(fermentationSummary(ferm, 9)).toBe("Total 6 days · dry hop day 9 is after the last stage.");
   });
   it("an ingredient row names its stage in sentence case, as the Stage pick does (#1139)", () => {
     expect(ingredientDetail("whirlpool", 4, "1.2", "lb")).toBe("Whirlpool · 4 min · 1.2 lb / bbl");

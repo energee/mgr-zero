@@ -139,11 +139,11 @@ describe("SCREENS", () => {
     expect(mash).toContain("Add step");
   });
 
-  it("draws a fermentation schedule that places the dry hop", () => {
+  it("draws a fermentation schedule with its total, leaving dry-hop days to the recipe's lines", () => {
     const ferm = text("Fermentation schedule");
     expect(ferm).toContain("Diacetyl rest");
     expect(ferm).toContain("Total 18 days");
-    expect(ferm).toMatch(/dry hop day 4 falls in Primary/);
+    expect(ferm).not.toMatch(/falls in Primary/);
     expect(ferm).toContain("Add stage");
   });
 

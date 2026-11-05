@@ -134,14 +134,8 @@ export function mashStepDetail(step: MashStep): string {
 /** A fermentation stage's row detail, "68 °F · 4 days": on the schedule sheet and in a batch's cellar plan. */
 export const fermentationStageDetail = (stage: FermentationStage) => `${stage.tempF} °F · ${plural(stage.days, "day")}`;
 
-/** Total days, and where a dry hop on day N lands: day 4 is the last day of a 4-day Primary. */
-export function fermentationSummary(stages: readonly FermentationStage[], dryHopDay?: number): string {
-  const total = stages.reduce((n, s) => n + s.days, 0);
-  if (dryHopDay === undefined) return `Total ${total} days.`;
-  let end = 0;
-  const stage = stages.find((s) => { end += s.days; return dryHopDay <= end; });
-  return `Total ${total} days · dry hop day ${dryHopDay} ${stage ? `falls in ${stage.name}` : "is after the last stage"}.`;
-}
+/** The schedule's total days. */
+export const fermentationSummary = (stages: readonly FermentationStage[]) => `Total ${scheduleDays(stages)} days.`;
 
 /** The process columns get_recipe returns on a version. */
 export type ProcessColumns = {
