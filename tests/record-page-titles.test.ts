@@ -166,7 +166,9 @@ describe("successful record metadata", () => {
     const { bindings } = requestBindings();
     const query = bindings.runCommand as (name: string) => Promise<unknown>;
     const read = async (name: string) => name === primary ? [{ id: MISSING, name: "Saved record" }] : query(name);
-    const page = loadPage(`app/(app)/${route}/page.tsx`, { ...bindings, runCommand: read, runPageQuery: read });
+    const reading = { ...bindings, runCommand: read, runPageQuery: read };
+    const body = route in DETAIL_BODY ? DETAIL_BODY[route] : undefined;
+    const page = loadPage(`app/(app)/${route}/page.tsx`, body ? { ...reading, ...loadPage(`app/(app)/${body[0]}`, reading) } : reading);
     expect(await page.generateMetadata({ params: Promise.resolve({ id: "new" }), searchParams: Promise.resolve({}) })).toEqual({ title: creationTitle });
     expect(await page.generateMetadata({ params: Promise.resolve({ id: MISSING }), searchParams: Promise.resolve({}) })).toEqual({ title: savedTitle });
   });
