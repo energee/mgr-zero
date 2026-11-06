@@ -1,6 +1,6 @@
 // lib/agent/sessions.ts — logs what a model did: names, codes and timings, never input
 // or output values, because those are tenant data. docs/plans/agent-access.md, Phase 4.
-import { CommandError, type Ctx } from "@/lib/commands/registry";
+import { CommandError, type Ctx, getCommandDefinition } from "@/lib/commands/registry";
 
 export type AgentStep = {
   tool: string;
@@ -46,8 +46,10 @@ export function askMgrStep({ toolName, input, durationMs, output }: ToolEnd): Ag
 export async function recordAgentStep(ctx: Ctx, conversationId: string | null, step: AgentStep): Promise<void> {
   const { error } = await ctx.db.rpc("record_agent_step", {
     p_brewery: ctx.breweryId, p_tool: step.tool, p_outcome: step.outcome, p_duration_ms: Math.round(step.durationMs),
-    p_conversation: conversationId ?? undefined, p_operation: step.operation, p_kind: step.kind,
-    p_error_code: step.errorCode, p_input_path: step.inputPath, p_proposal: step.proposalId,
+    p_conversation: conversationId ?? undefined, p_kind: step.kind, p_error_code: step.errorCode,
+    // A model picks these, so an unknown name could be anything it pasted.
+    p_operation: step.operation && getCommandDefinition(step.operation) ? step.operation : undefined,
+    p_input_path: step.inputPath?.slice(0, 200), p_proposal: step.proposalId,
   });
   if (error) console.error("agent_step_unrecorded", { tool: step.tool, code: error.code });
 }

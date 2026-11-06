@@ -91,6 +91,37 @@ describe("agent session log", () => {
     expect(error).not.toBeNull();
   });
 
+  it("logs a name MGR does not know as no operation, because it is model free text", async () => {
+    const pasted = "ask-a-customer-at-example.com";
+    expect((await tool(agent.token, "run_query", { name: pasted })).isError).toBe(true);
+    expect(lastStep()).toMatchObject({ tool: "run_query", operation: null, error_code: "unknown_command" });
+    expect(JSON.stringify(steps())).not.toContain(pasted);
+  });
+
+  it("refuses free text and another person's proposal from a token calling the RPC itself", async () => {
+    const step = { p_brewery: breweryId, p_tool: "run_query", p_outcome: "ok", p_duration_ms: 1 };
+    const db = client(agent.token);
+    expect((await db.rpc("record_agent_step", { ...step, p_tool: "customer details here" })).error?.code).toBe("23514");
+    expect((await db.rpc("record_agent_step", { ...step, p_operation: "customer details here" })).error?.code).toBe("23514");
+    expect((await db.rpc("record_agent_step", { ...step, p_error_code: "customer details here" })).error?.code).toBe("23514");
+    expect((await db.rpc("record_agent_step", { ...step, p_input_path: "x".repeat(201) })).error?.code).toBe("23514");
+    const other = await makeStaff(breweryId, "admin");
+    const foreign = sql(`insert into public.agent_proposals (brewery_id, actor_id, client_id, command, input)
+      values ('${breweryId}', '${other.id}', 'someone-else', 'create_bin', '{}') returning id`, true)[0];
+    expect((await db.rpc("record_agent_step", { ...step, p_proposal: foreign })).error?.code).toBe("42501");
+  });
+
+  it("prunes an old step even while its session stays active", async () => {
+    await tool(agent.token, "run_query", { name: "get_today" });
+    const live = sessionCount();
+    sql(`update public.agent_session_steps set created_at = now() - interval '91 days' where brewery_id = '${breweryId}'`);
+    sql(`update public.agent_session_notes set created_at = now() - interval '91 days' where brewery_id = '${breweryId}'`);
+    sql(`set role service_role; select public.prune_agent_history()`, true);
+    expect(steps()).toEqual([]);
+    expect(Number(sql(`select count(*) from public.agent_session_notes where brewery_id = '${breweryId}'`, true)[0])).toBe(0);
+    expect(sessionCount()).toBe(live);
+  });
+
   it("prunes sessions and proposals after 90 days", async () => {
     sql(`update public.agent_sessions set last_seen_at = now() - interval '91 days' where brewery_id = '${breweryId}'`);
     sql(`update public.agent_proposals set expires_at = now() - interval '91 days' where brewery_id = '${breweryId}'`);

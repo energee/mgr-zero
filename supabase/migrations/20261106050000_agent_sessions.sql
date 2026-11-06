@@ -17,14 +17,15 @@ create table public.agent_session_steps (
   id uuid primary key default gen_random_uuid(),
   brewery_id uuid not null references public.breweries(id),
   session_id uuid not null references public.agent_sessions(id) on delete cascade,
-  tool text not null,
-  operation text,
+  -- A token can call record_agent_step itself, so these checks keep free text out.
+  tool text not null check (tool ~ '^[a-z0-9_]{1,64}$'),
+  operation text check (operation ~ '^[a-z0-9_]{1,64}$'),
   kind text check (kind in ('query', 'command')),
   outcome text not null check (outcome in ('ok', 'refused', 'failed')),
-  error_code text,
-  input_path text,
+  error_code text check (error_code ~ '^[A-Za-z0-9_]{1,64}$'),
+  input_path text check (char_length(input_path) <= 200),
   proposal_id uuid references public.agent_proposals(id) on delete set null,
-  duration_ms integer not null check (duration_ms >= 0),
+  duration_ms integer not null check (duration_ms between 0 and 86400000),
   created_at timestamptz not null default now()
 );
 create index agent_session_steps_brewery on public.agent_session_steps (brewery_id, created_at desc);
@@ -83,6 +84,10 @@ create function public.record_agent_step(p_brewery uuid, p_tool text, p_outcome 
   p_error_code text default null, p_input_path text default null, p_proposal uuid default null)
 returns void language plpgsql security definer set search_path = '' as $$
 begin
+  if p_proposal is not null and not exists (
+    select 1 from public.agent_proposals p
+    where p.id = p_proposal and p.brewery_id = p_brewery and p.actor_id = auth.uid()
+  ) then raise exception 'a step can link only your own proposal' using errcode = '42501'; end if;
   insert into public.agent_session_steps (brewery_id, session_id, tool, operation, kind, outcome, error_code, input_path, proposal_id, duration_ms)
     values (p_brewery, private.current_agent_session(p_brewery, p_conversation), p_tool, p_operation, p_kind, p_outcome, p_error_code, p_input_path, p_proposal, p_duration_ms);
 end $$;
@@ -95,15 +100,21 @@ begin
     values (p_brewery, private.current_agent_session(p_brewery, null), p_kind, p_body);
 end $$;
 
--- Q6: sessions, their steps and notes, and proposals all last 90 days.
+-- Q6: sessions, their steps and notes, and proposals all last 90 days. Steps and notes
+-- go by their own age, because a session in steady use would otherwise keep them forever.
 create function public.prune_agent_history() returns integer
 language sql security definer set search_path = '' as $$
-  with sessions as (
+  with steps as (
+    delete from public.agent_session_steps where created_at < now() - interval '90 days' returning 1
+  ), notes as (
+    delete from public.agent_session_notes where created_at < now() - interval '90 days' returning 1
+  ), sessions as (
     delete from public.agent_sessions where last_seen_at < now() - interval '90 days' returning 1
   ), proposals as (
     delete from public.agent_proposals where expires_at < now() - interval '90 days' returning 1
   )
-  select ((select count(*) from sessions) + (select count(*) from proposals))::int;
+  select ((select count(*) from steps) + (select count(*) from notes)
+    + (select count(*) from sessions) + (select count(*) from proposals))::int;
 $$;
 
 revoke all on function private.current_agent_session(uuid, uuid), public.leave_agent_note(uuid, text, text), public.prune_agent_history(),
