@@ -51,7 +51,7 @@ describe("POST /api/command bearer auth", () => {
       handler: executionHandler,
     });
     defineCommand({
-      name: "chat_execution_probe", input: z.object({}), roles: ["admin"], aiExposed: true,
+      name: "chat_execution_probe", input: z.object({}), roles: ["admin"],
       risk: "append_only", requiresConfirmation: true, compensation: null,
       idempotency: "dedupe", offlineReplay: false, atomicity: "rpc",
       preview: async () => ({ effects: [], warnings: [], version: {} }),

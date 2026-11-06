@@ -175,7 +175,6 @@ defineQuery({
   description: "Search SKUs, orders, invoices, lots, material lots, customers, purchase orders, batches, packaging runs, transfers, routes, recipes, vessels, vendors, ship-tos, materials, keg pools, bins, state licenses and water profiles by name prefix or exact document number (ORD-, INV-, PO-, B-, RUN-, TRF-, L-); a bare number matches every numbered kind; exact numbers sort first; kinds without a detail page link to their list page; RLS decides the rows, kinds only narrow, and kinds whose page the caller's role cannot open are skipped",
   input: z.object({ q: z.string().trim().min(1).max(SEARCH_QUERY_MAX_LENGTH), kinds: z.array(z.enum(SEARCH_KINDS)).max(SEARCH_KINDS.length).optional() }),
   roles: ["admin", "sales", "warehouse", "brewer"],
-  aiExposed: true,
   handler: async (ctx, i): Promise<SearchHit[]> => {
     const kinds = openableKinds(ctx, [...new Set(i.kinds?.length ? i.kinds : SEARCH_KINDS)]);
     const hits = (await Promise.all(kinds.map((k) => byKind(ctx, k, i.q)))).flat();

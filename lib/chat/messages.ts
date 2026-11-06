@@ -19,7 +19,7 @@ export const PROPOSAL_ERROR = "MGR proposed a change this panel cannot confirm. 
 /**
  * The record_movement proposal awaiting confirmation in the newest assistant
  * message, or an operator error when that proposal fails composerProposal. The
- * agent can propose any AI-exposed command (ChatCommandProposal in
+ * agent can propose any previewed command (ChatCommandProposal in
  * lib/chat/agent.ts), but the panel renders and commits only record_movement,
  * so anything else returns `error` and never reaches the commit button. Only
  * the newest assistant message counts: a later reply supersedes an older

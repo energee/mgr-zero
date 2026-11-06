@@ -480,8 +480,10 @@ report the change in the PR.
     proposal opens a review page with labelled fields. Depends on tasks 13 and 14.
 16. **Write evals (O1, O3, O4).** 20 write tasks, scored on the stored proposal.
     Accept: O3 is 85% or more, O4 is 0, O1 is 50. Depends on tasks 11 and 15.
-17. **Retire the old list.** Move Ask MGR onto the same tools and delete
-    `aiExposed`. Depends on task 15.
+17. **Retire the old list.** Move Ask MGR onto the same read tools and delete
+    `aiExposed`. Ask MGR keeps its in-chat preview for writes, because a proposal
+    needs an OAuth client. Its `run_query` checks its own list, because a person's
+    context has no `ctx.agent`. Depends on task 15.
 
 ### Group F — Go live
 
