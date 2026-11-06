@@ -10,7 +10,7 @@ vi.mock("@/lib/chat/jobs", () => ({
   cleanupChatState: async () => ({}),
 }));
 vi.mock("@/lib/email/jobs", () => ({ runOrderEmailBatch: async () => ({}) }));
-vi.mock("@/lib/retention/jobs", () => ({ pruneCommandRequests: async () => 0 }));
+vi.mock("@/lib/retention/jobs", () => ({ pruneCommandRequests: async () => 0, pruneAgentHistory: async () => 0 }));
 import { authorizeJob } from "@/lib/jobs/auth";
 import { POST as scan } from "@/app/api/chat/jobs/scan/route";
 import { POST as chatDeliver } from "@/app/api/chat/jobs/deliver/route";

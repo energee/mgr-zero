@@ -179,8 +179,8 @@ describe("agent tokens", () => {
       "begin_agent_proposal", "begin_qbo_invoice_sync", "begin_square_catalog_sync", "cancel_purchase_order", "close_purchase_order_short",
       "complete_invite_membership", "consume_command_admission", "create_agent_proposal", "decline_agent_proposal",
       "finish_agent_proposal", "get_brew_day_plan", "get_brew_record",
-      "get_material_count_preview", "get_order_email_status", "get_qbo_sync_status", "preview_inventory_movement",
-      "record_invite_failure", "record_submitted_order_occurrence",
+      "get_material_count_preview", "get_order_email_status", "get_qbo_sync_status", "leave_agent_note", "preview_inventory_movement",
+      "record_agent_step", "record_invite_failure", "record_submitted_order_occurrence",
     ]);
   });
 });

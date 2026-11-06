@@ -5,7 +5,9 @@ The scheduled prune of old command records, and the admin scripts that export an
 `POST /api/retention/jobs/prune` requires a bearer token matching
 `RETENTION_JOB_SECRET`. It removes command replay records
 (`private.command_requests`) older than 90 days, keeping unfinished ones and any
-that QuickBooks/Square sync history or portal quotes still reference. A
+that QuickBooks/Square sync history or portal quotes still reference. It also
+removes agent sessions, with their steps and notes, and agent proposals past 90
+days. A
 `.github/workflows/hosted-jobs.yml` calls it daily, with the secret
 `RETENTION_JOB_SECRET` equal to the Vercel value.
 

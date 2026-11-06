@@ -2,6 +2,7 @@ import { createUIMessageStreamResponse, gateway, isStepCount, streamText, toUIMe
 import { consumeAdmission } from "@/lib/commands/admission";
 import { buildRouteContext } from "@/lib/commands/context";
 import { CommandError, runCommand, type Ctx } from "@/lib/commands/registry";
+import { askMgrStep, recordAgentStep } from "@/lib/agent/sessions";
 import { createComposerTools } from "@/lib/chat/agent";
 import { buildModelMessages, type StoredChatMessage } from "@/lib/chat/model-messages";
 import { readChatRequest } from "@/lib/chat/request";
@@ -47,6 +48,9 @@ export async function POST(req: Request) {
       tools: createComposerTools(ctx, body.id),
       // One read can take three steps (find, describe, run), and a write usually needs reads first.
       stopWhen: isStepCount(8),
+      onToolExecutionEnd: ({ toolCall, toolExecutionMs, toolOutput }) => recordAgentStep(ctx, body.id, askMgrStep({
+        toolName: toolCall.toolName, input: toolCall.input, durationMs: toolExecutionMs, output: toolOutput,
+      })),
       onError: ({ error }) => { console.error("chat stream failed", { code: providerFailureCode(error) }); },
       onEnd: async ({ text }) => {
         if (text.trim()) await runCommand("append_chat_message", { conversationId: body.id, role: "assistant", content: text.slice(0, 4000) }, ctx, execution());

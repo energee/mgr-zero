@@ -5,7 +5,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const reap = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/retention/jobs", () => ({ pruneCommandRequests: async () => 3 }));
+vi.mock("@/lib/retention/jobs", () => ({ pruneCommandRequests: async () => 3, pruneAgentHistory: async () => 4 }));
 vi.mock("@/lib/qbo", async (importOriginal) => ({ ...await importOriginal<typeof import("@/lib/qbo")>(), reapQboOAuthExchanges: reap }));
 import { POST } from "@/app/api/retention/jobs/prune/route";
 
@@ -21,7 +21,7 @@ it("skips the reap when QuickBooks is not configured", async () => {
   vi.stubEnv("QBO_CLIENT_ID", "");
   const response = await prune();
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({ ok: true, pruned: 3, qboReap: null });
+  expect(await response.json()).toEqual({ ok: true, pruned: 3, prunedAgentHistory: 4, qboReap: null });
   expect(reap).not.toHaveBeenCalled();
 });
 
@@ -33,5 +33,5 @@ it.each([0, 1])("reports the reap's failed count %i with the matching job status
   reap.mockResolvedValue({ done: 2, failed });
   const response = await prune();
   expect(response.status).toBe(failed ? 500 : 200);
-  expect(await response.json()).toEqual({ ok: failed === 0, pruned: 3, qboReap: { done: 2, failed } });
+  expect(await response.json()).toEqual({ ok: failed === 0, pruned: 3, prunedAgentHistory: 4, qboReap: { done: 2, failed } });
 });

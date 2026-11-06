@@ -324,9 +324,10 @@ over the length cap is rejected.
   conversation id, first and last seen) and `agent_session_steps` (tool,
   kind, outcome, error code, failing input path, proposal or request id,
   duration). No values, because query results are tenant data.
-- Session grouping: the `conversationId` from `get_started` when the agent
-  sends it, otherwise grant plus person plus a 30-minute idle window. The
-  2026-07-28 spec removed `Mcp-Session-Id`, so MGR keeps its own.
+- Session grouping: Ask MGR's conversation id, otherwise client plus person
+  plus a 30-minute idle window. The 2026-07-28 spec removed `Mcp-Session-Id`,
+  so MGR keeps its own. An agent-sent `conversationId` waits until a client
+  needs one (Negative 1).
 - One `recordAgentStep`, called by the MCP adapter and by Ask MGR through
   AI SDK 7's `onToolExecutionEnd` with `runtimeContext`. The SDK catches
   callback errors itself, so the recorder must log its own (Negative 5).
