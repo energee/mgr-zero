@@ -341,6 +341,7 @@ Operator procedures live in `docs/operations/`:
 - [Buyer order-confirmation email](docs/operations/order-email-worker.md) — delivery worker, schedule, failure log categories, retries.
 - [Data retention and closing a brewery](docs/operations/brewery-retention.md) — command-record prune job, brewery export and close.
 - [E2E runners](docs/operations/e2e-runners.md) — `bun run test:e2e` and the mobile command-surface regression.
+- [Outside agents on hosted](docs/operations/agent-hosted-setup.md) — signing keys, access token hook, OAuth server, checks, and how to undo.
 - [Documentation agent](docs/operations/documentation-agent.md) — post-merge audit of the staff and portal field manuals, integration of newly added Markdown, and one `Docs gaps:` issue per agent for what it overlooks.
 
 ## Design evidence
