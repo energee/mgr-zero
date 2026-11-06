@@ -41,7 +41,9 @@ export function toProposalViewProps({ agentName, description, undo, status, fail
   agentName: string; description: string; undo: string; status: string; failure: string | null; rows: ProposalRow[];
 }): ProposalViewModel {
   return {
-    agentName, description, undo,
+    agentName, description,
+    // compensation text is written for agents, so it names commands like delete_bin.
+    undo: undo.replace(/\b[a-z]+(?:_[a-z]+)+\b/g, name => name.replaceAll("_", " ")),
     rows: rows.map(row => ({ label: fieldLabel(row.field), value: fieldValue(row) })),
     canDecide: status === "pending",
     note: noteFor(status, failure, rows.some(row => row.warning)),
