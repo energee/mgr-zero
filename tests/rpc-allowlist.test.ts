@@ -51,6 +51,7 @@ const AUTHENTICATED_RPCS = [
   "decline_agent_proposal(uuid)",
   "finish_agent_proposal(uuid,text,text)",
   "leave_agent_note(uuid,text,text)",
+  "list_agent_sessions(uuid,uuid)",
   "record_agent_step(uuid,text,text,integer,uuid,text,text,text,text,uuid)",
   "list_my_invitations()",
   "revoke_account_invitation(uuid,uuid,uuid)",

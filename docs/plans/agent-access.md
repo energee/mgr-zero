@@ -333,8 +333,9 @@ over the length cap is rejected.
   callback errors itself, so the recorder must log its own (Negative 5).
 - `leave_note` tool: kind `friction` or `handoff`, 500 characters. Stored
   as untrusted text and always shown labelled with the client.
-- `list_agent_sessions` query and an Admin Agent activity page
-  over sessions, steps and the `command_requests` they caused.
+- `list_agent_sessions` and `get_agent_session` queries, and an Admin Agent
+  activity page over sessions and their steps. Steps name the proposal they
+  made. Following one on to its `command_requests` waits until someone asks.
 - Session notes stay deterministic: built from steps. A model-written
   summary waits until someone asks for it (Negative 1).
 

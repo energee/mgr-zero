@@ -26,6 +26,8 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Agents", file: "app/(app)/settings/agents/page.tsx" },
   { name: "Changes to approve", file: "app/(app)/proposals/page.tsx" },
   { name: "Review change", file: "app/(app)/proposals/[id]/page.tsx" },
+  { name: "Agent activity", file: "app/(app)/settings/agents/activity/page.tsx" },
+  { name: "Agent session", file: "app/(app)/settings/agents/activity/[id]/page.tsx" },
   { name: "Accept invite", file: "app/(auth)/accept/page.tsx" },
   { name: "Expired invite", file: "app/(auth)/invite-expired/page.tsx" },
   { name: "Expired reset", file: "app/(auth)/reset/page.tsx" },

@@ -3,8 +3,10 @@ import { BatchCompletionFixture } from "@/components/mgr/fixtures/batch-completi
 import { AccountInvitationsView } from "@/components/mgr/views/account-invitations";
 import { AgentConsentView } from "@/components/mgr/views/agent-consent";
 import { ConnectedAgentsView } from "@/components/mgr/views/connected-agents";
+import { AgentActivityView, AgentSessionView } from "@/components/mgr/views/agent-activity";
 import { ProposalView } from "@/components/mgr/views/proposal";
 import { ProposalsView } from "@/components/mgr/views/proposals";
+import { toAgentSessionViewProps } from "@/lib/mgr/agent-activity-view";
 import { toProposalViewProps } from "@/lib/mgr/proposal-view";
 import { RouteErrorView } from "@/components/mgr/views/route-error";
 import { CommandRecoveryView } from "@/components/mgr/views/command-recovery";
@@ -665,6 +667,24 @@ export const SCREENS: Screen[] = [
     reads: "get_proposal_status", writes: "approve_agent_proposal · decline_agent_proposal",
     spec: "Shows the command's description, each field by name, and how to undo it. Approving runs it as you. An id with no name shows a warning and is never hidden.",
     body: <ProposalView model={toProposalViewProps({ agentName: "Claude", description: "Add a bin to a location", undo: "Reverse with delete_bin while it is empty.", status: "pending", failure: null, rows: [{ field: "locationId", value: "Main warehouse" }, { field: "name", value: "Cooler A" }] })} />,
+  },
+  {
+    step: 1, slice: "all", group: "Global", name: "Agent activity",
+    to: { Settings: "Settings", Claude: "Agent session" },
+    job: "See what agents and Ask MGR did at this brewery", states: DEFAULT_STATES,
+    reads: "list_agent_sessions", writes: "",
+    spec: "Admin only, opened from Settings. Shows the latest 100 sessions. It records names and outcomes, never what was read or typed.",
+    body: <AgentActivityView rows={[{ id: "example", title: "Claude", detail: "maria@brewery.test · 12 steps · 1 problem · Nov 5, 2026" }]} />,
+  },
+  {
+    step: 1, slice: "all", group: "Global", name: "Agent session",
+    to: { "Agent activity": "Agent activity" },
+    job: "See one session's steps and notes", states: DEFAULT_STATES,
+    reads: "get_agent_session", writes: "",
+    spec: "A note is text a model wrote, so it always shows under the agent's name.",
+    body: <AgentSessionView model={toAgentSessionViewProps({ id: "example", clientId: "claude", clientName: "Claude", person: "maria@brewery.test", lastSeenAt: "2026-11-05T15:00:00Z", steps: 2, problems: 1, notes: 1,
+      stepRows: [{ tool: "run_query", operation: "get_today", outcome: "ok", error_code: null, input_path: null }, { tool: "run_query", operation: "get_on_hand", outcome: "refused", error_code: "invalid_input", input_path: "skuId" }],
+      noteRows: [{ id: "note", kind: "friction", body: "I could not tell which location a bin belongs to." }] }, "UTC")} />,
   },
   {
     step: 1, slice: "all", group: "Global", name: "Agents",
