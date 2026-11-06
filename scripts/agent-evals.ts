@@ -1,6 +1,7 @@
 // scripts/agent-evals.ts — the agent evals in docs/plans/agent-access.md, task 11.
 // --dry-run validates every case and prints what would run. It sends nothing.
-// --live is not built, so it always refuses. A run needs credentials and a paid model.
+// --live always refuses until model credits are decided (#329). lib/mgr/agent-eval-run.ts
+// is the runner it will use, proved offline with a scripted model.
 //   bun scripts/agent-evals.ts --dry-run
 import "@/lib/commands/all";
 import { readFile } from "node:fs/promises";
@@ -23,8 +24,7 @@ function agentOperations(): Operations {
 /**
  * What one run would send. The agent gets only `request`, never the expectation.
  * Reversed order flips the judge's labels here.
- * A future live runner must also flip the tool list it gets from MCP.
- * The prompt has no options to flip.
+ * runEvalCase flips the tool list. The prompt has no options to flip.
  * The two runs of a case can differ by chance, so a change is a flag, not proof of an order effect.
  */
 function buildRun({ expectation, id, prompt, role }: EvalCase, reversed: boolean) {
@@ -47,7 +47,7 @@ async function main(): Promise<void> {
   if (args.length !== 1 || !["--dry-run", "--live"].includes(args[0])) {
     throw new Error("Usage: bun scripts/agent-evals.ts --dry-run|--live");
   }
-  if (args[0] === "--live") throw new Error("Live evals need model credentials and an agent runner, and neither exists yet. No requests were sent.");
+  if (args[0] === "--live") throw new Error("Live evals wait on a decision about model credits (#329). No requests were sent.");
   const fixture = new URL("../tests/fixtures/agent-evals.json", import.meta.url);
   const cases = evalCaseSchema.array().min(1).parse(JSON.parse(await readFile(fixture, "utf8")));
   if (new Set(cases.map(item => item.id)).size !== cases.length) throw new Error("Duplicate case IDs");
