@@ -18,6 +18,7 @@ import { taproomTodayRows } from "@/lib/mgr/taproom-today";
 import type { TapInterval } from "@/lib/mgr/tap-board-state";
 import { onlyRoles } from "@/lib/mgr/roles";
 import { navTitle } from "@/lib/mgr/nav";
+import { plural } from "@/lib/mgr/plural";
 import { ORDER_SHEET_PARAM, sheetId } from "@/lib/mgr/order-sheet";
 import { OrderSheetFromAddress } from "./orders/order-sheet";
 
@@ -49,11 +50,15 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
     ]);
     return <TodayView model={toTodayViewProps({ taproom: taproomTodayRows(location, open, counts, report, brewery.timeZone) })} linkRows />;
   }
-  const items = adminItems ?? (await runCommand("get_today", {}, ctx)) as TodayItem[];
+  const [items, waiting] = await Promise.all([
+    adminItems ?? runCommand("get_today", {}, ctx) as Promise<TodayItem[]>,
+    runCommand("list_agent_proposals", {}, ctx) as Promise<unknown[]>,
+  ]);
   const sheet = sheetId((await searchParams)[ORDER_SHEET_PARAM]);
   return (
     <>
-      <TodayView model={toTodayViewProps({ items, timeZone: brewery.timeZone, actions: todayActions(brewery.roles) })} linkRows />
+      <TodayView model={toTodayViewProps({ items, timeZone: brewery.timeZone, actions: todayActions(brewery.roles) })} linkRows
+        notice={waiting.length > 0 && E.nav(`${plural(waiting.length, "change")} to approve`, "Proposed by your agents", "", undefined, "/proposals")} />
       {sheet && <OrderSheetFromAddress id={sheet} />}
     </>
   );

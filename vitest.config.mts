@@ -33,6 +33,7 @@ const pureTests = [
   "tests/chat-failure.test.ts",
   "tests/chat-view.test.ts",
   "tests/settings-view.test.ts",
+  "tests/proposal-view.test.ts",
   "tests/agent-connect-view.test.ts",
   "tests/agent-hidden.test.ts",
   "tests/agent-readiness.test.ts",

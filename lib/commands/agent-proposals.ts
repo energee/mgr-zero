@@ -24,9 +24,9 @@ defineQuery({
   input: z.object({ proposalId }),
   roles: STAFF_ROLES,
   handler: async (ctx, { proposalId: id }) => {
-    const row = await unwrap(ctx.db.from("agent_proposals").select("command, status, failure, expires_at").eq("id", id).maybeSingle());
+    const row = await unwrap(ctx.db.from("agent_proposals").select("command, input, client_id, status, failure, expires_at").eq("id", id).eq("brewery_id", ctx.breweryId).maybeSingle());
     if (!row) throw new CommandError("No such proposal.", 404, "not_found");
-    return { command: row.command, status: shownStatus(row), failure: row.failure, expiresAt: row.expires_at };
+    return { command: row.command, input: row.input, clientId: row.client_id, status: shownStatus(row), failure: row.failure, expiresAt: row.expires_at };
   },
 });
 
@@ -47,6 +47,7 @@ defineCommand({
   input: z.object({ proposalId }),
   roles: STAFF_ROLES,
   agentHidden: true,
+  compensation: "Undo the change itself, using the undo for the command that ran.",
   handler: async (ctx, { proposalId: id }, execution) => {
     const proposal = await unwrap(ctx.db.rpc("begin_agent_proposal", { p_brewery: ctx.breweryId, p_proposal: id })) as { command: string; input: unknown; requestId: string };
     try {
@@ -69,6 +70,7 @@ defineCommand({
   input: z.object({ proposalId }),
   roles: STAFF_ROLES,
   agentHidden: true,
+  compensation: "Cannot be undone; ask the agent to propose the change again.",
   handler: async (ctx, { proposalId: id }) => {
     await unwrap(ctx.db.rpc("decline_agent_proposal", { p_proposal: id }));
     return { status: "declined" };

@@ -13,6 +13,6 @@ export default async function ConnectedAgentsPage({ searchParams }: { searchPara
   const [brewery, { error }, db] = await Promise.all([getActiveBrewery(), searchParams, createServerClient()]);
   const { data, error: readError } = await db.auth.oauth.listGrants();
   if (readError) throw readError;
-  return <ConnectedAgentsView agents={toConnectedAgents(data, brewery.timeZone)} remove={revokeAgent} backHref="/"
+  return <ConnectedAgentsView agents={toConnectedAgents(data, brewery.timeZone)} remove={revokeAgent} backHref="/" proposalsHref="/proposals"
     error={error ? "That agent could not be removed. Try again." : undefined} />;
 }

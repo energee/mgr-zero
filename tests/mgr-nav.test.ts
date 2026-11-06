@@ -206,7 +206,7 @@ describe("navGroups (#1159)", () => {
 
 describe("UNLISTED_NAV (#1513)", () => {
   it("keeps the pages Settings and Me link, out of the rail and More", () => {
-    expect(UNLISTED_NAV.map(i => i.label)).toEqual(["Import", "Sale channels", "Locations", "Chat", "Agents"]);
+    expect(UNLISTED_NAV.map(i => i.label)).toEqual(["Import", "Sale channels", "Locations", "Chat", "Agents", "Changes to approve"]);
     const drawnHrefs = STAFF_NAV.flatMap(t => [t.href, ...(t.children ?? []).map(c => c.href)]);
     for (const item of UNLISTED_NAV) expect.soft(drawnHrefs, item.label).not.toContain(item.href);
   });

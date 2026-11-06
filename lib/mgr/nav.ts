@@ -111,6 +111,7 @@ export const UNLISTED_NAV: readonly NavItem[] = [
   { label: "Locations", href: "/locations", roles: ["admin"], about: "Manage warehouses, taprooms and their bins" },
   { label: "Chat", href: "/settings/chat", about: "Link Slack and set your notifications" },
   { label: "Agents", href: "/settings/agents", about: "See and remove the AI agents connected to your account" },
+  { label: "Changes to approve", href: "/proposals", about: "Approve or decline what your agents proposed" },
 ];
 
 export const PORTAL_NAV: readonly NavItem[] = [
