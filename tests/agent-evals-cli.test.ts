@@ -34,7 +34,7 @@ describe("agent evals CLI safety", () => {
     expect(result.stdout).toBe("");
   });
 
-  it("refuses --live even with a key, because no runner exists yet", () => {
+  it("refuses --live even with a key, until model credits are decided", () => {
     const result = runEvals(["--live"], { ANTHROPIC_API_KEY: "not-a-real-key" });
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("No requests were sent.");
