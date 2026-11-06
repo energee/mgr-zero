@@ -21,7 +21,7 @@ import "@/lib/commands/all";
 
 const root = resolve(__dirname, "..");
 // The pages that explain the endpoint itself, in the order a caller meets them.
-const CONCEPTS = ["overview", "authentication", "idempotency", "errors", "conventions"];
+const CONCEPTS = ["overview", "authentication", "idempotency", "errors", "conventions", "mcp"];
 const read = (path: string) => readFileSync(resolve(root, path), "utf8");
 // An index page with the rules every operation shares, then one page per area
 // whose `##` headings are its operations. One page carrying every operation
