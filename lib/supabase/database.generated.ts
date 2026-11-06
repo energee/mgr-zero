@@ -4844,6 +4844,9 @@ isOneToOne: false
 "advance_square_sales_sync":
 { Args: { "p_actor": string,"p_brewery": string,"p_connection": string,"p_expected_version": number,"p_next_version": number,"p_request_id": string }; Returns: boolean
                            },
+"agent_friction_report":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
 "agent_session_is_live":
 { Args: Record<PropertyKey, never>; Returns: boolean
                            },
