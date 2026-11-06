@@ -8,6 +8,7 @@ import { CommandError, definePreTenantCommand } from "./registry";
 definePreTenantCommand({
   name: "provision_brewery",
   description: "Create a brewery and join it as its first admin.",
+  compensation: "Cannot be undone; no command deletes a brewery.",
   input: z.object({ name: z.string().trim().min(1).describe("The new brewery's name"), timezone: z.string().min(1), ttb: z.string().trim().nullable().optional() }),
   handler: async (ctx, input, execution) => {
     if ((await import("@/lib/env/server")).getServerEnv().dedicated) {

@@ -26,6 +26,7 @@ const rpcOutputs = (lines: z.infer<typeof outputs>) =>
 defineCommand({
   name: "schedule_packaging_run",
   description: "Plan a packaging run: the brand being packaged, the date, the units intended, and optionally the tank it draws from",
+  compensation: "Reverse with cancel_packaging_run.",
   input: z.object({
     brandId: z.string().uuid(),
     plannedOn: isoDate,
@@ -43,6 +44,7 @@ defineCommand({
 defineCommand({
   name: "update_packaging_run",
   description: "Revise a planned run: pick the tank it draws from, replace the planned units, or stamp it started (which needs a tank)",
+  compensation: "Reverse a plan edit with update_packaging_run and the previous values; a started run cannot be unstarted.",
   input: z.object({
     runId: z.string().uuid(),
     occupancyId: z.string().uuid().optional(),
@@ -60,6 +62,7 @@ defineCommand({
 
 defineCommand({
   name: "cancel_packaging_run", description: "Cancel an unstarted packaging run plan; retains history and refuses recorded physical work",
+  compensation: "Cannot be undone; plan a new run with schedule_packaging_run.",
   input: z.object({ runId: z.string().uuid() }),
   roles: ["admin", "brewer", "warehouse"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("cancel_packaging_run", {
@@ -69,6 +72,7 @@ defineCommand({
 
 defineCommand({
   name: "reschedule_packaging_run", description: "Reschedule an unstarted packaging run plan; retains history and refuses recorded physical work",
+  compensation: "Reverse with reschedule_packaging_run and the previous date.",
   input: z.object({ runId: z.string().uuid(), plannedOn: isoDate }),
   roles: ["admin", "brewer", "warehouse"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("reschedule_packaging_run", {
@@ -96,6 +100,7 @@ const actualRows = (rows: z.infer<typeof packagingActual>[]) => rows.map(row => 
 defineCommand({
   name: "record_historical_packaging_run",
   description: "Admin only: record a historical batch's packaging (closed before the books opened) as a closed run and lot with its actual quantities; writes no stock, so nothing goes on hand",
+  compensation: "Cannot be undone; historical packaging has no correction.",
   input: z.object({
     batchId: z.string().uuid(),
     packagedOn: isoDate,
@@ -115,6 +120,7 @@ defineCommand({
 defineCommand({
   name: "close_packaging_run",
   description: "Close a started run: record the barrels drawn and the units actually filled, which writes the lot, the production_in stock and the packaging materials consumed; the production_in stock is dated Packaged on, which may not be after today or inside a filed report period",
+  compensation: "Cannot be reopened; fix it with correct_packaging_run_outputs or correct_packaging_material_record while the batch is open and its stock unused.",
   input: z.object({
     runId: z.string().uuid(),
     bblDrawn: z.number().nonnegative(),
@@ -154,6 +160,7 @@ defineQuery({
 });
 defineCommand({
   name: "correct_packaging_material_record", description: "Replace unused packaging material actuals with a reason; preserves history, finished outputs and tank draw",
+  compensation: "Reverse by correcting the latest record again with correct_packaging_material_record.",
   input: z.object({ recordId: z.string().uuid().describe("The packaging material record to correct"), reason: z.string().trim().min(1).describe("Why the material record is corrected"), actuals: z.array(packagingActual) }),
   roles: ["admin", "brewer", "warehouse"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("correct_packaging_material_record", {
@@ -172,6 +179,7 @@ defineQuery({
 defineCommand({
   name: "correct_packaging_run_outputs",
   description: "Correct an unused closed run's output quantities and barrels drawn with exact production reversals and replacements; refuses downstream stock use, completed batches and filed periods",
+  compensation: "Reverse by correcting the run again with correct_packaging_run_outputs.",
   input: z.object({
     runId: z.string().uuid(),
     previousCorrectionId: z.string().uuid().nullable().describe("Latest output correction ID; null for the first correction"),
@@ -204,6 +212,7 @@ defineCommand({
   name: "record_repack",
   description:
     "Break a composed SKU into its component SKU at one bin: paired volume-neutral ledger rows under one ref, plus the parent format's BOM material movements",
+  compensation: "Cannot be undone; no command rebuilds the composed package.",
   roles: ["admin", "warehouse"],
   requiresConfirmation: true,
   input: z.object({

@@ -3,6 +3,7 @@ import { CommandError, cents, completeRows, defineCommand, defineQuery, PAGE_SIZ
 
 defineCommand({
   name: "connect_square", description: "Begin administrator consent for a Square seller connection",
+  compensation: "Nothing connects until consent finishes; reverse a finished connection with disconnect_square.",
   input: z.object({ reconnect: z.boolean().optional() }), roles: ["admin"],
   handler: async (ctx, input, execution) => {
     const { beginSquareOAuth, squareConfig, SquareClient } = await import("@/lib/pos");
@@ -12,6 +13,7 @@ defineCommand({
 
 defineCommand({
   name: "disconnect_square", description: "Stop Square sync locally, purge its credential, and report whether remote revocation was confirmed; on a connection whose revocation is unresolved, retry it by merchant id",
+  compensation: "Reverse by reconnecting with connect_square, which needs admin consent again.",
   input: z.object({ connectionId: z.string().uuid().describe("The Square connection to disconnect") }), roles: ["admin"],
   handler: async (ctx, input, execution) => {
     const [{ disconnectSquare }, { squareConfig, SquareClient }] = await Promise.all([
@@ -31,6 +33,7 @@ defineQuery({
 
 defineCommand({
   name: "sync_square_catalog", description: "Refresh the complete Square location and catalog-variation snapshot without changing inventory",
+  compensation: "Cannot be undone; it copies Square, so change the catalog there and sync again.",
   input: z.object({}), roles: ["admin"],
   handler: async (ctx, _input, execution) => {
     const { squareConfig, SquareClient, syncSquareCatalog } = await import("@/lib/pos");
@@ -40,6 +43,7 @@ defineCommand({
 
 defineCommand({
   name: "sync_square_sales", description: "Resume a bounded Square UPDATED_AT scan, append immutable sale and return revisions, and complete honest coverage without changing inventory",
+  compensation: "Cannot be undone; it appends immutable Square sales and changes no inventory.",
   input: z.object({}), roles: ["admin"],
   handler: async (ctx, _input, execution) => {
     const { squareConfig, SquareClient, syncSquareSales } = await import("@/lib/pos");
@@ -223,6 +227,7 @@ defineQuery({
 
 defineCommand({
   name: "set_pos_location_mapping", description: "Map one observed Square location to one unclaimed MGR location; an unobserved remap clears its menu. Retire an observed mapping first to preserve historical attribution before replacing it",
+  compensation: "Reverse with retire_pos_location_mapping.",
   input: z.object({ posLocationId: z.string().trim().min(1), mgrLocationId: z.string().uuid() }), roles: ["admin"],
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_pos_location_mapping", {
     p_brewery: ctx.breweryId, p_external_location: input.posLocationId,
@@ -232,6 +237,7 @@ defineCommand({
 
 defineCommand({
   name: "retire_pos_location_mapping", description: "Retire one Square location's current MGR mapping and menu; preserve historical sales attribution and release the MGR location for a corrected mapping",
+  compensation: "Reverse by mapping again with set_pos_location_mapping, then rebuilding the menu with configure_pos_menu.",
   input: z.object({ posLocationId: z.string().trim().min(1) }), roles: ["admin"], requiresConfirmation: true,
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("retire_pos_location_mapping", {
     p_brewery: ctx.breweryId, p_external_location: input.posLocationId, p_request_id: execution.requestId,
@@ -240,6 +246,7 @@ defineCommand({
 
 defineCommand({
   name: "set_pos_item_mapping", description: "Map one Square variation to a packaged SKU or brand-owned poured format, or explicitly ignore it",
+  compensation: "Reverse with set_pos_item_mapping and the previous mapping; sales already matched keep their match.",
   input: z.object({
     externalItemId: z.string().trim().min(1), externalVariationId: z.string().trim().min(1),
     skuId: z.string().uuid().optional(), formatId: z.string().uuid().optional(), disposition: z.enum(["mapped", "ignored"]).describe("mapped links the variation to skuId or formatId; ignored leaves it unmapped on purpose"),
@@ -259,6 +266,7 @@ const menuRoles = ["admin", "warehouse"] as const;
 
 defineCommand({
   name: "configure_pos_menu", description: "Choose the mapped MGR bin and sale channel that derive one Square location's menu",
+  compensation: "Reverse with configure_pos_menu and the previous bin and sale channel.",
   input: z.object({ posLocationId, binId: z.string().uuid(), saleChannelId: z.string().uuid() }),
   roles: [...menuRoles],
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("configure_pos_menu", {
@@ -298,6 +306,7 @@ defineQuery({
 
 defineCommand({
   name: "set_pos_price_override", description: "Set or clear one beer's nullable poured-format price override for one Square location",
+  compensation: "Reverse with set_pos_price_override and the previous price, or null to clear it.",
   input: z.object({
     posLocationId, formatId: z.string().uuid(), brandId: z.string().uuid(),
     unitPriceCents: cents.nullable(),
@@ -322,6 +331,7 @@ const squareItemPublicationInput = z.object({ ...squarePublicationOptions, brand
 
 defineCommand({
   name: "publish_pos_menu", description: "Publish every derived brand and format change for one Square location",
+  compensation: "Cannot be undone; change the menu and publish again.",
   input: z.object({ posLocationId, retryConflict: z.boolean().optional() }).strict(),
   roles: [...menuRoles],
   handler: async (ctx, input, execution) => {
@@ -332,6 +342,7 @@ defineCommand({
 
 defineCommand({
   name: "publish_pos_item", description: "Create, update, retire, or explicitly adopt one brand's Square item and format variations",
+  compensation: "Cannot be undone; change the menu and publish again, but an adopted Square item stays linked.",
   input: squareItemPublicationInput, roles: [...menuRoles],
   handler: async (ctx, input, execution) => {
     const { publishSquareCatalogItemCommand, squareConfig, SquareClient } = await import("@/lib/pos");
@@ -341,6 +352,7 @@ defineCommand({
 
 defineCommand({
   name: "set_pos_website_publication", description: "Publish or unpublish one beer's currently priced, stocked menu row on the brewery website feed",
+  compensation: "Reverse with set_pos_website_publication and the opposite value.",
   input: z.object({ posLocationId, formatId: z.string().uuid(), brandId: z.string().uuid(), published: z.boolean() }),
   roles: [...menuRoles],
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_pos_website_publication", {

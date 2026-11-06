@@ -16,11 +16,13 @@ defineQuery({
 });
 defineCommand({
   name: "save_catalog_category", description: "Add a category or rename it across every brand in this brewery",
+  compensation: "Rename it back with save_catalog_category, or remove a new category with delete_catalog_category.",
   input: z.object({ name: z.string().trim().min(1).describe("The category name to save"), previousName: z.string().min(1).optional() }), roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("save_catalog_category", { p_brewery: ctx.breweryId, p_previous_name: i.previousName ?? null, p_name: i.name, p_request_id: execution.requestId })),
 });
 defineCommand({
   name: "delete_catalog_category", description: "Delete an unused category; brands using it block deletion",
+  compensation: "Reverse by adding the category again with save_catalog_category.",
   input: z.object({ name: z.string().min(1).describe("The name of the category to delete") }), roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("delete_catalog_category", { p_brewery: ctx.breweryId, p_name: i.name, p_request_id: execution.requestId })),
 });
@@ -30,6 +32,7 @@ defineCommand({
 // the optional Brand-screen facts.
 defineCommand({
   name: "upsert_brand", description: "Create or edit a brand: name, style (added to the brewery's styles when new), ABV, and optional description, category, price group, hops, and a staff-only alias (an informal name such as a series number); every field is replaced, so omit the alias to clear it",
+  compensation: "Reverse an edit with upsert_brand and the previous values; a new brand cannot be deleted.",
   input: z.object({
     id: z.string().uuid().optional().describe("The brand to edit; omit to create one"), name: z.string().trim().min(1).describe("The brand's name"), style: z.string().optional(), abv: z.number().min(BRAND_ABV.min, BRAND_ABV.message).max(BRAND_ABV.max, BRAND_ABV.message).optional(),
     description: z.string().optional(), category: z.string().optional().describe("The brand's catalog category"), priceGroupId: z.string().uuid().optional(), hops: z.string().optional(),
@@ -45,6 +48,7 @@ defineCommand({
 
 defineCommand({
   name: "create_sku", description: "Create a SKU: one brand × one packaged format; the name defaults to brand · format; optional keg pool supplies the per-keg deposit",
+  compensation: "Cannot be deleted; switch the SKU off with update_sku.",
   input: z.object({ brandId: z.string().uuid(), formatId: z.string().uuid(), name: z.string().optional().describe("The SKU's name; it defaults to brand · format"), upc: upc.optional(), kegPoolId: z.string().uuid().nullable().optional() }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_sku", {
@@ -54,6 +58,7 @@ defineCommand({
 
 defineCommand({
   name: "update_sku", description: "Edit a SKU's active state, optional UPC, keg pool and default batch share (fraction over 0 through 1; brand shares total at most 1; omit to keep, null to clear); brand, format, provider mappings and history stay unchanged",
+  compensation: "Reverse with update_sku and the previous values.",
   input: z.object({ skuId: z.string().uuid(), active: z.boolean(), upc: upc.optional(), kegPoolId: z.string().uuid().nullable().optional(), batchShare: z.number().positive().max(1).nullable().optional().describe("Fraction of a planned batch's volume for this SKU; omit to keep, null to clear") }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_sku", {
@@ -67,6 +72,7 @@ defineCommand({
 const KEG_SIZES = ["half_bbl", "quarter_bbl", "sixth_bbl", "fifty_l", "thirty_l", "twenty_l"] as const;
 defineCommand({
   name: "create_composed_format", description: "Create a packaged format and its atomic child quantities together; volume is always derived, never stored on the parent",
+  compensation: "Reverse with delete_format while the format is unused.",
   input: z.object({ name: z.string().trim().min(1).describe("The format's name"), packageType: z.enum(["keg", "can", "bottle"]), components: z.array(z.object({ childFormatId: z.string().uuid(), qty: z.number().finite().positive().describe("How many of this child format make one unit of the parent") })).min(1) }).strict(),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_composed_format", {
@@ -77,12 +83,14 @@ defineCommand({
 
 defineCommand({
   name: "delete_format", description: "Delete an unused format and its own contents and materials; refuse formats referenced by SKUs, other packages, prices or history. Sales may delete an unused pour; packaged formats stay admin.",
+  compensation: "Reverse by creating it again with upsert_format or create_composed_format, then replace_format_bom; it gets a new ID.",
   input: z.object({ formatId: z.string().uuid() }), roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("delete_format", { p_brewery: ctx.breweryId, p_id: i.formatId, p_request_id: execution.requestId })),
 });
 
 defineCommand({
   name: "upsert_format", description: "Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (priceGroupId and positive finite ounces required; no package facts, never stock). A format in use keeps its basis: one used by a SKU, component or BOM stays packaged; one used by a POS mapping, menu or sale stays poured. The same use also fixes its bblPerUnit, unitsPerCase and ounces; a rename still saves",
+  compensation: "Reverse an edit with upsert_format and the previous values, or remove an unused new format with delete_format.",
   input: z.object({
     id: z.string().uuid().optional().describe("The format to edit; omit to create one"), name: z.string().trim().min(1).describe("The format's name"), basis: z.enum(["packaged", "poured"]),
     packageType: z.enum(["keg", "can", "bottle"]).optional(), kegSize: z.enum(KEG_SIZES).optional(),
@@ -102,6 +110,7 @@ defineCommand({
 
 defineCommand({
   name: "replace_format_components", description: "Replace a composed format's children (one level: atomic packaged children); its volume is derived from them",
+  compensation: "Reverse with replace_format_components and the previous children.",
   input: z.object({ formatId: z.string().uuid(), components: z.array(z.object({ childFormatId: z.string().uuid(), qty: z.number().positive().describe("How many of this child format make one unit of the parent") })) }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("replace_format_components", {
@@ -111,6 +120,7 @@ defineCommand({
 
 defineCommand({
   name: "replace_format_bom", description: "Replace a format's packaging bill of materials: material, qty per unit, and what happens to it on break (consumed or return_to_stock)",
+  compensation: "Reverse with replace_format_bom and the previous lines.",
   input: z.object({ formatId: z.string().uuid(), lines: z.array(z.object({ materialId: z.string().uuid(), qtyPerUnit: z.number().positive(), onBreak: z.enum(["consumed", "return_to_stock"]).default("consumed") })) }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("replace_format_bom", {
@@ -144,6 +154,7 @@ defineQuery({
 
 defineCommand({
   name: "create_location", description: "Create a location and say what it is used for — one place may be warehouse, taproom and storage at once; it starts with the Walk-in, Cold and Dry bins",
+  compensation: "Cannot be deleted; rename it or change its uses with update_location.",
   input: z.object({ name: z.string().min(1).describe("The location's name"), uses: z.array(z.enum(["warehouse", "taproom", "storage"])).min(1) }),
   roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_location", {
@@ -153,6 +164,7 @@ defineCommand({
 
 defineCommand({
   name: "update_location", description: "Rename a location or change what it is used for (any of warehouse, taproom, storage); movement history is untouched",
+  compensation: "Reverse with update_location and the previous name and uses.",
   input: z.object({ locationId: z.string().uuid(), name: z.string().trim().min(1).describe("The location's name"), uses: z.array(z.enum(["warehouse", "taproom", "storage"])).min(1) }),
   roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_location", {
@@ -179,6 +191,7 @@ defineQuery({
 
 defineCommand({
   name: "create_bin", description: "Add a bin to a location when stock needs another storage spot there",
+  compensation: "Reverse with delete_bin while the bin has no recorded stock.",
   input: z.object({ locationId: z.string().uuid(), name: z.string().min(1).describe("The bin's name") }),
   roles: ["admin", "warehouse"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_bin", {
@@ -188,6 +201,7 @@ defineCommand({
 
 defineCommand({
   name: "update_bin", description: "Rename a bin; its stock and movement history are unchanged",
+  compensation: "Rename it back with update_bin.",
   input: z.object({ binId: z.string().uuid(), name: z.string().min(1).describe("The bin's new name") }),
   roles: ["admin", "warehouse"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_bin", {
@@ -197,6 +211,7 @@ defineCommand({
 
 defineCommand({
   name: "delete_bin", description: "Remove an empty bin; a location keeps at least one",
+  compensation: "Reverse by adding the bin again with create_bin; it gets a new ID.",
   input: z.object({ binId: z.string().uuid() }),
   roles: ["admin", "warehouse"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("delete_bin", {
@@ -222,6 +237,7 @@ defineQuery({
 
 defineCommand({
   name: "upsert_sale_channel", description: "Create or edit a sale channel: its name and the tax treatment its removals are recorded under",
+  compensation: "Reverse an edit with upsert_sale_channel and the previous values, or remove an unused new channel with delete_sale_channel.",
   input: z.object({ id: z.string().uuid().optional().describe("The sale channel to edit; omit to create one"), name: z.string().trim().min(1).describe("The sale channel's name"), taxTreatment: z.enum(TAX_TREATMENTS) }),
   roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_sale_channel", {
@@ -231,6 +247,7 @@ defineCommand({
 
 defineCommand({
   name: "delete_sale_channel", description: "Remove a sale channel nothing references; the system Taproom channel is never removed",
+  compensation: "Reverse by creating the channel again with upsert_sale_channel; it gets a new ID.",
   input: z.object({ channelId: z.string().uuid() }),
   roles: ["admin"],
   handler: async (ctx, i, execution) => {
@@ -287,6 +304,7 @@ defineQuery({
 
 defineCommand({
   name: "upsert_price_group", description: "Create or rename a price group (a row of the price grid), set its position and optional cost ceiling",
+  compensation: "Reverse an edit with upsert_price_group and the previous values, or remove an unused new group with delete_price_group.",
   roles: ["admin", "sales"],
   input: z.object({ id: z.string().uuid().optional().describe("The price group to edit; omit to create one"), name: z.string().trim().min(1).describe("The price group's name"), position: z.number().int().positive().max(PG_INT_MAX), costCeilingCents: cents.optional() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_price_group", {
@@ -316,6 +334,7 @@ defineQuery({
 
 defineCommand({
   name: "set_price_group_barcode", description: "Set or clear a price group's UPC for one packaged format: every SKU on the group scans as it unless the SKU has its own UPC; null or blank clears it",
+  compensation: "Reverse with set_price_group_barcode and the previous UPC, or null if there was none.",
   roles: ["admin", "sales"],
   input: z.object({ priceGroupId: z.string().uuid(), formatId: z.string().uuid(), upc: upc.nullable() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_price_group_barcode", {
@@ -325,6 +344,7 @@ defineCommand({
 
 defineCommand({
   name: "delete_price_group", description: "Remove a price group no brand sits on, no pour belongs to and no cell prices",
+  compensation: "Reverse by creating the group again with upsert_price_group; it gets a new ID.",
   roles: ["admin", "sales"],
   input: z.object({ priceGroupId: z.string().uuid() }),
   handler: async (ctx, i, execution) => {

@@ -7,6 +7,7 @@ import { definePreTenantCommand, definePreTenantQuery, defineCommand, defineQuer
 defineCommand({
   name: "invite_staff",
   description: "Invite a person by email to join this brewery's staff with one role; use update_staff_role to change an existing member's roles",
+  compensation: "Reverse with revoke_account_invitation while the invitation is pending, or revoke_staff once the person is a member.",
   input: z.object({ email, role: z.enum(STAFF_ROLES).describe("The role the new member gets") }),
   roles: ["admin"],
   handler: async (ctx, input, execution) => (await import("@/lib/supabase/invites")).inviteStaff(ctx, input, execution),
@@ -15,6 +16,7 @@ defineCommand({
 defineCommand({
   name: "invite_customer_user",
   description: "Invite a buyer by email to the customer portal for one customer; use revoke_customer_user to end that access",
+  compensation: "Reverse with revoke_account_invitation while the invitation is pending, or revoke_customer_user once the buyer has access.",
   input: z.object({ email, customerId: z.string().uuid() }),
   roles: ["admin", "sales"],
   handler: async (ctx, input, execution) => (await import("@/lib/supabase/invites")).inviteCustomerUser(ctx, input, execution),
@@ -34,12 +36,14 @@ defineQuery({
 
 defineCommand({
   name: "update_staff_role", description: "Change one member's roles (admin); refused when it would leave the brewery without an admin",
+  compensation: "Reverse with update_staff_role and the previous roles.",
   input: z.object({ userId: z.string().uuid(), roles: z.array(z.enum(STAFF_ROLES)).min(1) }), roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_staff_role", { p_brewery: ctx.breweryId, p_user: i.userId, p_roles: i.roles, p_request_id: execution.requestId })),
 });
 
 defineCommand({
   name: "revoke_staff", description: "End one member's brewery membership (admin); never yourself or the last admin; the sign-in account remains",
+  compensation: "Reverse by inviting the person again with invite_staff.",
   input: z.object({ userId: z.string().uuid() }), roles: ["admin"], requiresConfirmation: true,
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("revoke_staff", { p_brewery: ctx.breweryId, p_user: i.userId, p_request_id: execution.requestId })),
 });
@@ -57,6 +61,7 @@ defineQuery({
 
 defineCommand({
   name: "revoke_customer_user", description: "End one buyer's portal access to a customer (admin or sales); the sign-in account remains",
+  compensation: "Reverse by inviting the buyer again with invite_customer_user.",
   input: z.object({ customerId: z.string().uuid(), userId: z.string().uuid() }), roles: ["admin", "sales"], requiresConfirmation: true,
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("revoke_customer_user", { p_brewery: ctx.breweryId, p_customer: i.customerId, p_user: i.userId, p_request_id: execution.requestId })),
 });
@@ -67,6 +72,7 @@ definePreTenantQuery({
 });
 definePreTenantCommand({
   name: "accept_account_invitation", description: "Consent to join the brewery or customer account in an invitation.",
+  compensation: "An admin reverses it with revoke_staff or revoke_customer_user.",
   input: z.object({ inviteId: z.uuid() }),
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("accept_account_invitation", {
     p_invite: input.inviteId, p_request_id: execution.requestId,
@@ -86,6 +92,7 @@ defineQuery({
 
 defineCommand({
   name: "resend_account_invitation", description: "Resend a pending existing-account invitation with the same role (admin); the old invitation can no longer be accepted",
+  compensation: "Cannot be undone; the old invitation stays dead, and revoke_account_invitation withdraws the new one.",
   roles: ["admin"], input: z.object({ inviteId: z.uuid() }),
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("resend_account_invitation", {
     p_brewery: ctx.breweryId, p_invite: input.inviteId, p_request_id: execution.requestId,
@@ -94,6 +101,7 @@ defineCommand({
 
 defineCommand({
   name: "revoke_account_invitation", description: "Revoke a pending existing-account invitation so it can no longer be accepted; use resend_account_invitation to replace it with a new one.",
+  compensation: "Cannot be undone; send a new invitation with invite_staff or invite_customer_user.",
   roles: ["admin", "sales"], input: z.object({ inviteId: z.uuid() }),
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("revoke_account_invitation", {
     p_brewery: ctx.breweryId, p_invite: input.inviteId, p_request_id: execution.requestId,
