@@ -49,6 +49,12 @@ numbers with `bun run scripts/agent-readiness.ts`.
 U5 counts written text only. `compensation` defaults to `null`, which says
 nothing.
 
+U6 leaves out `ttbId`: it is the number TTB printed, not a record id. That takes
+the total from 334 to 333. Eight uses have no name to read through `ctx.db`:
+QuickBooks items, vendors and accounts and Slack channels live in those systems,
+and quotes and chat notification deliveries have no read. `tests/proposal-labels.test.ts`
+lists them, and each shows as an unrecognised record.
+
 ### Results: does it get things right?
 
 | # | Measure | Today | Target | How it is measured |

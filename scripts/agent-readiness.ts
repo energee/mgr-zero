@@ -9,4 +9,5 @@ const counts = measureReadiness(listTools());
 console.log(`U1 Input field uses with a stated meaning: ${counts.fieldUsesWithMeaning} of ${counts.fieldUses}`);
 console.log(`U2 Operations described in 7 words or more: ${counts.describedOperations} of ${counts.operations}`);
 console.log(`U5 Commands that say how to undo them: ${counts.commandsWithUndo} of ${counts.commands}`);
+console.log(`U6 Command id field uses shown as names on an approval card: ${counts.commandIdFieldUsesNamed} of ${counts.commandIdFieldUses}`);
 console.log(`Totals: ${counts.queries} queries, ${counts.commands} commands, ${counts.commandIdFieldUses} command id field uses`);

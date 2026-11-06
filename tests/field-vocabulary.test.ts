@@ -5,9 +5,8 @@ import { describe, expect, it } from "vitest";
 import "@/lib/commands/all";
 import { listTools } from "@/lib/commands/registry";
 import { SEARCH_KINDS } from "@/lib/commands/search";
-import { isIdField } from "@/lib/mgr/agent-readiness";
 import { leafFields } from "@/lib/mgr/api-schema";
-import { FIELD_VOCABULARY } from "@/lib/mgr/field-vocabulary";
+import { FIELD_VOCABULARY, isIdField } from "@/lib/mgr/field-vocabulary";
 
 // Search already names 20 record kinds, so an id field reuses those names.
 // These are the record kinds search does not cover. Add one only for a new kind.
