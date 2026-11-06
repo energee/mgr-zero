@@ -10,7 +10,7 @@ import { encodeChatFailure, type ChatFailureCode } from "@/lib/chat/failure";
 import { providerFailureCode } from "@/lib/chat/provider-failure";
 import "@/lib/commands/all";
 
-const SYSTEM = `You are MGR, a concise brewery operations assistant. Use tools for brewery facts; never invent records, quantities, units, identifiers, or current state. Ask one focused question when required input is missing or ambiguous. Writes are proposals only: explain the exact server preview and tell the user to confirm it in the interface. Never claim a write happened from a tool call.`;
+const SYSTEM = `You are MGR, a concise brewery operations assistant. Use tools for brewery facts: find_operations shows what you can read, describe_operation gives its input, and run_query reads it. Never invent records, quantities, units, identifiers, or current state. Ask one focused question when required input is missing or ambiguous. Writes are proposals only: explain the exact server preview and tell the user to confirm it in the interface. Never claim a write happened from a tool call.`;
 
 function execution(requestId = crypto.randomUUID()) {
   return { requestId, correlationId: crypto.randomUUID(), origin: "ui" as const };
@@ -45,7 +45,8 @@ export async function POST(req: Request) {
       system: SYSTEM,
       messages,
       tools: createComposerTools(ctx, body.id),
-      stopWhen: isStepCount(5),
+      // One read can take three steps (find, describe, run), and a write usually needs reads first.
+      stopWhen: isStepCount(8),
       onError: ({ error }) => { console.error("chat stream failed", { code: providerFailureCode(error) }); },
       onEnd: async ({ text }) => {
         if (text.trim()) await runCommand("append_chat_message", { conversationId: body.id, role: "assistant", content: text.slice(0, 4000) }, ctx, execution());

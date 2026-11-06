@@ -26,7 +26,7 @@ export function insertMovement(ctx: Ctx, input: z.infer<typeof movementInput>, e
 defineCommand({
   name: "record_movement", description: "Append a staff-entered inventory movement (immutable; corrections are reversals); depletion names a saleChannelId, which no other supported type may carry",
   compensation: "Reverse with reverse_inventory_movement for an eligible standalone adjustment or loss; other types cannot be reversed.",
-  input: movementInput, roles: ["admin", "warehouse"], aiExposed: true,
+  input: movementInput, roles: ["admin", "warehouse"],
   risk: "append_only", requiresConfirmation: true,
   idempotency: "dedupe", offlineReplay: false, atomicity: "rpc",
   preview: async (ctx, input, conversationId) => {
@@ -89,7 +89,6 @@ type AtpRow = { brewery_id: string; sku_id: string; qty: number };
 defineQuery({
   name: "get_on_hand", description: "Physical on-hand quantity per SKU and location. Pass skuId for one SKU; omit it for every SKU. Use it for where stock sits; use get_atp for what can still be promised, since on-hand ignores open allocations.",
   input: bySku, roles: [...readRoles],
-  aiExposed: true,
   handler: async (ctx, i) => {
     const rows = await completeRows<OnHandRow>("On-hand stock", async (_, after) => {
       let q = ctx.db.from("on_hand").select("brewery_id, sku_id, location_id, qty").eq("brewery_id", ctx.breweryId);
@@ -143,7 +142,6 @@ defineQuery({
 defineQuery({
   name: "get_atp", description: "Available-to-promise per SKU: on-hand minus open allocations, across all locations. Pass skuId for one SKU; omit it for every SKU. Use it to answer whether an order can be filled; use get_on_hand for where stock sits by location.",
   input: bySku, roles: [...readRoles],
-  aiExposed: true,
   handler: (ctx, i) => completeRows<AtpRow>("Available stock", async (_, after) => {
     let q = ctx.db.from("atp").select("brewery_id, sku_id, qty").eq("brewery_id", ctx.breweryId);
     let counted = ctx.db.from("atp").select("sku_id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId);
@@ -243,7 +241,6 @@ defineQuery({
     packageType: z.enum(["keg", "can", "bottle"]).optional().describe("Keep only SKUs whose format packages this type"),
     unmapped: unmappedInput,
   }), roles: STAFF_ROLES,
-  aiExposed: true,
   handler: async (ctx, i) => {
     // `formats!inner` turns the format embed into a filter; the count joins the same way, or paging waits for rows the filter removed.
     const formats = i.packageType ? "formats!inner" : "formats";
@@ -277,7 +274,6 @@ defineQuery({
   // Brewers read locations too: a packaging run puts its output somewhere.
   name: "list_locations", description: "Locations and what each is used for, alphabetical; `use` keeps only the places put to that use (a place with several uses answers to each of them)",
   input: z.object({ use: z.enum(["warehouse", "taproom", "storage"]).optional() }), roles: STAFF_ROLES,
-  aiExposed: true,
   handler: async (ctx, i) => {
     // Postgres does the membership test (`uses @> {use}`): asking for taprooms
     // and scanning the answer would spend the row cap on locations the caller
@@ -314,7 +310,6 @@ export type BinMoveStock = {
 defineQuery({
   name: "get_bin_move_stock", description: "Stock by bin and explicit lot identity at one location, including untracked stock and empty keg sizes",
   input: z.object({ locationId: z.string().uuid() }), roles: ["admin", "warehouse"],
-  aiExposed: true,
   // Read all grouped sources, not just PostgREST's first 1,000 rows.
   handler: async (ctx, i) => await completeRows("Bin stock", start => ctx.db.from("bin_move_stock").select("bin_id, kind, stock_id, lot_id, keg_size, name, unit, lot_code, qty", { count: "exact" })
     .eq("brewery_id", ctx.breweryId).eq("location_id", i.locationId).gt("qty", 0)

@@ -31,7 +31,7 @@ defineQuery({
 });
 
 defineQuery({
-  name: "list_agent_proposals",
+  name: "list_agent_proposals", agentHidden: true,
   description: "The changes your agents have proposed that are still waiting for your approval",
   input: z.object({}),
   roles: STAFF_ROLES,

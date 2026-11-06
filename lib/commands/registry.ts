@@ -249,8 +249,7 @@ type DefinitionBase<In> = {
   input: ZodType<In>;
   roles: readonly StaffRole[] | "customer" | "any";
   requiresConfirmation?: boolean;
-  aiExposed?: boolean;
-  /** Keeps a read from outside agents, whatever the person's roles allow. */
+  /** Keeps an operation from every model, whatever the person's roles allow. */
   agentHidden?: boolean;
 };
 
@@ -283,7 +282,6 @@ export type CommandDefinitionMetadata = Pick<
   "name" | "description" | "input" | "roles" | "requiresConfirmation" | "agentHidden" | "kind"
 > & {
   scope: "tenant" | "pretenant";
-  aiExposed: boolean;
   risk?: CommandRisk;
   compensation?: string | null;
   idempotency?: CommandIdempotency;
@@ -308,16 +306,14 @@ function assertTenantCtx(ctx: OperationCtx): asserts ctx is Ctx {
 
 export function defineCommand<In, Out>(input: CommandDefinitionInput<In, Out>): CommandDefinition<In, Out> {
   requireUnusedName(input.name);
-  if (input.aiExposed && !input.preview) throw new CommandError("AI-exposed commands require a preview hook", 400, "invalid_command_metadata");
-  if (input.aiExposed && input.requiresConfirmation !== true) throw new CommandError("AI-exposed commands require confirmation", 400, "invalid_command_metadata");
+  if (input.preview && input.requiresConfirmation !== true) throw new CommandError("previewed commands require confirmation", 400, "invalid_command_metadata");
   if (input.offlineReplay && input.idempotency !== "dedupe") throw new CommandError("offline replay requires durable dedupe", 400, "invalid_command_metadata");
   const definition: CommandDefinition<In, Out> = {
     risk: "mutable", compensation: null, idempotency: "online_only", offlineReplay: false, atomicity: "rpc",
-    ...input, aiExposed: input.aiExposed ?? false, kind: "command",
+    ...input, kind: "command",
   };
   registry.set(definition.name, {
     ...definition,
-    aiExposed: definition.aiExposed ?? false,
     offlineReplay: definition.offlineReplay ?? false,
     preview: definition.preview as StoredDefinition["preview"],
     scope: "tenant",
@@ -333,10 +329,9 @@ export function defineCommand<In, Out>(input: CommandDefinitionInput<In, Out>): 
 
 export function defineQuery<In, Out>(input: QueryDefinitionInput<In, Out>): QueryDefinition<In, Out> {
   requireUnusedName(input.name);
-  const definition: QueryDefinition<In, Out> = { ...input, aiExposed: input.aiExposed ?? false, kind: "query" };
+  const definition: QueryDefinition<In, Out> = { ...input, kind: "query" };
   registry.set(definition.name, {
     ...definition,
-    aiExposed: definition.aiExposed ?? false,
     offlineReplay: false,
     scope: "tenant",
     execute: (ctx, parsed) => {
@@ -352,7 +347,7 @@ export function defineQuery<In, Out>(input: QueryDefinitionInput<In, Out>): Quer
 function registerPreTenant(kind: "command" | "query", definition: { name: string; description: string; input: ZodType<unknown> }, run: (ctx: PreTenantCtx, parsed: unknown, execution?: CommandExecution) => Promise<unknown>) {
   requireUnusedName(definition.name);
   registry.set(definition.name, {
-    ...definition, kind, scope: "pretenant", roles: "any", aiExposed: false, offlineReplay: false,
+    ...definition, kind, scope: "pretenant", roles: "any", offlineReplay: false,
     execute: (ctx, parsed, execution) => {
       if (ctx.breweryId !== null) throw new CommandError("pre-tenant context required", 403, "permission_denied");
       return run(ctx, parsed, execution);
@@ -394,7 +389,6 @@ export function getCommandDefinition(name: string): CommandDefinitionMetadata | 
     input: definition.input,
     roles: definition.roles,
     requiresConfirmation: definition.requiresConfirmation,
-    aiExposed: definition.aiExposed,
     risk: definition.risk,
     compensation: definition.compensation,
     idempotency: definition.idempotency,
@@ -453,7 +447,7 @@ export async function runCommand(name: string, rawInput: unknown, ctx: Operation
   if (!allowed) throw new CommandError(`permission denied: ${name} requires ${JSON.stringify(def.roles)}`, 403, "permission_denied");
   const input = parseInput(def.input, rawInput);
   const commandExecution = def.kind === "command" ? execution ?? createExecution() : undefined;
-  if (commandExecution?.origin === "chat" && (!def.aiExposed || !def.preview || !def.requiresConfirmation
+  if (commandExecution?.origin === "chat" && (!def.preview || !def.requiresConfirmation
     || !commandExecution.previewToken || !commandExecution.conversationId)) {
     throw new CommandError("chat commands require a confirmed preview", 400, "preview_required");
   }
@@ -466,20 +460,16 @@ export async function runCommand(name: string, rawInput: unknown, ctx: Operation
   }
 }
 
-export function listTools(options: { aiOnly?: boolean; ctx?: OperationCtx } = {}) {
+export function listTools() {
   // inputSchema is a Zod object for same-process use (API clients see the schema structure)
-  return [...registry.values()].filter((d) => {
-    if (!options.aiOnly) return true;
-    if (!options.ctx || !d.aiExposed || !canRun(options.ctx, d.name)) return false;
-    return options.ctx.breweryId === null || !options.ctx.roles.includes("customer") || d.name.startsWith("portal_");
-  }).map(d => ({
+  return [...registry.values()].map(d => ({
     name: d.name,
     description: d.description ?? "",
     inputSchema: d.input,
     kind: d.kind,
     scope: d.scope,
     requiresConfirmation: !!d.requiresConfirmation,
-    aiExposed: d.aiExposed,
+    previewable: !!d.preview,
     agentHidden: !!d.agentHidden,
     risk: d.risk,
     compensation: d.compensation,

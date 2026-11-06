@@ -20,7 +20,7 @@ const composerEffect = z.object({
 });
 export type ComposerEffect = z.infer<typeof composerEffect>;
 
-/** The agent may propose any AI-exposed command (lib/chat/agent.ts); the panel
+/** The agent may propose any previewed command (lib/chat/agent.ts); the panel
  *  renders and commits only this one, so anything else must fail the parse. */
 export const composerProposal = z.object({
   name: z.literal("record_movement"),

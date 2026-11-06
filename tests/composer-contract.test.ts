@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
+import { operationsFor } from "@/lib/agent/operations";
 import {
   _clearRegistry,
   defineCommand,
   defineQuery,
-  listTools,
   type Ctx,
 } from "@/lib/commands/registry";
 
@@ -18,12 +18,7 @@ describe("composer registry contract", () => {
 
   it("fails closed for invalid AI and offline metadata", () => {
     expect(() => defineCommand({
-      name: "unsafe", input: z.object({}), roles: ["admin"], aiExposed: true,
-      handler: async () => null,
-    })).toThrow(/preview/i);
-
-    expect(() => defineCommand({
-      name: "unconfirmed", input: z.object({}), roles: ["admin"], aiExposed: true,
+      name: "unconfirmed", input: z.object({}), roles: ["admin"],
       preview: async () => ({ effects: [], warnings: [], version: {} }),
       handler: async () => null,
     })).toThrow(/confirmation/i);
@@ -35,16 +30,15 @@ describe("composer registry contract", () => {
     })).toThrow(/offline replay/i);
   });
 
-  it("defaults to unexposed and lists only role-allowed AI tools", () => {
-    defineQuery({ name: "ordinary", input: z.object({}), roles: ["admin"], handler: async () => null });
-    defineQuery({ name: "staff_read", input: z.object({}), roles: ["admin"], aiExposed: true, handler: async () => null });
-    defineQuery({ name: "warehouse_read", input: z.object({}), roles: ["warehouse"], aiExposed: true, handler: async () => null });
-    defineQuery({ name: "portal_catalog", input: z.object({}), roles: "customer", aiExposed: true, handler: async () => null });
-    defineQuery({ name: "unsafe_customer_read", input: z.object({}), roles: "customer", aiExposed: true, handler: async () => null });
+  it("offers a model only what the person's role allows, and a customer only portal reads", () => {
+    defineQuery({ name: "staff_read", input: z.object({}), roles: ["admin"], handler: async () => null });
+    defineQuery({ name: "warehouse_read", input: z.object({}), roles: ["warehouse"], handler: async () => null });
+    defineQuery({ name: "secret_read", input: z.object({}), roles: ["admin"], agentHidden: true, handler: async () => null });
+    defineQuery({ name: "portal_catalog", input: z.object({}), roles: "customer", handler: async () => null });
+    defineQuery({ name: "unsafe_customer_read", input: z.object({}), roles: "customer", handler: async () => null });
 
-    expect(listTools().find((tool) => tool.name === "ordinary")).toMatchObject({ aiExposed: false });
-    expect(listTools({ aiOnly: true, ctx: admin }).map((tool) => tool.name)).toEqual(["staff_read"]);
-    expect(listTools({ aiOnly: true, ctx: warehouse }).map((tool) => tool.name)).toEqual(["warehouse_read"]);
-    expect(listTools({ aiOnly: true, ctx: customer }).map((tool) => tool.name)).toEqual(["portal_catalog"]);
+    expect(operationsFor(admin).map((tool) => tool.name)).toEqual(["staff_read"]);
+    expect(operationsFor(warehouse).map((tool) => tool.name)).toEqual(["warehouse_read"]);
+    expect(operationsFor(customer).map((tool) => tool.name)).toEqual(["portal_catalog"]);
   });
 });

@@ -3,14 +3,13 @@
 // database guards apply exactly as they do on /api/command.
 import type { AuthInfo, McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
+import { DESCRIBE_OPERATION, describeOperation, FIND_OPERATIONS, findOperations, operationsFor } from "@/lib/agent/operations";
 import { boundToolResult } from "@/lib/chat/agent";
 import { requireAdmission } from "@/lib/commands/admission";
 import { buildContextFromBearer } from "@/lib/commands/context";
 import { isProposable } from "@/lib/commands/agent-proposals";
-import { canRun, CommandError, getCommandDefinition, listTools, parseInput, runCommand, unwrap } from "@/lib/commands/registry";
+import { canRun, CommandError, getCommandDefinition, parseInput, runCommand, unwrap } from "@/lib/commands/registry";
 import { readAppUrl } from "@/lib/env/server-parser";
-import { fieldsOf, leafFields, sampleInput } from "@/lib/mgr/api-schema";
-import { fieldMeaning } from "@/lib/mgr/field-vocabulary";
 
 export const AGENT_INSTRUCTIONS = `MGR runs a brewery: beer, orders, inventory, production and compliance.
 You act as one person and can do only what their roles allow. Call get_started first.
@@ -48,8 +47,7 @@ async function runQuery(token: string, { name, input, ...choice }: BreweryChoice
 
 /** What this person's agent may read or propose at one brewery. */
 async function agentOperations(token: string, choice: BreweryChoice) {
-  const ctx = await contextFor(token, choice);
-  return listTools().filter(tool => tool.scope === "tenant" && !tool.agentHidden && canRun(ctx, tool.name));
+  return operationsFor(await contextFor(token, choice));
 }
 
 async function proposeCommand(token: string, { name, input, ...choice }: BreweryChoice & { name: string; input?: Record<string, unknown> }) {
@@ -60,27 +58,6 @@ async function proposeCommand(token: string, { name, input, ...choice }: Brewery
   const parsed = parseInput(getCommandDefinition(name)!.input, input ?? {});
   const proposal = await unwrap(ctx.db.rpc("create_agent_proposal", { p_brewery: ctx.breweryId, p_command: name, p_input: parsed as never })) as { id: string; expiresAt: string };
   return { status: "awaiting_approval", proposalId: proposal.id, approveUrl: `${readAppUrl()}/proposals/${proposal.id}`, expiresAt: proposal.expiresAt };
-}
-
-async function findOperations(token: string, { text, ...choice }: BreweryChoice & { text?: string }) {
-  const words = text?.toLowerCase().split(/\s+/).filter(Boolean) ?? [];
-  const operations = await agentOperations(token, choice);
-  // Not boundToolResult: its row cap is for data, and would hide operations from the agent.
-  return operations
-    .filter(({ name, description }) => words.every(word => `${name} ${description}`.toLowerCase().includes(word)))
-    .map(({ name, description, kind }) => ({ name, description, kind }));
-}
-
-async function describeOperation(token: string, { name, ...choice }: BreweryChoice & { name: string }) {
-  const operation = (await agentOperations(token, choice)).find(tool => tool.name === name);
-  if (!operation) throw new CommandError(`agents cannot run ${name}`, 403, "agent_not_allowed");
-  return {
-    name,
-    description: operation.description,
-    fields: fieldsOf(operation.inputSchema),
-    meanings: Object.fromEntries(leafFields(operation.inputSchema).map(field => [field.name, fieldMeaning(field)])),
-    example: sampleInput(operation.inputSchema),
-  };
 }
 
 /** The guides are public, so this asks the same endpoint the docs search box uses. */
@@ -121,13 +98,13 @@ export function registerAgentTools(server: McpServer) {
     inputSchema: z.object({}),
   }, (_input, ctx) => answer(() => getStarted(tokenOf(ctx))));
   server.registerTool("find_operations", {
-    description: "List what you can read or propose, optionally matching words in the name or description.",
+    description: FIND_OPERATIONS,
     inputSchema: z.object({ text: z.string().optional().describe("Words to match, such as 'unpaid invoices'"), breweryId }),
-  }, (input, ctx) => answer(() => findOperations(tokenOf(ctx), input)));
+  }, ({ text, ...choice }, ctx) => answer(async () => findOperations(await agentOperations(tokenOf(ctx), choice), text)));
   server.registerTool("describe_operation", {
-    description: "Explain one operation: what it does, what each input field means, and an example input.",
+    description: DESCRIBE_OPERATION,
     inputSchema: z.object({ name: z.string().describe("The operation, from find_operations"), breweryId }),
-  }, (input, ctx) => answer(() => describeOperation(tokenOf(ctx), input)));
+  }, ({ name, ...choice }, ctx) => answer(async () => describeOperation(await agentOperations(tokenOf(ctx), choice), name)));
   server.registerTool("search_guide", {
     description: "Search the MGR guides for how something works, such as 'how reversals work'. Start at the How MGR works guide.",
     inputSchema: z.object({ query: z.string().describe("What to look up") }),
