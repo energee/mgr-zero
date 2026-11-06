@@ -12,7 +12,7 @@ describe("toProposalViewProps", () => {
     const model = toProposalViewProps(proposal);
     expect(model.canDecide).toBe(true);
     expect(model.note).toBeNull();
-    expect(model.undo).toBe("Reverse with delete_bin while it is empty.");
+    expect(model.undo).toBe("Reverse with delete bin while it is empty.");
   });
 
   it("shows a quantity with its unit, and plain words for true, false and nothing", () => {
@@ -31,6 +31,11 @@ describe("toProposalViewProps", () => {
       { field: "locationId", value: "Main warehouse" }, { field: "lines[0].batch_id", value: "B-12" },
     ] }).rows.map(row => row.label);
     expect(labels).toEqual(["Location", "Lines 1 batch"]);
+  });
+
+  it("writes command names in the undo line as words, because a person reads it", () => {
+    expect(toProposalViewProps({ ...proposal, undo: "Reverse with delete_bin while the bin has no recorded stock." }).undo)
+      .toBe("Reverse with delete bin while the bin has no recorded stock.");
   });
 
   it("warns before approval when a record could not be named", () => {
