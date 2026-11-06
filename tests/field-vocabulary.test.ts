@@ -45,6 +45,6 @@ describe("FIELD_VOCABULARY", () => {
 
   // The readiness floor cannot catch this: a new unexplained field leaves the count where it was.
   it("leaves no input field without a meaning", () => {
-    expect(inputs.filter(field => !field.described && !Object.hasOwn(FIELD_VOCABULARY, field.name)).map(field => field.name)).toEqual([]);
+    expect(inputs.filter(field => !field.description && !Object.hasOwn(FIELD_VOCABULARY, field.name)).map(field => field.name)).toEqual([]);
   });
 });

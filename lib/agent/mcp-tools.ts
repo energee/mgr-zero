@@ -7,7 +7,8 @@ import { boundToolResult } from "@/lib/chat/agent";
 import { requireAdmission } from "@/lib/commands/admission";
 import { buildContextFromBearer } from "@/lib/commands/context";
 import { canRun, CommandError, listTools, runCommand } from "@/lib/commands/registry";
-import { fieldsOf, sampleInput } from "@/lib/mgr/api-schema";
+import { fieldsOf, leafFields, sampleInput } from "@/lib/mgr/api-schema";
+import { FIELD_VOCABULARY } from "@/lib/mgr/field-vocabulary";
 
 export const AGENT_INSTRUCTIONS = `MGR runs a brewery: beer, orders, inventory, production and compliance.
 You act as one person and can do only what their roles allow. Call get_started first.
@@ -56,10 +57,22 @@ async function findOperations(token: string, { text, ...choice }: BreweryChoice 
     .map(({ name, description }) => ({ name, description }));
 }
 
+/** A schema's own description wins: it covers a name that differs between operations. */
+function fieldMeaning({ name, description }: { name: string; description?: string }) {
+  const shared = Object.hasOwn(FIELD_VOCABULARY, name) ? FIELD_VOCABULARY[name] : undefined;
+  return { meaning: description ?? shared?.meaning, unit: shared?.unit };
+}
+
 async function describeOperation(token: string, { name, ...choice }: BreweryChoice & { name: string }) {
   const operation = (await readableOperations(token, choice)).find(tool => tool.name === name);
   if (!operation) throw new CommandError(`agents cannot run ${name}`, 403, "agent_not_allowed");
-  return { name, description: operation.description, fields: fieldsOf(operation.inputSchema), example: sampleInput(operation.inputSchema) };
+  return {
+    name,
+    description: operation.description,
+    fields: fieldsOf(operation.inputSchema),
+    meanings: Object.fromEntries(leafFields(operation.inputSchema).map(field => [field.name, fieldMeaning(field)])),
+    example: sampleInput(operation.inputSchema),
+  };
 }
 
 /** Who the agent acts for, and today's work when there is one brewery to ask about. */
@@ -95,7 +108,7 @@ export function registerAgentTools(server: McpServer) {
     inputSchema: z.object({ text: z.string().optional().describe("Words to match, such as 'unpaid invoices'"), breweryId }),
   }, (input, ctx) => answer(() => findOperations(tokenOf(ctx), input)));
   server.registerTool("describe_operation", {
-    description: "Explain one read: what it does, its input fields, and an example input.",
+    description: "Explain one read: what it does, what each input field means, and an example input.",
     inputSchema: z.object({ name: z.string().describe("The operation, from find_operations"), breweryId }),
   }, (input, ctx) => answer(() => describeOperation(tokenOf(ctx), input)));
   server.registerTool("run_query", {

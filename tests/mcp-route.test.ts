@@ -98,6 +98,14 @@ describe("/api/mcp", () => {
     expect(body.example).toEqual({});
   });
 
+  it("says what each field means, from a schema or the shared vocabulary", async () => {
+    const { body } = await tool(token, "describe_operation", { name: "get_today" });
+    expect(body.meanings.now.meaning).toEqual(expect.any(String));
+    const { body: lots } = await tool(token, "describe_operation", { name: "list_batches" });
+    expect(Object.keys(lots.meanings).length).toBeGreaterThan(0);
+    expect(Object.values(lots.meanings).every((field) => (field as { meaning?: string }).meaning)).toBe(true);
+  });
+
   it("will not describe what the agent cannot run", async () => {
     expect((await tool(token, "describe_operation", { name: "get_qbo_connection" })).body.code).toBe("agent_not_allowed");
     expect((await tool(token, "describe_operation", { name: "record_movement" })).body.code).toBe("agent_not_allowed");
