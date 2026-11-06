@@ -30,7 +30,7 @@ defineQuery({
 });
 
 defineCommand({
-  name: "set_brewery_agents_enabled",
+  name: "set_brewery_agents_enabled", agentHidden: true,
   description: "Allow or stop outside agents, such as Claude or ChatGPT, for this brewery. Off stops every connected agent at once",
   input: z.object({ enabled: z.boolean() }),
   roles: ["admin"],

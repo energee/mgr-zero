@@ -5,7 +5,27 @@ export type Database = {
 
   "public": {
           Tables: {
-            "allocations": {
+            "agent_proposals": {
+                  Row: {
+                    "actor_id": string,"brewery_id": string,"client_id": string,"command": string,"created_at": string,"expires_at": string,"failure": string | null,"id": string,"input": NonNullable<Json>,"request_id": string,"status": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "actor_id": string,"brewery_id": string,"client_id": string,"command": string,"created_at"?: string,"expires_at"?: string,"failure"?: string | null,"id"?: string,"input": NonNullable<Json>,"request_id"?: string,"status"?: string
+                  }
+                  Update: {
+                    "actor_id"?: string,"brewery_id"?: string,"client_id"?: string,"command"?: string,"created_at"?: string,"expires_at"?: string,"failure"?: string | null,"id"?: string,"input"?: NonNullable<Json>,"request_id"?: string,"status"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "agent_proposals_brewery_id_fkey"
+      columns: ["brewery_id"]
+isOneToOne: false
+      referencedRelation: "breweries"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"allocations": {
                   Row: {
                     "brewery_id": string,"created_at": string,"id": string,"qty": number,"ref": string,"sku_id": string,"source": Database["public"]['Enums']["allocation_source"],"status": Database["public"]['Enums']["allocation_status"]
                   }
@@ -4755,6 +4775,9 @@ isOneToOne: false
 "assert_chat_admin":
 { Args: { "b": string }; Returns: undefined
                            },
+"begin_agent_proposal":
+{ Args: { "p_brewery": string,"p_proposal": string }; Returns: Json
+                           },
 "begin_chat_installation":
 { Args: { "p_brewery": string,"p_provider": string,"p_redirect_uri": string,"p_request_id": string,"p_state_hash": string }; Returns: Json
                            },
@@ -4965,6 +4988,9 @@ isOneToOne: false
 "correct_taproom_count":
 { Args: { "p_brewery": string,"p_corrections": Json,"p_count": string,"p_reason": string,"p_request_id": string }; Returns: Json
                            },
+"create_agent_proposal":
+{ Args: { "p_brewery": string,"p_command": string,"p_input": Json }; Returns: Json
+                           },
 "create_bin":
 { Args: { "p_brewery": string,"p_location": string,"p_name": string,"p_request_id": string }; Returns: Json
                            },
@@ -5036,6 +5062,9 @@ isOneToOne: false
         isOneToOne: false
         isSetofReturn: true
       } },
+"decline_agent_proposal":
+{ Args: { "p_proposal": string }; Returns: undefined
+                           },
 "delete_bin":
 { Args: { "p_bin": string,"p_brewery": string,"p_request_id": string }; Returns: Json
                            },
@@ -5092,6 +5121,9 @@ isOneToOne: false
                            },
 "find_chat_oauth_intent":
 { Args: { "p_actor": string,"p_state_hash": string }; Returns: Json
+                           },
+"finish_agent_proposal":
+{ Args: { "p_failure"?: string,"p_proposal": string,"p_status": string }; Returns: undefined
                            },
 "finish_order_email":
 { Args: { "p_delivery": string,"p_error": string,"p_lease": string,"p_provider_id": string }; Returns: boolean

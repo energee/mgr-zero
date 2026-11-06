@@ -122,7 +122,7 @@ describe("all staff-dependent RLS policies preserve multi-role union (#797)", { 
     expect(actual).toEqual(policies.map(test => `${test.table}:${test.policy}`).sort());
     expect(sql(`select tablename||':'||policyname from pg_policies where schemaname='public'
       and not (coalesce(qual,'')||coalesce(with_check,'') ~ '(staff_roles?\\(|has_staff_role|is_staff_of|my_staff_brewery_ids|taproom_can)') order by 1`))
-      .toEqual(["customer_users:self_read", "invoice_questions:customer_read", "locations:customer_read_portal_source", "ship_tos:customer_own"]);
+      .toEqual(["agent_proposals:actor_read", "customer_users:self_read", "invoice_questions:customer_read", "locations:customer_read_portal_source", "ship_tos:customer_own"]);
     expect(policies.every(test => test.table in matrix)).toBe(true);
   });
 

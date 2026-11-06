@@ -261,18 +261,26 @@ field in every command's schema has a label, or the test fails.
 
 **Modify:**
 - New migration: `agent_proposals` (tenant, RLS): actor, client, command,
-  canonical input, status (`pending`, `approved`, `declined`, `expired`,
-  `committed`, `failed`), request id, and created and expiry times.
-  `create_agent_proposal` is the one write an agent token may make, so it joins
-  the reviewed list in `tests/agent-access.test.ts`. It must not touch the ledger.
+  canonical input, status (`pending`, `approved`, `declined`, `committed`,
+  `failed`), request id, and created and expiry times. `expired` is derived from
+  `expires_at`, so nothing has to run when one lapses. `create_agent_proposal` is
+  the one write an agent token may make, so it joins the reviewed list in
+  `tests/agent-access.test.ts`. It must not touch the ledger.
+- A token can call `create_agent_proposal` directly with any command name, so the
+  check in `propose_command` is not enough. Approval checks `isProposable` again,
+  and requires the proposal's brewery to match the active one.
+- Agents cannot propose changes to who has access or to integrations: staff roles,
+  invitations, QuickBooks, Square and Slack connections, and the agent switch.
+  These set `agentHidden`.
 - `propose_command`: validate the input against the command's schema and check
   `canRun`, store the proposal, and return
   `{ status: "awaiting_approval", proposalId, approveUrl, expiresAt }`.
 - New `get_proposal_status` query.
 - New `approve_agent_proposal` and `decline_agent_proposal` commands. Approve
   runs the stored command through `runCommand` on the person's session, with the
-  proposal's request id. The command's own checks are the staleness check; a
-  refusal marks the proposal `failed` and shows why.
+  proposal's request id. `pending` to `approved` is one atomic step, so two
+  approvals cannot both run it. The command's own checks are the staleness check;
+  a refusal marks the proposal `failed` and shows why.
 - Attribution needs no ledger change. The person's session commits, so `ui` is
   the true origin, and `agent_proposals.request_id` links the agent to the
   ledger row. No RPC changes.

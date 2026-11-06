@@ -2,7 +2,7 @@ import { z } from "zod";
 import { CommandError, cents, completeRows, defineCommand, defineQuery, PAGE_SIZE, unwrap, type Ctx } from "./registry";
 
 defineCommand({
-  name: "connect_square", description: "Begin administrator consent for a Square seller connection",
+  name: "connect_square", agentHidden: true, description: "Begin administrator consent for a Square seller connection",
   input: z.object({ reconnect: z.boolean().optional() }), roles: ["admin"],
   handler: async (ctx, input, execution) => {
     const { beginSquareOAuth, squareConfig, SquareClient } = await import("@/lib/pos");
@@ -11,7 +11,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "disconnect_square", description: "Stop Square sync locally, purge its credential, and report whether remote revocation was confirmed; on a connection whose revocation is unresolved, retry it by merchant id",
+  name: "disconnect_square", agentHidden: true, description: "Stop Square sync locally, purge its credential, and report whether remote revocation was confirmed; on a connection whose revocation is unresolved, retry it by merchant id",
   input: z.object({ connectionId: z.string().uuid().describe("The Square connection to disconnect") }), roles: ["admin"],
   handler: async (ctx, input, execution) => {
     const [{ disconnectSquare }, { squareConfig, SquareClient }] = await Promise.all([

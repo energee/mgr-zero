@@ -176,8 +176,9 @@ describe("agent tokens", () => {
         and has_function_privilege('authenticated', p.oid, 'execute')
         and pg_get_functiondef(p.oid) !~ 'claim_command_request'
       order by 1`)).toEqual([
-      "begin_qbo_invoice_sync", "begin_square_catalog_sync", "cancel_purchase_order", "close_purchase_order_short",
-      "complete_invite_membership", "consume_command_admission", "get_brew_day_plan", "get_brew_record",
+      "begin_agent_proposal", "begin_qbo_invoice_sync", "begin_square_catalog_sync", "cancel_purchase_order", "close_purchase_order_short",
+      "complete_invite_membership", "consume_command_admission", "create_agent_proposal", "decline_agent_proposal",
+      "finish_agent_proposal", "get_brew_day_plan", "get_brew_record",
       "get_material_count_preview", "get_order_email_status", "get_qbo_sync_status", "preview_inventory_movement",
       "record_invite_failure", "record_submitted_order_occurrence",
     ]);

@@ -3,6 +3,7 @@ import "./catalog";
 import "./tenancy";
 import "./inventory";
 import "./preview";
+import "./agent-proposals";
 import "./transfers";
 import "./import";
 import "./invites";

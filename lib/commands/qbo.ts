@@ -17,7 +17,7 @@ export async function qboUnmappedFilter(ctx: Ctx, idColumn: string) {
 }
 
 defineCommand({
-  name: "connect_qbo", description: "Begin administrator consent for a QuickBooks connection",
+  name: "connect_qbo", agentHidden: true, description: "Begin administrator consent for a QuickBooks connection",
   input: z.object({ reconnect: z.boolean().optional() }), roles: ["admin"],
   handler: async (ctx, input, execution) => {
     const { beginQboOAuth, qboConfig, QboOAuthClient } = await import("@/lib/qbo");
@@ -26,7 +26,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "disconnect_qbo", description: "Disable QuickBooks locally, release its company ownership, purge its credential, and attempt remote revocation; the exact requestId replays the recorded outcome",
+  name: "disconnect_qbo", agentHidden: true, description: "Disable QuickBooks locally, release its company ownership, purge its credential, and attempt remote revocation; the exact requestId replays the recorded outcome",
   input: z.object({ connectionId: z.string().uuid().describe("The QuickBooks connection to disconnect") }), roles: ["admin"],
   handler: async (ctx, input, execution) => {
     const [{ disconnectQbo }, { qboConfig, QboOAuthClient }] = await Promise.all([

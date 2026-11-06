@@ -1,6 +1,6 @@
 // tests/mcp-route.test.ts — the MCP endpoint at /api/mcp: who may call it, and what
 // an agent can reach through it. Drives the real route with a real agent token.
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { GET as resourceMetadata } from "@/app/.well-known/oauth-protected-resource/api/mcp/route";
 import { POST } from "@/app/api/mcp/route";
 import { API, client, connectAgent } from "./agent-oauth";
@@ -66,7 +66,7 @@ describe("/api/mcp", () => {
 
   it("offers the agent tools", async () => {
     const { tools } = await resultOf(await call("tools/list", {}, token));
-    expect(tools.map((t: { name: string }) => t.name).sort()).toEqual(["describe_operation", "find_operations", "get_started", "run_query"]);
+    expect(tools.map((t: { name: string }) => t.name).sort()).toEqual(["describe_operation", "find_operations", "get_started", "propose_command", "run_query", "search_guide"]);
   });
 
   it("tells a fresh agent who it acts for and where", async () => {
@@ -88,7 +88,8 @@ describe("/api/mcp", () => {
     expect(everything).toContain("get_inventory_value");
     expect(await found(warehouse.token)).not.toContain("get_inventory_value");
     expect(everything).not.toContain("get_qbo_connection");
-    expect(everything).not.toContain("record_movement");
+    expect(everything).toContain("record_movement");
+    expect(everything).not.toContain("update_staff_role");
   });
 
   it("describes an operation's input, with an example", async () => {
@@ -108,7 +109,7 @@ describe("/api/mcp", () => {
 
   it("will not describe what the agent cannot run", async () => {
     expect((await tool(token, "describe_operation", { name: "get_qbo_connection" })).body.code).toBe("agent_not_allowed");
-    expect((await tool(token, "describe_operation", { name: "record_movement" })).body.code).toBe("agent_not_allowed");
+    expect((await tool(token, "describe_operation", { name: "update_staff_role" })).body.code).toBe("agent_not_allowed");
   });
 
   it("runs a query its person's roles allow, defaulting a single brewery", async () => {
@@ -129,6 +130,24 @@ describe("/api/mcp", () => {
 
   it.each(["list_qbo_customers", "list_chat_channels", "search_colas", "get_chat_history"])("refuses %s, which reaches past the person's database access", async (name) => {
     expect((await tool(token, "run_query", { name, input: {} })).body.code).toBe("agent_not_allowed");
+  });
+
+  it("searches the public guides and links each hit", async () => {
+    vi.stubEnv("APP_URL", "https://mgr.test");
+    const realFetch = globalThis.fetch;
+    const hits = [
+      { id: "1", type: "page", content: "How MGR works", url: "/docs/how-mgr-works" },
+      { id: "2", type: "text", content: "A reversal is a new entry.", url: "/docs/how-mgr-works#reversals" },
+    ];
+    const search = vi.spyOn(globalThis, "fetch").mockImplementation((input, init) =>
+      String(input).startsWith("https://mgr.test/") ? Promise.resolve(Response.json(hits)) : realFetch(input, init));
+    const { body } = await tool(token, "search_guide", { query: "reversal" });
+    expect(search.mock.calls.map(([input]) => String(input))).toContain("https://mgr.test/api/search?query=reversal");
+    expect(body).toEqual([
+      { text: "How MGR works", url: "https://mgr.test/docs/how-mgr-works" },
+      { text: "A reversal is a new entry.", url: "https://mgr.test/docs/how-mgr-works#reversals" },
+    ]);
+    search.mockRestore();
   });
 
   it("refuses a command", async () => {
