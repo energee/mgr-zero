@@ -9,7 +9,7 @@ description: "One endpoint for every read and write: how to call it, the rules t
 MGR has one HTTP endpoint. No resource URLs, no verb shopping. You POST an
 operation name and its input, and the response is always the same envelope.
 Everything else in this section is a rule that holds across every operation,
-or the operations themselves.
+or the operations themselves. Outside agents use [MCP](#mcp) instead.
 
 ### The endpoint [#endpoint]
 
@@ -854,6 +854,72 @@ The inventory ledger is append-only: a correction is a new movement in the
 opposite direction, never an edit. Invoices work the same way. A credit memo is
 negative lines at the original prices. Where you might expect an update or a
 delete, look for the compensating operation instead.
+
+## Agents over MCP [#mcp]
+
+An outside agent, such as Claude or ChatGPT, does not call `/api/command`. It
+connects to the MCP endpoint, which reaches the same operations through six
+tools. Nothing is listed for agents by hand: a new operation is reachable once
+it is registered.
+
+```http
+POST /api/mcp
+authorization: Bearer <OAuth access token>
+```
+
+A call with no token answers `401`, with a challenge that points to
+`/.well-known/oauth-protected-resource/api/mcp`. That document names the sign-in
+server. An MCP client registers itself there and asks the person to sign in and
+consent. A person's own session token is refused.
+
+| Tool | What it does |
+| --- | --- |
+| `get_started` | Says which breweries the agent can reach, its roles there, and today's work. |
+| `find_operations` | Lists what the agent can read or propose, optionally matching words. |
+| `describe_operation` | Explains one operation: its fields, what they mean, and an example input. |
+| `run_query` | Runs one read by name. |
+| `propose_command` | Stores a change for the person to approve. |
+| `search_guide` | Searches the MGR guides. |
+
+### What an agent can do [#mcp-limits]
+
+A token acts as one person, with that person's roles. It reaches every brewery
+where the person works and agents are on. Name a `breweryId` when `get_started`
+lists more than one.
+
+An agent reads with `run_query` and never runs a command directly. Operations
+that change access or integrations are hidden, and so are reads that reach a
+provider or chat history. Calling one returns `agent_not_allowed`.
+
+`run_query` returns at most 50 rows and sets `truncated` when there are more. A
+result over 20,000 characters comes back empty, with a message to narrow the
+request. Agents share the person's request budget with `/api/command`.
+
+A refusal is a tool result with `isError` set, holding `code`, `message` and
+`issues`. The [validation rules](#validation) apply, so an agent can correct the
+named field and try again.
+
+### Proposing a change [#mcp-proposals]
+
+`propose_command` checks the input and the person's role, then stores the change.
+It runs nothing.
+
+```json
+{
+  "status": "awaiting_approval",
+  "proposalId": "<uuid>",
+  "approveUrl": "<address of the review page>",
+  "expiresAt": "<timestamp>"
+}
+```
+
+Share `approveUrl` with the person. Only that person can approve, in their own
+signed-in session, within 24 hours. An agent's token cannot approve.
+
+To follow a proposal, call `get_proposal_status` with `run_query`. Its `status` is
+`pending`, `approved`, `declined`, `committed`, `failed` or `expired`. A `failed`
+proposal also gives the reason in `failure`. `approved` that stays `approved`
+means the result is unknown, so check the record before proposing it again.
 
 ## Operations [#operations]
 
