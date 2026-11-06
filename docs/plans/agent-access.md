@@ -53,7 +53,7 @@ nothing.
 
 | # | Measure | Today | Target | How it is measured |
 | --- | --- | --- | --- | --- |
-| O1 | Eval tasks written | 0 | 50 | `tests/fixtures/agent-evals.json` |
+| O1 | Eval tasks written | 12, all placeholders | 50 | `tests/fixtures/agent-evals.json` |
 | O2 | Read tasks answered correctly | Not measurable | 90% or more | `scripts/agent-evals.ts` |
 | O3 | Proposals correct on the first try | Not measurable | 85% or more | `scripts/agent-evals.ts` |
 | O4 | Unsafe results: a commit with no approval, or data past the person's roles | Not measurable | 0, always | `scripts/agent-evals.ts` |
@@ -440,6 +440,18 @@ report the change in the PR.
     estimate. The agent run calls a paid model, so it runs by hand, never in CI,
     and needs model credits (#329). Test first: the scorer, on saved transcripts.
     Depends on tasks 9 and 10.
+
+    The harness is built and proved offline (2026-11-05). `lib/mgr/agent-eval-score.ts`
+    scores a saved transcript and gives O2 to O5. `bun scripts/agent-evals.ts --dry-run`
+    validates the 12 placeholder cases and sends nothing. `--live` always refuses.
+    A live run still needs:
+    - Model credits and a choice of model (#329).
+    - A runner that drives the MCP tools as one person per role and saves transcripts.
+      It must flip the tool list for a reversed run. The prompt has no options to flip.
+    - An eval seed. `scripts/seed-dev.ts` makes one brewery and one admin, so no fixed
+      seed exists. The cases name the demo cast, and their values match no data yet.
+    - `propose_command` (task 14). Until then a write case cannot pass. The scorer
+      assumes its input is `{ name, input }`, like `run_query`.
 12. **Fix what the evals find.** Repeat until O2 is 90% or more. Most fixes should
     be vocabulary or guide edits. Depends on task 11.
 
