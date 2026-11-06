@@ -32,6 +32,8 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
     ? await Promise.all([runCommand("get_first_run_state", {}, ctx) as Promise<FirstRun>, runCommand("get_today", {}, ctx) as Promise<TodayItem[]>])
     : [null, null];
   if (state && showFirstRun(state)) return <FirstRunChecklist brewery={brewery.name} state={state} />;
+  const proposalNotice = (waiting: unknown[]) => waiting.length > 0
+    && E.nav(`${plural(waiting.length, "change")} to approve`, "Proposed by your agents", "", undefined, "/proposals");
   if (onlyRoles(brewery.roles, ["taproom"])) {
     const locations = (await runCommand("list_locations", { use: "taproom" }, ctx)) as { id: string; name: string }[];
     const location = locations[0];
@@ -43,12 +45,13 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         />
       );
     }
-    const [open, counts, report] = await Promise.all([
+    const [open, counts, report, waiting] = await Promise.all([
       runCommand("list_open_taps", { locationId: location.id }, ctx) as Promise<TapInterval[]>,
       runCommand("list_taproom_counts", { locationId: location.id }, ctx) as Promise<{ counted_on: string; created_at: string }[]>,
       runCommand("get_taproom_variance", { locationId: location.id, weeks: 4 }, ctx) as Promise<{ as_of: string; reason: string | null; rows: { variance_bbl: number | null }[]; periods: { coverage_complete: boolean; reason: string | null }[] }>,
+      runCommand("list_agent_proposals", {}, ctx) as Promise<unknown[]>,
     ]);
-    return <TodayView model={toTodayViewProps({ taproom: taproomTodayRows(location, open, counts, report, brewery.timeZone) })} linkRows />;
+    return <TodayView model={toTodayViewProps({ taproom: taproomTodayRows(location, open, counts, report, brewery.timeZone) })} linkRows notice={proposalNotice(waiting)} />;
   }
   const [items, waiting] = await Promise.all([
     adminItems ?? runCommand("get_today", {}, ctx) as Promise<TodayItem[]>,
@@ -58,7 +61,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   return (
     <>
       <TodayView model={toTodayViewProps({ items, timeZone: brewery.timeZone, actions: todayActions(brewery.roles) })} linkRows
-        notice={waiting.length > 0 && E.nav(`${plural(waiting.length, "change")} to approve`, "Proposed by your agents", "", undefined, "/proposals")} />
+        notice={proposalNotice(waiting)} />
       {sheet && <OrderSheetFromAddress id={sheet} />}
     </>
   );
