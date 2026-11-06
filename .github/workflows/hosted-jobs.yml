@@ -69,7 +69,7 @@ jobs:
           curl -sS --fail-with-body --location --max-redirs 0 --max-time 240 -X POST "$MGR_URL/api/agents/jobs/friction" -H "Authorization: Bearer $SECRET" -o report.json
           jq -er .markdown report.json > report.md
           title="Agent friction"
-          open=$(gh issue list --state open --search "in:title \"$title\"" --json number,title --jq "map(select(.title == \"$title\"))[0].number // empty")
+          open=$(gh issue list --state open --author app/github-actions --search "in:title \"$title\"" --json number,title --jq "map(select(.title == \"$title\"))[0].number // empty")
           if [ -n "$open" ]; then
             gh issue edit "$open" --body-file report.md
           else

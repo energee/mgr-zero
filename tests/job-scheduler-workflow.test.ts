@@ -37,6 +37,8 @@ describe("hosted jobs workflow", () => {
     // Calling a public URL needs no repository access. Only the report writes, and only issues.
     expect(workflow.permissions).toEqual({});
     expect(workflow.jobs["agent-friction"].permissions).toEqual({ issues: "write" });
+    // Anyone can open an issue on a public repo, so the job rewrites only one it filed.
+    expect(workflow.jobs["agent-friction"].steps[0].run).toContain("--author app/github-actions");
   });
 
   it("skips the friction report until its secret is set, so hosted jobs stays green", () => {
