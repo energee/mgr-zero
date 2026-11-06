@@ -25,9 +25,9 @@ export function insertMovement(ctx: Ctx, input: z.infer<typeof movementInput>, e
 
 defineCommand({
   name: "record_movement", description: "Append a staff-entered inventory movement (immutable; corrections are reversals); depletion names a saleChannelId, which no other supported type may carry",
+  compensation: "Reverse with reverse_inventory_movement for an eligible standalone adjustment or loss; other types cannot be reversed.",
   input: movementInput, roles: ["admin", "warehouse"], aiExposed: true,
   risk: "append_only", requiresConfirmation: true,
-  compensation: "reverse_inventory_movement for an eligible standalone adjustment or loss",
   idempotency: "dedupe", offlineReplay: false, atomicity: "rpc",
   preview: async (ctx, input, conversationId) => {
     const preview = await unwrap(ctx.db.rpc("preview_inventory_movement", {
@@ -43,6 +43,7 @@ defineCommand({
 
 defineCommand({
   name: "reverse_inventory_movement", description: "Reverse one standalone adjustment or loss with an exact linked opposite entry; compound movements and counts keep their correction owner",
+  compensation: "Cannot be undone; a reversal cannot be reversed, so enter the movement again with record_movement.",
   input: z.object({ movementId: z.string().uuid(), note: z.string().trim().min(1) }), roles: ["admin", "warehouse"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("reverse_inventory_movement", {
     p_brewery: ctx.breweryId, p_movement: i.movementId, p_note: i.note, p_request_id: execution.requestId,
@@ -51,6 +52,7 @@ defineCommand({
 
 defineCommand({
   name: "set_taproom_par", description: "Set par level for a SKU at a taproom",
+  compensation: "Reverse with set_taproom_par and the previous quantity.",
   input: z.object({ locationId: z.string().uuid(), skuId: z.string().uuid(), parQty: z.number().nonnegative() }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_taproom_par", {
@@ -69,6 +71,7 @@ defineCommand({
  */
 defineCommand({
   name: "set_standing_allocation", description: "Set or release a standing taproom allocation (source 'taproom_standing') for a SKU at a location; returns an ATP soft warning",
+  compensation: "Reverse with set_standing_allocation and the previous quantity, or 0 to release it.",
   input: z.object({ locationId: z.string().uuid(), skuId: z.string().uuid(), qty: z.number().nonnegative().describe("Units of the SKU to hold for this location; 0 releases the allocation") }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_standing_allocation", {
@@ -112,6 +115,7 @@ defineQuery({
 // 2026-09-06 Decision 5). Two locations is create_stock_transfer; the RPC says so.
 defineCommand({
   name: "move_stock_bin", description: "Move stock between two bins of one location: paired ledger rows, no transfer document; a cross-location pair is refused",
+  compensation: "Reverse with move_stock_bin in the opposite direction.",
   roles: ["admin", "warehouse"],
   input: stockLine.safeExtend({ materialLotId: z.string().uuid().optional(), skuLotId: z.string().uuid().optional() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("move_stock_bin", {

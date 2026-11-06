@@ -407,9 +407,10 @@ report the change in the PR.
    `brewing-domain.md` and the schema decisions. Each concept and lifecycle gets
    an anchor. Test first: `tests/docs.test.ts` fails on a missing anchor. Accept:
    U3 is 16 of 16, U4 is 6 of 6, and the owner has read it.
-6. **Undo statements (U5).** Make `compensation` required on `defineCommand`, as a
-   sentence or an explicit "cannot be undone" reason. Test first: a command with
-   no statement fails to register. Accept: U5 is all.
+6. **Undo statements (U5) (done).** Every registered command sets `compensation`
+   to one sentence: which command reverses it, or why it cannot be undone. The type
+   stays optional, so test fixtures need none. `tests/command-undo.test.ts` fails
+   on any registered command with no statement. Accept: U5 is all.
 
 ### Group C — Reach every read (Phase 2)
 

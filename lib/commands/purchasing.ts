@@ -22,6 +22,7 @@ const SENT_VIA = ["mailto", "external"] as const;
 
 defineCommand({
   name: "upsert_vendor", description: "Create or edit a supplier: contact, payment terms, and the typed lead time Planning dates a buy-by from",
+  compensation: "Reverse an edit with upsert_vendor and the previous values; a new vendor cannot be deleted, only set inactive.",
   input: z.object({
     id: z.string().uuid().optional().describe("The vendor to edit; omit to create one"),
     name: z.string().trim().min(1).describe("The vendor's name"),
@@ -42,6 +43,7 @@ defineCommand({
 defineCommand({
   name: "upsert_material",
   description: "Create or edit a material definition: kind, base and purchase units with the factor between them, lot tracking, default vendor, extract potential, alpha acid. Units are refused once movements, recipe ingredients, format BOM lines, PO lines, contracts or transfer lines use the material",
+  compensation: "Reverse an edit with upsert_material and the previous values; a new material cannot be deleted, only set inactive.",
   input: z.object({
     id: z.string().uuid().optional().describe("The material to edit; omit to create one"),
     name: z.string().trim().min(1).describe("The material's name"),
@@ -77,6 +79,7 @@ defineCommand({
 defineCommand({
   name: "upsert_material_contract",
   description: "Create or edit a purchasing commitment for one material with one vendor; releases are ordered against it all year, and it never gates ordering; endsOn cannot precede startsOn",
+  compensation: "Reverse an edit with upsert_material_contract and the previous values, or remove an unused new contract with delete_material_contract.",
   input: z.object({
     id: z.string().uuid().optional().describe("The contract to edit; omit to create one"),
     vendorId: z.string().uuid(),
@@ -97,6 +100,7 @@ defineCommand({
 
 defineCommand({
   name: "delete_material_contract", description: "Delete an unused material contract; contracts on purchase orders must be ended instead",
+  compensation: "Reverse by creating the contract again with upsert_material_contract; it gets a new ID.",
   input: z.object({ contractId: z.string().uuid() }),
   roles: [...PURCHASING],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("delete_material_contract", {
@@ -223,6 +227,7 @@ const poLinesJson = (lines: z.infer<typeof poLine>[]) => lines.map((l) => ({
 defineCommand({
   name: "create_purchase_order",
   description: "Draft a purchase order with all its lines in one write; a contracted line takes the contract price unless one is typed, and the expected lot is advisory",
+  compensation: "Reverse with cancel_purchase_order.",
   input: z.object({ vendorId: z.string().uuid(), expectedOn: isoDate.optional(), note: z.string().optional(), lines: z.array(poLine).min(1) }),
   roles: [...PO_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_purchase_order", {
@@ -236,6 +241,7 @@ defineCommand({
 defineCommand({
   name: "update_purchase_order",
   description: "Edit a draft purchase order before it is sent: its vendor, expected date and all its lines, replaced in one write; a contracted line takes the contract price unless one is typed; a sent order is refused",
+  compensation: "Reverse with update_purchase_order and the previous values.",
   input: z.object({ poId: z.string().uuid(), vendorId: z.string().uuid(), expectedOn: isoDate.optional(), lines: z.array(poLine).min(1) }),
   roles: [...PO_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_purchase_order", {
@@ -247,6 +253,7 @@ defineCommand({
 defineCommand({
   name: "send_purchase_order",
   description: "Mark a draft purchase order sent by mail client (mailto) or outside MGR (external): an attestation, dated today; no email is sent",
+  compensation: "Cannot return to draft; reverse with cancel_purchase_order before any receipt.",
   input: z.object({ poId: z.string().uuid(), sentVia: z.enum(SENT_VIA) }),
   roles: [...PO_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("send_purchase_order", {
@@ -258,6 +265,7 @@ const closureInput = z.object({ poId: z.string().uuid(), reason: z.string().trim
 
 defineCommand({
   name: "cancel_purchase_order", description: "Cancel a draft or sent purchase order without receipts, recording the reason and releasing its unreceived remainder",
+  compensation: "Cannot be undone; start again with create_purchase_order.",
   input: closureInput, roles: [...PO_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("cancel_purchase_order", {
     p_brewery: ctx.breweryId, p_po: i.poId, p_reason: i.reason, p_request_id: execution.requestId,
@@ -266,6 +274,7 @@ defineCommand({
 
 defineCommand({
   name: "close_purchase_order_short", description: "Close a purchase order's unreceived remainder with a reason; counted receipts and stock remain unchanged",
+  compensation: "Cannot be undone; order the remainder on a new purchase order with create_purchase_order.",
   input: closureInput, roles: [...PO_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("close_purchase_order_short", {
     p_brewery: ctx.breweryId, p_po: i.poId, p_reason: i.reason, p_request_id: execution.requestId,
@@ -281,6 +290,7 @@ const receiptCountLine = z.object({
 defineCommand({
   name: "correct_purchase_receipt",
   description: "Correct a purchase receipt with a reason and receiving bin: preserve the original facts and downstream lot provenance, compensate its movements, and append replacement counts and actual unit costs while preventing negative stock",
+  compensation: "Reverse by correcting the latest revision again with correct_purchase_receipt.",
   input: z.object({ receiptId: z.string().uuid(), reason: z.string().trim().min(1).describe("Why the receipt is corrected"), locationId: z.string().uuid().optional(), binId: z.string().uuid().optional(), lines: z.array(receiptCountLine).min(1) }),
   roles: [...PO_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("correct_purchase_receipt", {
@@ -294,6 +304,7 @@ defineCommand({
 defineCommand({
   name: "receive_purchase_order",
   description: "Count what arrived against a sent purchase order at one bin: receipt, lines with optional actual unit costs (over or short both allowed), lots read off the package, and receipt movements in one write; status derives from the counts",
+  compensation: "Reverse with correct_purchase_receipt until its lots are used.",
   input: z.object({
     poId: z.string().uuid(), locationId: z.string().uuid(), binId: z.string().uuid(), receivedOn: isoDate.optional(),
     lines: z.array(receiptCountLine).min(1),
@@ -412,6 +423,7 @@ defineQuery({
 defineCommand({
   name: "draft_purchase_order_from_requirements",
   description: "Draft one purchase order per vendor for the chosen material gaps, quantities rounded up to whole purchase units, contract price up to the available commitment; materials with no vendor or past their buy-by are skipped and named with the reason",
+  compensation: "Reverse with cancel_purchase_order on each draft.",
   input: z.object({ materialIds: z.array(z.string().uuid()).min(1) }),
   roles: [...PO_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("draft_purchase_order_from_requirements", {
@@ -436,6 +448,7 @@ defineQuery({
 defineCommand({
   name: "record_material_count",
   description: "Record the previewed material count at one bin; reject changed stock and post exactly the reviewed lot adjustments",
+  compensation: "Reverse by recording a corrected count with record_material_count.",
   input: materialCountInput.extend({ countedOn: isoDate.optional(), revision: z.string().min(1).optional().describe("Preview revision; omitted only to replay a completed legacy request") }),
   roles: [...PURCHASING],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_material_count", {

@@ -49,7 +49,7 @@ describe("measureReadiness", () => {
 
 // Raise a floor when a number improves. A drop means a new operation or field
 // shipped without the meaning an agent needs.
-const FLOORS = { describedOperations: 314, fieldUsesWithMeaning: 916, commandsWithUndo: 1 };
+const FLOORS = { describedOperations: 314, fieldUsesWithMeaning: 916, commandsWithUndo: 178 };
 
 it("never loses ground on the scorecard", () => {
   expect(measureReadiness(listTools())).toMatchObject(Object.fromEntries(

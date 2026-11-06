@@ -79,12 +79,14 @@ export async function quotePortalOrder(ctx: Ctx, i: z.infer<typeof quoteInput>, 
 
 defineCommand({
   name: "portal_quote_order", description: "Portal: freeze current prices, deposits, addresses, and optional QuickBooks tax for review",
+  compensation: "Nothing to undo; a quote changes no order, and an unused one expires.",
   roles: "customer", input: quoteInput,
   handler: (ctx, i, execution) => quotePortalOrder(ctx, i, execution.requestId),
 });
 
 defineCommand({
   name: "portal_submit_quote", description: "Portal: atomically submit an unchanged reviewed quote as a new or existing draft order",
+  compensation: "A buyer cannot take it back; brewery staff reverse it with cancel_order.",
   roles: "customer",
   input: z.object({ quoteId: z.string().uuid(), orderId: z.string().uuid().optional(), expectedIdentity }),
   handler: (ctx, i, execution) => {
@@ -98,6 +100,7 @@ defineCommand({
 
 defineCommand({
   name: "portal_create_order", description: "Portal: create a draft order for the caller's account",
+  compensation: "A buyer cannot delete a draft; brewery staff reverse it with cancel_order.",
   roles: "customer",
   input: z.object({ shipToId: z.string().uuid(), poNumber: z.string().optional(), note: z.string().optional(), requestedShipDate: isoDate.nullable().optional(), expectedIdentity, lines }),
   handler: (ctx, i, execution) => {
@@ -118,6 +121,7 @@ defineCommand({
 
 defineCommand({
   name: "portal_update_draft_order", description: "Portal: replace a draft order's lines and header fields before submitting it",
+  compensation: "Reverse with portal_update_draft_order and the previous values.",
   roles: "customer",
   input: z.object({ orderId: z.string().uuid(), shipToId: z.string().uuid().optional(), poNumber: z.string().optional(), note: z.string().optional(), requestedShipDate: isoDate.nullable().optional(), expectedIdentity, lines }),
   handler: (ctx, i, execution) => {
@@ -133,6 +137,7 @@ defineCommand({
 
 defineCommand({
   name: "portal_submit_order", description: "Portal: submit the caller's draft order to the brewery for confirmation",
+  compensation: "A buyer cannot take it back; brewery staff reverse it with cancel_order.",
   roles: "customer",
   input: z.object({ orderId: z.string().uuid(), expectedIdentity }),
   handler: (ctx, i, execution) => {
@@ -239,6 +244,7 @@ defineQuery({
 
 defineCommand({
   name: "raise_invoice_question", description: "Portal: ask the brewery about one of the caller's invoices; the question lands on the sales Today list and nothing on the invoice changes",
+  compensation: "A buyer cannot withdraw it; brewery staff close it with resolve_invoice_question.",
   roles: "customer",
   input: z.object({ invoiceId: z.string().uuid(), body: z.string().trim().min(1).max(2000) }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("raise_invoice_question", { p_brewery: ctx.breweryId, p_invoice: i.invoiceId, p_body: i.body, p_request_id: execution.requestId })),

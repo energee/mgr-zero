@@ -18,6 +18,7 @@ export async function qboUnmappedFilter(ctx: Ctx, idColumn: string) {
 
 defineCommand({
   name: "connect_qbo", description: "Begin administrator consent for a QuickBooks connection",
+  compensation: "Nothing connects until consent finishes; reverse a finished connection with disconnect_qbo.",
   input: z.object({ reconnect: z.boolean().optional() }), roles: ["admin"],
   handler: async (ctx, input, execution) => {
     const { beginQboOAuth, qboConfig, QboOAuthClient } = await import("@/lib/qbo");
@@ -27,6 +28,7 @@ defineCommand({
 
 defineCommand({
   name: "disconnect_qbo", description: "Disable QuickBooks locally, release its company ownership, purge its credential, and attempt remote revocation; the exact requestId replays the recorded outcome",
+  compensation: "Reverse by reconnecting with connect_qbo, which needs admin consent again.",
   input: z.object({ connectionId: z.string().uuid().describe("The QuickBooks connection to disconnect") }), roles: ["admin"],
   handler: async (ctx, input, execution) => {
     const [{ disconnectQbo }, { qboConfig, QboOAuthClient }] = await Promise.all([
@@ -70,6 +72,7 @@ defineQuery({
 
 defineCommand({
   name: "set_qbo_customer_mapping", description: "Bind a customer to a QuickBooks customer in the current company",
+  compensation: "Reverse with set_qbo_customer_mapping and the previous QuickBooks ID; a first mapping cannot be cleared.",
   input: z.object({ customerId: z.string().uuid(), qboCustomerId: z.string().trim().min(1) }), roles: ["admin", "sales"],
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_qbo_customer_mapping", {
     p_brewery: ctx.breweryId, p_customer: input.customerId, p_qbo_customer_id: input.qboCustomerId, p_request_id: execution.requestId,
@@ -78,6 +81,7 @@ defineCommand({
 
 defineCommand({
   name: "set_qbo_item_mapping", description: "Bind a SKU to a QuickBooks item in the current company",
+  compensation: "Reverse with set_qbo_item_mapping and the previous QuickBooks ID; a first mapping cannot be cleared.",
   input: z.object({ skuId: z.string().uuid(), qboItemId: z.string().trim().min(1) }), roles: ["admin", "sales"],
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_qbo_item_mapping", {
     p_brewery: ctx.breweryId, p_sku: input.skuId, p_qbo_item_id: input.qboItemId, p_request_id: execution.requestId,
@@ -86,6 +90,7 @@ defineCommand({
 
 defineCommand({
   name: "set_qbo_deposit_mapping", description: "Set the QuickBooks item used for returnable-keg deposit charges",
+  compensation: "Reverse with set_qbo_deposit_mapping and the previous QuickBooks ID; a first mapping cannot be cleared.",
   input: z.object({ qboItemId: z.string().trim().min(1) }), roles: ["admin"],
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_qbo_deposit_mapping", {
     p_brewery: ctx.breweryId, p_qbo_item_id: input.qboItemId, p_request_id: execution.requestId,
@@ -94,6 +99,7 @@ defineCommand({
 
 defineCommand({
   name: "set_qbo_one_way_fee_mapping", description: "Set the QuickBooks item used for one-way keg fee charges",
+  compensation: "Reverse with set_qbo_one_way_fee_mapping and the previous QuickBooks ID; a first mapping cannot be cleared.",
   input: z.object({ qboItemId: z.string().trim().min(1) }), roles: ["admin"],
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_qbo_one_way_fee_mapping", {
     p_brewery: ctx.breweryId, p_qbo_item_id: input.qboItemId, p_request_id: execution.requestId,
@@ -102,6 +108,7 @@ defineCommand({
 
 defineCommand({
   name: "set_qbo_push_defaults", description: "Set the ACH and card options copied onto future QuickBooks invoices",
+  compensation: "Reverse with set_qbo_push_defaults and the previous options.",
   input: z.object({ allowAch: z.boolean(), allowCard: z.boolean() }), roles: ["admin"],
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_qbo_push_defaults", {
     p_brewery: ctx.breweryId, p_allow_ach: input.allowAch, p_allow_card: input.allowCard,
@@ -111,6 +118,7 @@ defineCommand({
 
 defineCommand({
   name: "set_qbo_vendor_mapping", description: "Bind a vendor's exact QuickBooks ID to the connected company for receipt Bills",
+  compensation: "Reverse with set_qbo_vendor_mapping and the previous QuickBooks ID; a first mapping cannot be cleared.",
   input: z.object({ vendorId: z.string().uuid(), qboVendorId: z.string().trim().min(1) }), roles: ["admin"],
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_qbo_vendor_mapping", {
     p_brewery: ctx.breweryId, p_vendor: input.vendorId, p_qbo_vendor_id: input.qboVendorId, p_request_id: execution.requestId,
@@ -119,6 +127,7 @@ defineCommand({
 
 defineCommand({
   name: "set_qbo_purchase_account", description: "Set the exact QuickBooks expense or inventory asset account ID used by all material receipt Bills",
+  compensation: "Reverse with set_qbo_purchase_account and the previous account ID; a first account cannot be cleared.",
   input: z.object({ qboAccountId: z.string().trim().min(1) }), roles: ["admin"],
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_qbo_purchase_account", {
     p_brewery: ctx.breweryId, p_qbo_account_id: input.qboAccountId, p_request_id: execution.requestId,
@@ -127,6 +136,7 @@ defineCommand({
 
 defineCommand({
   name: "post_receipt_bill", description: "Post one frozen Bill per receipt revision chain; an uncertain retry reconciles the original Bill without creating another; corrections and payments remain in QuickBooks",
+  compensation: "Reverse in QuickBooks by correcting or voiding the Bill.",
   input: z.object({ receiptId: z.string().uuid(), newAttemptReason: z.literal("corrected").optional() }), roles: ["admin"], requiresConfirmation: true,
   handler: async (ctx, input, execution) => {
     // Keep server-only transport out of the provider-free registry/docs loader.
@@ -137,6 +147,7 @@ defineCommand({
 
 defineCommand({
   name: "push_invoice_to_qbo", description: "Push a frozen local invoice or credit memo to the current QuickBooks company with a durable request ID",
+  compensation: "Reverse in QuickBooks by voiding or deleting the document, then run sync_qbo_payments.",
   input: z.object({
     invoiceId: z.string().uuid(),
     newAttemptReason: z.enum(["corrected", "remote_deleted"]).optional(),
@@ -150,6 +161,7 @@ defineCommand({
 
 defineCommand({
   name: "sync_qbo_payments", description: "Read one frozen batch of current QuickBooks invoices and credit memos, including invoice cash evidence and confirmed document deletions, then apply it all-or-none; the exact requestId replays the recorded result",
+  compensation: "Cannot be undone; it copies QuickBooks, so fix the record there and sync again.",
   input: z.object({}), roles: ["admin", "sales"],
   handler: async (ctx, _input, execution) => {
     const { qboConfig, QboOAuthClient, syncQboInvoices } = await import("@/lib/qbo");
@@ -159,6 +171,7 @@ defineCommand({
 
 defineCommand({
   name: "write_off_invoice", description: "Mark an invoice written off in MGR without recording cash or changing QuickBooks: one voided or deleted in QuickBooks, or an unpaid one QuickBooks never received (its MGR payments stay)",
+  compensation: "Cannot be undone; no command clears a write-off.",
   input: z.object({ invoiceId: z.string().uuid(), reason: z.string().trim().min(1).max(500).describe("Why the invoice is written off") }),
   roles: ["admin"], requiresConfirmation: true,
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("write_off_invoice", {

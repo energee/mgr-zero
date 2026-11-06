@@ -17,6 +17,7 @@ const stop = z.object({ shipmentId: z.string().uuid().optional(), stockTransferI
 
 defineCommand({
   name: "save_route", description: "Create or edit a delivery route and replace its stops (shipments or stock transfers) in one step; delivered stops must be kept and a departed route cannot change",
+  compensation: "Reverse an edit with save_route and the previous values before departure; a route cannot be deleted.",
   roles: [...ROLES],
   input: z.object({
     id: z.string().uuid().optional().describe("The route to edit; omit to create one"), name: z.string().optional().describe("The route's name"), deliveryDate: isoDate,
@@ -139,12 +140,14 @@ const routeInput = z.object({ routeId: z.string().uuid() });
 
 defineCommand({
   name: "depart_route", description: "Stamp the route's departure as its driver or an admin; needs at least one stop, and its transfer stops become in transit",
+  compensation: "Cannot be undone; leave_delivery_for_later takes off a stop that was not attempted.",
   roles: [...ROLES], input: routeInput,
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("depart_route", { p_route: i.routeId, p_request_id: execution.requestId })),
 });
 
 defineCommand({
   name: "leave_delivery_for_later", description: "Take an open stop off a departed route when it could not be attempted; its shipment or transfer becomes unassigned without refusal, invoicing, or restocking",
+  compensation: "Reverse by adding the stop to another route with save_route.",
   roles: [...ROLES], input: z.object({ routeId: z.string().uuid(), deliveryId: z.string().uuid().describe("The open stop to take off the route") }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("leave_delivery_for_later", {
     p_route: i.routeId, p_delivery: i.deliveryId, p_request_id: execution.requestId,
@@ -153,12 +156,14 @@ defineCommand({
 
 defineCommand({
   name: "return_route", description: "Stamp the route's return as its driver or an admin, once it has departed and every stop has an outcome",
+  compensation: "Cannot be undone; a returned route stays closed.",
   roles: [...ROLES], input: routeInput,
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("return_route", { p_route: i.routeId, p_request_id: execution.requestId })),
 });
 
 defineCommand({
   name: "check_in_refused_return", description: "Full returnable kegs coming back with beer also post Returned shells. Physically check in refused on-delivery beer at its shipped source lot; damaged quantities also post loss, without a credit",
+  compensation: "Cannot be undone; no command reverses a refused-beer check-in.",
   roles: [...ROLES],
   input: z.object({ deliveryId: z.string().uuid().describe("The delivery stop the refused beer came back from"), locationId: z.string().uuid(), lines: z.array(z.object({
     orderLineId: z.string().uuid(), sources: z.array(z.object({ movementId: z.string().uuid(), binId: z.string().uuid(), qty: z.number().int().positive().describe("Whole units checked in from this shipped movement"), damaged: z.boolean() })).min(1),
