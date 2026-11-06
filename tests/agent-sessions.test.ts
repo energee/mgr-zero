@@ -2,7 +2,7 @@
 // never values, and a failure to log must not fail the model's work.
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/mcp/route";
-import { askMgrStep, recordAgentStep } from "@/lib/agent/sessions";
+import { askMgrStep, failureOf, recordAgentStep } from "@/lib/agent/sessions";
 import { CommandError, type Ctx } from "@/lib/commands/registry";
 import { asUser, makeBrewery, makeStaff, sql } from "./helpers";
 import { client, connectAgent } from "./agent-oauth";
@@ -105,6 +105,7 @@ describe("agent session log", () => {
     expect((await db.rpc("record_agent_step", { ...step, p_operation: "customer details here" })).error?.code).toBe("23514");
     expect((await db.rpc("record_agent_step", { ...step, p_error_code: "customer details here" })).error?.code).toBe("23514");
     expect((await db.rpc("record_agent_step", { ...step, p_input_path: "x".repeat(201) })).error?.code).toBe("23514");
+    expect((await db.rpc("record_agent_step", { ...step, p_input_path: "the customer at 12 Main St" })).error?.code).toBe("23514");
     const other = await makeStaff(breweryId, "admin");
     const foreign = sql(`insert into public.agent_proposals (brewery_id, actor_id, client_id, command, input)
       values ('${breweryId}', '${other.id}', 'someone-else', 'create_bin', '{}') returning id`, true)[0];
@@ -129,6 +130,14 @@ describe("agent session log", () => {
     expect(sessionCount()).toBe(0);
     expect(steps()).toEqual([]);
     expect(Number(sql(`select count(*) from public.agent_proposals where brewery_id = '${breweryId}'`, true)[0])).toBe(0);
+  });
+
+  it("keeps a failing path up to the first part that is not a field name, because a record's keys are input", () => {
+    const pathOf = (...path: (string | number)[]) => failureOf(new CommandError("bad", 400, "invalid_input", [{ path, code: "custom", message: "bad" }])).inputPath;
+    expect(pathOf("lines", 0, "skuId")).toBe("lines.0.skuId");
+    expect(pathOf("rows", 2, "Jane Doe's order", "qty")).toBe("rows.2");
+    expect(pathOf("the customer at 12 Main St")).toBeUndefined();
+    expect(pathOf(..."abcdefghij".split(""))).toBe("a.b.c.d.e.f.g.h");
   });
 
   it("names Ask MGR's steps from the SDK's event", () => {

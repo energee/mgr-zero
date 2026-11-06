@@ -23,7 +23,7 @@ create table public.agent_session_steps (
   kind text check (kind in ('query', 'command')),
   outcome text not null check (outcome in ('ok', 'refused', 'failed')),
   error_code text check (error_code ~ '^[A-Za-z0-9_]{1,64}$'),
-  input_path text check (char_length(input_path) <= 200),
+  input_path text check (input_path ~ '^[A-Za-z0-9_]{1,64}(\.[A-Za-z0-9_]{1,64}){0,7}$'),
   proposal_id uuid references public.agent_proposals(id) on delete set null,
   duration_ms integer not null check (duration_ms between 0 and 86400000),
   created_at timestamptz not null default now()
