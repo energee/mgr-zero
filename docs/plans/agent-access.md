@@ -4,9 +4,10 @@ Status: approved by the owner, 2026-11-04. Q4 and Phases 2 and 3 were rewritten
 at the owner's request on 2026-11-05, so that agents reach every operation with
 nothing maintained twice. Tracked in #1766.
 
-Phases 1 to 5 are on `main`, and so is the Phase 6 documentation. What is left
-needs the owner: the hosted steps (R4), the client matrix (R3), and the evals
-(O1 to O5), which wait on real staff questions and a decision on model credits.
+Phases 1 to 5 are on `main`, and so are the Phase 6 documentation and the eval
+harness, seed and 50 author-written cases. What is left needs the owner: the hosted
+steps (R4, `docs/operations/agent-hosted-setup.md`), the client matrix (R3), and live
+eval runs (O2 to O5), which wait on a decision about model credits (#329).
 
 ## Goal
 
@@ -28,7 +29,7 @@ understands what it is doing. These numbers say how far away that is. Each row
 is measured, not estimated. Last measured: `main`, 2026-11-06. Print the current
 numbers with `bun run scripts/agent-readiness.ts`.
 
-**Today: 7 of 15 at target.**
+**Today: 8 of 15 at target.**
 
 ### Reach: can an agent get there?
 
@@ -53,11 +54,14 @@ numbers with `bun run scripts/agent-readiness.ts`.
 U5 counts written text only. `compensation` defaults to `null`, which says
 nothing.
 
-U6 leaves out `ttbId`: it is the number TTB printed, not a record id. That takes
-the total from 334 to 333. Eight uses have no name to read through `ctx.db`:
-QuickBooks items, vendors and accounts and Slack channels live in those systems,
-and quotes and chat notification deliveries have no read. `tests/proposal-labels.test.ts`
-lists them, and each shows as an unrecognised record.
+U6 leaves out `ttbId`: it is the number TTB printed, not a record id. The 10 uses
+without a name are all reviewed in `tests/proposal-labels.test.ts`. Two are the
+proposal ids on approve and decline, which are hidden from agents and never reach
+a card. Eight have no name to read through `ctx.db`: QuickBooks items, vendors and
+accounts and Slack channels live in those systems, and quotes and chat notification
+deliveries have no read. Each of the eight shows as an unrecognised record with a
+warning. Naming them would need a call to the provider, so U6 stays below target
+until someone asks for that.
 
 ### Results: does it get things right?
 
