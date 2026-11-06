@@ -30,7 +30,9 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
 - The MGR mark is the v1 tank/porthole SVG. `app/icon.svg` is the favicon; `lib/mgr-icon.ts` owns the path; `components/mgr-icon.tsx` is the in-app reuse. Dream PRs are published by the MGR GitHub App (`mgr[bot]`), not `claude[bot]`; the model has read-only GitHub access and a separate deterministic job mints the App token from `vars.MGR_APP_ID` + `secrets.MGR_APP_PRIVATE_KEY`. Upload `docs/brand/mgr-github-app-icon.png` (a raster of the same mark) as the app logo.
 - Every AI mutation is proposal-only: registry-owned server preview,
   canonical effects, explicit user confirmation, same `requestId` +
-  `previewToken`, and stale revalidation. There is no generic Undo. The offline
+  `previewToken`, and stale revalidation. There is no generic Undo, but every
+  registered command carries a `compensation` sentence saying how it is undone
+  (#1778, `tests/command-undo.test.ts`). The offline
   outbox replays only fermentation readings (`lib/composer/offline-policy.ts`);
   voice and server chat history are deferred.
 - The rev-4 gates are closed except exact QBO payload persistence: pre-tenant
@@ -68,8 +70,9 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
 - **AI chat design consolidated (2026-09-07, PR #180):** the language layer is
   a client of the command registry — `preview_command` canonicalizes and
   issues a version token, a human clicks every write, and the agent's read
-  scope is exactly `listTools({aiOnly:true})` filtered by role, so coverage
-  only grows by registering commands, never by widening model access. Spec
+  scope is the registry filtered by role minus `agentHidden` queries (the
+  `aiExposed` flag and `listTools({aiOnly})` were deleted by #1785), so coverage
+  grows by registering commands. Spec
   `.agents/superpowers/specs/2026-09-07-mgr-ai-chat-design.md`, plan
   `.agents/superpowers/plans/2026-09-07-ai-chat.md`; supersedes slice 1C's
   composer tasks 8–10. Companion decisions from the same review: staff roles
@@ -143,6 +146,8 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
 - **Tenancy and auth boundaries (2026-10-30, #1659, PR #1701, draft).** Command and chat requests need JSON and an Origin matching `APP_URL`; auth emails and invoice-payment redirects build from `APP_URL`, never request Host; OAuth state is server-random and stored as a digest. Identity labels are presentation only; authorization comes from membership and roles. Hosted Auth redirect wildcards await owner approval.
 - **Compliance and correction rulings (2026-10-31, PRs #1705, #1706, #1698).** Beer in process for an ended period is replayed as of period end in the brewery timezone; saved snapshots are never rewritten. Admin may correct the latest Taproom count once, either direction, by append-only compensation. Brew-turn, used-receipt and Square-mapping corrections append compensating facts and never rewrite history.
 - **Owner merge hold on SQL PRs (2026-10-30).** Database PRs land in migration-timestamp order, only by the owner, each synced with `scripts/land-pr.sh <pr> --sync-only`; green branches alone are not proof of the assembled queue. Hosted backup/restore gates #1615 and #311 are separate from that order.
+
+- **Outside agents (2026-11-05/06, #1766, plan `docs/plans/agent-access.md`; hosted steps `docs/operations/agent-hosted-setup.md`).** An agent signs in by OAuth at `/oauth/consent` and reaches `/api/mcp`; an Admin switch (`set_brewery_agents_enabled`) gates each brewery, and a person's own token is refused. Reads follow the person's roles; any query that reaches a provider or credential, or returns model-written text, sets `agentHidden` (`tests/agent-hidden.test.ts` fails on a new one). Writes are never run directly: `propose_command` stores a command, the person approves it on their own session, and approval re-checks `isProposable` (no access or integration changes). Ask MGR and MCP share `lib/agent/operations.ts`. Tool calls are logged as names, outcomes and error paths, never input or output values (`lib/agent/sessions.ts`); sessions and proposals prune at 90 days. The repo is public, so the weekly Agent friction issue holds no notes or input. Eval cases are author-written (`tests/fixtures/agent-evals.json`) and test the harness, not production accuracy; `--live` still refuses until credits are decided. Readiness scorecard: 8 of 15 targets met (#1793).
 
 ## Gotchas (carried from MGR v1)
 - PostgREST caches the schema: after DDL, errors naming a column/enum that plainly exists are a stale cache — `NOTIFY pgrst, 'reload schema'` or restart the stack before debugging.
