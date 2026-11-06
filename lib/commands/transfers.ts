@@ -12,6 +12,7 @@ const readRoles = ["admin", "sales", "warehouse"] as const;
 
 defineCommand({
   name: "create_stock_transfer", description: "Create a submitted stock transfer between two locations: sku, material or keg-pool lines, each with a from-bin and a to-bin; record its pick next",
+  compensation: "Reverse with cancel_stock_transfer before it is received.",
   roles: [...roles],
   input: z.object({
     fromLocationId: z.string().uuid(), toLocationId: z.string().uuid(),
@@ -33,6 +34,7 @@ defineCommand({
 
 defineCommand({
   name: "record_stock_transfer_pick", description: "Record picked quantities per transfer line; the transfer becomes picked",
+  compensation: "Record the right quantities with record_stock_transfer_pick, or reverse with cancel_stock_transfer.",
   roles: [...roles],
   input: z.object({ transferId: z.string().uuid(), picks: z.array(z.object({ lineId: z.string().uuid().describe("The stock transfer line picked"), qty: z.number().nonnegative().describe("How much was picked: units of the SKU, the material's base units, or whole kegs") })).min(1) }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_stock_transfer_pick", {
@@ -42,6 +44,7 @@ defineCommand({
 
 defineCommand({
   name: "receive_stock_transfer", description: "Receive a picked transfer: paired volume-neutral ledger rows per line (FG, material or kegs) in one transaction; the transfer becomes received",
+  compensation: "Cannot be undone; send the stock back with a new create_stock_transfer.",
   roles: [...roles], requiresConfirmation: true,
   input: z.object({ transferId: z.string().uuid(), lines: z.array(z.object({ lineId: z.string().uuid().describe("The stock transfer line received"), qty: z.number().nonnegative().describe("How much was received: units of the SKU, the material's base units, or whole kegs"), sources: z.array(z.object({ lotId: z.string().uuid().nullable().describe("The lot received: finished goods on a SKU line, material on a material line; null for no lot"), qty: z.number().positive().describe("How much came from this lot, in the line's units") })).optional() })) }),
   handler: async (ctx, i, execution) => {
@@ -54,6 +57,7 @@ defineCommand({
 
 defineCommand({
   name: "cancel_stock_transfer", description: "Cancel an unreceived stock transfer with a reason; its picks are released and no stock moves, since a pick never left the source bin",
+  compensation: "Cannot be undone; start again with create_stock_transfer.",
   roles: [...roles], requiresConfirmation: true,
   input: z.object({ transferId: z.string().uuid(), reason: z.string().trim().min(1).max(500).describe("Why the transfer is cancelled") }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("cancel_stock_transfer", { p_transfer: i.transferId, p_reason: i.reason, p_request_id: execution.requestId })),

@@ -59,7 +59,7 @@ lists them, and each shows as an unrecognised record.
 
 | # | Measure | Today | Target | How it is measured |
 | --- | --- | --- | --- | --- |
-| O1 | Eval tasks written | 0 | 50 | `tests/fixtures/agent-evals.json` |
+| O1 | Eval tasks written | 12, all placeholders | 50 | `tests/fixtures/agent-evals.json` |
 | O2 | Read tasks answered correctly | Not measurable | 90% or more | `scripts/agent-evals.ts` |
 | O3 | Proposals correct on the first try | Not measurable | 85% or more | `scripts/agent-evals.ts` |
 | O4 | Unsafe results: a commit with no approval, or data past the person's roles | Not measurable | 0, always | `scripts/agent-evals.ts` |
@@ -413,9 +413,10 @@ report the change in the PR.
    `brewing-domain.md` and the schema decisions. Each concept and lifecycle gets
    an anchor. Test first: `tests/docs.test.ts` fails on a missing anchor. Accept:
    U3 is 16 of 16, U4 is 6 of 6, and the owner has read it.
-6. **Undo statements (U5).** Make `compensation` required on `defineCommand`, as a
-   sentence or an explicit "cannot be undone" reason. Test first: a command with
-   no statement fails to register. Accept: U5 is all.
+6. **Undo statements (U5) (done).** Every registered command sets `compensation`
+   to one sentence: which command reverses it, or why it cannot be undone. The type
+   stays optional, so test fixtures need none. `tests/command-undo.test.ts` fails
+   on any registered command with no statement. Accept: U5 is all.
 
 ### Group C — Reach every read (Phase 2)
 
@@ -445,6 +446,18 @@ report the change in the PR.
     estimate. The agent run calls a paid model, so it runs by hand, never in CI,
     and needs model credits (#329). Test first: the scorer, on saved transcripts.
     Depends on tasks 9 and 10.
+
+    The harness is built and proved offline (2026-11-05). `lib/mgr/agent-eval-score.ts`
+    scores a saved transcript and gives O2 to O5. `bun scripts/agent-evals.ts --dry-run`
+    validates the 12 placeholder cases and sends nothing. `--live` always refuses.
+    A live run still needs:
+    - Model credits and a choice of model (#329).
+    - A runner that drives the MCP tools as one person per role and saves transcripts.
+      It must flip the tool list for a reversed run. The prompt has no options to flip.
+    - An eval seed. `scripts/seed-dev.ts` makes one brewery and one admin, so no fixed
+      seed exists. The cases name the demo cast, and their values match no data yet.
+    - `propose_command` (task 14). Until then a write case cannot pass. The scorer
+      assumes its input is `{ name, input }`, like `run_query`.
 12. **Fix what the evals find.** Repeat until O2 is 90% or more. Most fixes should
     be vocabulary or guide edits. Depends on task 11.
 

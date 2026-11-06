@@ -32,6 +32,7 @@ defineQuery({
 defineCommand({
   name: "set_brewery_agents_enabled",
   description: "Allow or stop outside agents, such as Claude or ChatGPT, for this brewery. Off stops every connected agent at once",
+  compensation: "Reverse with set_brewery_agents_enabled and the opposite value.",
   input: z.object({ enabled: z.boolean() }),
   roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_brewery_agents_enabled", {
@@ -53,6 +54,7 @@ definePreTenantQuery({
 defineCommand({
   name: "set_brewery_gravity_unit",
   description: "Set the brewery-wide default unit gravity is shown and entered in (storage stays degrees Plato)",
+  compensation: "Reverse with set_brewery_gravity_unit and the previous unit.",
   input: z.object({ unit: z.enum(GRAVITY_UNITS).describe("The unit gravity is shown and entered in") }),
   roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_brewery_gravity_unit", {
@@ -63,6 +65,7 @@ defineCommand({
 defineCommand({
   name: "set_my_gravity_unit",
   description: "Set your own gravity display unit, or null to follow the brewery default",
+  compensation: "Reverse with set_my_gravity_unit and the previous unit, or null to follow the brewery.",
   input: z.object({ unit: z.enum(GRAVITY_UNITS).nullable().describe("Your gravity unit; null follows the brewery default") }),
   roles: STAFF_ROLES,
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_my_gravity_unit", {
@@ -84,6 +87,7 @@ defineQuery({
 defineCommand({
   name: "update_brewery",
   description: "Edit the brewery's basics from Settings (admin): name, timezone, TTB registry number, the customer-facing phone the portal prints, and how many hours until a fermentation reading is overdue",
+  compensation: "Reverse with update_brewery and the previous values; after the first filing the timezone cannot change.",
   roles: ["admin"],
   input: z.object({
     name: z.string().trim().min(1).describe("The brewery's name"), timezone: z.string().trim().min(1),
@@ -108,6 +112,7 @@ defineQuery({
 
 defineCommand({
   name: "set_brewery_ai_model", description: "Set the brewery-wide AI Gateway model used by Ask MGR",
+  compensation: "Reverse with set_brewery_ai_model and the previous model.",
   input: z.object({ model: gatewayModel }), roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_brewery_ai_model", {
     p_brewery: ctx.breweryId, p_model: i.model, p_request_id: execution.requestId,
@@ -125,6 +130,7 @@ defineQuery({
 // freezes the value after any filed snapshot; an unchanged value remains a no-op.
 defineCommand({
   name: "set_books_opened_on", description: "Set or clear the day compliance reports start counting the ledger before any report is filed (admin); after filing, only the unchanged value is allowed",
+  compensation: "Reverse with set_books_opened_on before the first filing, or correct_reporting_basis after it.",
   input: z.object({ booksOpenedOn: isoDate.nullable() }), roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_brewery_books_opened_on", {
     p_brewery: ctx.breweryId, p_books_opened_on: i.booksOpenedOn, p_request_id: execution.requestId,
@@ -135,6 +141,7 @@ defineCommand({
 // Frozen on the order line at ship, so a change reaches only later shipments.
 defineCommand({
   name: "set_one_way_keg_fee", description: "Set the non-refundable fee, in cents, invoiced for each one-way keg shipped (admin); 0 bills none",
+  compensation: "Reverse with set_one_way_keg_fee and the previous fee.",
   input: z.object({ feeCents: z.number().int().min(0) }), roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_one_way_keg_fee", {
     p_brewery: ctx.breweryId, p_fee_cents: i.feeCents, p_request_id: execution.requestId,
@@ -143,6 +150,7 @@ defineCommand({
 
 defineCommand({
   name: "set_brewery_operating_defaults", description: "Change the brewery fermentation reading cadence in hours and optionally its days-to-package estimate for projected batch packaging demand",
+  compensation: "Reverse with set_brewery_operating_defaults and the previous values.",
   input: z.object({ readingDueHours, daysToPackage: z.number().int().min(1).max(120).optional().describe("Days from brewing (or the planned brew date) to projected packaging; omit to keep the current value") }), roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_brewery_operating_defaults", {
     p_brewery: ctx.breweryId, p_reading_due_hours: i.readingDueHours, p_request_id: execution.requestId,

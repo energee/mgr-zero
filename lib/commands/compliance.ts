@@ -29,6 +29,7 @@ const cleared = (fields: Record<string, unknown>) => Object.keys(fields).filter(
 
 defineCommand({
   name: "upsert_brand_approval", description: "Record or edit one brand's COLA or formula approval: ttbId is a COLA's TTB-assigned ID or a formula's number, and serialNumber is a COLA's own applicant serial (a formula takes none); imageUrl selects an official TTB label attachment and requires an approved COLA date; the same kind and ttbId on the same brand is one record; an edit keeps a field left out and clears one sent as null; changing kind or TTB ID clears an omitted image",
+  compensation: "Reverse an edit with upsert_brand_approval and the previous values; a new approval cannot be deleted.",
   roles: [...ROLES],
   // Both identifiers are text: a TTB ID or serial may carry leading zeros.
   input: z.object({ id: z.string().uuid().optional().describe("The approval to edit"), brandId: z.string().uuid(), kind: z.enum(["cola", "formula"]).describe("Whether this approval is a COLA or a formula"), ttbId: z.string().min(1).describe("A COLA's TTB-assigned ID, or a formula's number"), serialNumber: text, approvedOn: day, expiresOn: day, note: text, imageUrl: z.string().refine(isColaImageUrl, "Select an official TTB label image").nullable().optional() })
@@ -43,6 +44,7 @@ defineCommand({
 
 defineCommand({
   name: "upsert_state_registration", description: "Record or edit a brand's permission to sell in one state; an edit keeps a field left out and clears one sent as null",
+  compensation: "Reverse an edit with upsert_state_registration and the previous values; a new registration cannot be deleted.",
   roles: [...ROLES],
   input: z.object({ brandId: z.string().uuid(), state: stateCode, registrationNo: text, approvedOn: day, expiresOn: day }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_state_registration", {
@@ -54,6 +56,7 @@ defineCommand({
 
 defineCommand({
   name: "upsert_brewery_state_license", description: "Record or edit one of the brewery's state licenses by state and kind (kind is stored lower-case and trimmed); an edit keeps a field left out and clears one sent as null",
+  compensation: "Reverse an edit with upsert_brewery_state_license and the previous values, or remove a new license with delete_brewery_state_license.",
   roles: [...ROLES],
   input: z.object({ state: stateCode, kind: z.string().trim().min(1).describe("The license type; it is stored lower-case and trimmed"), licenseNo: text, expiresOn: day, note: text }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_brewery_state_license", {
@@ -65,6 +68,7 @@ defineCommand({
 
 defineCommand({
   name: "delete_brewery_state_license", description: "Delete a brewery state license that no longer applies; use upsert_brewery_state_license to change one instead",
+  compensation: "Reverse by entering the license again with upsert_brewery_state_license.",
   roles: [...ROLES],
   input: z.object({ licenseId: z.string().uuid() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("delete_brewery_state_license", {
@@ -219,6 +223,7 @@ defineQuery({
 defineCommand({
   name: "reattribute_loss",
   description: "Allocate part of a generic cellar loss (batch completion or cellar transfer) to samples, direct cellar Taproom removals, or destruction while preserving the original and exact total; Sample requires a destination state",
+  compensation: "Cannot be undone; the allocated barrels stay reclassified.",
   roles: [...ROLES],
   input: z.object({
     adjustmentId: z.string().uuid(),
@@ -246,6 +251,7 @@ export type Filing = { id: string; jurisdiction: string; period_start: string; p
 defineCommand({
   name: "correct_reporting_basis",
   description: "Admin correction after filing: record immutable old/new books-opened basis, actor, time and reason, and flag every affected filed period as needing amendment; original snapshots stay unchanged",
+  compensation: "Reverse with correct_reporting_basis and the earlier date; periods it flagged for amendment stay flagged.",
   roles: ["admin"],
   input: z.object({ booksOpenedOn: isoDate.nullable(), expectedBooksOpenedOn: isoDate.nullable(), reason: z.string().trim().min(1).describe("Why the reporting basis is corrected") }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("correct_reporting_basis", {
@@ -264,6 +270,7 @@ defineQuery({
 
 defineCommand({
   name: "file_compliance_report", description: "Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, a period not yet over, a period that starts before the books opened, a TTB period that is not exactly one calendar month, quarter, or year. MGR does not transmit the filing; filing takes the cellar workflow lock to wait for packaging closes and books-opened changes, rechecks the date, and fixes that reporting basis after the first filing",
+  compensation: "Cannot be undone; a filed report is corrected by amending it outside MGR.",
   roles: [...ROLES],
   // A partial TTB range would claim days of a real period and block its filing (#486).
   input: period.extend({ note: z.string().optional() }).refine(

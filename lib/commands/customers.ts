@@ -19,6 +19,7 @@ const hasStateIffUs = (i: { country: string; state?: string }) => (i.country ===
 
 defineCommand({
   name: "delete_customer", description: "Delete an unused customer and its ship-to addresses; preserve linked history, portal access, invitations and QuickBooks customers",
+  compensation: "Reverse by creating it again with upsert_customer and upsert_ship_to; both get new IDs.",
   roles: ["admin"],
   input: z.object({ customerId: z.string().uuid() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("delete_customer", {
@@ -28,6 +29,7 @@ defineCommand({
 
 defineCommand({
   name: "upsert_customer", description: "Create or update a customer account: its sale channel decides its prices and where its removals post; tax treatment may override the channel default",
+  compensation: "Reverse an edit with upsert_customer and the previous values, or remove an unused new customer with delete_customer.",
   roles: [...roles],
   input: z.object({
     // Keep the historical raw name through request lookup; SQL trims and
@@ -57,6 +59,7 @@ defineCommand({
 
 defineCommand({
   name: "upsert_ship_to", description: "Create or update a ship-to address; isDefault switches the customer default, omission preserves it on edit; addresses cannot change customer",
+  compensation: "Reverse an edit with upsert_ship_to and the previous values, or remove an unused, non-default address with delete_ship_to.",
   roles: [...roles],
   // A ship-to needs its label and country, and a US one its state: enough for the
   // TTB destination (user, 2026-10-15). Street, city and ZIP stay optional until
@@ -87,6 +90,7 @@ defineCommand({
 
 defineCommand({
   name: "delete_ship_to", description: "Delete a ship-to address no order names; the customer's default ship-to is refused until another ship-to is the default",
+  compensation: "Reverse by adding the address again with upsert_ship_to; it gets a new ID.",
   roles: [...roles],
   input: z.object({ shipToId: z.string().uuid() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("delete_ship_to", {
@@ -96,6 +100,7 @@ defineCommand({
 
 defineCommand({
   name: "set_portal_fulfillment_source", description: "Set the warehouse used for customer portal orders",
+  compensation: "Reverse with set_portal_fulfillment_source and the previous location.",
   roles: ["admin"],
   input: z.object({ locationId: z.string().uuid() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_portal_fulfillment_source", {
@@ -169,6 +174,7 @@ defineQuery({
 
 defineCommand({
   name: "set_channel_price", description: "Fill one cell of the price grid: every SKU on that group and format sells at it on that channel",
+  compensation: "Reverse with set_channel_price and the previous price, or clear_channel_price if the cell was empty.",
   roles: ["admin", "sales"],
   input: z.object({ saleChannelId: z.string().uuid(), priceGroupId: z.string().uuid(), formatId: z.string().uuid(), unitPriceCents: cents }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_channel_price", {
@@ -179,6 +185,7 @@ defineCommand({
 
 defineCommand({
   name: "clear_channel_price", description: "Empty one cell of the price grid; SKUs on that group and format become unpriced on that channel",
+  compensation: "Reverse with set_channel_price and the previous price.",
   roles: ["admin", "sales"],
   input: z.object({ saleChannelId: z.string().uuid(), priceGroupId: z.string().uuid(), formatId: z.string().uuid() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("clear_channel_price", {

@@ -13,6 +13,7 @@ defineQuery({
 
 defineCommand({
   name: "create_chat_conversation", description: "Create one server-owned composer conversation for the current author and brewery",
+  compensation: "Cannot be undone; a conversation changes no brewery records.",
   input: z.object({ title: z.string().trim().min(1).max(120).optional() }), roles: STAFF_ROLES,
   idempotency: "dedupe",
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("create_chat_conversation", {
@@ -22,6 +23,7 @@ defineCommand({
 
 defineCommand({
   name: "append_chat_message", description: "Append one message to the current author's composer conversation",
+  compensation: "Cannot be undone; a message changes no brewery records.",
   input: z.object({ conversationId, role: z.enum(["user", "assistant"]).describe("Who wrote the message"), content: z.string().trim().min(1).max(4000) }), roles: STAFF_ROLES,
   idempotency: "dedupe",
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("append_chat_message", {

@@ -9,6 +9,7 @@ const IMPORT_CONCURRENCY = 8;
 defineCommand({
   name: "import_csv",
   description: "Import CSV customers, ship-tos, brand/SKUs, channel prices or opening balances with existing reference names or IDs; each row commits independently and the same requestId safely replays the exact raw batch",
+  compensation: "Cannot be undone as a batch; fix each committed row through its own record.",
   input: z.object({ kind: z.enum(IMPORT_KINDS).describe("What the CSV rows hold"), rows: z.array(z.record(z.string(), z.string())).min(1).max(IMPORT_ROW_CAP) }),
   roles: ["admin"],
   handler: async (ctx, input, execution) => {
