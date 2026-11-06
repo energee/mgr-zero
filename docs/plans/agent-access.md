@@ -217,7 +217,7 @@ cannot change the account, and cannot read a brewery that has agents off.
 **Test first:** a contract test drives the local route with the official MCP
 SDK client, under both protocol versions. It finds an operation, describes it,
 runs a query, gets a structured error, and reads the orientation result. A
-warehouse token finds no invoice query; an admin token does. A hidden operation
+warehouse token cannot find `get_inventory_value`; an admin token can. A hidden operation
 cannot be found or run. A query registered in the test is found with no other
 change.
 
@@ -476,7 +476,8 @@ report the change in the PR.
     every id field in every command resolves, or the test fails. Depends on task 3.
 14. **Proposals (R2).** Migration below, `propose_command`, approve and decline.
     Test first: the Phase 3 list. Depends on tasks 7 and 8.
-15. **Inbox card.** Today card with labelled fields. Depends on tasks 13 and 14.
+15. **Approval screens.** A Today notice links to **Changes to approve**, and each
+    proposal opens a review page with labelled fields. Depends on tasks 13 and 14.
 16. **Write evals (O1, O3, O4).** 20 write tasks, scored on the stored proposal.
     Accept: O3 is 85% or more, O4 is 0, O1 is 50. Depends on tasks 11 and 15.
 17. **Retire the old list.** Move Ask MGR onto the same tools and delete

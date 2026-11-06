@@ -90,6 +90,7 @@ const RECORDS = [
   ["orders/[id]/restock", "id", "get_order"],
   ["orders/[id]/ship", "id", "get_order"],
   ["packaging/[id]", "id", "get_packaging_run"],
+  ["proposals/[id]", "id", "get_proposal_status"],
   ["purchase-orders/[id]", "id", "get_purchase_order"],
   ["purchase-orders/[id]/edit", "id", "get_purchase_order"],
   ["recipes/[id]", "id", "get_recipe"],

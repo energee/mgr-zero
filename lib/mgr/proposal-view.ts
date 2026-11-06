@@ -13,7 +13,7 @@ const CLOSED_NOTES: Record<string, string> = {
 function fieldLabel(field: string) {
   const words = field.replace(/\[(\d+)\]/g, (_, index: string) => ` ${Number(index) + 1} `).replace(/[._]/g, " ")
     .replace(/([a-z])([A-Z])/g, "$1 $2").replace(/\s+/g, " ").trim().toLowerCase();
-  return sentenceCase(words);
+  return sentenceCase(words.replace(/ id$/, ""));
 }
 
 function fieldValue({ value, unit }: ProposalRow) {
@@ -26,7 +26,7 @@ export type ProposalViewModel = {
   agentName: string;
   description: string;
   undo: string;
-  rows: { label: string; value: string; meaning?: string; warning?: true }[];
+  rows: { label: string; value: string }[];
   canDecide: boolean;
   note: { text: string; role: "note" | "alert" } | null;
 };
@@ -42,7 +42,7 @@ export function toProposalViewProps({ agentName, description, undo, status, fail
 }): ProposalViewModel {
   return {
     agentName, description, undo,
-    rows: rows.map(row => ({ label: fieldLabel(row.field), value: fieldValue(row), meaning: row.meaning, warning: row.warning })),
+    rows: rows.map(row => ({ label: fieldLabel(row.field), value: fieldValue(row) })),
     canDecide: status === "pending",
     note: noteFor(status, failure, rows.some(row => row.warning)),
   };

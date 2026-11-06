@@ -656,7 +656,7 @@ export const SCREENS: Screen[] = [
     job: "See what your agents proposed", states: DEFAULT_STATES,
     reads: "list_agent_proposals", writes: "",
     spec: "Opened from Today and from Me, Agents. Lists only your own agents' waiting changes. An expired one drops off.",
-    body: <ProposalsView rows={[{ id: "example", title: "Add a bin to a location", detail: "From Claude", href: "#" }]} />,
+    body: <ProposalsView rows={[{ id: "example", title: "Add a bin to a location", detail: "From Claude" }]} />,
   },
   {
     step: 1, slice: "all", group: "Global", name: "Review change",

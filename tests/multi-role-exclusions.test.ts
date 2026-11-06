@@ -62,6 +62,7 @@ vi.mock("@/lib/mgr/page-query", async importOriginal => ({
         lines: [], payments: [], hasPendingPush: false, wasPushedToQbo: false, localPaidCents: 0, localCreditCents: 0, quickbooksLink: null,
       };
       case "list_invoice_questions": return [];
+      case "list_agent_proposals": return [];
       case "get_qbo_connection": return { connected: false, state: "disconnected", realmLabel: null };
       default: throw new Error(`Unexpected page query: ${name}`);
     }
@@ -90,7 +91,7 @@ describe("live page exclusion decisions", () => {
     expect(pageState.calls).not.toContain("get_today");
     pageState.roles = ["taproom", "brewer"]; pageState.calls = [];
     await TodayPage({ searchParams: Promise.resolve({}) });
-    expect(pageState.calls).toEqual(["get_today"]);
+    expect(pageState.calls).toEqual(["get_today", "list_agent_proposals"]);
   });
 
   it("passes quiet-hours permission through the live preferences adapter", async () => {

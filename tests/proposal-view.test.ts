@@ -26,6 +26,13 @@ describe("toProposalViewProps", () => {
     expect(toProposalViewProps({ ...proposal, rows: [{ field: "lines[1].qty", value: 2 }] }).rows[0].label).toBe("Lines 2 qty");
   });
 
+  it("names a record field without its id suffix, because the value is the record's name", () => {
+    const labels = toProposalViewProps({ ...proposal, rows: [
+      { field: "locationId", value: "Main warehouse" }, { field: "lines[0].batch_id", value: "B-12" },
+    ] }).rows.map(row => row.label);
+    expect(labels).toEqual(["Location", "Lines 1 batch"]);
+  });
+
   it("warns before approval when a record could not be named", () => {
     const model = toProposalViewProps({ ...proposal, rows: [{ field: "skuId", value: "Unrecognised record 8f3a", warning: true }] });
     expect(model.canDecide).toBe(true);
