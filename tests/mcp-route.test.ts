@@ -66,7 +66,7 @@ describe("/api/mcp", () => {
 
   it("offers the agent tools", async () => {
     const { tools } = await resultOf(await call("tools/list", {}, token));
-    expect(tools.map((t: { name: string }) => t.name).sort()).toEqual(["describe_operation", "find_operations", "get_started", "propose_command", "run_query", "search_guide"]);
+    expect(tools.map((t: { name: string }) => t.name).sort()).toEqual(["describe_operation", "find_operations", "get_started", "leave_note", "propose_command", "run_query", "search_guide"]);
   });
 
   it("tells a fresh agent who it acts for and where", async () => {

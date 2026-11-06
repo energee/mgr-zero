@@ -25,6 +25,84 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"agent_session_notes": {
+                  Row: {
+                    "body": string,"brewery_id": string,"created_at": string,"id": string,"kind": string,"session_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "body": string,"brewery_id": string,"created_at"?: string,"id"?: string,"kind": string,"session_id": string
+                  }
+                  Update: {
+                    "body"?: string,"brewery_id"?: string,"created_at"?: string,"id"?: string,"kind"?: string,"session_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "agent_session_notes_brewery_id_fkey"
+      columns: ["brewery_id"]
+isOneToOne: false
+      referencedRelation: "breweries"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "agent_session_notes_session_id_fkey"
+      columns: ["session_id"]
+isOneToOne: false
+      referencedRelation: "agent_sessions"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"agent_session_steps": {
+                  Row: {
+                    "brewery_id": string,"created_at": string,"duration_ms": number,"error_code": string | null,"id": string,"input_path": string | null,"kind": string | null,"operation": string | null,"outcome": string,"proposal_id": string | null,"session_id": string,"tool": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "brewery_id": string,"created_at"?: string,"duration_ms": number,"error_code"?: string | null,"id"?: string,"input_path"?: string | null,"kind"?: string | null,"operation"?: string | null,"outcome": string,"proposal_id"?: string | null,"session_id": string,"tool": string
+                  }
+                  Update: {
+                    "brewery_id"?: string,"created_at"?: string,"duration_ms"?: number,"error_code"?: string | null,"id"?: string,"input_path"?: string | null,"kind"?: string | null,"operation"?: string | null,"outcome"?: string,"proposal_id"?: string | null,"session_id"?: string,"tool"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "agent_session_steps_brewery_id_fkey"
+      columns: ["brewery_id"]
+isOneToOne: false
+      referencedRelation: "breweries"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "agent_session_steps_proposal_id_fkey"
+      columns: ["proposal_id"]
+isOneToOne: false
+      referencedRelation: "agent_proposals"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "agent_session_steps_session_id_fkey"
+      columns: ["session_id"]
+isOneToOne: false
+      referencedRelation: "agent_sessions"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"agent_sessions": {
+                  Row: {
+                    "actor_id": string,"brewery_id": string,"client_id": string | null,"conversation_id": string | null,"first_seen_at": string,"id": string,"last_seen_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "actor_id": string,"brewery_id": string,"client_id"?: string | null,"conversation_id"?: string | null,"first_seen_at"?: string,"id"?: string,"last_seen_at"?: string
+                  }
+                  Update: {
+                    "actor_id"?: string,"brewery_id"?: string,"client_id"?: string | null,"conversation_id"?: string | null,"first_seen_at"?: string,"id"?: string,"last_seen_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "agent_sessions_brewery_id_fkey"
+      columns: ["brewery_id"]
+isOneToOne: false
+      referencedRelation: "breweries"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"allocations": {
                   Row: {
                     "brewery_id": string,"created_at": string,"id": string,"qty": number,"ref": string,"sku_id": string,"source": Database["public"]['Enums']["allocation_source"],"status": Database["public"]['Enums']["allocation_status"]
@@ -5317,6 +5395,9 @@ isOneToOne: false
               "access_expires_at": string,"access_token": string,"credential_version": number,"merchant_id": string,"refresh_token": string,"request_body": string,"superseded": boolean
             }[]
                            },
+"leave_agent_note":
+{ Args: { "p_body": string,"p_brewery": string,"p_kind": string }; Returns: undefined
+                           },
 "leave_delivery_for_later":
 { Args: { "p_delivery": string,"p_request_id": string,"p_route": string }; Returns: Json
                            },
@@ -5467,6 +5548,9 @@ isOneToOne: false
 "provision_brewery":
 { Args: { "p_actor": string,"p_name": string,"p_request_id": string,"p_timezone": string,"p_ttb": string }; Returns: string
                            },
+"prune_agent_history":
+{ Args: Record<PropertyKey, never>; Returns: number
+                           },
 "prune_chat_integration_logs":
 { Args: { "p_older_than"?: string }; Returns: Json
                            },
@@ -5515,6 +5599,9 @@ isOneToOne: false
                            },
 "reconcile_chat_installation":
 { Args: { "p_credential_deleted": boolean,"p_failure_code": string,"p_installation": string }; Returns: undefined
+                           },
+"record_agent_step":
+{ Args: { "p_brewery": string,"p_conversation"?: string,"p_duration_ms": number,"p_error_code"?: string,"p_input_path"?: string,"p_kind"?: string,"p_operation"?: string,"p_outcome": string,"p_proposal"?: string,"p_tool": string }; Returns: undefined
                            },
 "record_batch_addition":
 { Args: { "p_brewery": string,"p_lot": string,"p_material": string,"p_note": string,"p_occupancy": string,"p_qty": number,"p_request_id": string,"p_stage": Database["public"]['Enums']["ingredient_stage"] }; Returns: Json

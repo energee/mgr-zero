@@ -858,7 +858,7 @@ delete, look for the compensating operation instead.
 ## Agents over MCP [#mcp]
 
 An outside agent, such as Claude or ChatGPT, does not call `/api/command`. It
-connects to the MCP endpoint, which reaches the same operations through six
+connects to the MCP endpoint, which reaches the same operations through seven
 tools. Nothing is listed for agents by hand: a new operation is reachable once
 it is registered.
 
@@ -880,6 +880,7 @@ consent. A person's own session token is refused.
 | `run_query` | Runs one read by name. |
 | `propose_command` | Stores a change for the person to approve. |
 | `search_guide` | Searches the MGR guides. |
+| `leave_note` | Records what got in the way, or context for the next session, in up to 500 characters. |
 
 ### What an agent can do [#mcp-limits]
 
@@ -894,6 +895,9 @@ provider or chat history. Calling one returns `agent_not_allowed`.
 `run_query` returns at most 50 rows and sets `truncated` when there are more. A
 result over 20,000 characters comes back empty, with a message to narrow the
 request. Agents share the person's request budget with `/api/command`.
+
+MGR logs each tool call with its name, outcome and any failing input path, never
+input or output values. The log lasts 90 days.
 
 A refusal is a tool result with `isError` set, holding `code`, `message` and
 `issues`. The [validation rules](#validation) apply, so an agent can correct the

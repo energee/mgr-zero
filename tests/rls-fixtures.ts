@@ -13,7 +13,7 @@ export const matrix = {
   customers: "deny", ship_tos: "deny", vendors: "deny", materials: "deny", material_lots: "deny",
   styles: "deny", water_profiles: "deny", price_groups: "deny", brands: "tenant", catalog_categories: "deny", formats: "tenant", format_components: "tenant",
   keg_pools: "tenant", skus: "tenant", format_bom: "deny", locations: "taproom", bins: "taproom",
-  agent_proposals: "deny", sale_channels: "deny", channel_prices: "deny", price_group_barcodes: "deny", inventory_movements: "deny", allocations: "deny",
+  agent_proposals: "deny", agent_sessions: "deny", agent_session_steps: "deny", agent_session_notes: "deny", sale_channels: "deny", channel_prices: "deny", price_group_barcodes: "deny", inventory_movements: "deny", allocations: "deny",
   taproom_pars: "taproom", tap_intervals: "tenant", taproom_counts: "tenant", taproom_count_lines: "tenant", recipes: "deny", recipe_versions: "deny", recipe_ingredients: "deny", recipe_water_additions: "deny",
   vessels: "deny", batches: "deny", vessel_occupancies: "deny", transfers: "deny", volume_adjustments: "deny", volume_adjustment_reclassifications: "deny",
   fermentation_readings: "deny", material_movements: "deny", batch_additions: "deny", brew_records: "deny", brew_pulls: "deny", packaging_runs: "deny",
@@ -53,7 +53,7 @@ const serviceOnly = new Set<Table>(["brewery_counters", "volume_adjustment_recla
 // These tables grant service_role no SELECT either (writes arrive only through future definer RPCs), so the
 // service positive control reads them with privileged SQL instead of widening the grant for the harness.
 const privilegedRead: Partial<Record<Table, true>> = {
-  agent_proposals: true,
+  agent_proposals: true, agent_sessions: true, agent_session_steps: true, agent_session_notes: true,
   qbo_customer_snapshots: true, qbo_customer_decisions: true,
   reporting_basis_corrections: true, report_basis_amendments: true,
   invoice_payments: true, invoice_payment_voids: true,
@@ -76,6 +76,9 @@ export async function fixtures() {
   const customer = await seedCustomer(brewery.id);
   await ins("customer_users", { customer_id: customer.customerId, user_id: owner.id });
   sql(`insert into public.agent_proposals (brewery_id, actor_id, client_id, command, input) values ('${brewery.id}', '${owner.id}', 'fixture', 'create_bin', '{}')`);
+  sql(`with session as (insert into public.agent_sessions (brewery_id, actor_id, client_id) values ('${brewery.id}', '${owner.id}', 'fixture') returning id),
+    step as (insert into public.agent_session_steps (brewery_id, session_id, tool, outcome, duration_ms) select '${brewery.id}', id, 'run_query', 'ok', 1 from session)
+    insert into public.agent_session_notes (brewery_id, session_id, kind, body) select '${brewery.id}', id, 'handoff', 'fixture' from session`);
   const vendor = await put("vendors", { name: "Vendor" });
   const material = await put("materials", { name: "Malt", category: "malt", base_uom: "lb", purchase_uom: "lb" });
   await put("material_lots", { material_id: material.id, lot_code: "M1" });
