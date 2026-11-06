@@ -1,8 +1,14 @@
 // Ask MGR boundary: the shared read tools, bounded results and preview-only writes.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import { AdmissionError, requireAdmission } from "@/lib/commands/admission";
 import { _clearRegistry, defineCommand, defineQuery, type Ctx } from "@/lib/commands/registry";
 import { boundToolResult, createComposerTools } from "@/lib/chat/agent";
+
+vi.mock("@/lib/commands/admission", async (original) => ({
+  ...await original<typeof import("@/lib/commands/admission")>(),
+  requireAdmission: vi.fn(async () => undefined),
+}));
 
 const ctx = { db: null, userId: "actor", breweryId: "brewery", roles: ["admin"] } as unknown as Ctx;
 const options = { toolCallId: "call", messages: [], context: undefined, abortSignal: new AbortController().signal };
@@ -35,6 +41,18 @@ describe("composer agent tools", () => {
       await expect(tools.run_query.execute!({ name }, options)).rejects.toMatchObject({ code: "agent_not_allowed" });
     }
     expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("spends the person's request budget on each read, as MCP does", async () => {
+    const handler = vi.fn(async () => []);
+    defineQuery({ name: "available", input: z.object({}), roles: ["admin"], handler });
+    const tools = createComposerTools(ctx, "conversation");
+    vi.mocked(requireAdmission).mockClear();
+    await tools.run_query.execute!({ name: "available" }, options);
+    expect(requireAdmission).toHaveBeenCalledWith(ctx.db);
+    vi.mocked(requireAdmission).mockRejectedValueOnce(new AdmissionError(5));
+    await expect(tools.run_query.execute!({ name: "available" }, options)).rejects.toMatchObject({ code: "rate_limited" });
+    expect(handler).toHaveBeenCalledTimes(1);
   });
 
   it("will not run a previewed write as a read", async () => {

@@ -22,6 +22,12 @@ function queriesReachingOutside() {
 describe("what agents cannot reach", () => {
   const hidden = new Set(listTools().filter(tool => tool.agentHidden).map(tool => tool.name));
 
+  // Its rows hold what agents wrote, which Ask MGR would otherwise read as instructions.
+  it("keeps the proposal list from models, while an agent can still follow its own by id", () => {
+    expect(hidden).toContain("list_agent_proposals");
+    expect(hidden).not.toContain("get_proposal_status");
+  });
+
   it("finds the queries that reach beyond the database", () => {
     expect(queriesReachingOutside()).toEqual(expect.arrayContaining(["list_qbo_customers", "list_chat_channels", "search_colas"]));
   });

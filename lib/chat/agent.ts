@@ -1,6 +1,7 @@
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import { DESCRIBE_OPERATION, describeOperation, FIND_OPERATIONS, findOperations, operationsFor } from "@/lib/agent/operations";
+import { requireAdmission } from "@/lib/commands/admission";
 import { CommandError, previewCommand, runCommand, type CommandPreview, type Ctx } from "@/lib/commands/registry";
 
 const MAX_ROWS = 50;
@@ -47,6 +48,7 @@ export function createComposerTools(ctx: Ctx, conversationId: string, onProposal
         if (!operations.some(operation => operation.name === name && operation.kind === "query")) {
           throw new CommandError(`Ask MGR cannot run ${name}`, 403, "agent_not_allowed");
         }
+        await requireAdmission(ctx.db);
         return boundToolResult(await runCommand(name, input ?? {}, ctx));
       },
     }),
