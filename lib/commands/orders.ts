@@ -17,6 +17,7 @@ const toLines = (ls: z.infer<typeof lines>) => ls.map(l => ({ sku_id: l.skuId, q
 
 defineCommand({
   name: "create_order", description: "Create a draft order (wholesale or taproom transfer) with price-snapshot lines",
+  compensation: "Reverse with cancel_order.",
   roles: [...salesRoles],
   input: z.object({
     kind: z.enum(["wholesale", "taproom_transfer"]).describe("wholesale sells to a customer; taproom_transfer moves stock to a taproom"),
@@ -37,6 +38,7 @@ defineCommand({
 
 defineCommand({
   name: "update_draft_order", description: "Replace a draft order's header fields and lines",
+  compensation: "Reverse with update_draft_order and the previous values; it captures current prices again.",
   roles: [...salesRoles],
   input: z.object({
     orderId: z.string().uuid(), shipToId: z.string().uuid().optional(),
@@ -55,6 +57,7 @@ defineCommand({
 
 defineCommand({
   name: "submit_order", description: "Submit a draft order for confirmation; it holds no allocations until confirm_order",
+  compensation: "Cannot return to draft; reverse with cancel_order.",
   roles: [...salesRoles],
   input: z.object({ orderId: z.string().uuid() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("submit_order", { p_order: i.orderId, p_request_id: execution.requestId })),
@@ -62,6 +65,7 @@ defineCommand({
 
 defineCommand({
   name: "confirm_order", description: "Confirm a submitted order; creates allocations and returns ATP soft warnings",
+  compensation: "Cannot return to submitted; reverse with cancel_order, which releases its allocations.",
   roles: [...salesRoles],
   input: z.object({ orderId: z.string().uuid() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("confirm_order", { p_order: i.orderId, p_request_id: execution.requestId })),
@@ -69,6 +73,7 @@ defineCommand({
 
 defineCommand({
   name: "adjust_order_lines", description: "Replace lines on a submitted/confirmed/picked order; a submitted order holds no allocations until confirm, otherwise re-syncs allocations and returnable-keg deposits; on a picked order, an added or raised line sends it back to confirmed for a re-pick, and staged excess flags a restock; returns ATP soft warnings",
+  compensation: "Reverse with adjust_order_lines and the previous lines; a line added back takes the current price.",
   roles: [...salesRoles], requiresConfirmation: true,
   // Keep raw reasons replayable; the RPC trims and validates new writes after its request lookup.
   input: z.object({ orderId: z.string().uuid(), reason: z.string().min(1).describe("Why the lines changed"), lines }),
@@ -77,6 +82,7 @@ defineCommand({
 
 defineCommand({
   name: "set_order_pickup", description: "Set pickup or delivery on an unshipped wholesale order without changing lines, prices or allocations; pickups are invoiced when shipped and never routed",
+  compensation: "Reverse with set_order_pickup and the opposite value.",
   roles: [...salesRoles],
   input: z.object({ orderId: z.string().uuid(), pickup: z.boolean() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_order_pickup", {
@@ -86,6 +92,7 @@ defineCommand({
 
 defineCommand({
   name: "cancel_order", description: "Cancel an unshipped order and release its allocations",
+  compensation: "Cannot be undone; a cancelled order is final, so start again with create_order.",
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({ orderId: z.string().uuid(), reason: z.string().min(1).describe("Why the order is cancelled") }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("cancel_order", { p_order: i.orderId, p_reason: i.reason, p_request_id: execution.requestId })),
@@ -93,6 +100,7 @@ defineCommand({
 
 defineCommand({
   name: "confirm_restock", description: "Confirm staged quantities were put back; clears needs_restock; no ledger movement",
+  compensation: "Cannot be undone; on an unshipped order, count the line again with record_pick.",
   roles: [...warehouseRoles],
   input: z.object({ orderId: z.string().uuid() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("confirm_restock", { p_order: i.orderId, p_request_id: execution.requestId })),
@@ -100,6 +108,7 @@ defineCommand({
 
 defineCommand({
   name: "resolve_short_pick", description: "Resolve one line counted below ordered after any pending put-back by adjusting the order down to the count; the missing quantity is cancelled, not backordered",
+  compensation: "Reverse by raising the line with adjust_order_lines, then picking it again.",
   roles: [...warehouseRoles],
   input: z.object({
     orderId: z.string().uuid(), lineId: z.string().uuid().describe("The short order line"), qtyPicked: z.number().nonnegative(),
@@ -112,6 +121,7 @@ defineCommand({
 
 defineCommand({
   name: "confirm_delivery", description: "Close a stop with accepted and refused quantities; invoice only accepted goods on delivery, never restore stock",
+  compensation: "Cannot be undone; correct the beer with check_in_refused_return or return_shipment.",
   roles: [...warehouseRoles], requiresConfirmation: true,
   input: z.object({ deliveryId: z.string().uuid().describe("The delivery stop to close"), signedBy: z.string().trim().optional(),
     refused: z.array(z.object({ orderLineId: z.string().uuid(), qty: z.number().int().positive().describe("Whole units of this line the customer refused") })).default([]),
@@ -130,6 +140,7 @@ const pickLines = z.array(z.object({ lineId: z.string().uuid().describe("The ord
 
 defineCommand({
   name: "record_pick", description: "Record picked quantities per line after any pending put-back; order becomes picked once all lines are counted",
+  compensation: "Enter the right counts with record_pick before the order ships.",
   roles: [...warehouseRoles],
   input: z.object({ orderId: z.string().uuid(), picks: pickLines }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_pick", {
@@ -139,6 +150,7 @@ defineCommand({
 
 defineCommand({
   name: "ship_order", description: "Ship a picked order (refused while any line has no picked count): movements + allocation fulfillment + invoice (now, or deferred to confirm_delivery), one transaction; anything held back below picked flags a restock, and a wholesale line shipped below picked needs a shortReason (saved as the line's short reason); returnable keg lines post Shipped shells and warn, never refuse, when shells are short",
+  compensation: "Cannot be undone; use return_shipment for sold beer, or create_stock_transfer to bring back a taproom transfer.",
   roles: [...warehouseRoles], requiresConfirmation: true,
   input: z.object({
     orderId: z.string().uuid(), carrier: z.string().optional(), tracking: z.string().optional(),
@@ -155,6 +167,7 @@ defineCommand({
 
 defineCommand({
   name: "release_allocation", description: "Release one open reservation so its quantity returns to ATP",
+  compensation: "Reserve again with adjust_order_lines for an order line, or set_standing_allocation for a standing hold.",
   roles: [...salesRoles],
   input: z.object({ allocationId: z.string().uuid() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("release_allocation", { p_allocation: i.allocationId, p_request_id: execution.requestId })),
@@ -211,6 +224,7 @@ defineQuery({
 
 defineCommand({
   name: "return_shipment", description: "Return shipped beer at invoice prices and its destination, posting damaged beer to loss and full-keg shells as Returned. Deposit-only refunds need no location or reason; returnEmptyKegs optionally checks empties into locationId and binId with the refund atomically. With refusedDeliveryId, the credit memo also credits the one-way keg fee for the refused kegs",
+  compensation: "Cannot be undone; bill the beer again on a new order.",
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({
     invoiceId: z.string().uuid(), refusedDeliveryId: z.string().uuid().optional(), locationId: z.string().uuid().optional(), reason: z.enum(["damaged", "wrong_item", "unsold"]).optional().describe("Why the beer came back; a deposit-only refund needs none"),
@@ -225,6 +239,7 @@ defineCommand({
 
 defineCommand({
   name: "reorder_refused_delivery", description: "Create one editable draft for a shipped order's refused quantities, preserving customer, ship-to, fulfillment source, pickup, customer PO and note; capture current prices; a second reorder of the same order is refused",
+  compensation: "Reverse with cancel_order on the new draft; the shipped order cannot be reordered a second time.",
   roles: [...salesRoles],
   input: z.object({ orderId: z.string().uuid() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("reorder_refused_delivery", { p_order: i.orderId, p_request_id: execution.requestId })),
@@ -232,6 +247,7 @@ defineCommand({
 
 defineCommand({
   name: "create_credit_memo", description: "Full returnable kegs coming back with beer also post Returned shells; deposit-only refunds do not. Credit an invoice: negative lines at original prices + return_in movements",
+  compensation: "Cannot be undone; bill the beer again on a new order.",
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({
     invoiceId: z.string().uuid(), locationId: z.string().uuid(), reason: z.string().min(1).describe("Why the invoice is credited"),
@@ -245,6 +261,7 @@ defineCommand({
 
 defineCommand({
   name: "create_replenishment_order", description: "Create a confirmed taproom transfer order from par-gap quantities",
+  compensation: "Reverse with cancel_order.",
   roles: [...salesRoles],
   input: z.object({ fromLocationId: z.string().uuid(), toLocationId: z.string().uuid(), lines }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_replenishment_order", {
@@ -254,6 +271,7 @@ defineCommand({
 
 defineCommand({
   name: "record_historical_order", description: "Admin only: record an order picked up before the books opened as shipped, picked up and paid at the given prices; writes no stock, deposits or fees, and its invoice is never sent to QuickBooks",
+  compensation: "Cannot be undone; a historical order cannot be cancelled or returned.",
   roles: ["admin"],
   input: z.object({
     customerId: z.string().uuid(), shipToId: z.string().uuid(), pickedUpOn: isoDate, note: z.string().optional(),
@@ -354,6 +372,7 @@ defineQuery({
 
 defineCommand({
   name: "resolve_invoice_question", description: "Mark a buyer's invoice question answered (the reply happens off-system); clears its sales Today row",
+  compensation: "Cannot be undone; the buyer can ask again with raise_invoice_question.",
   roles: [...salesRoles],
   input: z.object({ questionId: z.string().uuid() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("resolve_invoice_question", { p_brewery: ctx.breweryId, p_question: i.questionId, p_request_id: execution.requestId })),
@@ -364,6 +383,7 @@ defineCommand({
 // than the balance, no future received date in the brewery's zone.
 defineCommand({
   name: "record_invoice_payment", description: "Record a payment received outside QuickBooks on an invoice QuickBooks never received; paid in full marks the invoice paid on the latest received day of its payments; returns the remaining balance",
+  compensation: "Reverse with void_invoice_payment.",
   roles: [...salesRoles],
   input: z.object({
     invoiceId: z.string().uuid(), amountCents: z.number().int().positive(), receivedOn: isoDate,
@@ -377,6 +397,7 @@ defineCommand({
 
 defineCommand({
   name: "void_invoice_payment", description: "Void a payment recorded in MGR with a reason, the only correction; the payment row is kept, and an invoice that drops below its total is no longer paid; returns the balance",
+  compensation: "Cannot be undone; enter the payment again with record_invoice_payment.",
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({ paymentId: z.string().uuid(), reason: z.string().trim().min(1).max(500).describe("Why the payment is voided") }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("void_invoice_payment", {

@@ -48,6 +48,7 @@ const fraction = z.number().gt(0).lte(1);
 
 defineCommand({
   name: "create_recipe", description: "Create a recipe: a name, optionally the brand it brews, and a note; its brewing facts live on versions",
+  compensation: "Cannot be undone; no command deletes a recipe.",
   input: z.object({ name: z.string().trim().min(1).describe("The recipe's name"), brandId: z.string().uuid().optional(), note: z.string().optional() }),
   roles: ["admin", "brewer"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_recipe", {
@@ -60,6 +61,7 @@ defineCommand({
 // keep the brand they copied, so nothing downstream is rewritten.
 defineCommand({
   name: "set_recipe_brand", description: "Set or clear the brand a recipe brews (a pre-fill for new batches); batches already scheduled keep their brand",
+  compensation: "Reverse with set_recipe_brand and the previous brand, or null if there was none.",
   input: z.object({ recipeId: z.string().uuid(), brandId: z.string().uuid().nullable() }),
   roles: ["admin", "brewer"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_recipe_brand", {
@@ -70,6 +72,7 @@ defineCommand({
 defineCommand({
   name: "create_recipe_version",
   description: "Add the next version of a recipe: its mash and fermentation schedules, whirlpool/knockout/pre-boil, water and additions, assumptions and ingredients; versions are immutable and snapshot each material's extract potential",
+  compensation: "Cannot be undone; versions are immutable, so add a corrected one with create_recipe_version.",
   input: z.object({
     recipeId: z.string().uuid(),
     mashSchedule: z.array(mashStep).min(1),
@@ -125,6 +128,7 @@ defineCommand({
 defineCommand({
   name: "record_batch_addition",
   description: "Add a post-knockout material (dry hop, fruit, adjunct) to an open occupancy: one batch_additions row plus its consumption movement from the bin holding the most of it; lot required when the material is lot-tracked",
+  compensation: "Cannot be undone; no command corrects a batch addition.",
   input: z.object({
     occupancyId: z.string().uuid(), materialId: z.string().uuid(), stage: z.enum(INGREDIENT_STAGES),
     qty: z.number().positive().describe("How much was added, in the material's base units"), lotId: z.string().uuid().optional().describe("The material lot added; required when the material is lot-tracked"), note: z.string().optional(),
@@ -167,6 +171,7 @@ defineQuery({
 });
 defineCommand({
   name: "upsert_water_profile", description: "Create a water profile, or edit one by profileId: its name, six ions in ppm, and optional alkalinity as CaCO3, water pH and notes",
+  compensation: "Reverse an edit with upsert_water_profile and the previous values; a new profile cannot be deleted.",
   input: z.object({
     profileId: z.string().uuid().optional(), name: z.string().trim().min(1).describe("The water profile's name"),
     calciumPpm: ppm, magnesiumPpm: ppm, sodiumPpm: ppm, sulfatePpm: ppm, chloridePpm: ppm, bicarbonatePpm: ppm,
@@ -337,6 +342,7 @@ const bbl = z.number().positive().max(9_999_999.999);
 
 defineCommand({
   name: "upsert_vessel", description: "Create or rename a vessel: its name, kind and capacity. Contents are never stored here — they are derived from the open occupancy",
+  compensation: "Reverse an edit with upsert_vessel and the previous values, or remove a new vessel with delete_vessel.",
   input: z.object({
     id: z.string().uuid().optional().describe("The vessel to edit; omit to create one"),
     name: z.string().trim().min(1).describe("The vessel's name"),
@@ -354,6 +360,7 @@ defineCommand({
 
 defineCommand({
   name: "delete_vessel", description: "Delete a vessel that never held beer, or retire one with batch history so that history keeps it; a vessel holding beer is refused. The result's retired flag says which",
+  compensation: "Cannot be undone; a retired vessel stays retired, so add a replacement with upsert_vessel.",
   input: z.object({ vesselId: z.string().uuid() }),
   roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("delete_vessel", {
@@ -375,6 +382,7 @@ defineQuery({
 // and a batch's identity is only required at packaging.
 defineCommand({
   name: "schedule_batch", description: "Pencil a brew day into the calendar: planned date and volume, optionally the brand it is meant to become and the recipe version to brew",
+  compensation: "Reverse with cancel_batch.",
   input: z.object({
     intendedBrandId: z.string().uuid().optional(),
     recipeVersionId: z.string().uuid().optional(),
@@ -426,6 +434,7 @@ defineQuery({
 // A first turn still refuses overlapping occupancies, including backdated ones.
 defineCommand({
   name: "record_brew_day", description: "Record a same-batch brew turn with actual ingredient sources and frozen process, opening or topping up its tank",
+  compensation: "Cannot be undone; fix the record with correct_brew_record.",
   input: z.object({
     batchId: z.string().uuid(),
     vesselId: z.string().uuid(),
@@ -444,6 +453,7 @@ defineCommand({
 // back by get_brew_day_plan. record_brew_day still does the consuming.
 defineCommand({
   name: "save_batch_pulls", description: "Prep saves the lots and amounts pulled for a planned batch and its planned tank; moves no stock",
+  compensation: "Reverse with save_batch_pulls and the previous pulls before brew day.",
   input: z.object({ batchId: z.string().uuid(), vesselId: z.string().uuid().nullable(), lines: z.array(brewPull) }),
   roles: ["admin", "brewer"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("save_batch_pulls", {
@@ -453,6 +463,7 @@ defineCommand({
 
 defineCommand({
   name: "correct_brew_record", description: "Correct a brew turn's ingredients and process after later additions, transfers or packaging using linked material compensation and replacement actuals; volume changes require an open occupancy with sufficient volume and unfiled books",
+  compensation: "Reverse by correcting the latest revision again with correct_brew_record.",
   input: z.object({ recordId: z.string().uuid().describe("The brew record to correct"), reason: z.string().trim().min(1).describe("Why the brew record is corrected"), initialBbl: z.number().positive().multipleOf(0.001),
     actuals: z.array(brewActual), process: brewProcess.default({}), confirmEmpty: z.boolean().default(false) }),
   roles: ["admin", "brewer"],
@@ -468,6 +479,7 @@ defineCommand({
 // process field.
 defineCommand({
   name: "record_historical_batch", description: "Admin only: record a past batch brewed and closed before the books opened, with its knockout volume and process but no tank stay and no completion loss",
+  compensation: "Cannot be undone; correct_brew_record cannot change its knockout volume.",
   input: z.object({ batchId: z.string().uuid(), brewedOn: isoDate, closedOn: isoDate,
     knockoutBbl: z.number().positive().multipleOf(0.001), process: brewProcess.default({}) }),
   roles: ["admin"],
@@ -479,6 +491,7 @@ defineCommand({
 
 defineCommand({
   name: "cancel_batch", description: "Cancel an unstarted batch plan; retains history and refuses recorded physical work",
+  compensation: "Cannot be undone; plan a new batch with schedule_batch.",
   input: z.object({ batchId: z.string().uuid() }),
   roles: ["admin", "brewer"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("cancel_batch", {
@@ -488,6 +501,7 @@ defineCommand({
 
 defineCommand({
   name: "reschedule_batch", description: "Reschedule an unstarted batch plan; retains history and refuses recorded physical work",
+  compensation: "Reverse with reschedule_batch and the previous date.",
   input: z.object({ batchId: z.string().uuid(), plannedOn: isoDate }),
   roles: ["admin", "brewer"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("reschedule_batch", {
@@ -621,6 +635,7 @@ defineQuery({
 defineCommand({
   name: "complete_batch",
   description: "Close a brewed batch and its open occupancies; beer still in tanks at the threshold requires confirmInTankBbl equal to the previewed inTankBbl being written off as loss",
+  compensation: "Cannot be undone; a batch never reopens, but reattribute_loss can reclassify its loss.",
   input: z.object({ batchId: z.string().uuid(), confirmInTankBbl: z.number().nonnegative().optional() }),
   roles: ["admin", "brewer"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("complete_batch", {
@@ -637,6 +652,7 @@ defineCommand({
 defineCommand({
   name: "record_cellar_transfer",
   description: "Move beer out of one occupancy into a vessel: opens an occupancy if the vessel is empty, blends into the open one if it is not, and closes the source when it empties",
+  compensation: "Cannot be undone; a cellar transfer has no correction.",
   input: z.object({
     fromOccupancyId: z.string().uuid(),
     toVesselId: z.string().uuid(),
@@ -656,6 +672,7 @@ defineCommand({
 defineCommand({
   name: "record_fermentation_reading",
   description: "Log one timestamped fermentation reading against an open occupancy, a brewed batch, or both (the occupancy must hold the batch); this is the only current operation eligible for exact offline replay",
+  compensation: "Cannot be undone; the reading stays in the log, so record a corrected one.",
   input: fermentationReadingInput,
   roles: [...fermentationReadingOfflinePolicy.roles],
   idempotency: fermentationReadingOfflinePolicy.idempotency,
