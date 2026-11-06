@@ -314,3 +314,13 @@ export const FIELD_VOCABULARY: Record<string, { meaning: string; unit?: string; 
   note: { meaning: "Free text kept with the record." },
   rows: { meaning: "The CSV rows, each an object of column name to text." },
 };
+
+/** True for a field that holds a record's id, which a reader cannot understand without looking up its name.
+ * `ttbId` is left out: it is the number TTB printed on the approval, so it already reads as itself. */
+export const isIdField = (name: string) => name !== "ttbId" && (name === "id" || /Ids?$/.test(name));
+
+/** A schema's own description wins: it covers a name that differs between operations. */
+export function fieldMeaning({ name, description }: { name: string; description?: string }) {
+  const shared = Object.hasOwn(FIELD_VOCABULARY, name) ? FIELD_VOCABULARY[name] : undefined;
+  return { meaning: description ?? shared?.meaning, unit: shared?.unit };
+}

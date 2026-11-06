@@ -14,6 +14,7 @@ const REASONS = ["submitted_order", "pick_due", "restock_due", "delivery_next", 
 defineCommand({
   name: "set_notification_preference",
   description: "Mute/unmute one notification reason for yourself and optionally override your quiet hours (chat delivery only; MGR Today is unaffected)",
+  compensation: "Reverse with set_notification_preference and the previous setting.",
   input: z.object({ reason: z.enum(REASONS).describe("The notification reason this setting applies to"), enabled: z.boolean(), quietHours: notificationQuietHoursSchema.nullable().optional() }),
   roles: STAFF_ROLES,
   handler: async (ctx, i, execution) => {
@@ -30,6 +31,7 @@ defineCommand({
 defineCommand({
   name: "set_brewery_quiet_hours",
   description: "Set the brewery-wide quiet hours (brewery time) that delay every personal chat notification; null clears them",
+  compensation: "Reverse with set_brewery_quiet_hours and the previous hours, or null to clear them.",
   input: quietHoursWindowSchema.safeExtend({ installationId: z.string().uuid() }),
   roles: ["admin"],
   handler: async (ctx, i, execution) => {
@@ -41,6 +43,7 @@ defineCommand({
 defineCommand({
   name: "set_notification_destination",
   description: "Provide reason + personalDestinationId to choose your verified personal destination, or as admin provide installationId + externalDestinationId for the private operations channel",
+  compensation: "Reverse with set_notification_destination and the previous destination.",
   input: z.union([z.object({ reason: z.enum(REASONS).describe("The notification reason this setting applies to"), personalDestinationId: z.string().uuid() }), z.object({ installationId: z.string().uuid(), externalDestinationId: z.string().min(1) })]),
   roles: STAFF_ROLES,
   handler: async (ctx, i, execution) => {
@@ -56,6 +59,7 @@ defineCommand({
 defineCommand({
   name: "consume_chat_link_proof", agentHidden: true,
   description: "Complete a Slack → MGR account link using the single-use proof from App Home (current staff only)",
+  compensation: "Reverse with unlink_chat_user.",
   input: z.object({ proof: z.string().min(1) }),
   roles: STAFF_ROLES,
   handler: async (ctx, i, execution) => {
@@ -68,6 +72,7 @@ defineCommand({
 defineCommand({
   name: "unlink_chat_user", agentHidden: true,
   description: "Unlink a Slack user from MGR (own link, or any link as admin); stops personal delivery",
+  compensation: "Reverse by linking again from Slack App Home, which ends in consume_chat_link_proof.",
   input: z.object({ linkId: z.string().uuid() }),
   roles: STAFF_ROLES,
   handler: async (ctx, i, execution) => { await unwrap(ctx.db.rpc("unlink_chat_user", { p_brewery: ctx.breweryId, p_link: i.linkId, p_request_id: execution.requestId })); return { ok: true }; },
@@ -91,6 +96,7 @@ defineQuery({
 defineCommand({
   name: "snooze_notification",
   description: "Delay one personal chat reminder for up to seven days; Today due state is unchanged",
+  compensation: "Cannot be undone; a snooze can only be extended.",
   input: z.object({ deliveryId: z.string().uuid().describe("The chat notification delivery to snooze, not a delivery stop"), until: z.iso.datetime({ offset: true }) }),
   roles: ["admin", "sales", "warehouse", "brewer"],
   handler: async (ctx, i, execution) => await unwrap(ctx.db.rpc("snooze_notification", {
@@ -101,6 +107,7 @@ defineCommand({
 defineCommand({
   name: "set_personal_quiet_hours",
   description: "Override personal chat quiet hours for every reason; null clears the override",
+  compensation: "Reverse with set_personal_quiet_hours and the previous hours, or null to clear the override.",
   input: personalQuietHoursSchema,
   roles: ["admin", "sales", "warehouse", "brewer"],
   handler: async (ctx, i, execution) => await unwrap(ctx.db.rpc("set_personal_quiet_hours", {
@@ -158,6 +165,7 @@ defineQuery({ name: "list_chat_channels", agentHidden: true, description: "List 
   handler: async (ctx, i) => (await import("@/lib/chat/jobs")).listChatChannels(ctx, i.installationId),
 });
 defineCommand({ name: "begin_chat_installation", agentHidden: true, description: "Begin explicit administrator consent to install Slack with the three required scopes",
+  compensation: "Nothing changes until consent finishes; reverse a finished install with disconnect_chat_installation.",
   input: z.object({}), roles: ["admin"],
   handler: async (ctx, _i, execution) => {
     const { beginSlackInstall, slackRedirectUri } = await import("@/lib/chat/oauth");
@@ -165,6 +173,7 @@ defineCommand({ name: "begin_chat_installation", agentHidden: true, description:
   },
 });
 defineCommand({ name: "begin_chat_reauthorization", agentHidden: true, description: "Begin explicit administrator consent to reauthorize the existing Slack workspace",
+  compensation: "Nothing changes until consent finishes; stop delivery afterwards with disable_chat_installation.",
   input: z.object({ installationId: z.string().uuid() }), roles: ["admin"],
   handler: async (ctx, i, execution) => {
     const { beginSlackReauthorization, slackRedirectUri } = await import("@/lib/chat/oauth");
@@ -172,10 +181,12 @@ defineCommand({ name: "begin_chat_reauthorization", agentHidden: true, descripti
   },
 });
 defineCommand({ name: "disable_chat_installation", agentHidden: true, description: "Stop all Slack delivery locally without needing Slack to be reachable",
+  compensation: "Reverse with begin_chat_reauthorization, which needs admin consent in Slack.",
   input: z.object({ installationId: z.string().uuid() }), roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("disable_chat_installation", { p_brewery: ctx.breweryId, p_installation: i.installationId, p_request_id: execution.requestId })),
 });
 defineCommand({ name: "disconnect_chat_installation", agentHidden: true, description: "Stop Slack delivery and invalidate links, then attempt credential cleanup; retry if cleanup is pending",
+  compensation: "Cannot be undone; install again with begin_chat_installation, and each person links again.",
   input: z.object({ installationId: z.string().uuid() }), roles: ["admin"],
   handler: async (ctx, i, execution) => {
     const { disconnectSlackInstallation } = await import("@/lib/chat/oauth");

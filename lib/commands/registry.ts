@@ -257,6 +257,11 @@ type DefinitionBase<In> = {
 export type CommandDefinition<In, Out> = DefinitionBase<In> & {
   kind: "command";
   risk?: CommandRisk;
+  /**
+   * One plain sentence: which command reverses this one, or why it cannot be undone.
+   * Optional so test fixtures can skip it; tests/command-undo.test.ts requires it on
+   * every registered command.
+   */
   compensation?: string | null;
   idempotency?: CommandIdempotency;
   offlineReplay?: boolean;
@@ -359,6 +364,7 @@ function registerPreTenant(kind: "command" | "query", definition: { name: string
 export function definePreTenantCommand<In, Out>(definition: {
   name: "provision_brewery" | "accept_account_invitation";
   description: string;
+  compensation?: string;
   input: ZodType<In>;
   handler: (ctx: PreTenantCtx, input: In, execution: CommandExecution) => Promise<Out>;
 }) {

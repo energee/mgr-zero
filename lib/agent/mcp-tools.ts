@@ -10,7 +10,7 @@ import { isProposable } from "@/lib/commands/agent-proposals";
 import { canRun, CommandError, getCommandDefinition, listTools, parseInput, runCommand, unwrap } from "@/lib/commands/registry";
 import { readAppUrl } from "@/lib/env/server-parser";
 import { fieldsOf, leafFields, sampleInput } from "@/lib/mgr/api-schema";
-import { FIELD_VOCABULARY } from "@/lib/mgr/field-vocabulary";
+import { fieldMeaning } from "@/lib/mgr/field-vocabulary";
 
 export const AGENT_INSTRUCTIONS = `MGR runs a brewery: beer, orders, inventory, production and compliance.
 You act as one person and can do only what their roles allow. Call get_started first.
@@ -69,12 +69,6 @@ async function findOperations(token: string, { text, ...choice }: BreweryChoice 
   return operations
     .filter(({ name, description }) => words.every(word => `${name} ${description}`.toLowerCase().includes(word)))
     .map(({ name, description, kind }) => ({ name, description, kind }));
-}
-
-/** A schema's own description wins: it covers a name that differs between operations. */
-function fieldMeaning({ name, description }: { name: string; description?: string }) {
-  const shared = Object.hasOwn(FIELD_VOCABULARY, name) ? FIELD_VOCABULARY[name] : undefined;
-  return { meaning: description ?? shared?.meaning, unit: shared?.unit };
 }
 
 async function describeOperation(token: string, { name, ...choice }: BreweryChoice & { name: string }) {

@@ -147,26 +147,44 @@ export function fieldsOf(schema: $ZodType): ApiField[] {
     .sort((a, b) => (a.required === b.required ? 0 : a.required ? -1 : 1));
 }
 
-/** Every value an operation's input takes, at any depth, with what its schema says it means. */
-export function leafFields(node: $ZodType, name = "", inherited?: string): { name: string; description?: string }[] {
+export type LeafField = { name: string; description?: string; path: string[] };
+
+/** Every value an operation's input takes, at any depth, with what its schema says it means.
+ * `path` is the keys that reach it; a `*` step stands for each item of an array. */
+export function leafFields(node: $ZodType, name = "", inherited?: string, path: string[] = []): LeafField[] {
   const def = definition(node);
   const description = inherited ?? core.globalRegistry.get(node)?.description;
   switch (def.type) {
     case "object":
-      return Object.entries(def.shape).flatMap(([key, field]) => leafFields(field, key));
+      return Object.entries(def.shape).flatMap(([key, field]) => leafFields(field, key, undefined, [...path, key]));
     case "array":
-      return leafFields(def.element, name, description);
+      return leafFields(def.element, name, description, [...path, "*"]);
     case "optional": case "nullable": case "nonoptional": case "default": case "prefault": case "readonly": case "catch":
-      return leafFields(def.innerType, name, description);
+      return leafFields(def.innerType, name, description, path);
     case "pipe":
-      return leafFields(def.in, name, description);
+      return leafFields(def.in, name, description, path);
     case "union":
       // A union of objects is alternative shapes; a union of values is one field.
       if (def.options.some(option => definition(option).type === "object")) {
-        return def.options.flatMap(option => leafFields(option, name, description));
+        return def.options.flatMap(option => leafFields(option, name, description, path));
       }
   }
-  return [{ name, description }];
+  return [{ name, description, path }];
+}
+
+/** The values a real input holds at a leaf's `path`, each with where it sits, such as `lines[0].skuId`.
+ * A value the input left out yields nothing. A null or an empty array is kept, because clearing a value says something. */
+export function valuesAt(input: unknown, path: string[], at = ""): { at: string; value: unknown }[] {
+  if (input === undefined) return [];
+  if (input === null || path.length === 0) return [{ at, value: input }];
+  const [step, ...rest] = path;
+  if (step === "*") {
+    return Array.isArray(input) && input.length > 0
+      ? input.flatMap((item, index) => valuesAt(item, rest, `${at}[${index}]`))
+      : [{ at, value: input }];
+  }
+  if (typeof input !== "object") return [];
+  return valuesAt((input as Record<string, unknown>)[step], rest, at ? `${at}.${step}` : step);
 }
 
 /** An example input: required fields, plus one optional field when a cross-field rule requires it. */
