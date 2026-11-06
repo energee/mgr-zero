@@ -14,7 +14,7 @@ export function AgentConsentView({ model, authorizationId, approve, deny }: {
     {E.hd(model ? `Connect ${model.clientName}?` : "Connect an agent")}
     {model ? <>
       {E.row(model.clientName, `Sends you back to ${model.destination}`)}
-      {E.info("It acts as you. It can read what your role can read, and it cannot change anything.")}
+      {E.info("It acts as you. It can read what your role can read, and it can propose changes. Nothing changes until you approve it.")}
       {E.info("The company behind this agent receives what it reads, under its own terms.")}
       {model.canApprove
         ? E.row("Breweries it can reach", model.reachable.join(", "))

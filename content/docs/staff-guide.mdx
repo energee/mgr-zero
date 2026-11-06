@@ -1651,7 +1651,7 @@ Once results show, **Import another file** returns to upload so you can import t
 
 ## Connect an AI agent [#agents]
 
-An outside agent, such as Claude or ChatGPT, can read MGR for you once your brewery allows it. It acts as you: it sees what your role can see, and it cannot change anything.
+An outside agent, such as Claude or ChatGPT, can work in MGR for you once your brewery allows it. It acts as you: it sees what your role can see, and it can propose changes. Nothing changes until you approve it.
 
 Agents are off for every brewery until an Admin turns on **Allow outside agents** under **Agents** in **Settings**. The switch saves at once. Turning it off stops every connected agent at that brewery straight away.
 
@@ -1670,6 +1670,18 @@ Check the page before you choose **Connect**:
 To see your connected agents, open **Me → Agents**. **Remove** stops an agent at once. To use it again, connect it again.
 
 <Screen name="Agents" />
+
+### Approve what an agent proposes [#agent-proposals]
+
+When an agent proposes a change, Today shows how many are waiting. The setup checklist and the taproom-only Today do not show this count. **Changes to approve** lists the changes, and **Me → Agents** always links there.
+
+<Screen name="Review change" />
+
+Each change shows what it does, its details by name, and how to undo it. **Approve** runs the change as you, using your role. **Decline** means it never runs.
+
+Only you can approve what your agent proposes. A change expires after 24 hours, and then the agent has to propose it again. If a detail shows as an unrecognised record, check it before you approve.
+
+Agents cannot propose changes to who has access, or to your QuickBooks, Square or Slack connections.
 
 ## Closing your account [#closing]
 

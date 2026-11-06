@@ -24,6 +24,8 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Connect agent blocked", file: "app/(auth)/oauth/consent/page.tsx" },
   { name: "Connect agent expired", file: "app/(auth)/oauth/consent/page.tsx" },
   { name: "Agents", file: "app/(app)/settings/agents/page.tsx" },
+  { name: "Changes to approve", file: "app/(app)/proposals/page.tsx" },
+  { name: "Review change", file: "app/(app)/proposals/[id]/page.tsx" },
   { name: "Accept invite", file: "app/(auth)/accept/page.tsx" },
   { name: "Expired invite", file: "app/(auth)/invite-expired/page.tsx" },
   { name: "Expired reset", file: "app/(auth)/reset/page.tsx" },

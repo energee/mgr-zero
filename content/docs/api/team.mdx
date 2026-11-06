@@ -111,6 +111,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "name": "accept_account_invitation", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "inviteId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
+## approve_agent_proposal [#approve_agent_proposal]
+
+`command` · admin, sales, warehouse, brewer, taproom
+
+Approve a change your agent proposed, which runs it now as you
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `proposalId` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "approve_agent_proposal", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "proposalId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 ## configure_pos_menu [#configure_pos_menu]
 
 `command` · admin, warehouse
@@ -162,6 +179,23 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "connect_square", "requestId": "11111111-1111-1111-1111-111111111111", "input": {} }'
+```
+
+## decline_agent_proposal [#decline_agent_proposal]
+
+`command` · admin, sales, warehouse, brewer, taproom
+
+Decline a change your agent proposed, so it never runs
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `proposalId` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "decline_agent_proposal", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "proposalId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 ## disconnect_qbo [#disconnect_qbo]
@@ -341,6 +375,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_pos_sale", "input": { "saleId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
+## get_proposal_status [#get_proposal_status]
+
+`query` · admin, sales, warehouse, brewer, taproom
+
+Whether a proposed change is waiting, was approved or declined, and why it failed if it did
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `proposalId` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_proposal_status", "input": { "proposalId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 ## get_qbo_connection [#get_qbo_connection]
 
 `query` · admin, sales
@@ -420,6 +471,21 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "invite_staff", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "email": "user@example.com", "role": "admin" } }'
+```
+
+## list_agent_proposals [#list_agent_proposals]
+
+`query` · admin, sales, warehouse, brewer, taproom
+
+The changes your agents have proposed that are still waiting for your approval
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_agent_proposals", "input": {} }'
 ```
 
 ## list_my_agent_breweries [#list_my_agent_breweries]

@@ -159,6 +159,8 @@ describe("every command id field", () => {
   // These have a kind but no name MGR can read through ctx.db. They show as an
   // unrecognised record. A new id field that cannot resolve fails this test.
   const NO_NAME_TO_READ = [
+    "approve_agent_proposal.proposalId", // Hidden from agents, so it never appears on a card.
+    "decline_agent_proposal.proposalId", // Hidden from agents, so it never appears on a card.
     "portal_submit_quote.quoteId", // The quote sits in a private table with no read.
     "set_notification_destination.externalDestinationId", // Slack holds the channel's name.
     "set_qbo_deposit_mapping.qboItemId", // QuickBooks holds the item's name.

@@ -436,6 +436,14 @@ export async function previewCommand(name: string, rawInput: unknown, ctx: Ctx, 
   return { valid: true, allowed: true, name, input: parsed.data, preview: await def.preview(ctx, parsed.data, conversationId) };
 }
 
+/** Validates input against an operation's schema, and names each failing field. */
+export function parseInput(schema: ZodType<unknown>, rawInput: unknown) {
+  const parsed = schema.safeParse(rawInput);
+  if (parsed.success) return parsed.data;
+  const issues = parsed.error.issues.map(issue => ({ path: issue.path.map(part => typeof part === "number" ? part : String(part)), code: issue.code, message: issue.message }));
+  throw new CommandError(issues.map(issue => issue.message).join("; "), 400, "invalid_input", issues);
+}
+
 // Output is unknown: a string name cannot carry the handler's type; callers narrow.
 export async function runCommand(name: string, rawInput: unknown, ctx: OperationCtx, execution?: CommandExecution): Promise<unknown> {
   const def = registry.get(name);
@@ -443,18 +451,14 @@ export async function runCommand(name: string, rawInput: unknown, ctx: Operation
   if (ctx.agent && (def.kind !== "query" || def.agentHidden)) throw new CommandError(`agents cannot run ${name}`, 403, "agent_not_allowed");
   const allowed = canRun(ctx, name);
   if (!allowed) throw new CommandError(`permission denied: ${name} requires ${JSON.stringify(def.roles)}`, 403, "permission_denied");
-  const parsed = def.input.safeParse(rawInput);
-  if (!parsed.success) {
-    const issues = parsed.error.issues.map(issue => ({ path: issue.path.map(part => typeof part === "number" ? part : String(part)), code: issue.code, message: issue.message }));
-    throw new CommandError(issues.map(issue => issue.message).join("; "), 400, "invalid_input", issues);
-  }
+  const input = parseInput(def.input, rawInput);
   const commandExecution = def.kind === "command" ? execution ?? createExecution() : undefined;
   if (commandExecution?.origin === "chat" && (!def.aiExposed || !def.preview || !def.requiresConfirmation
     || !commandExecution.previewToken || !commandExecution.conversationId)) {
     throw new CommandError("chat commands require a confirmed preview", 400, "preview_required");
   }
   try {
-    return await def.execute(ctx, parsed.data, commandExecution);
+    return await def.execute(ctx, input, commandExecution);
   } catch (e: unknown) {
     if (e instanceof CommandError) throw e;
     console.error(`handler error in ${name}:`, e);

@@ -281,7 +281,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   // Every staff role reads its brewery's copies of saved COLA labels; store_cola_label_image is service-only.
   readNames.push("get_stored_cola_label_image");
   // Existing-account consent is authenticated own-identity work, covered by existing-account-invites.test.ts.
-  const ownNames = ["accept_account_invitation","set_my_gravity_unit","consume_chat_link_proof","unlink_chat_user","set_notification_preference","set_personal_notification_destination","create_chat_conversation","append_chat_message"];
+  const ownNames = ["begin_agent_proposal","create_agent_proposal","decline_agent_proposal","finish_agent_proposal","accept_account_invitation","set_my_gravity_unit","consume_chat_link_proof","unlink_chat_user","set_notification_preference","set_personal_notification_destination","create_chat_conversation","append_chat_message"];
   const existing = [...readFileSync(new URL("./rls-command-boundary.test.ts", import.meta.url), "utf8").matchAll(/rpc: "(\w+)"/g)].map(m => m[1]);
   const infrastructureNames = ["agent_session_is_live", "consume_command_admission"];
   expect([...new Set(catalog.map(c => c.name))].sort()).toEqual([...new Set([...Object.keys(cases),...existing,...readNames,...ownNames,...infrastructureNames])].sort());
@@ -299,7 +299,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   readSignatures.push("get_staff_chat_installation(uuid)");
   readSignatures.push("get_saved_cola_image_permit(uuid,text,text)");
   readSignatures.push("get_stored_cola_label_image(uuid,text,text)");
-  const ownSignatures = ["accept_account_invitation(uuid,uuid)","set_my_gravity_unit(uuid,text,uuid)","consume_chat_link_proof(uuid,text,uuid)","unlink_chat_user(uuid,uuid,uuid)","set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text,boolean,uuid)","set_personal_notification_destination(uuid,text,uuid,uuid)","create_chat_conversation(uuid,text,uuid)","append_chat_message(uuid,uuid,text,text,uuid)"];
+  const ownSignatures = ["begin_agent_proposal(uuid,uuid)","create_agent_proposal(uuid,text,jsonb)","decline_agent_proposal(uuid)","finish_agent_proposal(uuid,text,text)","accept_account_invitation(uuid,uuid)","set_my_gravity_unit(uuid,text,uuid)","consume_chat_link_proof(uuid,text,uuid)","unlink_chat_user(uuid,uuid,uuid)","set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text,boolean,uuid)","set_personal_notification_destination(uuid,text,uuid,uuid)","create_chat_conversation(uuid,text,uuid)","append_chat_message(uuid,uuid,text,text,uuid)"];
   expect(catalog.filter(c => readNames.includes(c.name)).map(c => c.signature).sort()).toEqual(readSignatures.sort());
   expect(catalog.filter(c => ownNames.includes(c.name)).map(c => c.signature).sort()).toEqual([...ownSignatures].sort());
   // #467: brewery bootstrap is service-role only; the server passes the verified actor.
@@ -418,7 +418,8 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   expect(publicSnapshot()).toEqual(publicBefore);
   expect(sql(`select md5(string_agg(row_to_json(t)::text,'' order by request_id)) from private.command_requests t where brewery_id='${B}';
     select md5(string_agg(row_to_json(t)::text,'' order by request_id)) from private.invite_requests t where brewery_id='${B}'`)).toEqual(before);
-  const ownCommands = ownNames.filter(name => name !== "accept_account_invitation").map(name => name === "set_personal_notification_destination" ? "set_notification_destination" : name);
+  const proposalRpcs: Record<string, string> = { begin_agent_proposal: "approve_agent_proposal", set_personal_notification_destination: "set_notification_destination" };
+  const ownCommands = ownNames.filter(name => !["accept_account_invitation", "create_agent_proposal", "finish_agent_proposal"].includes(name)).map(name => proposalRpcs[name] ?? name);
   const ctx = { db, userId: f.taproom.id, breweryId: B, roles: ["taproom" as const] };
   const commands = listTools().filter(t => t.kind === "command" && t.scope === "tenant");
   expect(commands.filter(t => { const roles = getCommandDefinition(t.name)!.roles; return roles === "any" || Array.isArray(roles) && roles.includes("taproom"); }).map(t => t.name).sort()).toEqual([...ownCommands,"record_taproom_count","tap_keg","kick_keg","swap_keg"].sort());

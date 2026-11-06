@@ -217,7 +217,7 @@ cannot change the account, and cannot read a brewery that has agents off.
 **Test first:** a contract test drives the local route with the official MCP
 SDK client, under both protocol versions. It finds an operation, describes it,
 runs a query, gets a structured error, and reads the orientation result. A
-warehouse token finds no invoice query; an admin token does. A hidden operation
+warehouse token cannot find `get_inventory_value`; an admin token can. A hidden operation
 cannot be found or run. A query registered in the test is found with no other
 change.
 
@@ -267,18 +267,26 @@ field in every command's schema has a label, or the test fails.
 
 **Modify:**
 - New migration: `agent_proposals` (tenant, RLS): actor, client, command,
-  canonical input, status (`pending`, `approved`, `declined`, `expired`,
-  `committed`, `failed`), request id, and created and expiry times.
-  `create_agent_proposal` is the one write an agent token may make, so it joins
-  the reviewed list in `tests/agent-access.test.ts`. It must not touch the ledger.
+  canonical input, status (`pending`, `approved`, `declined`, `committed`,
+  `failed`), request id, and created and expiry times. `expired` is derived from
+  `expires_at`, so nothing has to run when one lapses. `create_agent_proposal` is
+  the one write an agent token may make, so it joins the reviewed list in
+  `tests/agent-access.test.ts`. It must not touch the ledger.
+- A token can call `create_agent_proposal` directly with any command name, so the
+  check in `propose_command` is not enough. Approval checks `isProposable` again,
+  and requires the proposal's brewery to match the active one.
+- Agents cannot propose changes to who has access or to integrations: staff roles,
+  invitations, QuickBooks, Square and Slack connections, and the agent switch.
+  These set `agentHidden`.
 - `propose_command`: validate the input against the command's schema and check
   `canRun`, store the proposal, and return
   `{ status: "awaiting_approval", proposalId, approveUrl, expiresAt }`.
 - New `get_proposal_status` query.
 - New `approve_agent_proposal` and `decline_agent_proposal` commands. Approve
   runs the stored command through `runCommand` on the person's session, with the
-  proposal's request id. The command's own checks are the staleness check; a
-  refusal marks the proposal `failed` and shows why.
+  proposal's request id. `pending` to `approved` is one atomic step, so two
+  approvals cannot both run it. The command's own checks are the staleness check;
+  a refusal marks the proposal `failed` and shows why.
 - Attribution needs no ledger change. The person's session commits, so `ui` is
   the true origin, and `agent_proposals.request_id` links the agent to the
   ledger row. No RPC changes.
@@ -468,7 +476,8 @@ report the change in the PR.
     every id field in every command resolves, or the test fails. Depends on task 3.
 14. **Proposals (R2).** Migration below, `propose_command`, approve and decline.
     Test first: the Phase 3 list. Depends on tasks 7 and 8.
-15. **Inbox card.** Today card with labelled fields. Depends on tasks 13 and 14.
+15. **Approval screens.** A Today notice links to **Changes to approve**, and each
+    proposal opens a review page with labelled fields. Depends on tasks 13 and 14.
 16. **Write evals (O1, O3, O4).** 20 write tasks, scored on the stored proposal.
     Accept: O3 is 85% or more, O4 is 0, O1 is 50. Depends on tasks 11 and 15.
 17. **Retire the old list.** Move Ask MGR onto the same tools and delete

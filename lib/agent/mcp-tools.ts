@@ -6,16 +6,20 @@ import { z } from "zod";
 import { boundToolResult } from "@/lib/chat/agent";
 import { requireAdmission } from "@/lib/commands/admission";
 import { buildContextFromBearer } from "@/lib/commands/context";
-import { canRun, CommandError, listTools, runCommand } from "@/lib/commands/registry";
+import { isProposable } from "@/lib/commands/agent-proposals";
+import { canRun, CommandError, getCommandDefinition, listTools, parseInput, runCommand, unwrap } from "@/lib/commands/registry";
+import { readAppUrl } from "@/lib/env/server-parser";
 import { fieldsOf, leafFields, sampleInput } from "@/lib/mgr/api-schema";
 import { fieldMeaning } from "@/lib/mgr/field-vocabulary";
 
 export const AGENT_INSTRUCTIONS = `MGR runs a brewery: beer, orders, inventory, production and compliance.
 You act as one person and can do only what their roles allow. Call get_started first.
-Use find_operations to see what you can read, describe_operation to learn its input, and run_query to run it.
+Use find_operations to see what you can do, describe_operation to learn its input, and run_query to read.
+Use search_guide to learn how MGR works before you act on something you are unsure of.
+To change anything, call propose_command. A change waits until your person approves it in MGR.
 Volumes are stored in bbl and money in cents.
 The inventory ledger is append-only, so a correction is a new entry, never an edit.
-You cannot change anything yet.`;
+You can never commit a change yourself.`;
 
 type Brewery = { id: string; name: string; timezone: string };
 
@@ -42,23 +46,33 @@ async function runQuery(token: string, { name, input, ...choice }: BreweryChoice
   return boundToolResult(await runCommand(name, input ?? {}, ctx));
 }
 
-/** What this person's agent may read at one brewery. */
-async function readableOperations(token: string, choice: BreweryChoice) {
+/** What this person's agent may read or propose at one brewery. */
+async function agentOperations(token: string, choice: BreweryChoice) {
   const ctx = await contextFor(token, choice);
-  return listTools().filter(tool => tool.kind === "query" && tool.scope === "tenant" && !tool.agentHidden && canRun(ctx, tool.name));
+  return listTools().filter(tool => tool.scope === "tenant" && !tool.agentHidden && canRun(ctx, tool.name));
+}
+
+async function proposeCommand(token: string, { name, input, ...choice }: BreweryChoice & { name: string; input?: Record<string, unknown> }) {
+  const ctx = await contextFor(token, choice);
+  await requireAdmission(ctx.db);
+  if (!isProposable(name)) throw new CommandError(`agents cannot propose ${name}`, 403, "agent_not_allowed");
+  if (!canRun(ctx, name)) throw new CommandError(`permission denied: ${name}`, 403, "permission_denied");
+  const parsed = parseInput(getCommandDefinition(name)!.input, input ?? {});
+  const proposal = await unwrap(ctx.db.rpc("create_agent_proposal", { p_brewery: ctx.breweryId, p_command: name, p_input: parsed as never })) as { id: string; expiresAt: string };
+  return { status: "awaiting_approval", proposalId: proposal.id, approveUrl: `${readAppUrl()}/proposals/${proposal.id}`, expiresAt: proposal.expiresAt };
 }
 
 async function findOperations(token: string, { text, ...choice }: BreweryChoice & { text?: string }) {
   const words = text?.toLowerCase().split(/\s+/).filter(Boolean) ?? [];
-  const operations = await readableOperations(token, choice);
+  const operations = await agentOperations(token, choice);
   // Not boundToolResult: its row cap is for data, and would hide operations from the agent.
   return operations
     .filter(({ name, description }) => words.every(word => `${name} ${description}`.toLowerCase().includes(word)))
-    .map(({ name, description }) => ({ name, description }));
+    .map(({ name, description, kind }) => ({ name, description, kind }));
 }
 
 async function describeOperation(token: string, { name, ...choice }: BreweryChoice & { name: string }) {
-  const operation = (await readableOperations(token, choice)).find(tool => tool.name === name);
+  const operation = (await agentOperations(token, choice)).find(tool => tool.name === name);
   if (!operation) throw new CommandError(`agents cannot run ${name}`, 403, "agent_not_allowed");
   return {
     name,
@@ -67,6 +81,15 @@ async function describeOperation(token: string, { name, ...choice }: BreweryChoi
     meanings: Object.fromEntries(leafFields(operation.inputSchema).map(field => [field.name, fieldMeaning(field)])),
     example: sampleInput(operation.inputSchema),
   };
+}
+
+/** The guides are public, so this asks the same endpoint the docs search box uses. */
+async function searchGuide({ query }: { query: string }) {
+  const origin = readAppUrl();
+  const response = await fetch(`${origin}/api/search?${new URLSearchParams({ query })}`);
+  if (!response.ok) throw new Error(`guide search answered ${response.status}`);
+  const hits = await response.json() as { content: string; url: string }[];
+  return hits.map(({ content, url }) => ({ text: content, url: `${origin}${url}` }));
 }
 
 /** Who the agent acts for, and today's work when there is one brewery to ask about. */
@@ -98,13 +121,25 @@ export function registerAgentTools(server: McpServer) {
     inputSchema: z.object({}),
   }, (_input, ctx) => answer(() => getStarted(tokenOf(ctx))));
   server.registerTool("find_operations", {
-    description: "List the reads you can run, optionally matching words in their name or description.",
+    description: "List what you can read or propose, optionally matching words in the name or description.",
     inputSchema: z.object({ text: z.string().optional().describe("Words to match, such as 'unpaid invoices'"), breweryId }),
   }, (input, ctx) => answer(() => findOperations(tokenOf(ctx), input)));
   server.registerTool("describe_operation", {
-    description: "Explain one read: what it does, what each input field means, and an example input.",
+    description: "Explain one operation: what it does, what each input field means, and an example input.",
     inputSchema: z.object({ name: z.string().describe("The operation, from find_operations"), breweryId }),
   }, (input, ctx) => answer(() => describeOperation(tokenOf(ctx), input)));
+  server.registerTool("search_guide", {
+    description: "Search the MGR guides for how something works, such as 'how reversals work'. Start at the How MGR works guide.",
+    inputSchema: z.object({ query: z.string().describe("What to look up") }),
+  }, (input) => answer(() => searchGuide(input)));
+  server.registerTool("propose_command", {
+    description: "Propose a change. It runs only after your person approves it in MGR, so say what you proposed and share the approveUrl.",
+    inputSchema: z.object({
+      name: z.string().describe("The command to propose, from find_operations"),
+      breweryId,
+      input: z.record(z.string(), z.unknown()).optional().describe("The command's input"),
+    }),
+  }, (input, ctx) => answer(() => proposeCommand(tokenOf(ctx), input)));
   server.registerTool("run_query", {
     description: "Run one MGR read by name, such as get_today. Name a breweryId when get_started lists more than one.",
     inputSchema: z.object({

@@ -57,7 +57,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "consume_chat_link_proof",
+  name: "consume_chat_link_proof", agentHidden: true,
   description: "Complete a Slack → MGR account link using the single-use proof from App Home (current staff only)",
   compensation: "Reverse with unlink_chat_user.",
   input: z.object({ proof: z.string().min(1) }),
@@ -70,7 +70,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "unlink_chat_user",
+  name: "unlink_chat_user", agentHidden: true,
   description: "Unlink a Slack user from MGR (own link, or any link as admin); stops personal delivery",
   compensation: "Reverse by linking again from Slack App Home, which ends in consume_chat_link_proof.",
   input: z.object({ linkId: z.string().uuid() }),
@@ -164,7 +164,7 @@ defineQuery({ name: "list_chat_channels", agentHidden: true, description: "List 
   input: z.object({ installationId: z.string().uuid() }), roles: ["admin"],
   handler: async (ctx, i) => (await import("@/lib/chat/jobs")).listChatChannels(ctx, i.installationId),
 });
-defineCommand({ name: "begin_chat_installation", description: "Begin explicit administrator consent to install Slack with the three required scopes",
+defineCommand({ name: "begin_chat_installation", agentHidden: true, description: "Begin explicit administrator consent to install Slack with the three required scopes",
   compensation: "Nothing changes until consent finishes; reverse a finished install with disconnect_chat_installation.",
   input: z.object({}), roles: ["admin"],
   handler: async (ctx, _i, execution) => {
@@ -172,7 +172,7 @@ defineCommand({ name: "begin_chat_installation", description: "Begin explicit ad
     return beginSlackInstall(ctx, slackRedirectUri(), execution.requestId);
   },
 });
-defineCommand({ name: "begin_chat_reauthorization", description: "Begin explicit administrator consent to reauthorize the existing Slack workspace",
+defineCommand({ name: "begin_chat_reauthorization", agentHidden: true, description: "Begin explicit administrator consent to reauthorize the existing Slack workspace",
   compensation: "Nothing changes until consent finishes; stop delivery afterwards with disable_chat_installation.",
   input: z.object({ installationId: z.string().uuid() }), roles: ["admin"],
   handler: async (ctx, i, execution) => {
@@ -180,12 +180,12 @@ defineCommand({ name: "begin_chat_reauthorization", description: "Begin explicit
     return beginSlackReauthorization(ctx, i.installationId, slackRedirectUri(), execution.requestId);
   },
 });
-defineCommand({ name: "disable_chat_installation", description: "Stop all Slack delivery locally without needing Slack to be reachable",
+defineCommand({ name: "disable_chat_installation", agentHidden: true, description: "Stop all Slack delivery locally without needing Slack to be reachable",
   compensation: "Reverse with begin_chat_reauthorization, which needs admin consent in Slack.",
   input: z.object({ installationId: z.string().uuid() }), roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("disable_chat_installation", { p_brewery: ctx.breweryId, p_installation: i.installationId, p_request_id: execution.requestId })),
 });
-defineCommand({ name: "disconnect_chat_installation", description: "Stop Slack delivery and invalidate links, then attempt credential cleanup; retry if cleanup is pending",
+defineCommand({ name: "disconnect_chat_installation", agentHidden: true, description: "Stop Slack delivery and invalidate links, then attempt credential cleanup; retry if cleanup is pending",
   compensation: "Cannot be undone; install again with begin_chat_installation, and each person links again.",
   input: z.object({ installationId: z.string().uuid() }), roles: ["admin"],
   handler: async (ctx, i, execution) => {
