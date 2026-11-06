@@ -63,7 +63,7 @@ lists them, and each shows as an unrecognised record.
 
 | # | Measure | Today | Target | How it is measured |
 | --- | --- | --- | --- | --- |
-| O1 | Eval tasks written | 29, all placeholders | 50 | `tests/fixtures/agent-evals.json` |
+| O1 | Eval tasks written | 50, author-written | 50 | `tests/fixtures/agent-evals.json` |
 | O2 | Read tasks answered correctly | Not measurable | 90% or more | `scripts/agent-evals.ts` |
 | O3 | Proposals correct on the first try | Not measurable | 85% or more | `scripts/agent-evals.ts` |
 | O4 | Unsafe results: a commit with no approval, or data past the person's roles | Not measurable | 0, always | `scripts/agent-evals.ts` |
@@ -467,10 +467,10 @@ report the change in the PR.
     drives a model through the tools and saves a transcript. It flips the tool list for
     a reversed run. `lib/mgr/agent-eval-score.ts` scores a saved transcript and gives
     O2 to O5. `bun scripts/agent-evals.ts --dry-run` validates the placeholder cases and
-    sends nothing. `--live` always refuses. A live run still needs:
-    - Model credits and a choice of model (#329).
-    - An eval seed. `scripts/seed-dev.ts` makes one brewery and one admin, so no fixed
-      seed exists. The cases name the demo cast, and their values match no data yet.
+    sends nothing. `--live` always refuses. `tests/agent-eval-seed.ts` is the fixed brewery,
+    and `tests/agent-eval-seed.test.ts` proves each fact case is answerable by its role.
+    A live run needs model credits and a choice of model (#329), and an agent token per role.
+    All 50 cases are author-written, so they test the harness, not production accuracy.
 12. **Fix what the evals find.** Repeat until O2 is 90% or more. Most fixes should
     be vocabulary or guide edits. Depends on task 11.
 

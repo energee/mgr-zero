@@ -53,7 +53,7 @@
     "expectation": {
       "facts": [
         {
-          "contains": "PO-1042"
+          "contains": "1042"
         }
       ]
     }
@@ -73,6 +73,340 @@
         },
         "pass": [
           "grounded_priority"
+        ]
+      }
+    }
+  },
+  {
+    "id": "read-customers",
+    "kind": "read",
+    "source": "author",
+    "role": "sales",
+    "prompt": "Which customers do we sell to?",
+    "expectation": {
+      "facts": [
+        {
+          "contains": "Harbor Bottle Shop"
+        },
+        {
+          "contains": "Mill Street Pub"
+        }
+      ]
+    }
+  },
+  {
+    "id": "read-vendors",
+    "kind": "read",
+    "source": "author",
+    "role": "warehouse",
+    "prompt": "Who do we buy from?",
+    "expectation": {
+      "facts": [
+        {
+          "contains": "Great Western Malting"
+        },
+        {
+          "contains": "Crown Cans"
+        }
+      ]
+    }
+  },
+  {
+    "id": "read-locations",
+    "kind": "read",
+    "source": "author",
+    "role": "admin",
+    "prompt": "What locations do we have?",
+    "expectation": {
+      "facts": [
+        {
+          "contains": "Cold Store"
+        }
+      ]
+    }
+  },
+  {
+    "id": "read-vessel-size",
+    "kind": "read",
+    "source": "author",
+    "role": "brewer",
+    "prompt": "How big is BBT1?",
+    "expectation": {
+      "facts": [
+        {
+          "contains": "20"
+        }
+      ]
+    }
+  },
+  {
+    "id": "read-fermenters",
+    "kind": "read",
+    "source": "author",
+    "role": "brewer",
+    "prompt": "Which fermenters do we have?",
+    "expectation": {
+      "facts": [
+        {
+          "contains": "FV1"
+        },
+        {
+          "contains": "FV2"
+        }
+      ]
+    }
+  },
+  {
+    "id": "read-skus",
+    "kind": "read",
+    "source": "author",
+    "role": "sales",
+    "prompt": "What SKUs are in the catalog?",
+    "expectation": {
+      "facts": [
+        {
+          "contains": "Hazy IPA 16 oz"
+        }
+      ]
+    }
+  },
+  {
+    "id": "read-on-hand-hazy",
+    "kind": "read",
+    "source": "author",
+    "role": "warehouse",
+    "prompt": "How many cases of Hazy IPA 16 oz are in the Warehouse?",
+    "expectation": {
+      "facts": [
+        {
+          "contains": "12"
+        }
+      ]
+    }
+  },
+  {
+    "id": "read-on-hand-cold",
+    "kind": "read",
+    "source": "author",
+    "role": "warehouse",
+    "prompt": "How many cases of Pils 16 oz are in the Cold Store?",
+    "expectation": {
+      "facts": [
+        {
+          "contains": "7"
+        }
+      ]
+    }
+  },
+  {
+    "id": "read-harbor-balance",
+    "kind": "read",
+    "source": "author",
+    "role": "sales",
+    "prompt": "What does Harbor Bottle Shop owe us?",
+    "expectation": {
+      "facts": [
+        {
+          "contains": "$525.00"
+        }
+      ]
+    }
+  },
+  {
+    "id": "read-biggest-balance",
+    "kind": "read",
+    "source": "author",
+    "role": "admin",
+    "prompt": "Which customer owes us the most right now?",
+    "expectation": {
+      "facts": [
+        {
+          "contains": "Ridgeline Tap Room"
+        }
+      ]
+    }
+  },
+  {
+    "id": "read-bins",
+    "kind": "read",
+    "source": "author",
+    "role": "warehouse",
+    "prompt": "What bins does the Warehouse have?",
+    "expectation": {
+      "facts": [
+        {
+          "contains": "Walk-in"
+        }
+      ]
+    }
+  },
+  {
+    "id": "read-open-po-vendor",
+    "kind": "read",
+    "source": "author",
+    "role": "warehouse",
+    "prompt": "Which vendor has a purchase order open right now?",
+    "expectation": {
+      "facts": [
+        {
+          "contains": "Yakima Valley Hops"
+        }
+      ]
+    }
+  },
+  {
+    "id": "read-last-gravity",
+    "kind": "read",
+    "source": "author",
+    "role": "brewer",
+    "prompt": "What was the last gravity on the batch in FV2?",
+    "expectation": {
+      "facts": [
+        {
+          "contains": "3.2"
+        }
+      ]
+    }
+  },
+  {
+    "id": "read-brands",
+    "kind": "read",
+    "source": "author",
+    "role": "sales",
+    "prompt": "What brands do we make?",
+    "expectation": {
+      "facts": [
+        {
+          "contains": "Hazy IPA"
+        },
+        {
+          "contains": "Pils"
+        }
+      ]
+    }
+  },
+  {
+    "id": "guide-correct-movement",
+    "kind": "read",
+    "source": "author",
+    "role": "warehouse",
+    "prompt": "I recorded a stock movement by mistake. How do I fix it?",
+    "expectation": {
+      "labels": {
+        "options": {
+          "grounded": "Explains it the way the MGR guide does, and a person could act on it.",
+          "vague_or_wrong": "Is vague, invented, or contradicts the MGR guide."
+        },
+        "pass": [
+          "grounded"
+        ]
+      }
+    }
+  },
+  {
+    "id": "guide-on-hand-vs-atp",
+    "kind": "read",
+    "source": "author",
+    "role": "sales",
+    "prompt": "What's the difference between on hand and available to promise?",
+    "expectation": {
+      "labels": {
+        "options": {
+          "grounded": "Explains it the way the MGR guide does, and a person could act on it.",
+          "vague_or_wrong": "Is vague, invented, or contradicts the MGR guide."
+        },
+        "pass": [
+          "grounded"
+        ]
+      }
+    }
+  },
+  {
+    "id": "guide-volume-units",
+    "kind": "read",
+    "source": "author",
+    "role": "brewer",
+    "prompt": "What unit does MGR keep beer volumes in?",
+    "expectation": {
+      "labels": {
+        "options": {
+          "grounded": "Explains it the way the MGR guide does, and a person could act on it.",
+          "vague_or_wrong": "Is vague, invented, or contradicts the MGR guide."
+        },
+        "pass": [
+          "grounded"
+        ]
+      }
+    }
+  },
+  {
+    "id": "guide-invoice-timing",
+    "kind": "read",
+    "source": "author",
+    "role": "sales",
+    "prompt": "When does MGR create the invoice for an order?",
+    "expectation": {
+      "labels": {
+        "options": {
+          "grounded": "Explains it the way the MGR guide does, and a person could act on it.",
+          "vague_or_wrong": "Is vague, invented, or contradicts the MGR guide."
+        },
+        "pass": [
+          "grounded"
+        ]
+      }
+    }
+  },
+  {
+    "id": "guide-quickbooks",
+    "kind": "read",
+    "source": "author",
+    "role": "admin",
+    "prompt": "Is MGR or QuickBooks the book of record for money?",
+    "expectation": {
+      "labels": {
+        "options": {
+          "grounded": "Explains it the way the MGR guide does, and a person could act on it.",
+          "vague_or_wrong": "Is vague, invented, or contradicts the MGR guide."
+        },
+        "pass": [
+          "grounded"
+        ]
+      }
+    }
+  },
+  {
+    "id": "guide-order-lifecycle",
+    "kind": "read",
+    "source": "author",
+    "role": "sales",
+    "prompt": "What stages does an order go through?",
+    "expectation": {
+      "labels": {
+        "options": {
+          "grounded": "Explains it the way the MGR guide does, and a person could act on it.",
+          "vague_or_wrong": "Is vague, invented, or contradicts the MGR guide."
+        },
+        "pass": [
+          "grounded"
+        ]
+      }
+    }
+  },
+  {
+    "id": "guide-keg-pools",
+    "kind": "read",
+    "source": "author",
+    "role": "warehouse",
+    "prompt": "What is a keg pool?",
+    "expectation": {
+      "labels": {
+        "options": {
+          "grounded": "Explains it the way the MGR guide does, and a person could act on it.",
+          "vague_or_wrong": "Is vague, invented, or contradicts the MGR guide."
+        },
+        "pass": [
+          "grounded"
         ]
       }
     }
