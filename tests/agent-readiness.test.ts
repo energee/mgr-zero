@@ -5,7 +5,7 @@ import { z } from "zod";
 import "@/lib/commands/all";
 import { listTools } from "@/lib/commands/registry";
 import { measureReadiness, type ReadinessTool } from "@/lib/mgr/agent-readiness";
-import { leafFields } from "@/lib/mgr/api-schema";
+import { leafFields, valuesAt } from "@/lib/mgr/api-schema";
 
 describe("leafFields", () => {
   it("reaches nested fields and sees a description on any wrapper", () => {
@@ -15,10 +15,10 @@ describe("leafFields", () => {
       lines: z.array(z.object({ skuId: z.uuid(), qty: z.number() })),
     });
     expect(leafFields(schema)).toEqual([
-      { name: "orderId", description: "The order" },
-      { name: "note", description: "A note" },
-      { name: "skuId", description: undefined },
-      { name: "qty", description: undefined },
+      { name: "orderId", description: "The order", path: ["orderId"] },
+      { name: "note", description: "A note", path: ["note"] },
+      { name: "skuId", description: undefined, path: ["lines", "*", "skuId"] },
+      { name: "qty", description: undefined, path: ["lines", "*", "qty"] },
     ]);
   });
 
@@ -28,28 +28,52 @@ describe("leafFields", () => {
   });
 });
 
+describe("valuesAt", () => {
+  it("reads each array item and says where the value sits", () => {
+    const input = { ship: [{ sources: [{ lotId: "a" }, { lotId: "b" }] }, { sources: [{ lotId: "c" }] }] };
+    expect(valuesAt(input, ["ship", "*", "sources", "*", "lotId"])).toEqual([
+      { at: "ship[0].sources[0].lotId", value: "a" },
+      { at: "ship[0].sources[1].lotId", value: "b" },
+      { at: "ship[1].sources[0].lotId", value: "c" },
+    ]);
+  });
+
+  it("yields nothing for a value the input left out", () => {
+    expect(valuesAt({}, ["note"])).toEqual([]);
+    expect(valuesAt({ lines: [{}] }, ["lines", "*", "skuId"])).toEqual([]);
+  });
+
+  it("keeps a null or an empty array, because clearing a value is part of the proposal", () => {
+    expect(valuesAt({ lotId: null }, ["lotId"])).toEqual([{ at: "lotId", value: null }]);
+    expect(valuesAt({ quietHours: null }, ["quietHours", "start"])).toEqual([{ at: "quietHours", value: null }]);
+    expect(valuesAt({ roles: [] }, ["roles", "*"])).toEqual([{ at: "roles", value: [] }]);
+  });
+});
+
 describe("measureReadiness", () => {
   const tool = (over: Partial<ReadinessTool>): ReadinessTool => ({
-    kind: "query", description: "Read every open order at this brewery today", inputSchema: z.object({}), ...over,
+    name: "fixture", kind: "query", description: "Read every open order at this brewery today", inputSchema: z.object({}), ...over,
   });
 
   // `note` has a description; `skuId` and `binId` are in the vocabulary; `id` has neither.
+  // `qboItemId` is a command id field with no name to read, so it does not count as shown.
   it("counts each row of the scorecard", () => {
     expect(measureReadiness([
       tool({}),
       tool({ description: "Too short", inputSchema: z.object({ id: z.uuid(), note: z.string().describe("Why") }) }),
       tool({ kind: "command", compensation: "Reverse the movement", inputSchema: z.object({ skuId: z.uuid() }) }),
       tool({ kind: "command", compensation: null, inputSchema: z.object({ lines: z.array(z.object({ binId: z.uuid() })) }) }),
+      tool({ kind: "command", compensation: null, inputSchema: z.object({ qboItemId: z.string() }) }),
     ])).toEqual({
-      operations: 4, queries: 2, commands: 2, describedOperations: 3,
-      fieldUses: 4, fieldUsesWithMeaning: 3, commandsWithUndo: 1, commandIdFieldUses: 2,
+      operations: 5, queries: 2, commands: 3, describedOperations: 4,
+      fieldUses: 5, fieldUsesWithMeaning: 4, commandsWithUndo: 1, commandIdFieldUses: 3, commandIdFieldUsesNamed: 2,
     });
   });
 });
 
 // Raise a floor when a number improves. A drop means a new operation or field
 // shipped without the meaning an agent needs.
-const FLOORS = { describedOperations: 314, fieldUsesWithMeaning: 916, commandsWithUndo: 178 };
+const FLOORS = { describedOperations: 314, fieldUsesWithMeaning: 916, commandsWithUndo: 178, commandIdFieldUsesNamed: 325 };
 
 it("never loses ground on the scorecard", () => {
   expect(measureReadiness(listTools())).toMatchObject(Object.fromEntries(

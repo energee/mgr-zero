@@ -40,7 +40,6 @@ const ALLOWED: Record<string, number> = {
   "portal.ts": 6,
   "production.ts": 12,
   "purchasing.ts": 12,
-  "search.ts": 4,
   "taproom.ts": 2,
   "transfers.ts": 2,
 };
