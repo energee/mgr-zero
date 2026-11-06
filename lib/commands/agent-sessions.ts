@@ -13,7 +13,7 @@ defineQuery({
 
 defineQuery({
   name: "get_agent_session", agentHidden: true,
-  description: "One session's steps and notes",
+  description: "One agent session with its steps and the notes the agent left",
   input: z.object({ sessionId: z.uuid().describe("The session, from list_agent_sessions") }),
   roles: ["admin"],
   handler: async (ctx, { sessionId }) => {

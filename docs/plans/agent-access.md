@@ -4,6 +4,10 @@ Status: approved by the owner, 2026-11-04. Q4 and Phases 2 and 3 were rewritten
 at the owner's request on 2026-11-05, so that agents reach every operation with
 nothing maintained twice. Tracked in #1766.
 
+Phases 1 to 5 are on `main`, and so is the Phase 6 documentation. What is left
+needs the owner: the hosted steps (R4), the client matrix (R3), and the evals
+(O1 to O5), which wait on real staff questions and a decision on model credits.
+
 ## Goal
 
 1. **Connect.** Any agent a staff member brings connects to MGR in minutes,
@@ -21,17 +25,17 @@ nothing maintained twice. Tracked in #1766.
 
 The goal is an agent that can read and write everything a person can, and
 understands what it is doing. These numbers say how far away that is. Each row
-is measured, not estimated. Baseline: `main`, 2026-11-05. Print the current
+is measured, not estimated. Last measured: `main`, 2026-11-06. Print the current
 numbers with `bun run scripts/agent-readiness.ts`.
 
-**Today: 0 of 15 at target.**
+**Today: 7 of 15 at target.**
 
 ### Reach: can an agent get there?
 
 | # | Measure | Today | Target | How it is measured |
 | --- | --- | --- | --- | --- |
-| R1 | Queries an agent can run over MCP | 0 of 137 | All but the hide list | The MCP contract test |
-| R2 | Commands an agent can propose | 0 of 177 | All but the hide list | The MCP contract test |
+| R1 | Queries an agent can run over MCP | All but the hide list | All but the hide list | The MCP contract test |
+| R2 | Commands an agent can propose | All but the hide list | All but the hide list | The MCP contract test |
 | R3 | Clients that finish a read and a proposal | 0 of 7 | 7 of 7 | By hand, Phase 6 matrix |
 | R4 | Hosted steps done: signing keys, hook, OAuth server | 0 of 3 | 3 of 3 | By hand, against hosted |
 
@@ -39,12 +43,12 @@ numbers with `bun run scripts/agent-readiness.ts`.
 
 | # | Measure | Today | Target | How it is measured |
 | --- | --- | --- | --- | --- |
-| U1 | Input field uses with a stated meaning | 41 of 916 | All | `scripts/agent-readiness.ts` |
-| U2 | Operations described in 7 words or more | 301 of 314 | All | `scripts/agent-readiness.ts` |
-| U3 | Core concepts explained in a public guide | 0 of 16 | 16 of 16 | Anchors in the guide |
-| U4 | Lifecycles explained in a public guide | 0 of 6 | 6 of 6 | Anchors in the guide |
-| U5 | Commands that say how to undo them, or that they cannot be | 1 of 177 | All | `scripts/agent-readiness.ts` |
-| U6 | Command id field uses shown as names on an approval card | 0 of 334 | All | The name lookup test, task 13 |
+| U1 | Input field uses with a stated meaning | 921 of 921 | All | `scripts/agent-readiness.ts` |
+| U2 | Operations described in 7 words or more | 322 of 322 | All | `scripts/agent-readiness.ts` |
+| U3 | Core concepts explained in a public guide | 16 of 16 | 16 of 16 | Anchors in the guide |
+| U4 | Lifecycles explained in a public guide | 6 of 6 | 6 of 6 | Anchors in the guide |
+| U5 | Commands that say how to undo them, or that they cannot be | 180 of 180 | All | `scripts/agent-readiness.ts` |
+| U6 | Command id field uses shown as names on an approval card | 325 of 335 | All | The name lookup test, task 13 |
 
 U5 counts written text only. `compensation` defaults to `null`, which says
 nothing.
