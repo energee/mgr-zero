@@ -147,26 +147,26 @@ export function fieldsOf(schema: $ZodType): ApiField[] {
     .sort((a, b) => (a.required === b.required ? 0 : a.required ? -1 : 1));
 }
 
-/** Every value an operation's input takes, at any depth, and whether its schema says what it means. */
-export function leafFields(node: $ZodType, name = "", described = false): { name: string; described: boolean }[] {
+/** Every value an operation's input takes, at any depth, with what its schema says it means. */
+export function leafFields(node: $ZodType, name = "", inherited?: string): { name: string; description?: string }[] {
   const def = definition(node);
-  const hasMeaning = described || Boolean(core.globalRegistry.get(node)?.description);
+  const description = inherited ?? core.globalRegistry.get(node)?.description;
   switch (def.type) {
     case "object":
       return Object.entries(def.shape).flatMap(([key, field]) => leafFields(field, key));
     case "array":
-      return leafFields(def.element, name, hasMeaning);
+      return leafFields(def.element, name, description);
     case "optional": case "nullable": case "nonoptional": case "default": case "prefault": case "readonly": case "catch":
-      return leafFields(def.innerType, name, hasMeaning);
+      return leafFields(def.innerType, name, description);
     case "pipe":
-      return leafFields(def.in, name, hasMeaning);
+      return leafFields(def.in, name, description);
     case "union":
       // A union of objects is alternative shapes; a union of values is one field.
       if (def.options.some(option => definition(option).type === "object")) {
-        return def.options.flatMap(option => leafFields(option, name, hasMeaning));
+        return def.options.flatMap(option => leafFields(option, name, description));
       }
   }
-  return [{ name, described: hasMeaning }];
+  return [{ name, description }];
 }
 
 /** An example input: required fields, plus one optional field when a cross-field rule requires it. */

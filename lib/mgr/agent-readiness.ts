@@ -28,7 +28,7 @@ export function measureReadiness(tools: ReadinessTool[]) {
     describedOperations: tools.filter(tool => tool.description.trim().split(/\s+/).length >= MIN_DESCRIPTION_WORDS).length,
     fieldUses: fields.length,
     // A field means something when its schema says so or its name is in the vocabulary.
-    fieldUsesWithMeaning: fields.filter(field => field.described || Object.hasOwn(FIELD_VOCABULARY, field.name)).length,
+    fieldUsesWithMeaning: fields.filter(field => field.description || Object.hasOwn(FIELD_VOCABULARY, field.name)).length,
     // `compensation` defaults to null, which says nothing, so only written text counts.
     commandsWithUndo: commands.filter(command => command.compensation).length,
     commandIdFieldUses: commands.flatMap(command => leafFields(command.inputSchema)).filter(field => isIdField(field.name)).length,

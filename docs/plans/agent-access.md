@@ -227,8 +227,12 @@ change.
 - `lib/commands/registry.ts`: `agentHidden` on a definition. `listTools` filters
   on it and `canRun`, and the agent gate in `runCommand` becomes "a query the
   person's roles allow and not hidden".
-- Review every query once for the hide list. Start with `get_qbo_connection`,
-  `get_cola_image` and `preview_command`.
+- The hide list covers every query that reaches past the person's database
+  access, plus Ask MGR history and Slack link details. A role says nothing about
+  credentials or outside calls: `list_qbo_customers` calls QuickBooks and can
+  refresh tokens with the service role. `tests/agent-hidden.test.ts` fails on a
+  new query that does this, so that class is closed by default. Plain database
+  reads stay open by default, because roles already limit them (Q4).
 - `/.well-known/oauth-protected-resource` for MCP auth discovery.
 - Server `instructions`, kept under 300 words: what MGR is, volumes are
   stored in bbl, the inventory ledger is append-only and corrections are
@@ -369,6 +373,11 @@ Work in this order, set by the owner on 2026-11-05:
    to write next.
 5. Then Group E, then Group F.
 
+Step 1 is done (2026-11-05). `mcp-remote`, a third-party client, found the server,
+registered itself, signed in through the consent page and ran `get_started` and
+`get_today`. The hook did not get in its way. Claude, ChatGPT, the 2026-07-28
+protocol and custom-scheme redirects are still untested.
+
 Each task starts with a failing test, except writing and by-hand checks. Each
 says which scorecard rows it moves. Tasks in one group can run in parallel unless
 a dependency is named. Run `scripts/agent-readiness.ts` after every task and
@@ -420,10 +429,16 @@ report the change in the PR.
 
 11. **Read evals (O1, O2, O4, O5).** New `tests/fixtures/agent-evals.json` and
     `scripts/agent-evals.ts`. 30 read tasks from real staff questions, each with a
-    known answer on a fixed seed. Scoring is by code where the answer is a fact.
-    This calls a paid model, so it runs by hand, never in CI. It needs model
-    credits, which is the open question in #329. Test first: the scorer, on saved
-    transcripts. Depends on tasks 9 and 10.
+    known answer on a fixed seed. Reuse the shape of
+    `scripts/experiment-production-attention.ts`: cases in a JSON file, `--dry-run`
+    that sends nothing, `--live` that refuses to run without credentials, and each
+    case run in normal and reversed order. Claude or ChatGPT is the agent under
+    test, because that is what staff use. Code scores facts. Jev scores open
+    answers against fixed labels, which is what it did well there. Keep a separate
+    brewer-reviewed holdout: author-written cases are not a production accuracy
+    estimate. The agent run calls a paid model, so it runs by hand, never in CI,
+    and needs model credits (#329). Test first: the scorer, on saved transcripts.
+    Depends on tasks 9 and 10.
 12. **Fix what the evals find.** Repeat until O2 is 90% or more. Most fixes should
     be vocabulary or guide edits. Depends on task 11.
 

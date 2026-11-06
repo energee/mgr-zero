@@ -38,7 +38,7 @@ defineCommand({
 });
 
 defineQuery({
-  name: "get_qbo_connection", description: "Get redacted QuickBooks connection health and the connectionId required to disconnect",
+  name: "get_qbo_connection", agentHidden: true, description: "Get redacted QuickBooks connection health and the connectionId required to disconnect",
   input: z.object({}), roles: ["admin", "sales"],
   handler: async (ctx) => (await import("@/lib/supabase/integration-tokens")).getQboHealth(ctx),
 });
@@ -51,7 +51,7 @@ defineQuery({
 
 // The mapping picker's live reads (#1515): run when the Map dialog opens, never cached.
 defineQuery({
-  name: "list_qbo_customers", description: "Read the connected QuickBooks company's active customers live, by name, for a person to pick a customer mapping; nothing is preselected",
+  name: "list_qbo_customers", agentHidden: true, description: "Read the connected QuickBooks company's active customers live, by name, for a person to pick a customer mapping; nothing is preselected",
   input: z.object({}), roles: ["admin", "sales"],
   handler: async (ctx) => {
     const { listQboRecords, qboConfig, QboOAuthClient } = await import("@/lib/qbo");
@@ -60,7 +60,7 @@ defineQuery({
 });
 
 defineQuery({
-  name: "list_qbo_items", description: "Read the connected QuickBooks company's active items live, by name, for a person to pick an item mapping; nothing is preselected",
+  name: "list_qbo_items", agentHidden: true, description: "Read the connected QuickBooks company's active items live, by name, for a person to pick an item mapping; nothing is preselected",
   input: z.object({}), roles: ["admin", "sales"],
   handler: async (ctx) => {
     const { listQboRecords, qboConfig, QboOAuthClient } = await import("@/lib/qbo");

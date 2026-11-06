@@ -110,6 +110,7 @@ export const UNLISTED_NAV: readonly NavItem[] = [
   { label: "Sale channels", href: "/settings/channels", roles: ["admin"], about: "Name how you sell and how each is taxed" },
   { label: "Locations", href: "/locations", roles: ["admin"], about: "Manage warehouses, taprooms and their bins" },
   { label: "Chat", href: "/settings/chat", about: "Link Slack and set your notifications" },
+  { label: "Agents", href: "/settings/agents", about: "See and remove the AI agents connected to your account" },
 ];
 
 export const PORTAL_NAV: readonly NavItem[] = [

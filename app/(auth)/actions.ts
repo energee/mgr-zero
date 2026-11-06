@@ -177,6 +177,29 @@ export async function acceptAccountInvitation(form: FormData) {
   redirect(result.kind === "staff" ? "/" : "/portal");
 }
 
+/** Records the person's decision and sends them back to the agent. A failed decision
+ *  reloads the consent page, which shows the request's true state. */
+async function decideAgent(form: FormData, decide: "approveAuthorization" | "denyAuthorization") {
+  const authorizationId = String(form.get("authorizationId") ?? "");
+  const db = await createServerClient();
+  const { data, error } = await db.auth.oauth[decide](authorizationId, { skipBrowserRedirect: true });
+  redirect(error ? `/oauth/consent?authorization_id=${encodeURIComponent(authorizationId)}` : data.redirect_url);
+}
+
+export async function approveAgent(form: FormData) {
+  await decideAgent(form, "approveAuthorization");
+}
+
+export async function denyAgent(form: FormData) {
+  await decideAgent(form, "denyAuthorization");
+}
+
+export async function revokeAgent(form: FormData) {
+  const db = await createServerClient();
+  const { error } = await db.auth.oauth.revokeGrant({ clientId: String(form.get("clientId") ?? "") });
+  redirect(error ? "/settings/agents?error=1" : "/settings/agents");
+}
+
 export async function switchCustomer(form: FormData) {
   const customerId = String(form.get("customerId") ?? "");
   const auth = createRequestAuthContext();

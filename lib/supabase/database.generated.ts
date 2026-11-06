@@ -5636,6 +5636,9 @@ isOneToOne: false
 "send_purchase_order":
 { Args: { "p_brewery": string,"p_po": string,"p_request_id": string,"p_sent_via": string }; Returns: Json
                            },
+"set_brewery_agents_enabled":
+{ Args: { "p_brewery": string,"p_enabled": boolean,"p_request_id": string }; Returns: Json
+                           },
 "set_brewery_ai_model":
 { Args: { "p_brewery": string,"p_model": string,"p_request_id": string }; Returns: Json
                            },

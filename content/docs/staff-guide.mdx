@@ -1416,7 +1416,7 @@ If the email service refuses an invitation, MGR explains whether the address is 
 
 <Screen name="Settings" />
 
-**Brewery details**, **Ask MGR** and **Wholesale fulfillment** save independently. **Save brewery** never saves edits in the other sections; the AI model and fulfillment warehouse save when selected. On desktop, Brewery details sits beside the other two. **Customer-facing phone** and **One-way keg fee ($)** sit together, with **Books opened on** and its explanation on a full-width row below the other brewery fields. **Gravity unit**, below Brewery details, is the brewery default; it saves when you select it, not with **Save brewery**. **Connections** (Accounting, Point of sale, and Chat) opens the page, above Brewery details, so a phone reaches them without scrolling past the forms. **People and places** (Team, Locations, Water profiles, Sale channels, and Import) follows the forms. On phones these sections stack. Use the shared **− / +** count control or type a whole number from 1 to 168 for **Reading overdue after (hours)**, then **Save brewery**.
+**Brewery details**, **Ask MGR**, **Agents** and **Wholesale fulfillment** save independently. **Save brewery** never saves edits in the other sections; the AI model and fulfillment warehouse save when selected. On desktop, Brewery details sits beside the other two. **Customer-facing phone** and **One-way keg fee ($)** sit together, with **Books opened on** and its explanation on a full-width row below the other brewery fields. **Gravity unit**, below Brewery details, is the brewery default; it saves when you select it, not with **Save brewery**. **Connections** (Accounting, Point of sale, and Chat) opens the page, above Brewery details, so a phone reaches them without scrolling past the forms. **People and places** (Team, Locations, Water profiles, Sale channels, and Import) follows the forms. On phones these sections stack. Use the shared **− / +** count control or type a whole number from 1 to 168 for **Reading overdue after (hours)**, then **Save brewery**.
 
 The **Customer-facing phone** field explains that the portal prints this number when online payment is unavailable. Leave it empty if you do not want a phone number shown.
 
@@ -1648,6 +1648,28 @@ For customers, a later ready row with the same name is blocked as a duplicate of
 Keep the page open until results are recovered. If the connection fails, some rows may have committed: **Retry same batch**, shown until results come back, returns the original committed and blocked outcomes without posting opening stock twice. **Correct blocked rows in a new batch** carries only blocked rows back to an editable **Review** step. Even if lookup data changes, retrying the unchanged old batch returns its original blocked result. Never upload committed opening balances as a new batch; that would add the stock again. Reloading this browser tab restores the unresolved batch and its original row numbers. Retry is always explicit. If you have checked the imported records and the batch cannot be recovered, select **Discard saved request**, then **Confirm discard**; MGR drops the saved batch without sending it and returns to **Review**, or to **Upload** after a reload. Check which rows were saved first, and never re-import committed opening balances. Closing the tab clears its recovery data.
 
 Once results show, **Import another file** returns to upload so you can import the next kind, such as ship-tos after customers or opening balances after SKUs. It clears the finished batch, file, and column matches, and reloads the reference ID lists so records the last batch created can be used. It appears only after results are recovered; an unresolved batch must be retried or discarded first. Any blocked rows from the finished batch are left behind, so correct them with **Correct blocked rows in a new batch** before moving on.
+
+## Connect an AI agent [#agents]
+
+An outside agent, such as Claude or ChatGPT, can read MGR for you once your brewery allows it. It acts as you: it sees what your role can see, and it cannot change anything.
+
+Agents are off for every brewery until an Admin turns on **Allow outside agents** under **Agents** in **Settings**. The switch saves at once. Turning it off stops every connected agent at that brewery straight away.
+
+When an agent asks to connect, MGR shows you a page to decide.
+
+<Screen name="Connect agent" />
+
+Check the page before you choose **Connect**:
+
+- **Sends you back to** names where your sign-in goes. An agent picks its own name, so trust this line over the name.
+- **Breweries it can reach** lists the breweries where agents are on. You cannot limit an agent to one of them.
+- The company behind the agent receives what it reads, under its own terms.
+
+**Deny** sends you back to the agent without connecting it. If none of your breweries allow agents, the page says so and only **Deny** is offered. If you wait too long, the page says the request has expired, so start again from your agent.
+
+To see your connected agents, open **Me → Agents**. **Remove** stops an agent at once. To use it again, connect it again.
+
+<Screen name="Agents" />
 
 ## Closing your account [#closing]
 

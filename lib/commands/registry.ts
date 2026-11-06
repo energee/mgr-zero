@@ -250,6 +250,8 @@ type DefinitionBase<In> = {
   roles: readonly StaffRole[] | "customer" | "any";
   requiresConfirmation?: boolean;
   aiExposed?: boolean;
+  /** Keeps a read from outside agents, whatever the person's roles allow. */
+  agentHidden?: boolean;
 };
 
 export type CommandDefinition<In, Out> = DefinitionBase<In> & {
@@ -273,7 +275,7 @@ type QueryDefinitionInput<In, Out> = Omit<QueryDefinition<In, Out>, "kind">;
 
 export type CommandDefinitionMetadata = Pick<
   CommandDefinition<unknown, unknown> | QueryDefinition<unknown, unknown>,
-  "name" | "description" | "input" | "roles" | "requiresConfirmation" | "kind"
+  "name" | "description" | "input" | "roles" | "requiresConfirmation" | "agentHidden" | "kind"
 > & {
   scope: "tenant" | "pretenant";
   aiExposed: boolean;
@@ -368,7 +370,7 @@ export function definePreTenantCommand<In, Out>(definition: {
 
 /** Authenticated reads that do not require an existing membership. */
 export function definePreTenantQuery<In, Out>(definition: {
-  name: "list_my_invitations";
+  name: "list_my_invitations" | "list_my_agent_breweries";
   description: string;
   input: ZodType<In>;
   handler: (ctx: PreTenantCtx, input: In) => Promise<Out>;
@@ -432,7 +434,7 @@ export async function previewCommand(name: string, rawInput: unknown, ctx: Ctx, 
 export async function runCommand(name: string, rawInput: unknown, ctx: OperationCtx, execution?: CommandExecution): Promise<unknown> {
   const def = registry.get(name);
   if (!def) throw new CommandError(`unknown command: ${name}`, 404, "unknown_command");
-  if (ctx.agent && !(def.kind === "query" && def.aiExposed)) throw new CommandError(`agents cannot run ${name}`, 403, "agent_not_allowed");
+  if (ctx.agent && (def.kind !== "query" || def.agentHidden)) throw new CommandError(`agents cannot run ${name}`, 403, "agent_not_allowed");
   const allowed = canRun(ctx, name);
   if (!allowed) throw new CommandError(`permission denied: ${name} requires ${JSON.stringify(def.roles)}`, 403, "permission_denied");
   const parsed = def.input.safeParse(rawInput);
@@ -468,6 +470,7 @@ export function listTools(options: { aiOnly?: boolean; ctx?: OperationCtx } = {}
     scope: d.scope,
     requiresConfirmation: !!d.requiresConfirmation,
     aiExposed: d.aiExposed,
+    agentHidden: !!d.agentHidden,
     risk: d.risk,
     compensation: d.compensation,
     idempotency: d.idempotency,

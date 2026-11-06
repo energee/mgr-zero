@@ -85,6 +85,8 @@ export type SettingsViewModel = {
   oneWayKegFee: string;
   aiModel: string;
   aiModels: GatewayModelOption[];
+  /** Whether outside agents such as Claude or ChatGPT may connect. */
+  agentsEnabled: boolean;
   deployment: string;
   /** Portal fulfillment location id, or null when none is set. */
   warehouseId: string | null;

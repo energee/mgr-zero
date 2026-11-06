@@ -15,10 +15,10 @@ describe("leafFields", () => {
       lines: z.array(z.object({ skuId: z.uuid(), qty: z.number() })),
     });
     expect(leafFields(schema)).toEqual([
-      { name: "orderId", described: true },
-      { name: "note", described: true },
-      { name: "skuId", described: false },
-      { name: "qty", described: false },
+      { name: "orderId", description: "The order" },
+      { name: "note", description: "A note" },
+      { name: "skuId", description: undefined },
+      { name: "qty", description: undefined },
     ]);
   });
 

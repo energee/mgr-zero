@@ -1,6 +1,8 @@
 import { NotFoundView } from "@/components/mgr/views/not-found";
 import { BatchCompletionFixture } from "@/components/mgr/fixtures/batch-completion";
 import { AccountInvitationsView } from "@/components/mgr/views/account-invitations";
+import { AgentConsentView } from "@/components/mgr/views/agent-consent";
+import { ConnectedAgentsView } from "@/components/mgr/views/connected-agents";
 import { RouteErrorView } from "@/components/mgr/views/route-error";
 import { CommandRecoveryView } from "@/components/mgr/views/command-recovery";
 import { PackagingSourcePicker, PlanActions } from "@/components/mgr/views/plan-actions";
@@ -406,7 +408,7 @@ const DEFAULT_STATES: NonNullable<Screen["states"]> = [["empty", "Nothing here y
 const occupancyActions = (reading: boolean) => <div className="flex flex-wrap gap-2">{reading && E.btn("Reading", "g")}{E.btn("Transfer", "g")}{E.btn("Addition", "g")}<BatchCompletionFixture /></div>;
 const permitted = (who: string): NonNullable<Screen["states"]> => [["permission", who, 1], ...DEFAULT_STATES.filter(([st]) => st !== "permission")];
 /** Settings and its no-warehouse variant draw the same page, so they read and write the same. */
-const SETTINGS_IO = { reads: "get_brewery · get_brewery_ai_model · list_locations · list_team_members · list_compliance_reports · list_reporting_basis_corrections · gateway.getAvailableModels [platform]", writes: "update_brewery · set_brewery_operating_defaults · set_books_opened_on · correct_reporting_basis · set_brewery_gravity_unit · set_brewery_ai_model · update_location · set_portal_fulfillment_source" };
+const SETTINGS_IO = { reads: "get_brewery · get_brewery_ai_model · list_locations · list_team_members · list_compliance_reports · list_reporting_basis_corrections · gateway.getAvailableModels [platform]", writes: "update_brewery · set_brewery_operating_defaults · set_books_opened_on · correct_reporting_basis · set_brewery_gravity_unit · set_brewery_ai_model · set_brewery_agents_enabled · update_location · set_portal_fulfillment_source" };
 
 /** INV-1039 partly paid in MGR: Record payment's cap and the $300.00 check Void payment voids. */
 const LOCAL_PARTLY_PAID = toInvoiceViewProps(invoiceLocalPartlyPaid);
@@ -621,6 +623,37 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
     body: <EntryView model={signIn} />,
+  },
+  {
+    step: 2, slice: "all", group: "Entry", surface: "entry", name: "Connect agent",
+    to: { Connect: "Connect agent", Deny: "Connect agent" },
+    job: "Decide whether an outside agent may act as you", states: DEFAULT_STATES,
+    reads: "supabase_auth_oauth_authorization [platform] · list_my_agent_breweries", writes: "supabase_auth_oauth_consent [platform]",
+    spec: "Supabase's OAuth server sends a person here when an agent such as Claude or ChatGPT asks to connect. A client chooses its own name, so the page also names where the sign-in goes. Both buttons return to the agent.",
+    body: <AgentConsentView model={{ clientName: "Claude", destination: "claude.ai", reachable: ["Demo Brewing"], unreachable: [], canApprove: true }} />,
+  },
+  {
+    step: 2, slice: "all", group: "Entry", surface: "entry", name: "Connect agent blocked",
+    to: { Deny: "Connect agent blocked" },
+    job: "Say why an agent cannot connect yet", states: DEFAULT_STATES,
+    reads: "supabase_auth_oauth_authorization [platform] · list_my_agent_breweries", writes: "supabase_auth_oauth_consent [platform]",
+    spec: "No brewery the person works at allows agents, so Connect is not offered. An Admin turns agents on in Settings.",
+    body: <AgentConsentView model={{ clientName: "Claude", destination: "claude.ai", reachable: [], unreachable: ["Demo Brewing"], canApprove: false }} />,
+  },
+  {
+    step: 2, slice: "all", group: "Entry", surface: "entry", name: "Connect agent expired",
+    job: "Say an agent's request is no longer valid", states: DEFAULT_STATES,
+    reads: "supabase_auth_oauth_authorization [platform]", writes: "",
+    spec: "The request expired or was never valid. The person starts again from their agent.",
+    body: <AgentConsentView model={null} />,
+  },
+  {
+    step: 1, slice: "all", group: "Global", name: "Agents",
+    to: { Today: "Today" },
+    job: "See and remove the agents connected to your account", states: DEFAULT_STATES,
+    reads: "supabase_auth_oauth_grants [platform]", writes: "supabase_auth_oauth_revoke [platform]",
+    spec: "Opened from the Me sheet. Removing an agent revokes its grant and stops it at once.",
+    body: <ConnectedAgentsView agents={[{ clientId: "example", name: "Claude", connectedOn: "Nov 5, 2026" }]} />,
   },
   {
     step: 2, slice: 1, group: "Entry", surface: "entry", name: "Account invitations",

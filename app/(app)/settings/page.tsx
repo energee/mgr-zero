@@ -10,6 +10,7 @@ import { dollarsInput } from "@/lib/mgr/money";
 import "@/lib/commands/all";
 import { PortalFulfillmentForm } from "./portal-fulfillment-form";
 import { SettingsForm, type BrewerySettings } from "./settings-form";
+import { AgentsSettingsForm } from "./agents-settings-form";
 import { AiModelSettingsForm } from "./ai-model-settings-form";
 import { getGatewayLanguageModels } from "@/lib/chat/models";
 import { ReportingBasisForm } from "./reporting-basis-form";
@@ -26,7 +27,7 @@ export default async function SettingsPage() {
   if (!brewery.roles.includes("admin")) redirect(deniedHref("Settings", ["admin"]));
   const ctx = await buildContext(brewery.id);
   const [row, locations, team, ai, aiModels, reports, basisCorrections] = await Promise.all([
-    runCommand("get_brewery", {}, ctx) as Promise<BrewerySettings & { portal_fulfillment_location_id: string | null; gravity_unit: GravityUnit }>,
+    runCommand("get_brewery", {}, ctx) as Promise<BrewerySettings & { portal_fulfillment_location_id: string | null; gravity_unit: GravityUnit; agents_enabled: boolean }>,
     runCommand("list_locations", {}, ctx) as Promise<{ id: string; name: string; uses: string[] }[]>,
     runCommand("list_team_members", {}, ctx) as Promise<unknown[]>,
     runCommand("get_brewery_ai_model", {}, ctx) as Promise<{ model: string }>,
@@ -55,6 +56,7 @@ export default async function SettingsPage() {
         oneWayKegFee: dollarsInput(row.one_way_keg_fee_cents),
         aiModel: ai.model,
         aiModels,
+        agentsEnabled: row.agents_enabled,
         deployment: serverEnv.dedicated ? "dedicated" : "hosted",
         warehouseId: row.portal_fulfillment_location_id,
         warehouseOptions: warehouses.map(({ id, name }) => ({ id, name })),
@@ -66,6 +68,7 @@ export default async function SettingsPage() {
       reportingBasisForm={<ReportingBasisForm key={row.books_opened_on ?? "unset"} basis={row.books_opened_on} history={basisCorrections} timeZone={row.timezone} />}
       fulfillmentForm={<PortalFulfillmentForm key={row.portal_fulfillment_location_id ?? "unconfigured"} locations={warehouses} currentId={row.portal_fulfillment_location_id} />}
       aiModelForm={<AiModelSettingsForm current={ai.model} models={aiModels} />}
+      agentsForm={<AgentsSettingsForm current={row.agents_enabled} />}
       hrefs={{ water: "/catalog/water-profiles?from=settings", locations: "/locations", team: "/settings/team", accounting: "/settings/accounting", pos: "/settings/pos", chat: "/settings/chat", import: "/settings/import", channels: "/settings/channels" }}
     />
   );
