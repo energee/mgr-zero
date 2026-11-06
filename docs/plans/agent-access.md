@@ -348,12 +348,14 @@ a `leave_note` text fails the test.
 **Modify:**
 - New service-only RPC `agent_friction_report`, called by a scheduled job
   under `app/api/` with job auth like `lib/jobs/auth.ts`.
-- Per tool: calls, error codes, the input paths that fail validation most,
-  proposals declined, stale and expired, and approval wait time.
-- Per client: sessions, and which tools it never reaches.
-- The job writes `findings.jsonl` and a script modeled on
-  `scripts/file-doc-findings.sh` rewrites one `Agent friction` issue. The
-  dreaming workflow reads it like the docs-gaps issues.
+- Per operation: calls, error codes and the input paths that fail most.
+  Proposals by status. Per client: sessions, with its name stripped to plain
+  characters, because a client picks its own name.
+- Approval wait time and which tools a client never reaches wait until someone
+  asks (Negative 1). A proposal stores no decision time yet.
+- `.github/workflows/hosted-jobs.yml` takes the report and rewrites one
+  `Agent friction` issue. The repo is public. The dreaming workflow sees the
+  issue's title and comment count, never its body.
 - `leave_note` text is never exported. It may hold tenant data, and it is a
   prompt-injection path into the coding agents. Ted reads it on an internal
   operator page and files an issue by hand when it matters.

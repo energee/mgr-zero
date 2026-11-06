@@ -4,9 +4,10 @@
 # so this POSTs the existing bearer-authenticated routes instead:
 #   - order email every 5 minutes (each call sends at most ten)
 #   - retention prune daily (#766)
+#   - agent friction report weekly, which rewrites the "Agent friction" issue (#1766)
 # GitHub may delay or skip a scheduled run under load; the next run catches up.
 # Needs repository variable MGR_URL (production origin, no trailing slash) and
-# secrets ORDER_EMAIL_JOB_SECRET and RETENTION_JOB_SECRET matching Vercel.
+# secrets ORDER_EMAIL_JOB_SECRET, RETENTION_JOB_SECRET and AGENT_FRICTION_JOB_SECRET matching Vercel.
 # Missing MGR_URL fails the scheduled job rather than hiding an unconfigured worker.
 # A failed call fails the run so GitHub notifies. A redirect fails too:
 # --fail ignores 3xx, and Vercel Deployment Protection answers 302.
@@ -16,6 +17,7 @@ on:
   schedule:
     - cron: '*/5 * * * *'
     - cron: '17 7 * * *'
+    - cron: '41 8 * * 1'
   workflow_dispatch:
 
 permissions: {}
@@ -47,3 +49,29 @@ jobs:
         run: |
           [ -n "$MGR_URL" ] || { echo "::error::MGR_URL repository variable is required"; exit 1; }
           curl -sS --fail-with-body --location --max-redirs 0 --max-time 240 -X POST "$MGR_URL/api/retention/jobs/prune" -H "Authorization: Bearer $SECRET"
+
+  agent-friction:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '41 8 * * 1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Rewrite the Agent friction issue
+        env:
+          SECRET: ${{ secrets.AGENT_FRICTION_JOB_SECRET }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          [ -n "$MGR_URL" ] || { echo "::error::MGR_URL repository variable is required"; exit 1; }
+          # An optional report: a missing secret must not mark hosted jobs, which delivers order email, as failing.
+          [ -n "$SECRET" ] || { echo "::warning::AGENT_FRICTION_JOB_SECRET is not set"; exit 0; }
+          curl -sS --fail-with-body --location --max-redirs 0 --max-time 240 -X POST "$MGR_URL/api/agents/jobs/friction" -H "Authorization: Bearer $SECRET" -o report.json
+          jq -er .markdown report.json > report.md
+          title="Agent friction"
+          open=$(gh issue list --state open --search "in:title \"$title\"" --json number,title --jq "map(select(.title == \"$title\"))[0].number // empty")
+          if [ -n "$open" ]; then
+            gh issue edit "$open" --body-file report.md
+          else
+            gh issue create --title "$title" --body-file report.md
+          fi

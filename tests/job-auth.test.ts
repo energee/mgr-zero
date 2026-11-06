@@ -10,13 +10,17 @@ vi.mock("@/lib/chat/jobs", () => ({
   cleanupChatState: async () => ({}),
 }));
 vi.mock("@/lib/email/jobs", () => ({ runOrderEmailBatch: async () => ({}) }));
-vi.mock("@/lib/retention/jobs", () => ({ pruneCommandRequests: async () => 0, pruneAgentHistory: async () => 0 }));
+vi.mock("@/lib/retention/jobs", () => ({
+  pruneCommandRequests: async () => 0, pruneAgentHistory: async () => 0,
+  readFrictionReport: async () => ({ operations: [], errors: [], paths: [], proposals: [], clients: [] }),
+}));
 import { authorizeJob } from "@/lib/jobs/auth";
 import { POST as scan } from "@/app/api/chat/jobs/scan/route";
 import { POST as chatDeliver } from "@/app/api/chat/jobs/deliver/route";
 import { POST as cleanup } from "@/app/api/chat/jobs/cleanup/route";
 import { POST as emailDeliver } from "@/app/api/email/jobs/deliver/route";
 import { POST as prune } from "@/app/api/retention/jobs/prune/route";
+import { POST as friction } from "@/app/api/agents/jobs/friction/route";
 
 afterEach(() => { vi.unstubAllEnvs(); });
 
@@ -36,6 +40,7 @@ describe("job routes", () => {
     vi.stubEnv("CHAT_JOB_SECRET", "chat");
     vi.stubEnv("ORDER_EMAIL_JOB_SECRET", "email");
     vi.stubEnv("RETENTION_JOB_SECRET", "retention");
+    vi.stubEnv("AGENT_FRICTION_JOB_SECRET", "friction");
     for (const post of [scan, chatDeliver, cleanup]) {
       expect(await status(post, "email")).toBe(401);
       expect(await status(post, "chat")).toBe(200);
@@ -44,5 +49,7 @@ describe("job routes", () => {
     expect(await status(emailDeliver, "email")).toBe(200);
     expect(await status(prune, "chat")).toBe(401);
     expect(await status(prune, "retention")).toBe(200);
+    expect(await status(friction, "friction")).toBe(200);
+    expect(await status(friction, "retention")).toBe(401);
   });
 });

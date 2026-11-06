@@ -376,7 +376,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     chat_settings_request_completed: [B,f.taproom.id,importRequest],
     get_published_pos_menu: [R()], store_cola_label_image: [B,"26001001000999","https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Forged.jpg&filetype=l","data:image/jpeg;base64,/9j/2Q=="],
     provision_brewery: [f.taproom.id,"Fixture","America/New_York",null,R()],
-    close_brewery: [B], prune_agent_history: [], prune_command_requests: [],
+    close_brewery: [B], agent_friction_report: [], prune_agent_history: [], prune_command_requests: [],
   };
   if (existsSync(".env.test.local")) {
     // Admit only this reset's verified probe; every other service RPC still
