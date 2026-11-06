@@ -9,16 +9,7 @@ reviews:
   auto_review:
     enabled: true
     drafts: false
-    base_branches:
-      - "main"
-      - "master"
   path_filters:
     - "!**/bun.lock"
-    - "!**/package-lock.json"
-    - "!**/yarn.lock"
-    - "!**/pnpm-lock.yaml"
-    - "!**/*.min.js"
-    - "!**/dist/**"
-    - "!**/.next/**"
 chat:
   auto_reply: true
