@@ -861,10 +861,11 @@ delete, look for the compensating operation instead.
 
 ## Agents over MCP [#mcp]
 
-An outside agent, such as Claude or ChatGPT, does not call `/api/command`. It
-connects to the MCP endpoint, which reaches the same operations through seven
-tools. Nothing is listed for agents by hand: a new operation is reachable once
-it is registered.
+An outside agent, such as Claude or ChatGPT, connects to the MCP endpoint, which
+reaches the same operations through seven tools. Nothing is listed for agents by
+hand: a new operation is reachable once it is registered. An agent's OAuth token
+is also accepted by `/api/command`, but only for reads it may run over MCP; a
+command sent with it returns `403 agent_not_allowed`.
 
 ```http
 POST /api/mcp
@@ -878,7 +879,7 @@ consent. A person's own session token is refused.
 
 | Tool | What it does |
 | --- | --- |
-| `get_started` | Says which breweries the agent can reach, its roles there, and today's work. |
+| `get_started` | Says which breweries the agent can reach and its roles there. When the person works at exactly one brewery, it also returns today's work. |
 | `find_operations` | Lists what the agent can read or propose, optionally matching words. |
 | `describe_operation` | Explains one operation: its fields, what they mean, and an example input. |
 | `run_query` | Runs one read by name. |
