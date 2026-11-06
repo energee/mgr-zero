@@ -12,7 +12,7 @@ export function AgentsSettingsForm({ current }: { current: boolean }) {
   const [seen, setSeen] = useState(current);
   if (seen !== current) { setSeen(current); setValue(current); }
   const action = useCommandAction();
-  return <AgentsSettingsView enabled={value} busy={action.busy} error={action.error ?? undefined}
+  return <AgentsSettingsView enabled={value} busy={action.busy} error={action.error ?? undefined} activityHref="/settings/agents/activity"
     onChange={enabled => {
       setValue(enabled);
       void action.run("set_brewery_agents_enabled", { enabled }).then(ok => { if (!ok) setValue(current); });

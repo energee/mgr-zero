@@ -112,6 +112,7 @@ export const UNLISTED_NAV: readonly NavItem[] = [
   { label: "Chat", href: "/settings/chat", about: "Link Slack and set your notifications" },
   { label: "Agents", href: "/settings/agents", about: "See and remove the AI agents connected to your account" },
   { label: "Changes to approve", href: "/proposals", about: "Approve or decline what your agents proposed" },
+  { label: "Agent activity", href: "/settings/agents/activity", roles: ["admin"], about: "See what agents and Ask MGR did here" },
 ];
 
 export const PORTAL_NAV: readonly NavItem[] = [

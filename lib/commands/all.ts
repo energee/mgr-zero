@@ -4,6 +4,7 @@ import "./tenancy";
 import "./inventory";
 import "./preview";
 import "./agent-proposals";
+import "./agent-sessions";
 import "./transfers";
 import "./import";
 import "./invites";

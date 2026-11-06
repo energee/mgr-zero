@@ -5401,6 +5401,9 @@ isOneToOne: false
 "leave_delivery_for_later":
 { Args: { "p_delivery": string,"p_request_id": string,"p_route": string }; Returns: Json
                            },
+"list_agent_sessions":
+{ Args: { "p_brewery": string,"p_session"?: string }; Returns: Json
+                           },
 "list_chat_conversations":
 { Args: { "p_brewery": string }; Returns: Json
                            },
