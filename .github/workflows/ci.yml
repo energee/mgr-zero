@@ -100,7 +100,7 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with: { bun-version-file: ".bun-version" }
       - run: bun install --frozen-lockfile
-      - uses: supabase/setup-cli@d239d1052f6f024a8d746d7e5aeddead63b9cb53 # v1
+      - uses: supabase/setup-cli@689adcfb80d947100a1eab127289b97d1fb07b13 # v1
         with: { version: 2.121.0 }
       # The CLI only reads auth templates inside the test project's root.
       - run: scripts/test-stack-templates.sh
