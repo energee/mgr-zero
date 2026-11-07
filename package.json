@@ -65,7 +65,7 @@
     "eslint-config-next": "16.4.4",
     "shadcn": "^4.23.0",
     "supabase": "^2.121.0",
-    "tailwindcss": "^4.3.3",
+    "tailwindcss": "^4.3.4",
     "tsx": "^4.23.15",
     "typescript": "https://registry.npmjs.org/@typescript/typescript6/-/typescript6-6.0.2.tgz",
     "vite": "8.3.4",
