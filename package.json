@@ -69,7 +69,7 @@
     "tsx": "^4.23.15",
     "typescript": "https://registry.npmjs.org/@typescript/typescript6/-/typescript6-6.0.2.tgz",
     "vite": "8.3.4",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   },
   "overrides": {
     "katex": "0.19.0",
