@@ -16,3 +16,12 @@ updates:
         patterns:
           - "chat"
           - "@chat-adapter/*"
+      # fumadocs-mdx requires a matching fumadocs-core; bumped apart the build fails.
+      fumadocs:
+        patterns:
+          - "fumadocs-*"
+      # tests/tooling-contract.test.ts pins next and eslint-config-next to one patch.
+      next:
+        patterns:
+          - "next"
+          - "eslint-config-next"
