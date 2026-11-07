@@ -10,6 +10,11 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # The runtime is Node 24 (.node-version, engines, ci.yml); the types track it,
+      # so a major bump waits for the runtime bump.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       # chat and its adapters pin each other's exact version; bumped apart they fail tsc.
       chat-sdk:
