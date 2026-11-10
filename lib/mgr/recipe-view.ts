@@ -17,10 +17,14 @@
 // the batch, as a count of packs when it is whole packs (ingredientPack,
 // batchTotalText), and the editor offers rounding it to whole packs
 // (packRounding). Each mash line carries its share of the grain bill by
-// weight (gristShares). Batch actuals is the table of get_recipe_outcomes: what the
-// shown copy predicts, then one row per brewed batch (outcomeTable), and the gap
-// for the shown copy (outcomeSummary).
-// As brewed lists the earlier copies those batches brewed (recipeHistory); Use
+// weight (gristShares), and two copies have the same grain bill when their mash
+// lines are the same (gristKey). Batch actuals is the table of
+// get_recipe_outcomes: what the shown copy predicts, then one row per brewed
+// batch, or per tank of a batch read in several, and the newest batches other
+// recipes brewed on the same grain bill (outcomeTable). Its summary line gives
+// the mash figures for the grain bill and the fermentation figures for the
+// shown copy (outcomeSummary).
+// As brewed lists the earlier copies this recipe's batches brewed (recipeHistory); Use
 // this again loads one into the editor and says where it came from (loadedNotice).
 // The database calls a saved copy a recipe version; the page never says so.
 import type { ReactNode } from "react";
@@ -134,7 +138,7 @@ export type RecipeViewModel = {
   /** The headline figures as value and label (["15.2 °P", "OG"]), and the lines under them (figureStrip). */
   figures?: [string, string][];
   figureNotes?: string[];
-  /** Batch actuals: one row per brewed batch of any copy (outcomeTable), then the gap for the shown copy. */
+  /** Batch actuals: the table (outcomeTable) and its summary line (outcomeSummary). */
   actuals?: RecipeActuals;
   actualsNote?: string;
 };
@@ -325,6 +329,13 @@ export function gristShares(lines: readonly { stage: string; perBbl: number; uni
   return pounds.map((lb) => (lb > 0 ? lb / bill : undefined));
 }
 
+/** The grain bill of a copy as one string, from its mash lines: the same for two copies exactly when they have the
+ *  same materials at the same per-bbl amounts, in any order. Nothing is rounded, and a malt written on two lines is
+ *  not one line of their sum. "" with no mash line. */
+export function gristKey(mashLines: readonly { materialId: string; perBbl: number }[]): string {
+  return mashLines.map((line) => `${line.materialId}:${line.perBbl}`).sort().join("|");
+}
+
 /** At `bbl`: whole when the total is already whole packs, else a Round choice down (from one pack up) and up, each
  *  named as the line will read once chosen ("Round to 4 × 50 lb", or "Round to 18 bags" with a pack word) and
  *  carrying the per-bbl amount that gives that many packs (perBblForPacks). Null with no pack.
@@ -340,12 +351,21 @@ export function packRounding(p: RecipePack, bbl: number): { whole: boolean; choi
 
 /** What get_recipe_outcomes returns for one brewed batch: its measured figures beside what its own copy (`version`)
  *  predicted and assumed. A measured figure is null when an input is missing. Efficiency is null until the batch closes, because
- *  nothing records how many turns it will have. The fractions (attenuation, efficiency) run 0 to 1; ABV is a percent. */
+ *  nothing records how many turns it will have. The fractions (attenuation, efficiency) run 0 to 1; ABV is a percent.
+ *  A batch whose gravity was read in more than one tank comes once per tank: `vessel` names the tank, OG, FG, ABV and
+ *  attenuation are that tank's, and the efficiency is the batch's on each. `sameGrainBill` says the batch's own copy
+ *  has the grain bill of the copy asked for (gristKey). `recipeName` is set on a batch another recipe brewed on that
+ *  grain bill: its `version` counts that recipe's copies, and its FG, ABV and attenuation are always null, because
+ *  they follow that recipe's yeast and fermentation. */
 export type RecipeOutcome = {
   batchId: string; batchNo: number | null; version: number; brewedOn: string; closed: boolean;
   ogPlato: number | null; fgPlato: number | null; abv: number | null; apparentAttenuation: number | null; brewhouseEfficiency: number | null;
   predicted: RecipeGravityResult | null; assumedEfficiency: number; assumedAttenuation: number;
+  sameGrainBill: boolean; vessel?: string; recipeName?: string;
 };
+
+/** How many batches the rows stand for: a batch read in two tanks has two rows. */
+const batchCount = (rows: RecipeOutcome[]) => new Set(rows.map((o) => o.batchId)).size;
 
 /** A fraction as a whole percent: 0.657 reads "66%". */
 export const wholePercent = (fraction: number) => `${Math.round(fraction * 100)}%`;
@@ -354,19 +374,30 @@ export const wholePercent = (fraction: number) => `${Math.round(fraction * 100)}
  *  not the one shown (the top row already says the shown copy's). Either is "" when there is none. */
 type OutcomeCell = { measured: string; predicted: string };
 /** Batch actuals as a table: the five figure columns, what the shown copy predicts and assumes for each, then one row per
- *  batch. `notes` say what is missing or can still move, and mark a batch another copy brewed. */
+ *  batch or tank. `tag` says what sets a row apart from its batch number: "in FV3" on a tank's row, "as Session IPA" on
+ *  a batch another recipe brewed. `notes` say what is missing or can still move, and mark a batch another copy brewed.
+ *  `footnote` is the line under the rows, drawn once another recipe's batch is among them. `batches` counts this
+ *  recipe's own brewed batches, for the folded line while there is no summary. */
 export type RecipeActuals = {
   columns: string[]; predicted: string[];
-  rows: { key: string; batch: string; brewed: string; notes: string[]; cells: OutcomeCell[] }[];
+  rows: { key: string; batch: string; brewed: string; tag?: string; notes: string[]; cells: OutcomeCell[] }[];
+  footnote?: string; batches: number;
 };
 /** What a copy predicts and assumes; a brewed batch carries its own copy's. */
 type OutcomeBasis = Pick<RecipeOutcome, "version" | "predicted" | "assumedEfficiency" | "assumedAttenuation">;
 
+/** How many batches of other recipes Batch actuals lists before it counts the rest: the newest ones. */
+const OTHER_RECIPE_ROWS = 5;
+
 /** Batch actuals: the five figures of each brewed batch, in the order given, under what the shown copy (`shown`) predicts
  *  and assumes. Gravity is in the reader's unit, named once in its column head. A batch another copy brewed is marked
- *  "earlier recipe" or "later recipe" and carries that copy's own prediction. Undefined with no batches, so no section is drawn. */
+ *  "earlier recipe" or "later recipe" and carries that copy's own prediction. A batch another recipe brewed reads
+ *  "as <recipe>" with its OG and efficiency alone; the first OTHER_RECIPE_ROWS of those are listed and the footnote
+ *  counts the rest. Every batch of this recipe is listed. Undefined with no batches, so no section is drawn. */
 export function outcomeTable(outcomes: RecipeOutcome[], unit: GravityUnit, shown: OutcomeBasis): RecipeActuals | undefined {
   if (outcomes.length === 0) return undefined;
+  const others = outcomes.filter((o) => o.recipeName !== undefined);
+  const unlisted = new Set(others.slice(OTHER_RECIPE_ROWS));
   // The column head names the unit, so a Plato figure drops it: "14.8" under "OG °P".
   const gravity = (plato: number | null) => (plato === null ? "" : formatGravity(plato, unit).replace(" °P", ""));
   const percent1 = (n: number | null) => (n === null ? "" : `${n.toFixed(1)}%`);
@@ -378,31 +409,45 @@ export function outcomeTable(outcomes: RecipeOutcome[], unit: GravityUnit, shown
   return {
     columns: [`OG${degrees}`, `FG${degrees}`, "ABV", "Attenuation", "Efficiency"],
     predicted: basis(shown),
-    rows: outcomes.map((o) => {
-      const own = o.version === shown.version ? null : basis(o);
+    rows: outcomes.filter((o) => !unlisted.has(o)).map((o) => {
+      // Another recipe's copy is neither earlier nor later than the one shown, and its FG is never read here.
+      const other = o.recipeName !== undefined;
+      const own = other || o.version === shown.version ? null : basis(o);
       const values = [
         gravity(o.ogPlato), gravity(o.fgPlato), percent1(o.abv),
         o.apparentAttenuation === null ? "" : wholePercent(o.apparentAttenuation), o.brewhouseEfficiency === null ? "" : wholePercent(o.brewhouseEfficiency),
       ];
       const notes = [
-        o.version < shown.version && "earlier recipe",
-        o.version > shown.version && "later recipe",
+        !other && o.version < shown.version && "earlier recipe",
+        !other && o.version > shown.version && "later recipe",
         o.ogPlato === null && "no gravity readings yet",
-        o.ogPlato !== null && o.fgPlato === null && "FG needs a second reading",
+        !other && o.ogPlato !== null && o.fgPlato === null && "FG needs a second reading",
         !o.closed && "still open",
       ].filter((note): note is string => Boolean(note));
-      return { key: o.batchId, batch: batNo(o.batchNo), brewed: formatDate(o.brewedOn), notes, cells: values.map((value, i) => ({ measured: value, predicted: own?.[i] ?? "" })) };
+      return {
+        // A batch read in two tanks has two rows, told apart by the tank.
+        key: o.vessel === undefined ? o.batchId : `${o.batchId} ${o.vessel}`, batch: batNo(o.batchNo), brewed: formatDate(o.brewedOn),
+        tag: other ? `as ${o.recipeName}` : o.vessel === undefined ? undefined : `in ${o.vessel}`,
+        notes, cells: values.map((value, i) => ({ measured: value, predicted: own?.[i] ?? "" })),
+      };
     }),
+    batches: batchCount(outcomes.filter((o) => o.recipeName === undefined)),
+    footnote: others.length === 0 ? undefined : [
+      "A batch brewed as another recipe counts toward the mash figures only, so its fermentation figures are left out.",
+      unlisted.size > 0 && `${plural(unlisted.size, "more batch", "more batches")} of this grain bill ${unlisted.size === 1 ? "is" : "are"} not listed.`,
+    ].filter(Boolean).join(" "),
   };
 }
 
+
 /** As brewed: one row per copy before `latestVersion` that a brewed batch used, newest copy first, named by its
  *  batch numbers ("B-0041 to B-0045") with their count and brew dates. A copy no batch brewed gets no row.
- *  `selected` marks the copy being shown. */
+ *  `selected` marks the copy being shown. A batch another recipe brewed is left out: its copy is not this recipe's. */
 export function recipeHistory(outcomes: RecipeOutcome[], shownVersion: number, latestVersion: number): RecipeHistoryRow[] {
-  const earlier = [...new Set(outcomes.map((o) => o.version))].filter((v) => v !== latestVersion).sort((a, b) => b - a);
+  const own = outcomes.filter((o) => o.recipeName === undefined);
+  const earlier = [...new Set(own.map((o) => o.version))].filter((v) => v !== latestVersion).sort((a, b) => b - a);
   return earlier.map((version) => {
-    const batches = outcomes.filter((o) => o.version === version);
+    const batches = own.filter((o) => o.version === version);
     const numbers = batches.flatMap((b) => b.batchNo ?? []);
     const [low, high] = numbers.length ? [Math.min(...numbers), Math.max(...numbers)] : [null, null];
     // ISO dates sort as text.
@@ -410,7 +455,7 @@ export function recipeHistory(outcomes: RecipeOutcome[], shownVersion: number, l
     const [first, last] = [days[0], days[days.length - 1]].map((day) => formatDate(day));
     return {
       title: low === high ? batNo(low) : `${batNo(low)} to ${batNo(high)}`,
-      detail: `${plural(batches.length, "batch", "batches")} · ${first === last ? first : `${first} – ${last}`}`,
+      detail: `${plural(batchCount(batches), "batch", "batches")} · ${first === last ? first : `${first} – ${last}`}`,
       href: `?v=${version}`, selected: version === shownVersion,
     };
   });
@@ -428,17 +473,26 @@ function percentRange(fractions: number[]): string {
   return low === high ? `${low}%` : `${low}–${high}%`;
 }
 
-/** The gap between what the copy `version` assumes and what its closed batches measured, or undefined under two such batches.
- *  An open batch is skipped because it has no efficiency and its FG can still move. It states the gap and gives no advice:
- *  the brewer decides what to do with it. */
-export function outcomeSummary(outcomes: RecipeOutcome[], version: number): string | undefined {
-  const measured = outcomes.filter((o) => o.version === version && o.closed && o.brewhouseEfficiency !== null);
-  if (measured.length < 2) return undefined;
-  const { assumedEfficiency, assumedAttenuation } = measured[0];
-  const attenuations = measured.flatMap((o) => o.apparentAttenuation ?? []);
-  const efficiency = `efficiency ${percentRange(measured.map((o) => o.brewhouseEfficiency!))} against ${wholePercent(assumedEfficiency)} assumed`;
-  const attenuation = attenuations.length >= 2 ? `; attenuation ${percentRange(attenuations)} against ${wholePercent(assumedAttenuation)} assumed` : "";
-  return `${plural(measured.length, "batch", "batches")}: ${efficiency}${attenuation}.`;
+/** The gap between what the shown copy (`shown`) assumes and what closed batches measured. It states the gap and gives no
+ *  advice: the brewer decides what to do with it. An open batch is skipped because it has no efficiency and its FG can
+ *  still move.
+ *  Efficiency follows the mash, so it is read from every batch on the shown copy's grain bill, whichever recipe or copy
+ *  brewed it; undefined under two such batches. Attenuation follows the yeast, so it is read from the shown copy's own
+ *  batches, and is left out under two values. When every batch counted is the shown copy's own, the line is one
+ *  sentence ("2 batches: efficiency …; attenuation …."); otherwise it names the grain bill, then this recipe. */
+export function outcomeSummary(outcomes: RecipeOutcome[], shown: OutcomeBasis): string | undefined {
+  const closed = outcomes.filter((o) => o.closed);
+  const isOwn = (o: RecipeOutcome) => o.recipeName === undefined && o.version === shown.version;
+  const mash = closed.filter((o) => o.sameGrainBill && o.brewhouseEfficiency !== null);
+  if (batchCount(mash) < 2) return undefined;
+  const fermented = closed.filter((o) => isOwn(o) && o.apparentAttenuation !== null);
+  const efficiency = `efficiency ${percentRange(mash.map((o) => o.brewhouseEfficiency!))} against ${wholePercent(shown.assumedEfficiency)} assumed`;
+  const attenuation = batchCount(fermented) >= 2 ? `attenuation ${percentRange(fermented.map((o) => o.apparentAttenuation!))} against ${wholePercent(shown.assumedAttenuation)} assumed` : "";
+  if (mash.every(isOwn)) return `${plural(batchCount(mash), "batch", "batches")}: ${efficiency}${attenuation && `; ${attenuation}`}.`;
+  // Two recipes of one name count as one, as they read in the table.
+  const recipes = new Set(mash.map((o) => o.recipeName)).size;
+  return `This grain bill, ${plural(batchCount(mash), "batch", "batches")}${recipes > 1 ? ` across ${recipes} recipes` : ""}: ${efficiency}.`
+    + (attenuation && ` This recipe, ${plural(batchCount(fermented), "batch", "batches")}: ${attenuation}.`);
 }
 
 /** The same heading for the screen and its browser tab: the recipe's name, whichever copy is shown. */
@@ -470,6 +524,8 @@ export function toRecipePageModel(
     ?? noMashText(ingredients.map((i) => i.stage));
   const { figures, notes: figureNotes } = figureStrip(s, ctx.unit, { saved: true, why });
   const shares = gristShares(ingredients.map((i) => ({ stage: i.stage, perBbl: Number(i.per_bbl_qty), unit: i.materials?.base_uom ?? material.unit(i.material_id) })));
+  // What the shown copy predicts and assumes: the top row of Batch actuals, and what its summary measures against.
+  const basis = { version: v.version, predicted: s.ogPlato !== null && s.fgPlato !== null && s.abv !== null ? { ogPlato: s.ogPlato, fgPlato: s.fgPlato, abv: s.abv } : null, assumedEfficiency: Number(v.brewhouse_efficiency), assumedAttenuation: Number(v.yeast_attenuation) };
   return {
     ...base,
     ...(v.version === latest
@@ -493,7 +549,7 @@ export function toRecipePageModel(
     fermentationSchedule: v.fermentation_schedule,
     water: waterFacts(draft.water, ctx.profiles, material.name),
     figures, figureNotes,
-    actuals: outcomeTable(ctx.outcomes, ctx.unit, { version: v.version, predicted: s.ogPlato !== null && s.fgPlato !== null && s.abv !== null ? { ogPlato: s.ogPlato, fgPlato: s.fgPlato, abv: s.abv } : null, assumedEfficiency: Number(v.brewhouse_efficiency), assumedAttenuation: Number(v.yeast_attenuation) }),
-    actualsNote: outcomeSummary(ctx.outcomes, v.version),
+    actuals: outcomeTable(ctx.outcomes, ctx.unit, basis),
+    actualsNote: outcomeSummary(ctx.outcomes, basis),
   };
 }

@@ -2,7 +2,8 @@
 // saved copy in the editor (recipe-version-form.tsx), with the recipe's brand
 // and the brands to pick from and, from toRecipePageModel, the saved date,
 // Schedule batch, the figures the saved copy froze, Batch actuals
-// (get_recipe_outcomes) and As brewed around the sheet. A
+// (get_recipe_outcomes, asked for the copy being shown, whose grain bill decides
+// which other recipes' batches it adds) and As brewed around the sheet. A
 // recipe not saved yet opens the blank sheet. ?v=N naming an earlier copy reads
 // that copy out read only (RecipeView), and ignores ?from. ?from=N is Use this
 // again: the editor opens on the current copy with copy N loaded as an unsaved
@@ -48,7 +49,7 @@ export default async function RecipePage({ params, searchParams }: Props) {
     runCommand("get_gravity_unit", {}, ctx),
     runCommand("list_water_profiles", {}, ctx),
     runCommand("list_brands", {}, ctx),
-    runCommand("get_recipe_outcomes", { recipeId: id }, ctx),
+    runCommand("get_recipe_outcomes", { recipeId: id, version: snapshot.version?.version }, ctx),
   ])) as [RecipeMaterial[], { effective: GravityUnit }, WaterProfileRow[], { id: string; name: string; alias: string | null }[], { batches: RecipeOutcome[] }];
   const { recipe, version } = snapshot;
   const latest = snapshot.versions[0];

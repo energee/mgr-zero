@@ -134,13 +134,21 @@ describe("SCREENS", () => {
     expect(String(recipe.reads)).toMatch(/get_recipe_outcomes \[(?!design)/);
     expect(recipe.states?.map(([name]) => name)).toContain("no batches");
     const drawn = text("Recipe");
-    // Folded to its summary line, which states the gap and gives no advice; the table opens under it.
-    expect(drawn).toMatch(/Batch actuals\s+2 batches: efficiency 68–71% against 72% assumed; attenuation 77–78% against 78% assumed\.\s+Show batches\s+Hide batches\s+Batch\s+OG °P/);
+    // Folded to its summary line, which states the gap and gives no advice; the table opens under it. The mash figures
+    // are the grain bill's, across the recipes that share it; the fermentation figures are this recipe's.
+    expect(drawn).toMatch(/Batch actuals\s+This grain bill, 11 batches across 3 recipes: efficiency 67–74% against 72% assumed\. This recipe, 2 batches: attenuation 77–78% against 78% assumed\.\s+Show batches\s+Hide batches\s+Batch\s+OG °P/);
     expect(body("Recipe")).toMatch(/<details[^>]*><summary/);
     // What this recipe predicts heads the table; a batch of an earlier copy carries that copy's own prediction in brackets.
     expect(drawn).toMatch(/Predicted\s+15\.2\s+3\.5\s+6\.3%\s+78%\s+72%/);
     expect(drawn).toMatch(/B-0413\s+Oct 3, 2026\s+14\.8\s+3\.5\s+6\.1%\s+77%\s+68%/);
     expect(drawn).toMatch(/B-0371\s+Jul 18, 2026\s+15\.0\s+\(15\.6\)[\s\S]*earlier recipe/);
+    // A batch split across two tanks has a row per tank: each tank's own FG, the batch's efficiency on both.
+    expect(drawn).toMatch(/B-0398\s+Sep 12, 2026\s+in FV3\s+15\.1\s+3\.4\s+6\.3%\s+78%\s+71%\s+B-0398\s+Sep 12, 2026\s+in FV5\s+15\.1\s+3\.6\s+6\.1%\s+77%\s+71%/);
+    // A batch another recipe brewed on the same grain bill reads as that recipe, with its OG and efficiency alone.
+    expect(drawn).toMatch(/B-0407\s+Sep 20, 2026\s+as Session IPA\s+15\.0\s+70%\s+B-0398/);
+    // The newest five of those are listed; the line under the rows counts the rest.
+    expect(drawn.match(/\bas (Session|West Coast) IPA\b/g)).toHaveLength(5);
+    expect(drawn).toMatch(/A batch brewed as another recipe counts toward the mash figures only, so its fermentation figures are left out\. 2 more batches of this grain bill are not listed\./);
     // As brewed: one row for the earlier copy two batches brewed, told by those batches, and Open reads it out.
     expect(drawn).toMatch(/As brewed\s+B-0356 to B-0371\s+· 2 batches · Jun 27, 2026 – Jul 18, 2026\s+Open\s+the recipe as brewed in B-0356 to B-0371/);
     expect(body("Recipe")).toMatch(/<a[^>]*data-to="Recipe"[^>]*>Open<span class="sr-only"> the recipe as brewed in B-0356 to B-0371<\/span><\/a>/);

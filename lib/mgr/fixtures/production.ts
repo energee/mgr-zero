@@ -272,14 +272,30 @@ export const WATER_HAZY: WaterDraft = {
 /** The names of WATER_HAZY's additions, as list_materials would give them to the recipe page. */
 const WATER_HAZY_NAMES: Record<string, string> = { gypsum: "Gypsum", cacl: "Calcium chloride", lactic: "Lactic acid" };
 
-/** Hazy IPA's brewed batches as get_recipe_outcomes returns them: two closed on the current copy (4), then two on the copy
- *  before it (3), which assumed more efficiency. Batch actuals and As brewed are computed from these. */
-const HAZY_V4 = { version: 4, closed: true, predicted: { ogPlato: 15.2, fgPlato: 3.5, abv: 6.3 }, assumedEfficiency: 0.72, assumedAttenuation: 0.78 };
+/** Hazy IPA's brewed batches as get_recipe_outcomes returns them, newest first. Two are closed on the current copy (4),
+ *  the second split across two tanks, so it comes once per tank. Two are on the copy before it (3), which assumed more
+ *  efficiency on the same grain bill. Between them sit the batches two other recipes brewed on that grain bill, which
+ *  carry their mash figures only. Batch actuals and As brewed are computed from these. */
+const HAZY_V4 = { version: 4, closed: true, predicted: { ogPlato: 15.2, fgPlato: 3.5, abv: 6.3 }, assumedEfficiency: 0.72, assumedAttenuation: 0.78, sameGrainBill: true };
 const HAZY_V3 = { ...HAZY_V4, version: 3, predicted: { ogPlato: 15.6, fgPlato: 3.6, abv: 6.5 }, assumedEfficiency: 0.74 };
+const B0398 = { ...HAZY_V4, batchId: "b-0398", batchNo: 398, brewedOn: "2026-09-12", ogPlato: 15.1, brewhouseEfficiency: 0.71 };
+/** A batch another recipe brewed on Hazy IPA's grain bill: its own copy's assumptions, its OG and efficiency, no fermentation figures. */
+const brewedAs = (recipeName: string, batchNo: number, brewedOn: string, ogPlato: number, brewhouseEfficiency: number): RecipeOutcome => ({
+  ...HAZY_V4, version: 2, predicted: { ogPlato: 15.4, fgPlato: 2.9, abv: 6.7 }, assumedEfficiency: 0.73, assumedAttenuation: 0.82,
+  batchId: `b-0${batchNo}`, batchNo, brewedOn, recipeName, ogPlato, brewhouseEfficiency, fgPlato: null, abv: null, apparentAttenuation: null,
+});
 const HAZY_OUTCOMES: RecipeOutcome[] = [
   { ...HAZY_V4, batchId: "b-0413", batchNo: 413, brewedOn: "2026-10-03", ogPlato: 14.8, fgPlato: 3.5, abv: 6.1, apparentAttenuation: 0.77, brewhouseEfficiency: 0.68 },
-  { ...HAZY_V4, batchId: "b-0398", batchNo: 398, brewedOn: "2026-09-12", ogPlato: 15.1, fgPlato: 3.4, abv: 6.3, apparentAttenuation: 0.78, brewhouseEfficiency: 0.71 },
+  brewedAs("Session IPA", 407, "2026-09-20", 15.0, 0.7),
+  { ...B0398, vessel: "FV3", fgPlato: 3.4, abv: 6.3, apparentAttenuation: 0.78 },
+  { ...B0398, vessel: "FV5", fgPlato: 3.6, abv: 6.1, apparentAttenuation: 0.77 },
+  brewedAs("West Coast IPA", 391, "2026-09-02", 15.3, 0.74),
+  brewedAs("Session IPA", 388, "2026-08-27", 15.2, 0.72),
+  brewedAs("West Coast IPA", 384, "2026-08-20", 14.7, 0.67),
+  brewedAs("Session IPA", 379, "2026-08-08", 15.0, 0.71),
   { ...HAZY_V3, batchId: "b-0371", batchNo: 371, brewedOn: "2026-07-18", ogPlato: 15.0, fgPlato: 3.6, abv: 6.1, apparentAttenuation: 0.77, brewhouseEfficiency: 0.7 },
+  brewedAs("West Coast IPA", 364, "2026-07-09", 14.9, 0.69),
+  brewedAs("Session IPA", 360, "2026-07-01", 15.1, 0.7),
   { ...HAZY_V3, batchId: "b-0356", batchNo: 356, brewedOn: "2026-06-27", ogPlato: 14.9, fgPlato: 3.5, abv: 6.1, apparentAttenuation: 0.77, brewhouseEfficiency: 0.69 },
 ];
 
@@ -340,7 +356,7 @@ export const recipeHazyV4: RecipeViewModel = {
   water: waterFacts(WATER_HAZY, waterProfiles, (id) => WATER_HAZY_NAMES[id]),
   ...(({ figures, notes }) => ({ figures, figureNotes: notes }))(figureStrip({ ...HAZY_V4.predicted, ibu: HAZY_IBU }, "plato", { saved: true })),
   actuals: outcomeTable(HAZY_OUTCOMES, "plato", HAZY_V4),
-  actualsNote: outcomeSummary(HAZY_OUTCOMES, 4),
+  actualsNote: outcomeSummary(HAZY_OUTCOMES, HAZY_V4),
   // The inventory's rows open nothing by address; the Recipe record's `to` says where a tap goes.
   history: recipeHistory(HAZY_OUTCOMES, 4, 4).map((row) => ({ ...row, href: undefined })),
 };

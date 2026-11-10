@@ -21,7 +21,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { RecipeNumbersView } from "@/components/mgr/views/recipe-numbers";
 import { describe, expect, it } from "vitest";
-import { batchTotalText, draftBlocker, draftIbu, figureStrip, gravityBlockerText, gristShares, ingredientCells, ingredientPack, loadedNotice, materialsNowGive, noMashText, packRounding, RECIPE_NUMBERS, recipeHistory, recipePageTitle, toRecipePageModel, versionNumbers, versionToDraft, waterFacts, type RecipeFigures, type RecipeIngredientView, type RecipeOutcome, type RecipePack, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
+import { batchTotalText, draftBlocker, draftIbu, figureStrip, gravityBlockerText, gristKey, gristShares, ingredientCells, ingredientPack, loadedNotice, materialsNowGive, noMashText, packRounding, RECIPE_NUMBERS, recipeHistory, recipePageTitle, toRecipePageModel, versionNumbers, versionToDraft, waterFacts, type RecipeFigures, type RecipeIngredientView, type RecipeOutcome, type RecipePack, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
 import { ibuText } from "@/lib/recipe-ibu";
 import type { IngredientLine, MashStep } from "@/lib/mgr/recipe-process-view";
 import { sgToPlato } from "@/lib/recipe-gravity";
@@ -55,7 +55,7 @@ it("names recipe tabs and the page with the recipe alone, whichever copy is show
 /** One closed batch of the snapshot's current copy (3), as get_recipe_outcomes returns it. */
 const batch: RecipeOutcome = {
   batchId: "b1", batchNo: 9, version: 3, brewedOn: "2026-10-03", closed: true, ogPlato: 12.5, fgPlato: 2.5, abv: 5.3, apparentAttenuation: 0.8, brewhouseEfficiency: 0.7,
-  predicted: null, assumedEfficiency: 0.725, assumedAttenuation: 0.07,
+  predicted: null, assumedEfficiency: 0.725, assumedAttenuation: 0.07, sameGrainBill: true,
 };
 
 describe("figureStrip", () => {
@@ -145,6 +145,18 @@ describe("recipeHistory", () => {
       { title: "B-0005 to B-0007", detail: "2 batches · Aug 12, 2026 – Sep 1, 2026", href: "?v=2", selected: false },
       { title: "B-0002", detail: "1 batch · Jul 4, 2026", href: "?v=1", selected: true },
     ]);
+  });
+});
+
+describe("recipeHistory beside a shared grain bill and split batches", () => {
+  const earlier = { ...batch, batchId: "b7", batchNo: 7, version: 2, brewedOn: "2026-09-01" };
+  it("leaves out the batches other recipes brewed, whose copies are not this recipe's", () => {
+    const other = { ...batch, batchId: "x1", batchNo: 3, version: 2, recipeName: "Session IPA" };
+    expect(recipeHistory([batch, other], 3, 3)).toEqual([]);
+    expect(recipeHistory([batch, other, earlier], 3, 3)).toEqual([{ title: "B-0007", detail: "1 batch · Sep 1, 2026", href: "?v=2", selected: false }]);
+  });
+  it("counts a batch read in two tanks once", () => {
+    expect(recipeHistory([batch, { ...earlier, vessel: "FV3" }, { ...earlier, vessel: "FV5" }], 3, 3)[0].detail).toBe("1 batch · Sep 1, 2026");
   });
 });
 
@@ -381,8 +393,8 @@ describe("toRecipePageModel", () => {
     expect(model.figures).toEqual([]);
     expect(model.figureNotes?.[0]).toBe("No mash ingredient, so nothing is predicted.");
   });
-  it("lists every copy's batches, marks an earlier copy's, and summarizes only the shown copy", () => {
-    const outcomes = [batch, { ...batch, batchId: "b2", batchNo: 8, brewhouseEfficiency: 0.71 }, { ...batch, batchId: "b3", batchNo: 7, version: 2 }];
+  it("lists every copy's batches, marks an earlier copy's, and leaves a copy with another grain bill out of the summary", () => {
+    const outcomes = [batch, { ...batch, batchId: "b2", batchNo: 8, brewhouseEfficiency: 0.71 }, { ...batch, batchId: "b3", batchNo: 7, version: 2, sameGrainBill: false }];
     const model = toRecipePageModel(predicted, { ...ctx, unit: "sg", outcomes });
     expect(model.actuals?.rows.map((r) => [r.batch, r.brewed, ...r.notes])).toEqual([["B-0009", "Oct 3, 2026"], ["B-0008", "Oct 3, 2026"], ["B-0007", "Oct 3, 2026", "earlier recipe"]]);
     expect(model.actuals?.columns[0]).toBe("OG");
@@ -390,6 +402,13 @@ describe("toRecipePageModel", () => {
     // The top row is what the shown copy itself assumes: its saved efficiency and attenuation.
     expect(model.actuals?.predicted.slice(3)).toEqual(["7%", "73%"]);
     expect(model.actualsNote).toMatch(/^2 batches: efficiency 70–71% against 73% assumed/);
+  });
+  it("draws another recipe's batch on the same grain bill as that recipe, and keeps it out of As brewed", () => {
+    const other = { ...batch, batchId: "x1", batchNo: 4, version: 1, recipeName: "Session IPA", fgPlato: null, abv: null, apparentAttenuation: null, brewhouseEfficiency: 0.66 };
+    const model = toRecipePageModel(predicted, { ...ctx, outcomes: [batch, other] });
+    expect(model.actuals?.rows.map((r) => [r.batch, r.tag, ...r.notes])).toEqual([["B-0009", undefined], ["B-0004", "as Session IPA"]]);
+    expect(model.actualsNote).toBe("This grain bill, 2 batches across 2 recipes: efficiency 66–70% against 73% assumed.");
+    expect(model.history).toEqual([]);
   });
   it("has no Batch actuals with no batches", () => {
     const model = toRecipePageModel(predicted, ctx);
@@ -662,6 +681,24 @@ describe("batch amounts in packs", () => {
   });
   it("coerces a numeric pack size that arrives as a string", () => {
     expect(ingredientPack(10, { base_uom: "lb", purchase_uom_factor: "55.000000" as unknown as number, pack_name: null })?.factor).toBe(55);
+  });
+});
+
+describe("gristKey", () => {
+  const bill = [{ materialId: "2row", perBbl: 45 }, { materialId: "oats", perBbl: 9.090909 }];
+  it("is the same for the same mash lines in any order", () => {
+    expect(gristKey([...bill].reverse())).toBe(gristKey(bill));
+  });
+  it("differs by any amount, however small, and by any material", () => {
+    expect(gristKey([bill[0], { ...bill[1], perBbl: 9.09091 }])).not.toBe(gristKey(bill));
+    expect(gristKey([bill[0], { ...bill[1], materialId: "wheat" }])).not.toBe(gristKey(bill));
+    expect(gristKey([bill[0]])).not.toBe(gristKey(bill));
+  });
+  it("keeps the lines as written: a malt on two lines is not one line of their sum", () => {
+    expect(gristKey([{ materialId: "2row", perBbl: 20 }, { materialId: "2row", perBbl: 25 }, bill[1]])).not.toBe(gristKey(bill));
+  });
+  it("is empty with no mash line, so a recipe without a grain bill shares none", () => {
+    expect(gristKey([])).toBe("");
   });
 });
 

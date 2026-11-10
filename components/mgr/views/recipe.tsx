@@ -10,8 +10,11 @@
 // the dry hops and any packaging or other additions. A row is when, what, and
 // how much for the batch; without a batch size it reads per bbl. Under the
 // sheet sit Batch actuals, folded to its summary line over the table, and As
-// brewed, one row per earlier copy. The rows, drawings and sentences are
-// worked out in lib/mgr/recipe-day-view.ts.
+// brewed, one row per earlier copy. The table has a row per batch, a row per
+// tank for a batch read in several ("in FV3"), and the newest batches other
+// recipes brewed on the same grain bill ("as Session IPA"). The rows, drawings
+// and sentences are worked out in lib/mgr/recipe-day-view.ts, and Batch
+// actuals in lib/mgr/recipe-view.ts.
 // The sheet has no always-visible number field. The batch size and the eight
 // process numbers read as text, and any of them opens the one Recipe numbers
 // sheet; a water fact opens Water; a line's name opens its Ingredient sheet.
@@ -49,7 +52,8 @@ type SheetKey = "numbers" | "water" | "mash" | "fermentation";
 
 /** Batch actuals: one narrow table at every width. The top row is what the shown copy predicts and assumes; a batch
  *  another copy brewed prints that copy's own prediction in brackets under its figure. The brew date drops under the
- *  batch number on a phone, and a batch's notes take a line of their own, so no column has to widen for them. */
+ *  batch number on a phone, and so does the row's tag: its tank, or the recipe it was brewed as. A batch's notes and
+ *  the table's footnote take a line of their own, so no column has to widen for them. */
 function Actuals({ actuals }: { actuals: RecipeActuals }) {
   const cell = "px-1.5 py-1 text-right tabular-nums first:pl-0 last:pr-0";
   return (
@@ -76,6 +80,7 @@ function Actuals({ actuals }: { actuals: RecipeActuals }) {
               <TableCell className="px-1.5 py-1 pl-0">
                 <span className="font-medium">{row.batch}</span>{" "}
                 <span className="block text-muted-foreground text-xs @xl:inline @xl:text-sm">{row.brewed}</span>
+                {row.tag ? <>{" "}<span className="block whitespace-normal text-muted-foreground text-xs @xl:inline @xl:text-sm">{row.tag}</span></> : null}
               </TableCell>
               {row.cells.map((c, i) => (
                 <TableCell key={actuals.columns[i]} className={cell}>
@@ -91,6 +96,11 @@ function Actuals({ actuals }: { actuals: RecipeActuals }) {
             ) : null}
           </Fragment>
         ))}
+        {actuals.footnote ? (
+          <TableRow className="hover:bg-transparent">
+            <TableCell colSpan={actuals.columns.length + 1} className="whitespace-normal px-0 py-1.5 text-muted-foreground text-xs">{actuals.footnote}</TableCell>
+          </TableRow>
+        ) : null}
       </TableBody>
     </Table>
   );
@@ -328,7 +338,7 @@ export function RecipeView({
             <details className="group border-b py-3">
               <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-4 gap-y-1 rounded-sm [&::-webkit-details-marker]:hidden">
                 <h2 className="font-semibold text-[0.9375rem]">Batch actuals</h2>
-                <span className={quiet}>{model.actualsNote ?? `${plural(model.actuals.rows.length, "batch", "batches")} brewed.`}</span>
+                <span className={quiet}>{model.actualsNote ?? `${plural(model.actuals.batches, "batch", "batches")} brewed.`}</span>
                 <span className="ml-auto text-primary text-sm"><span className="group-open:hidden">Show batches</span><span className="hidden group-open:inline">Hide batches</span></span>
               </summary>
               <div className="max-w-3xl pt-2"><Actuals actuals={model.actuals} /></div>

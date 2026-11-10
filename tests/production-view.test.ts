@@ -608,13 +608,30 @@ describe("Recipes view", () => {
 
 
   it("folds Batch actuals to its heading and summary line, over the table", () => {
-    const actuals = { columns: ["OG °P", "FG °P", "ABV", "Attenuation", "Efficiency"], predicted: ["15.2", "3.5", "6.3%", "78%", "72%"], rows: [{ key: "b1", batch: "B-0413", brewed: "Oct 3, 2026", notes: ["no gravity readings yet"], cells: ["", "", "", "", ""].map((measured) => ({ measured, predicted: "" })) }] };
+    const actuals = { columns: ["OG °P", "FG °P", "ABV", "Attenuation", "Efficiency"], predicted: ["15.2", "3.5", "6.3%", "78%", "72%"], batches: 1, rows: [{ key: "b1", batch: "B-0413", brewed: "Oct 3, 2026", notes: ["no gravity readings yet"], cells: ["", "", "", "", ""].map((measured) => ({ measured, predicted: "" })) }] };
     const html = htmlOf(createElement(RecipeView, { readOnly: true, model: { title: "Pale", actuals, actualsNote: "2 batches: efficiency 68–71% against 72% assumed." } }));
     expect(html).toMatch(/<details[^>]*><summary[^>]*><h2[^>]*>Batch actuals<\/h2>[^]*2 batches: efficiency[^]*Show batches[^]*<\/summary>[^]*<table[^]*Predicted[^]*15\.2[^]*B-0413[^]*Oct 3, 2026[^]*no gravity readings yet[^]*<\/table>[^]*<\/details>/);
-    // Without a summary yet, the line counts the batches.
+    // Without a summary yet, the line counts this recipe's batches.
     expect(htmlOf(createElement(RecipeView, { readOnly: true, model: { title: "Pale", actuals } }))).toContain("1 batch brewed.");
     // The long column heads keep their word for a screen reader where a phone shows three letters.
     expect(html).toMatch(/<span aria-hidden="true"[^>]*>Att\.<\/span><span class="sr-only[^"]*">Attenuation<\/span>/);
+  });
+
+  it("draws a row's tank or recipe quietly in its batch cell, and the footnote as the table's last row", () => {
+    const cells = ["15.1", "", "", "", "71%"].map((measured) => ({ measured, predicted: "" }));
+    const actuals = {
+      columns: ["OG °P", "FG °P", "ABV", "Attenuation", "Efficiency"], predicted: ["15.2", "3.5", "6.3%", "78%", "72%"], batches: 1,
+      rows: [{ key: "b1 FV3", batch: "B-0398", brewed: "Sep 12, 2026", tag: "in FV3", notes: [], cells }, { key: "b2", batch: "B-0391", brewed: "Sep 2, 2026", tag: "as West Coast IPA", notes: [], cells }],
+      footnote: "A batch brewed as another recipe counts toward the mash figures only, so its fermentation figures are left out.",
+    };
+    const html = htmlOf(createElement(RecipeView, { readOnly: true, model: { title: "Pale", actuals } }));
+    expect(html).toMatch(/<td[^>]*><span class="font-medium">B-0398<\/span> <span[^>]*text-muted-foreground[^>]*>Sep 12, 2026<\/span> <span[^>]*text-muted-foreground[^>]*>in FV3<\/span><\/td>/);
+    expect(html).toMatch(/<span[^>]*text-muted-foreground[^>]*>as West Coast IPA<\/span><\/td>/);
+    expect(html).toMatch(/<tr[^>]*><td[^>]*colSpan="6"[^>]*>A batch brewed as another recipe counts toward the mash figures only, so its fermentation figures are left out\.<\/td><\/tr><\/tbody>/);
+    // The folded line counts the batch once, not its tank rows or another recipe's batch.
+    expect(html).toContain("1 batch brewed.");
+    // A table with no such batch has no footnote row.
+    expect(htmlOf(createElement(RecipeView, { readOnly: true, model: { title: "Pale", actuals: { ...actuals, footnote: undefined } } }))).not.toContain("colSpan");
   });
 
   it("the fixture's Batch actuals are computed, and its prediction agrees with their brackets", () => {
@@ -631,7 +648,8 @@ describe("Recipes view", () => {
 
   it("the live Recipe page reads the outcomes and hands them to the page model", () => {
     const page = src("app/(app)/recipes/[id]/page.tsx");
-    expect(page).toMatch(/runCommand\("get_recipe_outcomes", \{ recipeId: id \}, ctx\)/);
+    // Asked for the copy being shown: its grain bill decides which other recipes' batches come back.
+    expect(page).toMatch(/runCommand\("get_recipe_outcomes", \{ recipeId: id, version: snapshot\.version\?\.version \}, ctx\)/);
     expect(page).toMatch(/toRecipePageModel\(snapshot, \{[^}]*outcomes/);
   });
 
