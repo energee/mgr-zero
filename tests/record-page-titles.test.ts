@@ -256,8 +256,9 @@ describe("the recipe page picks the editor or the read-out", () => {
     expect(drawn.props.loaded).toBeUndefined();
   });
 
-  it("opens the editor, not a read-out, when ?v= names the current copy", async () => {
-    expect((await open({ v: "3" })).type).toBe(RecipeEditor);
+  // A save makes a newer copy, so an address that still said ?v=3 would turn into the read-out of an earlier copy.
+  it("sends ?v= naming the current copy to the plain address", async () => {
+    await expect(open({ v: "3" })).rejects.toMatchObject({ digest: expect.stringContaining(`NEXT_REDIRECT;replace;/recipes/${MISSING};`) });
   });
 
   it("reads an earlier copy out read only", async () => {
@@ -279,8 +280,9 @@ describe("the recipe page picks the editor or the read-out", () => {
     expect(drawn.props).toMatchObject({ initial: { copy: 3 }, baseVersionId: "copy-3", loaded: { draft: { copy: 2 }, notice: "loaded 2" } });
   });
 
-  it("loads nothing when ?from= names what is already saved", async () => {
-    expect((await open({ from: "3" })).props.loaded).toBeUndefined();
+  // A ?from= left in the address would load that copy over the next save.
+  it("sends a ?from= that names what is already saved to the plain address", async () => {
+    await expect(open({ from: "3" })).rejects.toMatchObject({ digest: expect.stringContaining(`NEXT_REDIRECT;replace;/recipes/${MISSING};`) });
   });
 
   it("is not found when ?from= or ?v= names no saved copy", async () => {

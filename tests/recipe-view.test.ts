@@ -80,6 +80,9 @@ describe("materialsNowGive (Refresh from Materials)", () => {
   it("is silent while Materials give what the saved copy froze, to the precision the figures show", () => {
     expect(materialsNowGive(saved, saved, "plato")).toBeUndefined();
     expect(materialsNowGive(saved, { ...saved, ogPlato: 12.52, abv: 5.31 }, "plato")).toBeUndefined();
+    // Specific gravity prints coarser than a tenth of a degree Plato: 15.14 and 15.16 °P both read 1.062.
+    expect(materialsNowGive({ ...saved, ogPlato: 15.14 }, { ...saved, ogPlato: 15.16 }, "sg")).toBeUndefined();
+    expect(materialsNowGive({ ...saved, ogPlato: 15.14 }, { ...saved, ogPlato: 15.6 }, "sg")).toContain("Materials now give OG 1.064");
   });
   it("names the figures Materials now give once one differs", () => {
     expect(materialsNowGive(saved, { ...saved, ibu: { kind: "estimate", ibu: 38, whirlpool: false } }, "plato")).toBe("Materials now give OG 12.5 °P · FG 2.5 °P · ABV 5.3% · IBU 38.");
@@ -159,7 +162,7 @@ describe("loadedNotice (Use this again)", () => {
   });
   it("loads the earlier copy's own amounts, not the current one's", () => {
     const loaded = versionToDraft({ ...snapshot, version: { ...version, version: 2, note: "Before the Citra change" }, ingredients: snapshot.ingredients.map((i) => ({ ...i, per_bbl_qty: 99 })) })!;
-    expect(loaded.notes).toBe("Before the Citra change");
+    expect(loaded.notes).toBe("");
     expect(loaded.lines.every((l) => l.perBblQty === "99")).toBe(true);
   });
 });
@@ -181,9 +184,9 @@ describe("versionToDraft", () => {
   it("is null when the recipe has no version", () => {
     expect(versionToDraft({ ...snapshot, version: null, ingredients: [], waterAdditions: [] })).toBeNull();
   });
-  it("copies the version note, schedules and numbers", () => {
+  it("copies the schedules and numbers, and starts the change note blank: it describes the next change, not the last", () => {
     const d = versionToDraft(snapshot)!;
-    expect(d.notes).toBe("Less crystal");
+    expect(d.notes).toBe("");
     expect(d.numbers.efficiency).toBe("72.5");
     expect(d.mashSchedule).toEqual(version.mash_schedule);
     expect(d.fermentationSchedule).toEqual(version.fermentation_schedule);
@@ -314,7 +317,9 @@ describe("toRecipePageModel", () => {
   });
   it("dates the saved copy in the brewery's zone and carries the recipe note", () => {
     const model = toRecipePageModel({ ...predicted, recipe: { ...snapshot.recipe, note: "House pale" }, version: { ...version, created_at: "2026-10-01T03:00:00Z" } }, ctx);
-    expect(model.saved).toBe("Sep 30, 2026");
+    expect(model.saved).toBe("Sep 30, 2026 · Less crystal");
+    // An earlier copy prints its change note as its own field, so the saved line leaves it out.
+    expect(toRecipePageModel({ ...predicted, versions: [9, 3], version: { ...version, created_at: "2026-10-01T03:00:00Z" } }, ctx).saved).toBe("Sep 30, 2026");
     expect(model.recipeNote).toBe("House pale");
   });
   it("lists earlier brewed copies under the current recipe, and reads an earlier copy as brewed, read only", () => {
@@ -479,6 +484,8 @@ describe("the sheet", () => {
     expect(draw()).toMatch(/12\.5 °P<\/div><div[^>]*>OG</);
     expect(draw()).toContain("IBU not estimated: no predicted OG");
     expect(draw()).not.toContain("Refresh from Materials");
+    // A refresh runs on an unchanged sheet, where there is no save bar: its failure still has to show.
+    expect(renderToStaticMarkup(createElement(RecipeView, { model, controls: { ...controls, dirty: false, error: "Refresh failed" } }))).toContain("Refresh failed");
     const stale = draw({ text: "Materials now give OG 13.1 °P.", onRefresh: () => {} });
     expect(stale).toContain("Materials now give OG 13.1 °P.");
     expect(stale).toMatch(/<button[^>]*type="button"[^>]*>Refresh from Materials</);

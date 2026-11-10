@@ -4,12 +4,15 @@
 // batch, the figures the saved copy froze, Batch actuals (get_recipe_outcomes)
 // and As brewed around the sheet. A
 // recipe not saved yet opens the blank sheet. ?v=N naming an earlier copy reads
-// that copy out read only (RecipeView); ?v= naming the current copy is the
-// editor. ?from=N is Use this again: the editor opens on the current copy with
-// copy N loaded as an unsaved change. A ?v= or ?from= that names no saved copy
-// is not found. The page only fetches and renders. Schedule batch opens
+// that copy out read only (RecipeView), and ignores ?from. ?from=N is Use this
+// again: the editor opens on the current copy with copy N loaded as an unsaved
+// change. A ?v= naming the current copy, or a ?from= that would load nothing,
+// redirects to the plain address, so a later save cannot turn it into a
+// read-out or load the copy again. A ?v= or ?from= that names no saved copy is
+// not found. The page only fetches and renders. Schedule batch opens
 // /batches?recipe=<id>, whose New batch sheet starts on the saved recipe
 // (schedule_batch).
+import { redirect } from "next/navigation";
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { RecipeBrandPicker } from "./recipe-brand-picker";
 import { RecipeEditor } from "./recipe-version-form";
@@ -50,17 +53,19 @@ export default async function RecipePage({ params, searchParams }: Props) {
   ])) as [RecipeMaterial[], { effective: GravityUnit }, WaterProfileRow[], { id: string; name: string; alias: string | null }[], { batches: RecipeOutcome[] }];
   const { recipe, version } = snapshot;
   const latest = snapshot.versions[0];
+  if (v !== undefined && version?.version === latest) redirect(`/recipes/${id}`);
   const model = toRecipePageModel(snapshot, { materials, profiles, unit: gravityUnit.effective, timeZone: brewery.timeZone, outcomes: outcomes.batches });
   // An earlier copy is read as brewed; only the current one is edited.
   if (version && version.version !== latest) return <RecipeView readOnly model={model} />;
 
   const initial = versionToDraft(snapshot) ?? undefined;
-  // Use this again: the copy ?from names, read beside the current one. A copy that matches what is saved loads nothing.
+  // Use this again: the copy ?from names, read beside the current one. A copy that matches what is saved has nothing to load.
   const earlier = from === undefined ? null : (await getRecipePageData(id, copyNumber(from))).snapshot;
   const draft = earlier && versionToDraft(earlier);
   const loaded = earlier?.version && draft && initial && shouldKeepDraft(initial, draft)
     ? { draft, notice: loadedNotice(outcomes.batches, earlier.version.version, latest) }
     : undefined;
+  if (from !== undefined && !loaded) redirect(`/recipes/${id}`);
   const { saved, scheduleHref, recipeNote, tape, actualsNote, history, figures, figureNotes } = model;
   return (
     <RecipeEditor
@@ -70,7 +75,7 @@ export default async function RecipePage({ params, searchParams }: Props) {
       parentForm={<RecipeBrandPicker recipeId={recipe.id} brandId={recipe.brand_id} brands={brands} />}
       page={{ saved, scheduleHref, recipeNote, tape, actualsNote, history, figures, figureNotes }}
       // What get_recipe predicted for the saved copy; the editor compares its live preview against these.
-      saved={version ? { ogPlato: snapshot.ogPlato, fgPlato: snapshot.fgPlato, abv: snapshot.abv, ibu: snapshot.ibu } : undefined}
+      savedFigures={version ? { ogPlato: snapshot.ogPlato, fgPlato: snapshot.fgPlato, abv: snapshot.abv, ibu: snapshot.ibu } : undefined}
       initial={initial} baseVersionId={version?.id ?? null} loaded={loaded}
       materials={materials.map(toRecipeMaterial)} profiles={profiles.map(toWaterProfileOption)} unit={gravityUnit.effective}
     />

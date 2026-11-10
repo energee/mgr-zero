@@ -25,6 +25,11 @@ describe("outcomeTape", () => {
     expect(labels).toEqual(["B-0413 · Oct 3, 2026", "B-0371 · Jul 18, 2026 · earlier recipe"]);
   });
 
+  it("marks batches against the copy being shown, so an earlier copy's own batches are unmarked", () => {
+    const labels = outcomeTape([closed, { ...closed, batchId: "b0", batchNo: 371, version: 3, brewedOn: "2026-07-18" }], "plato", 3)!.map(([label]) => label);
+    expect(labels).toEqual(["B-0413 · Oct 3, 2026 · later recipe", "B-0371 · Jul 18, 2026"]);
+  });
+
   it("prints gravity in the reader's unit", () => {
     expect(detail({}, "sg")).toContain("OG 1.060 (1.062) · FG 1.014 (1.014)");
   });

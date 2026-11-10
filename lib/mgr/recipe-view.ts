@@ -108,7 +108,7 @@ export type RecipeViewModel = {
   /** Where Schedule batch goes: Batches, with New batch open on this recipe as saved. Only a saved recipe has one. */
   scheduleHref?: string;
   title: string;
-  /** When the shown copy was saved, as a date in the brewery's zone. Absent until the recipe is first saved. */
+  /** When the shown copy was saved, as a date in the brewery's zone, then the current copy's change note. Absent until the recipe is first saved. */
   saved?: string;
   /** An earlier copy's read-only note ("As brewed in B-0041 to B-0045 · read only"); absent on the current recipe. */
   asBrewed?: string;
@@ -178,13 +178,14 @@ export function versionNumbers(v: SnapshotVersion): Record<RecipeNumberKey, stri
   };
 }
 
-/** A new draft as a copy of the saved version, so a change starts from what was brewed; null when there is no version. */
+/** A new draft as a copy of the saved version, so a change starts from what was brewed; null when there is no version.
+ *  The change note starts blank: it describes the change about to be saved, not the one the copy was saved with. */
 export function versionToDraft(s: RecipeSnapshot): RecipeDraft | null {
   const v = s.version;
   if (!v) return null;
   return {
     numbers: versionNumbers(v),
-    notes: v.note ?? "",
+    notes: "",
     lines: s.ingredients.map((i) => ({ materialId: i.material_id, perBblQty: text(i.per_bbl_qty), stage: i.stage as IngredientStage, timingMinutes: text(i.timing_minutes) })),
     mashSchedule: v.mash_schedule,
     fermentationSchedule: v.fermentation_schedule,
@@ -287,18 +288,17 @@ export function figureStrip(f: RecipeFigures, unit: GravityUnit, { saved, why }:
   return { figures, notes: [f.ogPlato === null ? why : undefined, ibuNote].filter((note): note is string => Boolean(note)) };
 }
 
-/** The numbers of a prediction as the strip prints them (gravity and ABV to a tenth), plus how many hops still have a gap. */
-const figureKey = (f: RecipeFigures) => JSON.stringify([
-  ...[f.ogPlato, f.fgPlato, f.abv].map((n) => (n === null ? null : Math.round(n * 10))),
-  f.ibu?.kind, f.ibu && "ibu" in f.ibu ? f.ibu.ibu : null, f.ibu && "gaps" in f.ibu ? f.ibu.gaps.length : 0,
-]);
+/** A prediction exactly as the strip prints it in the brewery's gravity unit, plus how many hops still have a gap.
+ *  Comparing the printed figures keeps the offer from naming a number the sheet already shows. */
+const figureKey = (f: RecipeFigures, unit: GravityUnit) =>
+  JSON.stringify([figureStrip(f, unit, { saved: false }).figures, f.ibu && "gaps" in f.ibu ? f.ibu.gaps.length : 0]);
 
 /** The line that offers Refresh from Materials on an unchanged sheet: what the saved recipe would predict from current
  *  Materials (`now`), when that differs from what the saved copy froze (`saved`). Undefined when the numbers match, so
  *  a refresh would change nothing, and when `now` is null: the page cannot see one of the lines' materials (an
  *  inactive one), so it cannot tell what a refresh would give. */
 export function materialsNowGive(saved: RecipeFigures, now: RecipeFigures | null, unit: GravityUnit): string | undefined {
-  if (!now || figureKey(saved) === figureKey(now)) return undefined;
+  if (!now || figureKey(saved, unit) === figureKey(now, unit)) return undefined;
   const { figures } = figureStrip(now, unit, { saved: false });
   return `Materials now give ${figures.length ? figures.map(([value, label]) => `${label} ${value}`).join(" · ") : "no prediction"}.`;
 }
@@ -312,7 +312,7 @@ export function ingredientPack(stage: string, perBbl: number, material: Pick<Rec
 /** The line's batch total at `bbl`, to the 4 decimals material quantities store (as brew day scales it). */
 const batchQty = (p: RecipePack, bbl: number) => fromTicks(toTicks(p.perBbl * bbl));
 
-/** The total the page draws after "22 bbl" and an arrow: "220 lb = 4 × 50 lb + 20 lb", or just "220 lb" with no pack or under one pack. */
+/** The total the page draws under "At 22 bbl": "220 lb = 4 × 50 lb + 20 lb", or just "220 lb" with no pack or under one pack. */
 export const batchTotalText = (p: RecipePack, bbl: number): string => withPacks(batchQty(p, bbl), p.factor, p.unit);
 
 /** At `bbl`: whole when the total is already whole packs, else "Round to N × size" down (from one pack up) and up,
@@ -356,11 +356,12 @@ function outcomeDetail(o: RecipeOutcome, unit: GravityUnit): string {
   return parts.filter(Boolean).join(" · ");
 }
 
-/** Batch actuals' rows, one per batch in the order given: label, then figures. A batch brewed from a copy before
- *  `latestVersion` is marked "earlier recipe". Undefined with no batches, so no section is drawn. */
-export function outcomeTape(outcomes: RecipeOutcome[], unit: GravityUnit, latestVersion: number): [string, string][] | undefined {
+/** Batch actuals' rows, one per batch in the order given: label, then figures. A batch brewed from another copy than
+ *  the one shown is marked "earlier recipe" or "later recipe". Undefined with no batches, so no section is drawn. */
+export function outcomeTape(outcomes: RecipeOutcome[], unit: GravityUnit, shownVersion: number): [string, string][] | undefined {
   if (outcomes.length === 0) return undefined;
-  return outcomes.map((o) => [`${batNo(o.batchNo)} · ${formatDate(o.brewedOn)}${o.version === latestVersion ? "" : " · earlier recipe"}`, outcomeDetail(o, unit)]);
+  const mark = (version: number) => (version === shownVersion ? "" : version < shownVersion ? " · earlier recipe" : " · later recipe");
+  return outcomes.map((o) => [`${batNo(o.batchNo)} · ${formatDate(o.brewedOn)}${mark(o.version)}`, outcomeDetail(o, unit)]);
 }
 
 /** As brewed: one row per copy before `latestVersion` that a brewed batch used, newest copy first, named by its
@@ -444,7 +445,8 @@ export function toRecipePageModel(
         backHref: `/recipes/${recipe.id}`, backLabel: "Current recipe", useAgainHref: `/recipes/${recipe.id}?from=${v.version}`,
         asBrewed: `${shown ? `As brewed in ${shown.title}` : "An earlier recipe no batch brewed"} · read only`,
       }),
-    saved: formatDate(v.created_at, ctx.timeZone),
+    // The current copy's change note rides on the saved line; an earlier copy prints it as its own field (`notes`).
+    saved: [formatDate(v.created_at, ctx.timeZone), v.version === latest && v.note].filter(Boolean).join(" · "),
     history,
     ingredients: ingredients.map((i) => ({
       key: i.id, title: material.name(i.material_id),
@@ -457,7 +459,7 @@ export function toRecipePageModel(
     water: waterView(draft.water, ctx.profiles, material.name),
     notes: v.note ?? "",
     figures, figureNotes,
-    tape: outcomeTape(ctx.outcomes, ctx.unit, latest),
+    tape: outcomeTape(ctx.outcomes, ctx.unit, v.version),
     actualsNote: outcomeSummary(ctx.outcomes, v.version),
   };
 }

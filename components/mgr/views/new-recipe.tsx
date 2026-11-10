@@ -1,9 +1,9 @@
 // components/mgr/views/new-recipe.tsx — the recipe parent fields: what a
-// recipe is before it has a version. Name, and the brand it is meant to
+// recipe is before its sheet is saved. Name, and the brand it is meant to
 // brew and a note, both optional. Fields only, no form of their own: the inventory Recipe
-// record mounts them in RecipeView's parentForm slot and the live version
-// form (app/(app)/recipes/[id]/recipe-version-form.tsx) draws them above the
-// first version so one save creates both.
+// record mounts them in RecipeView's parentForm slot and the live editor
+// (app/(app)/recipes/[id]/recipe-version-form.tsx) draws them above the
+// blank sheet so one save creates both.
 "use client";
 
 import { nameWithAlias } from "@/lib/mgr/labels";

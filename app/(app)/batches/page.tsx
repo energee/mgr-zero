@@ -1,6 +1,6 @@
 // Batches and vessel reads remain at their existing authorized command boundary.
 // ?recipe=<recipe id> (the Recipe page's Schedule batch, #1581) opens New batch
-// on that recipe's current version.
+// on that recipe as last saved.
 import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 import { BatchesView } from "@/components/mgr/views/batches";
 import { getActiveBrewery } from "@/lib/brewery";

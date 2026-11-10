@@ -56,7 +56,7 @@ const BLANK_DRAFT: RecipeDraft = { numbers: BLANK_NUMBERS, notes: "", lines: [],
 const pctToFraction = (s: string) => Number(s) / 100;
 const NOT_KEPT = "Your changes could not be kept in this tab; they are lost if you leave the page before saving.";
 
-export function RecipeEditor({ recipeId, title, backHref, brands = [], parentForm, page, saved, initial, baseVersionId = null, loaded, materials, profiles, unit }: {
+export function RecipeEditor({ recipeId, title, backHref, brands = [], parentForm, page, savedFigures, initial, baseVersionId = null, loaded, materials, profiles, unit }: {
   recipeId?: string; title: string; backHref: string; brands?: NewRecipeBrand[];
   /** The recipe page's brand picker, drawn above the sheet. It saves on its own, apart from the sheet's Save changes. */
   parentForm?: ReactNode;
@@ -64,7 +64,7 @@ export function RecipeEditor({ recipeId, title, backHref, brands = [], parentFor
   page?: Pick<RecipeViewModel, "saved" | "scheduleHref" | "recipeNote" | "tape" | "actualsNote" | "history" | "figures" | "figureNotes">;
   /** What the saved copy predicts, frozen at its save (get_recipe). The unchanged sheet shows `page`'s figures, drawn
    *  from these; Refresh from Materials is offered when the live preview gives other numbers. Absent before the first save. */
-  saved?: RecipeFigures;
+  savedFigures?: RecipeFigures;
   /** The current saved copy as a draft (versionToDraft); absent before the first save and on /recipes/new. */
   initial?: RecipeDraft;
   /** The id of the copy `initial` is; a kept draft from another id is restored as stale. */
@@ -91,8 +91,12 @@ export function RecipeEditor({ recipeId, title, backHref, brands = [], parentFor
         // Use this again: keep the loaded copy as this tab's unsaved change, then drop ?from from the address,
         // so a reload restores it with whatever was changed since instead of loading the copy afresh.
         // A search-only replace keeps this editor mounted, so the sheet and the notice stay on screen.
-        try { writeRecipeDraft(sessionStorage, key, baseVersionId, loaded.draft); }
-        catch { setError(NOT_KEPT); }
+        try {
+          // An unsaved change already kept in this tab is replaced; the notice says so instead of dropping it silently.
+          const before = sessionStorage.getItem(key);
+          writeRecipeDraft(sessionStorage, key, baseVersionId, loaded.draft);
+          if (before !== null && before !== sessionStorage.getItem(key)) setNotice(`${loaded.notice} It replaced your earlier unsaved changes.`);
+        } catch { setError(NOT_KEPT); }
         router.replace(`/recipes/${recipeId}`, { scroll: false });
         return;
       }
@@ -185,11 +189,11 @@ export function RecipeEditor({ recipeId, title, backHref, brands = [], parentFor
   // A recipe being created has nothing saved to differ from: its bar is always up.
   const dirty = creating || shouldKeepDraft(start, draft);
   // An unchanged saved sheet shows what its copy froze; a changed or unsaved one shows the live preview.
-  const frozen = !dirty && saved !== undefined;
+  const frozen = !dirty && savedFigures !== undefined;
   // Refresh is offered only on a sheet that can be saved as it stands. A line whose material the page cannot see
   // (an inactive one) makes the live preview a guess, so the offer waits (materialsNowGive takes null).
   const refreshText = frozen && !blockedReason
-    ? materialsNowGive(saved, lines.every((l) => material.get(l.materialId)) ? live : null, unit)
+    ? materialsNowGive(savedFigures, lines.every((l) => material.get(l.materialId)) ? live : null, unit)
     : undefined;
   const parentLocked = creating && createdId !== "";
   const sheetMaterials = materials.map((m) => ({ id: m.id, name: m.name, unit: m.base_uom, category: m.category }));
@@ -212,7 +216,8 @@ export function RecipeEditor({ recipeId, title, backHref, brands = [], parentFor
         {parentLocked ? E.info("The recipe is saved under this name; only its sheet is still to save.") : null}
       </> : <>
         {parentForm}
-        {notice ? E.info(notice) : null}
+        {/* The notice is about an unsaved change, so it goes once the sheet is back to what is saved. */}
+        {notice && dirty ? E.info(notice) : null}
       </>}
       controls={{
         set: (field, value) => change(field === "notes" ? { notes: value } : { numbers: { ...draft.numbers, [field]: value } }),

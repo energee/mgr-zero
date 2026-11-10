@@ -191,7 +191,7 @@ describe("Recipe creation", () => {
     expect(form).toMatch(/onDiscard: creating \? undefined : discard/);
     // An unchanged saved sheet offers Refresh from Materials when its live preview differs from what the copy froze,
     // and never guesses when it cannot see a line's material.
-    expect(form).toMatch(/materialsNowGive\(saved, lines\.every\(\(l\) => material\.get\(l\.materialId\)\) \? live : null, unit\)/);
+    expect(form).toMatch(/materialsNowGive\(savedFigures, lines\.every\(\(l\) => material\.get\(l\.materialId\)\) \? live : null, unit\)/);
     expect(form).toMatch(/refresh: refreshText \? \{ text: refreshText, onRefresh: \(\) => void submit\(\) \} : undefined/);
     // Nothing the editor says to the brewer names a version.
     expect(form).not.toMatch(/["`][^"`\n]*\bversions?\b[^"`\n]*["`]/i);

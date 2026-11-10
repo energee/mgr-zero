@@ -78,7 +78,7 @@ export function WaterSheet({ water, profiles, materials, onChange, trigger }: { 
     item={(p) => <WaterAdditionView fields={p.fields} materials={materials} materialsHref="/materials" onChange={p.onChange} footer={p.footer} />} />;
 }
 
-/** One ingredient, edited in place: a step's add row opens a blank editor on that step's `stage`, Edit on a row opens it
+/** One ingredient, edited in place: a step's Add ingredient opens a blank editor on that step's `stage`, a line's name opens it
  *  filled from `line`. No list of its own; the recipe page is the list. */
 export function IngredientSheet({ line, stage = "mash", materials, limits, onSave, onDelete, trigger }: { line?: IngredientLine; stage?: IngredientStage; materials: IngredientMaterial[]; limits: TimingLimits; onSave: (line: IngredientLine) => void; onDelete?: () => void; trigger: ReactNode }) {
   const [open, setOpen] = useState(false);

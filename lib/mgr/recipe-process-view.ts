@@ -74,8 +74,8 @@ export const perBblDisplay = (n: number): string => n.toLocaleString("en-US", { 
 /** A line's timing, "4 min", or "day 3" for a stage timed in days; "" when the line has none. */
 export const ingredientTiming = (stage: string, timingMinutes: number | string | null) =>
   timingMinutes === null || timingMinutes === "" ? "" : timedInDays(stage) ? `day ${Number(timingMinutes) / MINUTES_PER_DAY}` : `${timingMinutes} min`;
-/** "4 min · 1.2 lb / bbl", or "day 3 · 1.2 lb / bbl": a line's timing and amount as one phrase, for Brew day's cellar
- *  plan. The stage is not named; that caller names it. The recipe page prints the two in columns of their own (ingredientCells). */
+/** "4 min · 1.2 lb / bbl", or "day 3 · 1.2 lb / bbl": a line's timing and amount as one phrase, for Prep's cellar
+ *  plan (brew-prep-view.ts). The stage is not named; that caller names it. The recipe page prints the two in columns of their own (ingredientCells). */
 export const ingredientDetail = (stage: string, timingMinutes: number | string | null, perBbl: number | string, unit?: string) =>
   [ingredientTiming(stage, timingMinutes), `${perBbl}${unit ? ` ${unit}` : ""} / bbl`].filter(Boolean).join(" · ");
 /** Name and base unit by material id, for rows that name a material the command returned. */

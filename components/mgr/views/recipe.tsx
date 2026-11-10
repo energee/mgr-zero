@@ -167,7 +167,8 @@ export function RecipeView({
           </div>
         </div>
         {packed ? (
-          <div className="flex shrink-0 flex-col gap-1">
+          // Page-only, never saved: Enter here must not submit the sheet around it.
+          <div className="flex shrink-0 flex-col gap-1" onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }}>
             {E.edit("Show totals at (bbl)", totalsAt, "number", undefined, { onChange: setTotalsAt, min: 0 })}
             {bbl > 0 ? null : E.polite("Enter a batch size to see totals in packs.")}
           </div>
@@ -179,6 +180,8 @@ export function RecipeView({
           <Button type="button" variant="outline" size="sm" disabled={controls.busy} onClick={controls.refresh.onRefresh}>Refresh from Materials</Button>
         </div>
       ) : null}
+      {/* With no unsaved change there is no save bar, so a failed refresh or an unreadable kept change says so here. */}
+      {controls && !controls.dirty ? <CommandFormMessage error={controls.error} /> : null}
       {RECIPE_SECTIONS.map(step)}
       {readOnly
         ? (model.notes ? E.fld("Change note", model.notes) : null)
