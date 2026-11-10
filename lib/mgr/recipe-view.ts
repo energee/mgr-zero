@@ -1,7 +1,9 @@
 // lib/mgr/recipe-view.ts — view-model for Recipe, the one brewsheet page: the
 // inventory frame, the live editor and the read-out of an earlier copy. The
-// sheet's sections in brew-day order, with the ingredient stages and process
-// numbers each holds (RECIPE_SECTIONS). Also the get_recipe result shape
+// model the page draws from (RecipeViewModel): the lines, the batch size and
+// the eight process numbers (RECIPE_NUMBERS), the two schedules and the water
+// (waterFacts); lib/mgr/recipe-day-view.ts works the day at a glance out of
+// them. Also the get_recipe result shape
 // (RecipeSnapshot), a saved copy as the draft the editor starts from
 // (versionToDraft), why a draft cannot be saved yet (draftBlocker), the page's
 // model of a saved copy (toRecipePageModel) and why a prediction is missing
@@ -9,8 +11,7 @@
 // get_recipe predicted for a saved copy, frozen at its save, or the editor's
 // preview from current Materials (draftIbu); when the two differ on an unchanged
 // sheet, materialsNowGive words the offer to Refresh from Materials. Each line
-// reads its timing and its amount per bbl (ingredientCells), and each schedule
-// lists its rows (mashView, fermentationView, waterView), the same on the
+// reads its timing and its amount per bbl (ingredientCells), the same on the
 // editor and a saved copy. The batch size is saved on each copy and optional
 // (batchSize reads the field). With one, every line also reads its amount for
 // the batch, as a count of packs when it is whole packs (ingredientPack,
@@ -36,23 +37,24 @@ import { plannedBarrelsError } from "./schedule-batch-view";
 import { submitReason } from "./submit-reason";
 import { READING_BOUNDS } from "@/lib/composer/offline-policy";
 import {
-  fermentationRowTitle, fermentationStageDetail, fermentationSummary, mashRowTitle, ingredientTiming, lineReady, mashRowSummary, mashStepDetail, materialLookup, perBblDisplay, scheduleDays, timingOutOfRange, toIngredientFields, waterAdditionDetail, waterReadout, WATER_ROW_TITLE,
+  ingredientTiming, lineReady, materialLookup, perBblDisplay, scheduleDays, timingOutOfRange, toIngredientFields,
   type FermentationStage, type IngredientLine, type IngredientStage, type MashStep, type ProcessColumns, type RecipeMaterial, type WaterDraft,
 } from "./recipe-process-view";
 /** A line's per-bbl amount with its material's pack: its size (base units per pack), base unit and pack word (hasPack says whether it has one). */
 export type RecipePack = Pack & { perBbl: number };
-/** One ingredient line of a step. `stage` places it in its section (RECIPE_SECTIONS); `amount` is per bbl ("40.9 lb")
- *  and `timing` is "60 min" or "day 3", or "" (ingredientCells). `edit` (the live editor only) takes the line's
- *  name as a trigger and returns the Ingredient sheet it opens. `pack` lets the page read the line's amount for the
- *  batch; `onRound` (the live editor only) takes the per-bbl amount a Round choice picked. `share` is a mash line's
- *  part of the grain bill by weight, from 0 to 1 (gristShares). */
+/** One ingredient line. `stage` says where it goes in; `amount` is per bbl ("40.9 lb"); `timing` is "60 min" or
+ *  "day 3", or "", and `timingMinutes` the same as a number, or null (ingredientCells). `edit` (the live editor only)
+ *  takes the line's name as a trigger and returns the Ingredient sheet it opens. `pack` lets the page read the line's
+ *  amount for the batch; `onRound` (the live editor only) takes the per-bbl amount a Round choice picked. `share` is a
+ *  mash line's part of the grain bill by weight, from 0 to 1 (gristShares). */
 export type RecipeIngredientView = {
-  key: string; title: string; stage: IngredientStage; amount: string; timing: string;
+  key: string; title: string; stage: IngredientStage; amount: string; timing: string; timingMinutes: number | null;
   edit?: (trigger: ReactNode) => ReactNode; pack?: RecipePack; onRound?: (perBbl: number) => void; share?: number;
 };
 /** A line's stage, per-bbl amount to three significant digits and timing, the same on the editor and a saved copy. */
 export const ingredientCells = (stage: IngredientStage, timingMinutes: number | string | null, perBbl: number | string, unit?: string) => ({
   stage, amount: `${perBblDisplay(Number(perBbl))}${unit ? ` ${unit}` : ""}`, timing: ingredientTiming(stage, timingMinutes),
+  timingMinutes: timingMinutes === null || timingMinutes === "" ? null : Number(timingMinutes),
 });
 
 /** Input bounds mirroring create_recipe_version, so the browser refuses a
@@ -62,10 +64,12 @@ export const ingredientCells = (stage: IngredientStage, timingMinutes: number | 
 const WHOLE_MINUTES = { min: 1, step: 1 } as const;
 const WHOLE_MINUTES_OR_NONE = { min: 0, step: 1 } as const;
 
-/** The eight process numbers with their labels and bounds; RECIPE_SECTIONS says which step draws each. */
+/** The eight process numbers with their labels and bounds, in the order the Recipe numbers sheet draws them, two to a row. */
 export const RECIPE_NUMBERS = [
-  ["preBoil", "Pre-boil volume bbl", { min: 0.01 }], ["boilMin", "Boil time min", WHOLE_MINUTES], ["whirlpoolMin", "Whirlpool min", WHOLE_MINUTES_OR_NONE], ["whirlpoolTemp", "Whirlpool temp °F", {}],
-  ["whirlpoolRest", "Whirlpool rest min", WHOLE_MINUTES_OR_NONE], ["knockoutTemp", "Knockout temp °F", {}], ["efficiency", "Brewhouse efficiency %", {}], ["attenuation", "Yeast attenuation %", {}],
+  ["efficiency", "Brewhouse efficiency %", {}], ["attenuation", "Yeast attenuation %", {}],
+  ["preBoil", "Pre-boil volume bbl", { min: 0.01 }], ["boilMin", "Boil time min", WHOLE_MINUTES],
+  ["whirlpoolMin", "Whirlpool min", WHOLE_MINUTES_OR_NONE], ["whirlpoolRest", "Whirlpool rest min", WHOLE_MINUTES_OR_NONE],
+  ["whirlpoolTemp", "Whirlpool temp °F", {}], ["knockoutTemp", "Knockout temp °F", {}],
 ] as const;
 export type RecipeNumberKey = (typeof RECIPE_NUMBERS)[number][0];
 /** The Batch size field's bounds: what recipe_versions.batch_bbl, a positive numeric(10,3), stores. */
@@ -74,39 +78,16 @@ export const BATCH_BBL_BOUNDS = { min: 0.001, max: 9_999_999.999 } as const;
  *  notation): then no line reads an amount for the batch. The same rule as New batch's planned barrels. */
 export const batchSize = (text: string | undefined): number => (text !== undefined && isNumber(text) && !plannedBarrelsError(text) ? Number(text) : 0);
 
-/** One step of the sheet: the ingredient stages drawn under it and the process numbers it holds. */
-export type RecipeSection = {
-  key: "water" | "mash" | "boil" | "whirlpool" | "knockout" | "fermentation" | "other";
-  title: string; stages: readonly IngredientStage[]; numbers: readonly RecipeNumberKey[];
-};
-/** The sheet top to bottom, as the brew day runs. Water, Mash and Fermentation also hold the schedule of the same key. */
-export const RECIPE_SECTIONS: readonly RecipeSection[] = [
-  { key: "water", title: "Water", stages: [], numbers: [] },
-  { key: "mash", title: "Mash", stages: ["mash"], numbers: ["efficiency"] },
-  { key: "boil", title: "Boil", stages: ["boil"], numbers: ["preBoil", "boilMin"] },
-  { key: "whirlpool", title: "Whirlpool", stages: ["whirlpool"], numbers: ["whirlpoolMin", "whirlpoolTemp", "whirlpoolRest"] },
-  { key: "knockout", title: "Knockout", stages: [], numbers: ["knockoutTemp"] },
-  { key: "fermentation", title: "Fermentation", stages: ["fermentation", "dry_hop"], numbers: ["attenuation"] },
-  { key: "other", title: "Packaging and other", stages: ["packaging", "other"], numbers: [] },
-];
-
-/** A step's schedule as the page lists it: its count ("Schedule · 3 steps") and summary over one row per entry. */
-export type RecipeScheduleView = { title: string; detail: string; rows: { title: string; detail: string }[] };
-export const mashView = (steps: readonly MashStep[]): RecipeScheduleView => ({
-  title: mashRowTitle(steps.length), detail: mashRowSummary(steps), rows: steps.map((m) => ({ title: m.name, detail: mashStepDetail(m) })),
+/** The recipe's water as the page reads it, each fact only when the sheet holds it: the target profile's name, the
+ *  target mash pH, the mash and sparge water in gallons, and each addition by name. The source profile is not read
+ *  out; it stays in the Water sheet. */
+export type RecipeWaterView = { target?: string; mashPh?: string; mashGal?: string; spargeGal?: string; additions: { name: string; qty: number; unit: string; stage: string }[] };
+/** The sheet's water for the page (RecipeWaterView). A target profile the page cannot name is left out. */
+export const waterFacts = (water: WaterDraft, profiles: readonly { id: string; name: string }[], materialName: (id: string) => string): RecipeWaterView => ({
+  target: profiles.find((p) => p.id === water.targetProfileId)?.name,
+  mashPh: water.targetMashPh || undefined, mashGal: water.mashGal || undefined, spargeGal: water.spargeGal || undefined,
+  additions: water.additions.map((a) => ({ name: materialName(a.materialId), qty: a.qty, unit: a.unit, stage: a.stage })),
 });
-export const fermentationView = (stages: readonly FermentationStage[]): RecipeScheduleView => ({
-  title: fermentationRowTitle(stages.length), detail: stages.length ? fermentationSummary(stages) : "No stages yet",
-  rows: stages.map((f) => ({ title: f.name, detail: fermentationStageDetail(f) })),
-});
-/** The sheet's water: its profiles, volumes and target pH (waterReadout), then each addition. "None yet" when it holds nothing. */
-export function waterView(water: WaterDraft, profiles: readonly { id: string; name: string }[], materialName: (id: string) => string): RecipeScheduleView {
-  const rows = [
-    ...waterReadout(water, (id) => profiles.find((p) => p.id === id)?.name).map(([title, detail]) => ({ title, detail })),
-    ...water.additions.map((a) => ({ title: materialName(a.materialId), detail: waterAdditionDetail(a) })),
-  ];
-  return { title: WATER_ROW_TITLE, detail: rows.length ? "" : "None yet", rows };
-}
 
 /** One earlier copy of the recipe, named by the batches that brewed it. `href` opens it read only; fixtures leave it out. */
 type RecipeHistoryRow = { title: string; detail: string; href?: string; selected: boolean };
@@ -118,8 +99,11 @@ export type RecipeViewModel = {
   /** Where Schedule batch goes: Batches, with New batch open on this recipe as saved. Only a saved recipe has one. */
   scheduleHref?: string;
   title: string;
-  /** When the shown copy was saved, as a date in the brewery's zone, then the current copy's change note. Absent until the recipe is first saved. */
+  /** When the shown copy was saved, as a date in the brewery's zone, then that save's change note. Absent until the recipe is first saved. */
   saved?: string;
+  /** The brand the recipe brews ("" for none) and the brands to pick from, the "" option reading "No brand yet"; the page's sentence holds the pick. Absent
+   *  on an earlier copy and while the recipe is being created, where the parent fields hold it. */
+  brand?: { value: string; options: { value: string; label: string }[] };
   /** An earlier copy's read-only note ("As brewed in B-0041 to B-0045 · read only"); absent on the current recipe. */
   asBrewed?: string;
   /** Where Use this again goes from an earlier copy: the current page, with this copy loaded as an unsaved change. */
@@ -141,9 +125,11 @@ export type RecipeViewModel = {
   knockoutTemp?: string;
   efficiency?: string;
   attenuation?: string;
-  mash?: RecipeScheduleView;
-  fermentation?: RecipeScheduleView;
-  water?: RecipeScheduleView;
+  /** The mash rests and the fermentation stages in order, as the copy stores them. */
+  mashSchedule?: MashStep[];
+  fermentationSchedule?: FermentationStage[];
+  water?: RecipeWaterView;
+  /** The change note being typed for the next save; the saved copy's own rides on `saved`. */
   notes?: string;
   /** The headline figures as value and label (["15.2 °P", "OG"]), and the lines under them (figureStrip). */
   figures?: [string, string][];
@@ -492,8 +478,8 @@ export function toRecipePageModel(
         backHref: `/recipes/${recipe.id}`, backLabel: "Current recipe", useAgainHref: `/recipes/${recipe.id}?from=${v.version}`,
         asBrewed: `${shown ? `As brewed in ${shown.title}` : "An earlier recipe no batch brewed"} · read only`,
       }),
-    // The current copy's change note rides on the saved line; an earlier copy prints it as its own field (`notes`).
-    saved: [formatDate(v.created_at, ctx.timeZone), v.version === latest && v.note].filter(Boolean).join(" · "),
+    // The copy's change note rides on the saved line.
+    saved: [formatDate(v.created_at, ctx.timeZone), v.note].filter(Boolean).join(" · "),
     history,
     ingredients: ingredients.map((i, n) => ({
       key: i.id, title: material.name(i.material_id),
@@ -503,10 +489,9 @@ export function toRecipePageModel(
     })),
     batchBbl: draft.batchBbl,
     ...versionNumbers(v),
-    mash: mashView(v.mash_schedule),
-    fermentation: fermentationView(v.fermentation_schedule),
-    water: waterView(draft.water, ctx.profiles, material.name),
-    notes: v.note ?? "",
+    mashSchedule: v.mash_schedule,
+    fermentationSchedule: v.fermentation_schedule,
+    water: waterFacts(draft.water, ctx.profiles, material.name),
     figures, figureNotes,
     actuals: outcomeTable(ctx.outcomes, ctx.unit, { version: v.version, predicted: s.ogPlato !== null && s.fgPlato !== null && s.abv !== null ? { ogPlato: s.ogPlato, fgPlato: s.fgPlato, abv: s.abv } : null, assumedEfficiency: Number(v.brewhouse_efficiency), assumedAttenuation: Number(v.yeast_attenuation) }),
     actualsNote: outcomeSummary(ctx.outcomes, v.version),

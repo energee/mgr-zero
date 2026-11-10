@@ -595,8 +595,8 @@ describe("Recipes view", () => {
     // The inventory frame leaves the row for the explorer, which walks it to the Water profiles record.
     expect(htmlOf(screen("Recipes").body)).toContain("Water profiles");
     expect(resolveTap(screen("Recipes"), "Water profiles")).toBe("Water profiles");
-    // Each step's add row opens the Ingredient record.
-    for (const step of ["mash", "boil", "whirlpool", "fermentation"]) expect(resolveTap(screen("Recipe"), `Add ingredient to ${step}`)).toBe("Ingredient");
+    // Each column's add action opens the Ingredient record.
+    for (const where of ["brew day", "the cellar"]) expect(resolveTap(screen("Recipe"), `Add ingredient to ${where}`)).toBe("Ingredient");
   });
 
   it("draws the inventory list through the live adapter, a recipe not written yet included", () => {
@@ -607,10 +607,12 @@ describe("Recipes view", () => {
   });
 
 
-  it("draws Batch actuals as a heading, the table, then the summary", () => {
+  it("folds Batch actuals to its heading and summary line, over the table", () => {
     const actuals = { columns: ["OG °P", "FG °P", "ABV", "Attenuation", "Efficiency"], predicted: ["15.2", "3.5", "6.3%", "78%", "72%"], rows: [{ key: "b1", batch: "B-0413", brewed: "Oct 3, 2026", notes: ["no gravity readings yet"], cells: ["", "", "", "", ""].map((measured) => ({ measured, predicted: "" })) }] };
     const html = htmlOf(createElement(RecipeView, { readOnly: true, model: { title: "Pale", actuals, actualsNote: "2 batches: efficiency 68–71% against 72% assumed." } }));
-    expect(html).toMatch(/<h2[^>]*>Batch actuals<\/h2>[^]*<table[^]*Predicted[^]*15\.2[^]*B-0413[^]*Oct 3, 2026[^]*no gravity readings yet[^]*<\/table>[^]*2 batches: efficiency/);
+    expect(html).toMatch(/<details[^>]*><summary[^>]*><h2[^>]*>Batch actuals<\/h2>[^]*2 batches: efficiency[^]*Show batches[^]*<\/summary>[^]*<table[^]*Predicted[^]*15\.2[^]*B-0413[^]*Oct 3, 2026[^]*no gravity readings yet[^]*<\/table>[^]*<\/details>/);
+    // Without a summary yet, the line counts the batches.
+    expect(htmlOf(createElement(RecipeView, { readOnly: true, model: { title: "Pale", actuals } }))).toContain("1 batch brewed.");
     // The long column heads keep their word for a screen reader where a phone shows three letters.
     expect(html).toMatch(/<span aria-hidden="true"[^>]*>Att\.<\/span><span class="sr-only[^"]*">Attenuation<\/span>/);
   });
@@ -622,9 +624,9 @@ describe("Recipes view", () => {
     expect(recipeHazyV4.figures?.slice(0, 3)).toEqual([["15.2 °P", "OG"], ["3.5 °P", "FG"], ["6.3%", "ABV"]]);
   });
 
-  it("the fixture's IBU is computed from its boil hop, and its dry hop adds nothing", () => {
-    expect(recipeHazyV4.figures?.at(-1)).toEqual(["15", "IBU"]);
-    expect(recipeHazyV4.figureNotes).toEqual([]);
+  it("the fixture's IBU is computed from its boil and whirlpool hops, and its dry hops add nothing", () => {
+    expect(recipeHazyV4.figures?.at(-1)).toEqual(["74", "IBU"]);
+    expect(recipeHazyV4.figureNotes).toEqual(["IBU 74 · whirlpool hops at 5%"]);
   });
 
   it("the live Recipe page reads the outcomes and hands them to the page model", () => {
@@ -646,20 +648,26 @@ describe("Recipes view", () => {
     expect(body.props.model).toEqual(recipeHazyV4);
   });
 
-  it("renders each step's recipe numbers beside its heading, each under its own label, without React key warnings", () => {
+  it("reads the recipe's numbers as text on the page and draws their fields in the Recipe numbers sheet, without React key warnings", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const html = htmlOf(createElement(RecipeView, { model: recipeHazyV4 }));
+    const sheet = htmlOf(screen("Recipe numbers").body);
     const errors = error.mock.calls.flat().join(" ");
     error.mockRestore();
 
     expect(errors).not.toContain('unique "key" prop');
-    // The numbers share the heading's line instead of a grid of their own; no field is drawn label-beside-control.
-    expect(html).not.toMatch(/grid-cols-2 md:grid-cols-4/);
-    expect(html).not.toMatch(/data-orientation="horizontal"/);
-    expect(html).toMatch(/<h2[^>]*>Whirlpool<\/h2>(?:(?!<h2)[\s\S])*Whirlpool min(?:(?!<h2)[\s\S])*Whirlpool temp °F(?:(?!<h2)[\s\S])*Whirlpool rest min/);
+    // The page holds no number field: the change note is its one input.
+    expect(html.match(/<input\b[^>]*>/g)).toHaveLength(1);
+    expect(html).toMatch(/<input[^>]*aria-label="Change note · optional"/);
+    // The sheet holds all nine, the batch size first; no field is drawn label-beside-control.
+    expect([...sheet.matchAll(/<label[^>]*>([^<]*)<\/label>/g)].map((m) => m[1])).toEqual([
+      "Batch size bbl", "Brewhouse efficiency %", "Yeast attenuation %", "Pre-boil volume bbl", "Boil time min", "Whirlpool min", "Whirlpool rest min", "Whirlpool temp °F", "Knockout temp °F",
+    ]);
+    expect(sheet).not.toMatch(/data-orientation="horizontal"/);
     // Each is the compact field: its own input under a small label, without the stepper's buttons.
-    expect(html).toMatch(/<label[^>]*text-xs[^>]*>Whirlpool min<\/label>/);
-    expect(html.slice(html.indexOf(">Whirlpool</h2>"), html.indexOf(">Knockout</h2>"))).not.toMatch(/aria-label="(Decrease|Increase)"/);
+    expect(sheet).toMatch(/<label[^>]*text-xs[^>]*>Whirlpool min<\/label>/);
+    expect(sheet).toMatch(/<input[^>]*aria-label="Batch size bbl"[^>]*value="22"/);
+    expect(sheet).not.toMatch(/aria-label="(Decrease|Increase)"/);
   });
 
   it("the live recipe page mounts RecipeEditor on the current copy and RecipeView, read only, on an earlier one", () => {

@@ -223,7 +223,7 @@ describe("successful record metadata", () => {
 
 // /recipes/<id> is the one recipe page: the editor on the current copy, the read-out of an earlier one.
 describe("the recipe page picks the editor or the read-out", () => {
-  const RecipeEditor = () => null, RecipeView = () => null, RecipeBrandPicker = () => null;
+  const RecipeEditor = () => null, RecipeView = () => null;
   type Drawn = { type: unknown; key: string | null; props: Record<string, unknown> };
   /** The page over a recipe whose saved copies are `copies`, newest first; its reads are stubbed at the command boundary. */
   function open(searchParams: Record<string, string>, copies = [3, 2, 1]) {
@@ -237,7 +237,7 @@ describe("the recipe page picks the editor or the read-out", () => {
       },
     });
     const page = loadPage("app/(app)/recipes/[id]/page.tsx", {
-      ...bindings, ...data, RecipeEditor, RecipeView, RecipeBrandPicker,
+      ...bindings, ...data, RecipeEditor, RecipeView,
       runCommand: async (name: string) => (name === "get_recipe_outcomes" ? { batches: [] } : name === "get_gravity_unit" ? { effective: "plato" } : []),
       toRecipeMaterial: (m: unknown) => m, toWaterProfileOption: (p: unknown) => p,
       toRecipePageModel: (s: { recipe: { name: string } }) => ({ title: s.recipe.name, saved: "Nov 3, 2026" }),

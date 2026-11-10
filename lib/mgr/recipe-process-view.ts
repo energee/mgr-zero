@@ -2,9 +2,8 @@
 // it and the recipe page reads it: ordered mash steps, fermentation stages and
 // water additions on the unsaved sheet (recipe-builder spec D2: repetition earns
 // a surface), pure list helpers, the summary lines the schedule screens print,
-// the titles the recipe page gives each schedule, the labelled read-out of
-// the sheet's water, and an ingredient typed as a count of packs for the
-// recipe's batch (packsToPerBbl, packsFieldText, packsLabel).
+// and an ingredient typed as a count of packs for the recipe's batch
+// (packsToPerBbl, packsFieldText, packsLabel).
 import type { PackName } from "./enums";
 import { sentenceCase } from "./labels";
 import { batchQty, packNoun, perBblForPacks, type Pack } from "./pack-qty";
@@ -134,24 +133,8 @@ export function mashSummary(steps: readonly MashStep[]): string {
   return `Total ${totalMinutes(steps)} min. ${rest ? `The ${rest.tempF} °F rest is recorded as the mash temperature.` : "No rest falls between 144 and 162 °F, so no mash temperature is recorded."}`;
 }
 
-/** What the recipe page calls each step's schedule, over its rows. Each sits under its step's heading (Mash,
- *  Fermentation, Water), so the title does not repeat that heading. */
-export const mashRowTitle = (steps: number) => `Schedule · ${plural(steps, "step")}`;
-export const fermentationRowTitle = (stages: number) => `Schedule · ${plural(stages, "stage")}`;
-export const WATER_ROW_TITLE = "Profile and additions";
-
-/** The one-line mash summary a recipe row shows: "Total 60 min · 152 °F saccharification rest". */
-export function mashRowSummary(steps: readonly MashStep[]): string {
-  const rest = saccharificationRest(steps);
-  return `Total ${totalMinutes(steps)} min · ${rest ? `${rest.tempF} °F saccharification rest` : "no saccharification rest"}`;
-}
-
-/** A water addition row's detail, "4 g · Mash": on the Water sheet and on a saved copy's read-out. */
+/** A water addition row's detail on the Water sheet, "4 g · Mash". */
 export const waterAdditionDetail = (a: { qty: number; unit: string; stage: string }) => `${a.qty} ${a.unit} · ${sentenceCase(a.stage)}`;
-
-/** The Water row detail, "Target Hazy target · 3 additions" or "No target · 0 additions": on the recipe sheet and on the Water sheet's trigger. */
-export const waterRowSummary = (targetName: string | undefined, additions: number) =>
-  `${targetName ? `Target ${targetName}` : "No target"} · ${plural(additions, "addition")}`;
 
 /** A mash step's row detail, "Infusion · 152 °F · 60 min"; the kind is dropped when it only repeats the step name ("Rest", kind "rest"). */
 export function mashStepDetail(step: MashStep): string {
@@ -170,19 +153,6 @@ export type ProcessColumns = {
   batch_bbl: number | null; pre_boil_bbl: number | null; whirlpool_minutes: number | null; whirlpool_temp_f: number | null; whirlpool_rest_minutes: number | null; knockout_temp_f: number | null;
   target_water_profile_id: string | null; source_water_profile_id: string | null; mash_water_gal: number | null; sparge_water_gal: number | null; target_mash_ph: number | null;
 };
-
-/** Label and value for each water fact the sheet holds, as typed; a fact it does not hold, or a profile the page
- *  cannot name, prints nothing. */
-export function waterReadout(w: Omit<WaterDraft, "additions">, profileName: (id: string) => string | undefined): [string, string][] {
-  const rows: [string, string | undefined][] = [
-    ["Source profile", profileName(w.sourceProfileId)],
-    ["Target profile", profileName(w.targetProfileId)],
-    ["Mash water", w.mashGal && `${w.mashGal} gal`],
-    ["Sparge water", w.spargeGal && `${w.spargeGal} gal`],
-    ["Target mash pH", w.targetMashPh],
-  ];
-  return rows.filter((r): r is [string, string] => Boolean(r[1]));
-}
 
 // Sheet field shapes (strings, as typed) and why each Save is withheld (null when
 // ready; ingredientReason's pattern), named beside the button. Pure, so a

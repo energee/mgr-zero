@@ -117,6 +117,8 @@ export const TAPS: [string | RegExp, string][] = [
   ["Add contract", "Contract"],
   [/^Fictional (Hop|Malt) Supply · /, "Contract"],
   ["New recipe", "Recipe"],
+  // Recipe reads its batch size and process numbers as text; each one, and the action under the band, opens their one sheet.
+  [/(^E|, e)dit recipe numbers$/, "Recipe numbers"],
   [/^(January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/, "Monthly compliance"],
   ["Save filed snapshot", "Compliance months"],
   // The months list is titled Compliance on the glass; its children crumb to that (#259).

@@ -1,17 +1,19 @@
 // app/(app)/recipes/[id]/recipe-version-form.tsx — the recipe editor: RecipeView
-// (components/mgr/views/recipe.tsx) with every field controlled. On
+// (components/mgr/views/recipe.tsx) bound to an unsaved sheet. On
 // /recipes/<id> it starts as the current saved copy (`initial`, from
 // versionToDraft), or blank before the first save, and the page's own parts
-// (`page`: saved date, Schedule batch, Batch actuals, As brewed) and its brand
-// picker (`parentForm`) sit around the sheet. Nothing is written until Save
+// (`page`: saved date, Schedule batch, Batch actuals, As brewed) sit around the
+// sheet. Nothing is written until Save
 // changes: the save bar is up only while the sheet differs from what is saved
 // (shouldKeepDraft), and Discard puts it back. An unchanged sheet shows the
 // figures the saved copy froze (`saved`); once changed it shows the live
 // preview. When current Materials would give the unchanged recipe other
 // figures (materialsNowGive), Refresh from Materials saves it again as it is,
-// which freezes them. The brand picker is apart from
-// that: it saves on pick (set_recipe_brand) and its refresh leaves the unsaved
-// sheet alone. An unsaved change is kept in sessionStorage per actor, brewery
+// which freezes them. The brand is apart from
+// that: the pick in the page's sentence saves on its own (set_recipe_brand),
+// says "Brand saved", and its refresh leaves the unsaved sheet alone. It
+// stays enabled while that save runs, so focus never drops; a pick made
+// meanwhile is ignored. An unsaved change is kept in sessionStorage per actor, brewery
 // and recipe (lib/mgr/recipe-draft.ts), written as each change is made,
 // restored with a notice on return, and cleared on save; /recipes/new keeps
 // none, since there is no recipe to key it by yet. Use this again arrives as
@@ -21,9 +23,12 @@
 // sheet is complete; the page then refreshes onto the new copy and remounts
 // this editor. Without a recipeId (recipes/new) the shared parent fields sit
 // on top, the save bar is always up, and one save runs create_recipe then
-// create_recipe_version, landing on the recipe. A line's name, a step's Add
-// ingredient (on that step's stage) and its Edit schedule open their sheets
-// (schedule-sheets.tsx). The OG/FG/ABV preview comes from the same pure
+// create_recipe_version, landing on the recipe. A line's name and Add
+// ingredient open the Ingredient sheet, and each schedule's action opens its
+// sheet (schedule-sheets.tsx). The batch size and the eight process numbers
+// have one sheet, Recipe numbers, and the water has one; a fact the page
+// draws opens the same sheet its action does (`sheetOpen`), so the sheet stays
+// open while that fact is retyped. The OG/FG/ABV preview comes from the same pure
 // recipeGravity the server uses (lib/recipe-gravity.ts), or names why there is
 // none (gravityBlockerText, noMashText). The IBU preview (draftIbu) reads each
 // material's current alpha acid. Efficiency and attenuation are typed as percents, as the
@@ -35,19 +40,21 @@
 // the batch size and each material's pack, so a line can be typed in packs.
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { E } from "@/components/mgr/e";
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { BLANK_RECIPE, NewRecipeFieldsView, type NewRecipeBrand } from "@/components/mgr/views/new-recipe";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import type { GravityUnit } from "@/lib/mgr/gravity-unit";
+import { nameWithAlias } from "@/lib/mgr/labels";
 import { useCommandContext } from "@/lib/brewery-provider";
 import { gravityBlockers, recipeGravity } from "@/lib/recipe-gravity";
 import { readRecipeDraft, recipeDraftKey, shouldKeepDraft, writeRecipeDraft } from "@/lib/mgr/recipe-draft";
-import { batchSize, draftBlocker, draftIbu, fermentationView, figureStrip, gravityBlockerText, gristShares, ingredientCells, ingredientPack, mashView, materialsNowGive, noMashText, RECIPE_NUMBERS, waterView, type RecipeDraft, type RecipeFigures, type RecipeNumberKey, type RecipeViewModel } from "@/lib/mgr/recipe-view";
+import { batchSize, draftBlocker, draftIbu, figureStrip, gravityBlockerText, gristShares, ingredientCells, ingredientPack, materialsNowGive, noMashText, RECIPE_NUMBERS, waterFacts, type RecipeDraft, type RecipeFigures, type RecipeNumberKey, type RecipeViewModel } from "@/lib/mgr/recipe-view";
 import { EMPTY_WATER, lineReady, materialLookup, optionalNumber as num, removeAt, scheduleDays, upsertAt, type RecipeMaterial, type MashStep, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
-import { FermentationScheduleSheet, IngredientSheet, MashScheduleSheet, WaterSheet } from "./schedule-sheets";
+import { FermentationScheduleSheet, IngredientSheet, MashScheduleSheet, RecipeNumbersSheet, WaterSheet } from "./schedule-sheets";
 
 type Numbers = Record<RecipeNumberKey, string>;
 
@@ -59,10 +66,12 @@ const BLANK_DRAFT: RecipeDraft = { batchBbl: "", numbers: BLANK_NUMBERS, notes: 
 const pctToFraction = (s: string) => Number(s) / 100;
 const NOT_KEPT = "Your changes could not be kept in this tab; they are lost if you leave the page before saving.";
 
-export function RecipeEditor({ recipeId, title, backHref, brands = [], parentForm, page, savedFigures, initial, baseVersionId = null, loaded, materials, profiles, unit }: {
-  recipeId?: string; title: string; backHref: string; brands?: NewRecipeBrand[];
-  /** The recipe page's brand picker, drawn above the sheet. It saves on its own, apart from the sheet's Save changes. */
-  parentForm?: ReactNode;
+export function RecipeEditor({ recipeId, title, backHref, brandId = null, brands = [], page, savedFigures, initial, baseVersionId = null, loaded, materials, profiles, unit }: {
+  recipeId?: string; title: string; backHref: string;
+  /** The brand the saved recipe brews, null for none; the pick in the page's sentence starts on it. */
+  brandId?: string | null;
+  /** The brands to pick from: in the sentence of a saved recipe, and in the Brand field of one being created. */
+  brands?: NewRecipeBrand[];
   /** What the recipe page draws around the sheet from the saved recipe; the sheet's own fields come from the draft. */
   page?: Pick<RecipeViewModel, "saved" | "scheduleHref" | "recipeNote" | "actuals" | "actualsNote" | "history" | "figures" | "figureNotes">;
   /** What the saved copy predicts, frozen at its save (get_recipe). The unchanged sheet shows `page`'s figures, drawn
@@ -78,12 +87,15 @@ export function RecipeEditor({ recipeId, title, backHref, brands = [], parentFor
 }) {
   const router = useRouter();
   const action = useCommandAction();
+  const brandAction = useCommandAction();
   const context = useCommandContext();
   const key = recipeId === undefined ? null : recipeDraftKey(context, recipeId);
   const start = initial ?? BLANK_DRAFT;
   const [parent, setParent] = useState(BLANK_RECIPE);
   const [draft, setDraft] = useState(loaded?.draft ?? start);
   const [notice, setNotice] = useState<string | null>(loaded?.notice ?? null);
+  // The one Recipe numbers sheet and the one Water sheet: which is open, whichever fact or action opened it.
+  const [sheetOpen, setSheetOpen] = useState<"numbers" | "water" | null>(null);
   const { batchBbl, numbers, notes, lines, mashSchedule, fermentationSchedule, water } = draft;
 
   const { setError } = action;
@@ -136,6 +148,11 @@ export function RecipeEditor({ recipeId, title, backHref, brands = [], parentFor
     if (key !== null) sessionStorage.removeItem(key);
     setDraft(start);
     setNotice(null);
+  }
+  // The brand saves when it is picked ("" clears it). A pick made while one is saving is ignored.
+  function pickBrand(value: string) {
+    if (brandAction.busy) return;
+    void brandAction.run("set_recipe_brand", { recipeId, brandId: value || null }, () => toast.success("Brand saved"));
   }
 
   // Declared before the preview reads it during render (#440).
@@ -205,10 +222,13 @@ export function RecipeEditor({ recipeId, title, backHref, brands = [], parentFor
   const ingredientSheet = { materials: sheetMaterials, limits: timingLimits, batchBbl: batchSize(batchBbl) };
   const shares = gristShares(lines.map((l) => ({ stage: l.stage, perBbl: Number(l.perBblQty), unit: material.unit(l.materialId) })));
   const liveStrip = figureStrip(live, unit, { saved: false, why: gravityWhy });
+  const toggle = (sheet: "numbers" | "water") => (open: boolean) => setSheetOpen(open ? sheet : null);
   return (
     <RecipeView
       model={{
         ...page, title, backHref, batchBbl, ...numbers, notes,
+        // A recipe being created picks its brand in the parent fields; a saved one in its sentence.
+        brand: creating ? undefined : { value: brandId ?? "", options: [{ value: "", label: "No brand yet" }, ...brands.map((b) => ({ value: b.id, label: nameWithAlias(b) }))] },
         ingredients: lines.map((l, i) => ({
           key: `${i}-${l.materialId}`, title: material.name(l.materialId), ...ingredientCells(l.stage, l.timingMinutes, l.perBblQty, material.unit(l.materialId)),
           edit: (trigger) => <IngredientSheet line={l} {...ingredientSheet} onSave={(f) => change({ lines: upsertAt(draft.lines, i, f) })} onDelete={() => change({ lines: removeAt(draft.lines, i) })} trigger={trigger} />,
@@ -216,33 +236,35 @@ export function RecipeEditor({ recipeId, title, backHref, brands = [], parentFor
           share: shares[i],
           onRound: (perBbl: number) => change({ lines: upsertAt(draft.lines, i, { ...l, perBblQty: String(perBbl) }) }),
         })),
-        mash: mashView(mashSchedule), fermentation: fermentationView(fermentationSchedule), water: waterView(water, profiles, material.name),
+        mashSchedule, fermentationSchedule, water: waterFacts(water, profiles, material.name),
         ...(frozen ? {} : { figures: liveStrip.figures, figureNotes: liveStrip.notes }),
       }}
       parentForm={creating ? <>
         <NewRecipeFieldsView brands={brands} values={parent} onChange={setParent} busy={action.busy || parentLocked} />
-        {/* The band lays the parent fields out side by side; a notice takes a whole row of it. */}
+        {/* The row lays the parent fields out side by side; a notice takes a whole row of it. */}
         {parentLocked ? <div className="basis-full">{E.info("The recipe is saved under this name; only its sheet is still to save.")}</div> : null}
-      </> : <>
-        {parentForm}
-        {/* The notice is about an unsaved change, so it goes once the sheet is back to what is saved. */}
-        {notice && dirty ? <div className="basis-full">{E.info(notice)}</div> : null}
-      </>}
+      </> : notice && dirty
+        // The notice is about an unsaved change, so it goes once the sheet is back to what is saved.
+        ? <div className="basis-full">{E.info(notice)}</div>
+        : undefined}
       controls={{
-        set: (field, value) => change(field === "notes" || field === "batchBbl" ? { [field]: value } : { numbers: { ...draft.numbers, [field]: value } }),
+        setNote: (value) => change({ notes: value }),
         onSubmit: () => void submit(), busy: action.busy, blockedReason, error: action.error,
         dirty,
         // A recipe being created has nothing saved to go back to.
         onDiscard: creating ? undefined : discard,
         refresh: refreshText ? { text: refreshText, onRefresh: () => void submit() } : undefined,
         submitLabel: creating && !parentLocked ? "Create recipe" : undefined,
+        onOpen: setSheetOpen,
+        brand: creating ? undefined : { onChange: pickBrand, error: brandAction.error },
       }}
       slots={{
         addIngredient: (stage, trigger) => <IngredientSheet stage={stage} {...ingredientSheet} onSave={(f) => change({ lines: [...draft.lines, f] })} trigger={trigger} />,
-        schedule: (key, trigger) => {
-          if (key === "mash") return <MashScheduleSheet steps={mashSchedule} onChange={(mashSchedule) => change({ mashSchedule })} trigger={trigger} />;
-          if (key === "fermentation") return <FermentationScheduleSheet stages={fermentationSchedule} onChange={(fermentationSchedule) => change({ fermentationSchedule })} trigger={trigger} />;
-          return <WaterSheet water={water} profiles={profiles} materials={materials} onChange={(water) => change({ water })} trigger={trigger} />;
+        sheet: (sheet, trigger) => {
+          if (sheet === "numbers") return <RecipeNumbersSheet open={sheetOpen === "numbers"} onOpenChange={toggle("numbers")} values={{ batchBbl, ...numbers }} onChange={(field, value) => change(field === "batchBbl" ? { batchBbl: value } : { numbers: { ...draft.numbers, [field]: value } })} trigger={trigger} />;
+          if (sheet === "mash") return <MashScheduleSheet steps={mashSchedule} onChange={(mashSchedule) => change({ mashSchedule })} trigger={trigger} />;
+          if (sheet === "fermentation") return <FermentationScheduleSheet stages={fermentationSchedule} onChange={(fermentationSchedule) => change({ fermentationSchedule })} trigger={trigger} />;
+          return <WaterSheet open={sheetOpen === "water"} onOpenChange={toggle("water")} water={water} profiles={profiles} materials={materials} onChange={(water) => change({ water })} trigger={trigger} />;
         },
       }}
     />

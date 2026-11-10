@@ -1,10 +1,10 @@
 // components/mgr/views/new-recipe.tsx — the recipe parent fields: what a
 // recipe is before its sheet is saved. Name, and the brand it is meant to
 // brew and a note, both optional; the brand's hint sits under its picker. Fields only, no
-// form or layout of their own (RecipeView's band lays them out side by side): the inventory Recipe
-// record mounts them in RecipeView's parentForm slot and the live editor
-// (app/(app)/recipes/[id]/recipe-version-form.tsx) draws them above the
-// blank sheet so one save creates both.
+// form or layout of their own (RecipeView's parentForm row lays them out side by side): the live editor
+// (app/(app)/recipes/[id]/recipe-version-form.tsx) draws them there, above the
+// blank sheet, so one save creates both. A saved recipe has no such fields: its
+// brand is a pick in the page's sentence.
 "use client";
 
 import { nameWithAlias } from "@/lib/mgr/labels";

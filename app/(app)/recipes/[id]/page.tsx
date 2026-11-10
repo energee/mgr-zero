@@ -1,8 +1,8 @@
 // app/(app)/recipes/[id]/page.tsx — the one recipe page. It opens the current
-// saved copy in the editor (recipe-version-form.tsx), every field live, with the
-// brand picker on top and, from toRecipePageModel, the saved date, Schedule
-// batch, the figures the saved copy froze, Batch actuals (get_recipe_outcomes)
-// and As brewed around the sheet. A
+// saved copy in the editor (recipe-version-form.tsx), with the recipe's brand
+// and the brands to pick from and, from toRecipePageModel, the saved date,
+// Schedule batch, the figures the saved copy froze, Batch actuals
+// (get_recipe_outcomes) and As brewed around the sheet. A
 // recipe not saved yet opens the blank sheet. ?v=N naming an earlier copy reads
 // that copy out read only (RecipeView), and ignores ?from. ?from=N is Use this
 // again: the editor opens on the current copy with copy N loaded as an unsaved
@@ -14,7 +14,6 @@
 // (schedule_batch).
 import { redirect } from "next/navigation";
 import { RecipeView } from "@/components/mgr/views/recipe";
-import { RecipeBrandPicker } from "./recipe-brand-picker";
 import { RecipeEditor } from "./recipe-version-form";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
@@ -72,7 +71,7 @@ export default async function RecipePage({ params, searchParams }: Props) {
       // A save makes a new current copy, so the editor remounts on it with nothing unsaved.
       key={version?.id ?? "unsaved"}
       recipeId={recipe.id} title={model.title} backHref="/recipes"
-      parentForm={<RecipeBrandPicker recipeId={recipe.id} brandId={recipe.brand_id} brands={brands} />}
+      brandId={recipe.brand_id} brands={brands}
       page={{ saved, scheduleHref, recipeNote, actuals, actualsNote, history, figures, figureNotes }}
       // What get_recipe predicted for the saved copy; the editor compares its live preview against these.
       savedFigures={version ? { ogPlato: snapshot.ogPlato, fgPlato: snapshot.fgPlato, abv: snapshot.abv, ibu: snapshot.ibu } : undefined}

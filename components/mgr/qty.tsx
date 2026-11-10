@@ -33,7 +33,7 @@ function useNumberNotation(input: RefObject<HTMLInputElement | null>, value: str
 const STEP_BUTTON = "border-input disabled:border-input";
 
 /** The same stepper for controlled forms and uncontrolled inventory fields. `compact` draws the input without its
- *  −/+ buttons, for a dense sheet of short numbers (Recipe); the same input, bounds and notation error. */
+ *  −/+ buttons, for a dense sheet of short numbers (Recipe numbers); the same input, bounds and notation error. */
 export function StepQuantity({ label, value, defaultValue, onChange, contextualLabels, compact, ...attributes }: Omit<FieldControls, "hideLabel" | "error"> & { label: string; value?: string; defaultValue?: string }) {
   const input = useRef<HTMLInputElement>(null);
   const notation = useNumberNotation(input, onChange ? value : undefined, value ?? defaultValue);

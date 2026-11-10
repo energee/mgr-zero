@@ -4,7 +4,7 @@ import type { BatchesSnapshot } from "@/lib/mgr/batches-view";
 import type { BrewDayViewModel } from "@/lib/mgr/brew-day-view";
 import { cellarPlanRows, startAtPlan, waterAdditionRows, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import type { ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
-import { fermentationView, figureStrip, gristShares, ingredientCells, ingredientPack, mashView, outcomeSummary, outcomeTable, recipeHistory, waterView, type RecipeOutcome, type RecipeViewModel } from "@/lib/mgr/recipe-view";
+import { figureStrip, gristShares, ingredientCells, ingredientPack, outcomeSummary, outcomeTable, recipeHistory, waterFacts, type RecipeOutcome, type RecipeViewModel } from "@/lib/mgr/recipe-view";
 import type { RecipesSnapshot } from "@/lib/mgr/recipes-view";
 import type { RunClosedViewModel } from "@/lib/mgr/run-closed-view";
 import { DEMO_TIME_ZONE } from "@/lib/mgr/fixtures/settings";
@@ -234,8 +234,8 @@ export const runClosedHazy: RunClosedViewModel = {
   timeZone: DEMO_TIME_ZONE,
 };
 
-/** Brands the Create recipe sheet offers; a recipe is brewed toward one, optionally. */
-export const recipeBrandOptions = [{ id: "hazy", name: "Hazy IPA" }, { id: "pils", name: "Pils" }, { id: "stout", name: "Stout" }];
+/** The brands a recipe can be brewed toward: what the Brand pick in Recipe's sentence offers. */
+const recipeBrandOptions = [{ id: "hazy", name: "Hazy IPA" }, { id: "pils", name: "Pils" }, { id: "stout", name: "Stout" }];
 
 /** list_recipes rows, drawn by the live adapter: two written recipes, and one saved by name with no sheet yet. */
 export const recipesList: RecipesSnapshot = {
@@ -263,10 +263,10 @@ export const FERM_STAGES: FermentationStage[] = [
   { name: "Conditioning", kind: "conditioning", tempF: 34, days: 10 },
 ];
 
-/** The drawn water: Denver source, Hazy target, a suggestion the brewer trimmed by hand so Calcium and Chloride warn; Bicarbonate warns too, since salts only add ions and Denver starts 70 ppm over the target. */
+/** The drawn water for a 22 bbl batch: Denver source, Hazy target, a suggestion the brewer trimmed by hand so Calcium and Chloride warn; Bicarbonate warns too, since salts only add ions and Denver starts 70 ppm over the target. */
 export const WATER_HAZY: WaterDraft = {
-  targetProfileId: "hazy", sourceProfileId: "denver", mashGal: "9.5", spargeGal: "12.0", targetMashPh: "5.35",
-  additions: [{ materialId: "gypsum", qty: 4, unit: "g", stage: "mash" }, { materialId: "cacl", qty: 6, unit: "g", stage: "mash" }, { materialId: "lactic", qty: 3, unit: "mL", stage: "sparge" }],
+  targetProfileId: "hazy", sourceProfileId: "denver", mashGal: "450", spargeGal: "600", targetMashPh: "5.35",
+  additions: [{ materialId: "gypsum", qty: 200, unit: "g", stage: "mash" }, { materialId: "cacl", qty: 300, unit: "g", stage: "mash" }, { materialId: "lactic", qty: 150, unit: "mL", stage: "sparge" }],
 };
 
 /** The names of WATER_HAZY's additions, as list_materials would give them to the recipe page. */
@@ -283,29 +283,41 @@ const HAZY_OUTCOMES: RecipeOutcome[] = [
   { ...HAZY_V3, batchId: "b-0356", batchNo: 356, brewedOn: "2026-06-27", ogPlato: 14.9, fgPlato: 3.5, abv: 6.1, apparentAttenuation: 0.77, brewhouseEfficiency: 0.69 },
 ];
 
-/** Hazy IPA v4's hop lines as get_recipe reads them, with the alpha acid frozen on v4. The page text is computed from these. */
-const HAZY_HOP = { name: "Citra", category: "hop", unit: "lb", alphaAcid: 12.5 };
-const HAZY_IBU = recipeIbu({
-  ogPlato: HAZY_V4.predicted.ogPlato,
-  lines: [{ ...HAZY_HOP, stage: "boil", perBblQty: 0.4, timingMinutes: 10 }, { ...HAZY_HOP, stage: "dry_hop", perBblQty: 1.2, timingMinutes: null }],
-});
+type HazyMaterial = Pick<RecipeMaterial, "base_uom" | "purchase_uom_factor" | "pack_name"> & { alphaAcid?: number };
+/** A hop sold in 44 lb boxes, and a material with no pack. */
+const boxed = (alphaAcid: number): HazyMaterial => ({ base_uom: "lb", purchase_uom_factor: 44, pack_name: "box", alphaAcid });
+const loose = (base_uom: string, alphaAcid?: number): HazyMaterial => ({ base_uom, purchase_uom_factor: 1, pack_name: null, alphaAcid });
 
-/** Hazy IPA's lines with each material's pack, as get_recipe and list_materials give them. At the recipe's 22 bbl the
- *  2-row is 18 bags of 55 lb and the oats 4 packs of 50 lb, sold by no word. Citra comes in 44 lb boxes, so neither hop
- *  line is whole boxes and each offers Round. */
-const HAZY_LINES: { key: string; title: string; stage: IngredientStage; timing: number | null; perBbl: number; material: Pick<RecipeMaterial, "base_uom" | "purchase_uom_factor" | "pack_name"> }[] = [
+/** Hazy IPA's lines with each material's pack and alpha acid, as get_recipe and list_materials give them. At the
+ *  recipe's 22 bbl the 2-row is 18 bags of 55 lb and the oats 4 packs of 50 lb, sold by no word. Citra and Mosaic come
+ *  in 44 lb boxes: the whirlpool and dry hop lines are whole boxes, and the 10 minute Citra is not, so it offers Round.
+ *  Magnum and Biofine have no pack, so they read in their unit.
+ *  The yeast is counted in "each" and sold by the pitch. `timing` is minutes, so day 3 is 3 × 1440. */
+const HAZY_LINES: { key: string; title: string; stage: IngredientStage; timing: number | null; perBbl: number; material: HazyMaterial }[] = [
   { key: "malt", title: "2-row", stage: "mash", timing: null, perBbl: 45, material: { base_uom: "lb", purchase_uom_factor: 55, pack_name: "bag" } },
   { key: "oats", title: "Flaked oats", stage: "mash", timing: null, perBbl: 9.090909, material: { base_uom: "lb", purchase_uom_factor: 50, pack_name: null } },
-  { key: "boil", title: "Citra", stage: "boil", timing: 10, perBbl: 0.4, material: { base_uom: "lb", purchase_uom_factor: 44, pack_name: "box" } },
-  { key: "dh", title: "Citra", stage: "dry_hop", timing: null, perBbl: 1.2, material: { base_uom: "lb", purchase_uom_factor: 44, pack_name: "box" } },
+  { key: "bitter", title: "Magnum", stage: "boil", timing: 60, perBbl: 0.1, material: loose("lb", 14) },
+  { key: "boil", title: "Citra", stage: "boil", timing: 10, perBbl: 0.4, material: boxed(12.5) },
+  { key: "wp-citra", title: "Citra", stage: "whirlpool", timing: null, perBbl: 2, material: boxed(12.5) },
+  { key: "yeast", title: "House ale yeast", stage: "fermentation", timing: 0, perBbl: 0.045455, material: { base_uom: "each", purchase_uom_factor: 1, pack_name: "pitch" } },
+  { key: "dh-citra", title: "Citra", stage: "dry_hop", timing: 3 * 1440, perBbl: 4, material: boxed(12.5) },
+  { key: "dh-mosaic", title: "Mosaic", stage: "dry_hop", timing: 3 * 1440, perBbl: 2, material: boxed(11.5) },
+  { key: "fining", title: "Biofine", stage: "packaging", timing: null, perBbl: 0.090909, material: loose("L") },
 ];
 const HAZY_SHARES = gristShares(HAZY_LINES.map((l) => ({ stage: l.stage, perBbl: l.perBbl, unit: l.material.base_uom })));
+/** The IBU get_recipe would read from the hop lines, with the alpha acid frozen at the save. The page text is computed from it. */
+const HAZY_IBU = recipeIbu({
+  ogPlato: HAZY_V4.predicted.ogPlato,
+  lines: HAZY_LINES.flatMap((l) => (l.material.alphaAcid === undefined ? [] : [{ name: l.title, category: "hop", unit: l.material.base_uom, alphaAcid: l.material.alphaAcid, stage: l.stage, perBblQty: l.perBbl, timingMinutes: l.timing }])),
+});
 
 /** Hazy IPA as saved (its fourth copy underneath, which the page never names), with no unsaved change. */
 export const recipeHazyV4: RecipeViewModel = {
   title: "Hazy IPA",
-  saved: "Aug 28, 2026",
+  // The saved date, then that save's change note.
+  saved: "Aug 28, 2026 · Whirlpool hard, knock out cold",
   recipeNote: "The flagship. Keep it soft and juicy.",
+  brand: { value: "hazy", options: [{ value: "", label: "No brand yet" }, ...recipeBrandOptions.map((b) => ({ value: b.id, label: b.name }))] },
   priceGroup: "3",
   priceGroupOptions: ["Not decided", "1", "2", "3", "4", "5", "6", "7", "8"],
   // Each line is built as the live page builds it: its cells, its pack and, for a mash line, its share of the grain bill.
@@ -314,7 +326,7 @@ export const recipeHazyV4: RecipeViewModel = {
     pack: ingredientPack(l.perBbl, l.material), share: HAZY_SHARES[i],
   })),
   batchBbl: "22",
-  preBoil: "16.8",
+  preBoil: "24.5",
   boilMin: "60",
   whirlpoolMin: "20",
   whirlpoolTemp: "180",
@@ -322,11 +334,10 @@ export const recipeHazyV4: RecipeViewModel = {
   knockoutTemp: "65",
   efficiency: "72",
   attenuation: "78",
-  // The schedules and the water list their rows, as the live sheet does; the Mash schedule, Fermentation schedule and Water frames edit them.
-  mash: mashView(MASH_STEPS),
-  fermentation: fermentationView(FERM_STAGES),
-  water: waterView(WATER_HAZY, waterProfiles, (id) => WATER_HAZY_NAMES[id]),
-  notes: "Whirlpool hard, knock out cold.",
+  // The schedules and the water the band, the cellar profile and the rows are drawn from; the Mash schedule, Fermentation schedule and Water frames edit them.
+  mashSchedule: MASH_STEPS,
+  fermentationSchedule: FERM_STAGES,
+  water: waterFacts(WATER_HAZY, waterProfiles, (id) => WATER_HAZY_NAMES[id]),
   ...(({ figures, notes }) => ({ figures, figureNotes: notes }))(figureStrip({ ...HAZY_V4.predicted, ibu: HAZY_IBU }, "plato", { saved: true })),
   actuals: outcomeTable(HAZY_OUTCOMES, "plato", HAZY_V4),
   actualsNote: outcomeSummary(HAZY_OUTCOMES, 4),
