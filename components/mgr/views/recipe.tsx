@@ -141,8 +141,8 @@ export function RecipeView({
           rows.map((row) => [name(row), row.amount, ...(timed ? [when(row)] : []), ...(totals ? [total(row)] : [])]),
           ["l", "r", "r", "r"], { sortable: false, dense: true },
         ) : null}
-        {/* The schedule's count and summary head its rows. */}
-        {plan ? E.tbl([plan.title, wrap(plan.detail)], plan.rows.map((r) => [wrap(r.title), wrap(r.detail)]), ["l", "r"], { sortable: false, dense: true }) : null}
+        {/* The schedule's count and summary head its rows. One row is its own summary, so it is not said twice (#1518). */}
+        {plan ? E.tbl([plan.title, plan.rows.length === 1 ? "" : wrap(plan.detail)], plan.rows.map((r) => [wrap(r.title), wrap(r.detail)]), ["l", "r"], { sortable: false, dense: true }) : null}
       </section>
     );
   };

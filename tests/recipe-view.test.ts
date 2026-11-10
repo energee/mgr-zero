@@ -469,10 +469,13 @@ describe("the sheet", () => {
   });
 
   it("lists a schedule's rows under its count and summary, with one action that opens its sheet", () => {
-    const mash = { title: "Schedule · 1 step", detail: "Total 60 min · 152 °F saccharification rest", rows: [{ title: "Saccharification", detail: "Infusion · 152 °F · 60 min" }] };
+    const mash = { title: "Schedule · 2 steps", detail: "Total 70 min · 152 °F saccharification rest", rows: [{ title: "Saccharification", detail: "Infusion · 152 °F · 60 min" }, { title: "Mash out", detail: "Infusion · 168 °F · 10 min" }] };
     const draw = (props: Partial<Parameters<typeof RecipeView>[0]>) => renderToStaticMarkup(createElement(RecipeView, { model: { title: "Pale", notes: "", mash }, ...props }));
     const text = draw({}).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
-    expect(text).toContain("Schedule · 1 step Total 60 min · 152 °F saccharification rest Saccharification Infusion · 152 °F · 60 min");
+    expect(text).toContain("Schedule · 2 steps Total 70 min · 152 °F saccharification rest Saccharification Infusion · 152 °F · 60 min Mash out");
+    // One step is its own summary, on the editor as on a read-out (#1518; tests/standing-help.test.ts pins the read-out).
+    const one = { ...mash, title: "Schedule · 1 step", detail: "Total 60 min · 152 °F saccharification rest", rows: [mash.rows[0]] };
+    expect(renderToStaticMarkup(createElement(RecipeView, { model: { title: "Pale", notes: "", mash: one } }))).not.toContain("Total 60 min");
     expect(text).toContain("Edit schedule for mash");
     expect(draw({ controls: { ...controls, dirty: false }, slots: { schedule: (key) => `SHEET:${key}` } })).toContain("SHEET:mash");
     expect(draw({ readOnly: true })).not.toMatch(/Edit schedule/);
