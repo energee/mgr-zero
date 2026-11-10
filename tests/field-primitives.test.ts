@@ -91,6 +91,19 @@ it("keeps blank numbers, constraints, and accessible names in the shared stepper
 });
 
 // A dense sheet of short numbers (Recipe's process numbers) drops the −/+ buttons, never the input's rules.
+// The − and + buttons are part of the number control, so they carry its border (--input) in the light theme too:
+// an outline button's own light border is the fainter page border, which left the box darker than its buttons.
+it("draws the stepper's buttons with the control border, enabled or disabled", () => {
+  const stepper = renderToStaticMarkup(E.edit("Quantity per bbl (lb)", "40.9", "number", undefined, { min: 0, onChange: () => {} }));
+  const buttons = stepper.match(/<button[^>]*aria-label="(Decrease|Increase)"[^>]*>/g) ?? [];
+  expect(buttons).toHaveLength(2);
+  for (const button of buttons) {
+    expect(button).toMatch(/class="[^"]*(?<![:\w-])border-input[^"]*"/);
+    expect(button).toContain("disabled:border-input");
+    expect(button).not.toMatch(/(?<![:\w-])border-border/);
+  }
+});
+
 it("draws a compact number field as the same input under a small label, without the stepper's buttons", () => {
   const compact = renderToStaticMarkup(E.edit("Boil time min", "1e3", "number", undefined, { compact: true, min: 1, step: 1, onChange: () => {} }));
   expect(compact).not.toMatch(/aria-label="(Decrease|Increase)"/);

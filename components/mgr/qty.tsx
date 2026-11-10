@@ -28,6 +28,10 @@ function useNumberNotation(input: RefObject<HTMLInputElement | null>, value: str
   return { error, errorId, changed };
 }
 
+/** The stepper's − and + are part of the number control, so they take its border (--input) in both themes, enabled
+ *  or not. An outline button alone takes the fainter page border in the light theme, which left the box darker than its buttons. */
+const STEP_BUTTON = "border-input disabled:border-input";
+
 /** The same stepper for controlled forms and uncontrolled inventory fields. `compact` draws the input without its
  *  −/+ buttons, for a dense sheet of short numbers (Recipe); the same input, bounds and notation error. */
 export function StepQuantity({ label, value, defaultValue, onChange, contextualLabels, compact, ...attributes }: Omit<FieldControls, "hideLabel" | "error"> & { label: string; value?: string; defaultValue?: string }) {
@@ -50,9 +54,9 @@ export function StepQuantity({ label, value, defaultValue, onChange, contextualL
     onChange={event => { notation.changed(event.target.value); onChange?.(event.target.value); }}
     className={cn("field-sizing-content [appearance:textfield] text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none", compact ? "w-full min-w-16 tabular-nums" : "w-auto min-w-14")} />;
   return <div className="flex flex-col gap-2">{compact ? control : <ButtonGroup>
-    <Button type="button" variant="outline" size="icon" data-preview-action aria-label={contextualLabels ? `Decrease ${label}` : "Decrease"} disabled={Boolean(notation.error) || attributes.disabled || attributes.readOnly || Boolean(onChange && attributes.min !== undefined && Number(value) <= Number(attributes.min))} onClick={() => step(-1)}>−</Button>
+    <Button type="button" variant="outline" size="icon" className={STEP_BUTTON} data-preview-action aria-label={contextualLabels ? `Decrease ${label}` : "Decrease"} disabled={Boolean(notation.error) || attributes.disabled || attributes.readOnly || Boolean(onChange && attributes.min !== undefined && Number(value) <= Number(attributes.min))} onClick={() => step(-1)}>−</Button>
     {control}
-    <Button type="button" variant="outline" size="icon" data-preview-action aria-label={contextualLabels ? `Increase ${label}` : "Increase"} disabled={Boolean(notation.error) || attributes.disabled || attributes.readOnly || Boolean(onChange && attributes.max !== undefined && Number(value) >= Number(attributes.max))} onClick={() => step(1)}>+</Button>
+    <Button type="button" variant="outline" size="icon" className={STEP_BUTTON} data-preview-action aria-label={contextualLabels ? `Increase ${label}` : "Increase"} disabled={Boolean(notation.error) || attributes.disabled || attributes.readOnly || Boolean(onChange && attributes.max !== undefined && Number(value) >= Number(attributes.max))} onClick={() => step(1)}>+</Button>
   </ButtonGroup>}{notationError && <FieldError id={notation.errorId}>{notationError}</FieldError>}</div>;
 }
 
