@@ -34,7 +34,8 @@ it("keeps other order callers selection-neutral when they supply a filtered list
 it("keeps batch intent optional while exposing eligible recipe and role-safe brand recovery", () => {
   const model = { ...scheduleBatchHazy, recipeId: "", brandId: "", recipeOptions: [], brandOptions: [], recipesHref: "/recipes", brandsHref: null };
   const html = renderToStaticMarkup(createElement(ScheduleBatchView, { model }));
-  expect(html).toContain("No recipe versions available.");
+  expect(html).toContain("No recipes available. Write a recipe and save it, or leave this undecided.");
+  expect(html).not.toMatch(/version/i);
   expect(html).toContain('href="/recipes"');
   expect(html).not.toContain('href="/catalog"');
   expect(html).toContain("Not decided");
@@ -46,7 +47,7 @@ it("keeps batch intent optional while exposing eligible recipe and role-safe bra
   const permitted = renderToStaticMarkup(createElement(ScheduleBatchView, { model: { ...model, brandsHref: "/catalog" } }));
   expect(permitted).toContain('href="/catalog"');
   const populated = renderToStaticMarkup(createElement(ScheduleBatchView, { model: scheduleBatchHazy }));
-  expect(populated).not.toContain("No recipe versions available");
+  expect(populated).not.toContain("No recipes available");
   expect(populated).not.toContain("No brands yet");
 });
 

@@ -59,3 +59,9 @@ it("keeps nothing for an untouched copy, so returning shows no notice", () => {
 it("keeps a draft once one dry hop changes", () => {
   expect(shouldKeepDraft(draft, { ...draft, lines: [{ ...draft.lines[0], perBblQty: "1.5" }] })).toBe(true);
 });
+
+it("counts a copy loaded by Use this again as an unsaved change, unless it matches what is saved", () => {
+  const earlier = { ...draft, notes: "Before the Citra change", lines: [{ ...draft.lines[0], perBblQty: "0.8" }] };
+  expect(shouldKeepDraft(draft, earlier)).toBe(true);
+  expect(shouldKeepDraft(draft, structuredClone(draft))).toBe(false);
+});

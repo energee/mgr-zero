@@ -15,7 +15,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { describe, expect, it } from "vitest";
-import { batchTotalText, draftBlocker, draftIbuText, gravityBlockerText, ingredientPack, noMashText, packRounding, RECIPE_NUMBERS, RECIPE_SECTIONS, recipeHistory, recipePageTitle, toRecipePageModel, versionNumbers, versionToDraft, type RecipeOutcome, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
+import { batchTotalText, draftBlocker, draftIbuText, gravityBlockerText, ingredientPack, loadedNotice, noMashText, packRounding, RECIPE_NUMBERS, RECIPE_SECTIONS, recipeHistory, recipePageTitle, toRecipePageModel, versionNumbers, versionToDraft, type RecipeOutcome, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
 import { INGREDIENT_STAGES, type IngredientLine, type MashStep } from "@/lib/mgr/recipe-process-view";
 import { sgToPlato } from "@/lib/recipe-gravity";
 
@@ -78,6 +78,21 @@ describe("recipeHistory", () => {
       { title: "B-0005 to B-0007", detail: "2 batches · Aug 12, 2026 – Sep 1, 2026", href: "?v=2", selected: false },
       { title: "B-0002", detail: "1 batch · Jul 4, 2026", href: "?v=1", selected: true },
     ]);
+  });
+});
+
+describe("loadedNotice (Use this again)", () => {
+  const earlier = [{ ...batch, batchId: "b7", batchNo: 7, version: 2, brewedOn: "2026-09-01" }, { ...batch, batchId: "b5", batchNo: 5, version: 2, brewedOn: "2026-08-12" }];
+  it("names the batches that brewed the loaded copy and what saving does", () => {
+    expect(loadedNotice([batch, ...earlier], 2, 3)).toBe("Loaded the recipe as brewed in B-0005 to B-0007. Save changes to make it the current recipe.");
+  });
+  it("says so when no batch brewed the loaded copy", () => {
+    expect(loadedNotice([batch, ...earlier], 1, 3)).toBe("Loaded an earlier recipe no batch brewed. Save changes to make it the current recipe.");
+  });
+  it("loads the earlier copy's own amounts, not the current one's", () => {
+    const loaded = versionToDraft({ ...snapshot, version: { ...version, version: 2, note: "Before the Citra change" }, ingredients: snapshot.ingredients.map((i) => ({ ...i, per_bbl_qty: 99 })) })!;
+    expect(loaded.notes).toBe("Before the Citra change");
+    expect(loaded.lines.every((l) => l.perBblQty === "99")).toBe(true);
   });
 });
 
@@ -216,7 +231,7 @@ describe("toRecipePageModel", () => {
   });
   it("counts mash steps and fermentation stages, and says No stages yet when there are none", () => {
     const model = toRecipePageModel({ ...predicted, version: { ...version, fermentation_schedule: [] } }, ctx);
-    expect(model.mash?.title).toBe("Mash schedule · 1 step");
+    expect(model.mash?.title).toBe("Schedule · 1 step");
     expect(model.mash?.detail).toBe("Total 60 min · 152 °F saccharification rest");
     expect(model.fermentation?.detail).toBe("No stages yet");
   });
@@ -310,7 +325,7 @@ describe("the sheet", () => {
     const between = (text: string, from: string, to: string) => at(text) > at(`>${from}</h2>`) && at(text) < at(`>${to}</h2>`);
     expect(between("Fieldstone White Wheat", "Mash", "Boil")).toBe(true);
     expect(between("Brewhouse efficiency %", "Mash", "Boil")).toBe(true);
-    expect(between("Mash schedule · 1 step", "Mash", "Boil")).toBe(true);
+    expect(between("Schedule · 1 step", "Mash", "Boil")).toBe(true);
     expect(between("Pre-boil volume bbl", "Boil", "Whirlpool")).toBe(true);
     expect(between("Whirlpool min", "Whirlpool", "Knockout")).toBe(true);
     expect(between("Knockout temp °F", "Knockout", "Fermentation")).toBe(true);

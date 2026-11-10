@@ -559,15 +559,15 @@ describe("Recipes view", () => {
     expect(body.props.model).toEqual(toRecipesViewProps(recipesList));
   });
 
-  it("maps live list_recipes onto Recipe, Version and Brand columns, without inventing a style", () => {
+  it("maps live list_recipes onto Recipe and Brand columns, without inventing a style or naming a version", () => {
     const model = toRecipesViewProps({
       recipes: [
         { id: "r1", name: "Hazy IPA", brand: null, latest_version: 1 },
         { id: "r2", name: "Stout", brand: "Stout", latest_version: null },
       ],
     });
-    expect(model.rows[0]).toEqual({ key: "r1", name: "Hazy IPA", version: 1, brand: null, href: "/recipes/r1" });
-    expect(model.rows[1]).toEqual({ key: "r2", name: "Stout", version: null, brand: "Stout", href: "/recipes/r2" });
+    expect(model.rows[0]).toEqual({ key: "r1", name: "Hazy IPA", written: true, brand: null, href: "/recipes/r1" });
+    expect(model.rows[1]).toEqual({ key: "r2", name: "Stout", written: false, brand: "Stout", href: "/recipes/r2" });
     const html = htmlOf(createElement(RecipesView, { model, linkRows: true }));
     expect(html).toContain('href="/recipes/r1"');
     expect(html).toContain('href="/recipes/r2"');
@@ -575,17 +575,19 @@ describe("Recipes view", () => {
   });
 
   // #1516 item 8: the shared RecordTable, one line per recipe on the desk.
-  it("draws the recipes through RecordTable, a missing version in the warning style", () => {
+  it("draws the recipes through RecordTable, a recipe not written yet in the warning style", () => {
     const html = htmlOf(createElement(RecipesView, { model: toRecipesViewProps(recipesList) }));
     expect(html).toContain("<table");
-    for (const header of ["Recipe", "Version", "Brand"]) expect(html).toMatch(new RegExp(`<th[^>]*>[\\s\\S]*?${header}[\\s\\S]*?</th>`));
-    expect(html).toContain(">v4<");
-    expect(html).toMatch(/class="text-warning-foreground"[^>]*>No version yet</);
+    for (const header of ["Recipe", "Brand"]) expect(html).toMatch(new RegExp(`<th[^>]*>[\\s\\S]*?${header}[\\s\\S]*?</th>`));
+    // The list names no version: a written recipe says nothing more, and one with no saved sheet says so under its name.
+    expect(html).not.toMatch(/version|>v\d+</i);
+    expect(html).toMatch(/class="text-warning-foreground"[^>]*>Not written yet</);
+    expect(html.match(/Not written yet/g)).toHaveLength(2); // the table row and the phone card, for the one unwritten recipe
     expect(html).toContain("No brand yet");
     expect(html).toMatch(/data-to="Recipe"[^>]*>Farmhouse saison</);
   });
 
-  it("links Water profiles, the catalog a version picks its water from (#1140, #1205)", () => {
+  it("links Water profiles, the catalog a recipe picks its water from (#1140, #1205)", () => {
     const live = htmlOf(createElement(RecipesView, { model: toRecipesViewProps({ recipes: [], waterProfilesHref: "/catalog/water-profiles" }) }));
     expect(live).toMatch(/<a[^>]*href="\/catalog\/water-profiles"[^>]*>[^]*?Water profiles/);
     expect(live).toContain("Manage water profiles");
@@ -597,10 +599,10 @@ describe("Recipes view", () => {
     for (const step of ["mash", "boil", "whirlpool", "fermentation"]) expect(resolveTap(screen("Recipe"), `Add ${step} ingredient`)).toBe("Ingredient");
   });
 
-  it("draws the inventory list through the live adapter, a recipe with no version included", () => {
+  it("draws the inventory list through the live adapter, a recipe not written yet included", () => {
     const { rows } = toRecipesViewProps(recipesList);
     expect(rows.map((r) => r.brand)).toEqual(["Hazy IPA", "Pils", null]);
-    expect(rows[2]).toMatchObject({ name: "Farmhouse saison", version: null });
+    expect(rows[2]).toMatchObject({ name: "Farmhouse saison", written: false });
     expect(htmlOf(screen("Recipes").body)).not.toMatch(/15 bbl · updated/);
   });
 
@@ -648,9 +650,10 @@ describe("Recipes view", () => {
     expect(html.match(/grid-cols-2 md:grid-cols-4/g)).toHaveLength(1);
   });
 
-  it("the live recipe page mounts RecipeView; its next version is RecipeEditor on ./new", () => {
-    expect(src("app/(app)/recipes/[id]/page.tsx")).toMatch(/<RecipeView\b/);
-    expect(src("app/(app)/recipes/[id]/new/page.tsx")).toMatch(/<RecipeEditor\b/);
+  it("the live recipe page mounts RecipeEditor on the current copy and RecipeView, read only, on an earlier one", () => {
+    const page = src("app/(app)/recipes/[id]/page.tsx");
+    expect(page).toMatch(/<RecipeEditor\b/);
+    expect(page).toMatch(/<RecipeView readOnly\b/);
   });
 });
 

@@ -172,19 +172,24 @@ describe("Recipe creation", () => {
   it("/recipes/new and /recipes/[id] draw the editor through RecipeView, never a detail override", () => {
     expect(src("app/(app)/recipes/new/page.tsx")).toMatch(/<RecipeEditor\b/);
     const detail = src("app/(app)/recipes/[id]/page.tsx");
-    expect(detail).toMatch(/<RecipeView\b/);
-    // Version history may use search params; the removed alternate detail drawing must stay gone.
+    // The recipe's own page is the editor; an earlier copy is the same view read only.
+    expect(detail).toMatch(/<RecipeEditor\b/);
+    expect(detail).toMatch(/<RecipeView readOnly\b/);
+    // As brewed and Use this again use search params; the removed alternate detail drawing must stay gone.
     expect(detail).not.toMatch(/detail=/);
-    const next = src("app/(app)/recipes/[id]/new/page.tsx");
-    expect(next).toMatch(/<RecipeEditor\b/);
-    // The next version starts as a copy of the current one, and a draft left in this tab comes back.
-    expect(next).toMatch(/initial=\{versionToDraft\(snapshot\)/);
+    // The editor starts as the current saved copy, and a change left in this tab comes back.
+    expect(detail).toMatch(/const initial = versionToDraft\(snapshot\)/);
     const form = src("app/(app)/recipes/[id]/recipe-version-form.tsx");
     expect(form).toMatch(/\breadRecipeDraft\b[^]*\bwriteRecipeDraft\b|\bwriteRecipeDraft\b[^]*\breadRecipeDraft\b/);
     expect(form).toMatch(/import \{[^}]*\breadRecipeDraft\b[^}]*\} from "@\/lib\/mgr\/recipe-draft"/);
     expect(form).toMatch(/import \{[^}]*\bwriteRecipeDraft\b[^}]*\} from "@\/lib\/mgr\/recipe-draft"/);
     expect(form).toMatch(/<RecipeView\b/);
     expect(form).toMatch(/<NewRecipeFieldsView\b/);
+    // The save bar is up only while the sheet differs from what is saved (always while creating), and Discard puts it back.
+    expect(form).toMatch(/dirty: creating \|\| shouldKeepDraft\(start, draft\)/);
+    expect(form).toMatch(/onDiscard: creating \? undefined : discard/);
+    // Nothing the editor says to the brewer names a version.
+    expect(form).not.toMatch(/["`][^"`\n]*\bversions?\b[^"`\n]*["`]/i);
     expect(form).not.toMatch(/<CommandForm\b|grid-cols-2|<Label\b|id="rv-/);
     expect(src("components/mgr/views/recipe.tsx")).not.toMatch(/detail\?:/);
     // "Add ingredient" is the add action: it opens the ingredient editor itself, not a list with a second header.

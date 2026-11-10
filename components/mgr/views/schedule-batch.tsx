@@ -29,7 +29,7 @@ export function ScheduleBatchView({ model, controls = {}, messages, footer }: {
   const warning = pastPlanWarning(date, model.today);
   return (
     <>
-      <OptionalPick label="Recipe · optional" value={model.recipeId} options={model.recipeOptions} onChange={controls.recipeId} empty={{ text: "No recipe versions available. Add a recipe and save a version, or leave this undecided.", label: "Recipes", href: model.recipesHref, to: "Recipes" }} />
+      <OptionalPick label="Recipe · optional" value={model.recipeId} options={model.recipeOptions} onChange={controls.recipeId} empty={{ text: "No recipes available. Write a recipe and save it, or leave this undecided.", label: "Recipes", href: model.recipesHref, to: "Recipes" }} />
       <OptionalPick label="Brand · optional" value={model.brandId} options={model.brandOptions} onChange={controls.brandId} empty={model.brandsHref === null
         ? { text: "No brands yet. An admin or sales member adds them in Catalog. You can leave this undecided." }
         : { text: "No brands yet. You can leave this undecided.", label: "Add a brand", href: model.brandsHref, to: "Catalog" }} />

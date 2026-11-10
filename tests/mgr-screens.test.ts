@@ -76,9 +76,16 @@ describe("SCREENS", () => {
     expect(recipe).not.toMatch(/version|\bv\d\b/i);
     expect(recipe).toContain("Schedule batch");
     expect(recipe).not.toMatch(/Save changes|Discard/);
-    expect(recipe).toContain("Mash schedule · 3 steps");
-    expect(recipe).toContain("Fermentation schedule · 4 stages");
-    expect(recipe).toMatch(/Water\s+Target /);
+    // A step's rows do not repeat its heading: a schedule row says what it opens, and a line reads its timing and amount.
+    expect(recipe).toContain("Schedule · 3 steps");
+    expect(recipe).toContain("Schedule · 4 stages");
+    expect(recipe).not.toMatch(/Mash schedule ·|Fermentation schedule ·/);
+    expect(recipe).toMatch(/Profile and additions\s+Target /);
+    expect(recipe).toContain("44 lb / bbl");
+    expect(recipe).toContain("10 min · 0.4 lb / bbl");
+    expect(recipe).not.toMatch(/Mash · 44|Boil · 10 min/);
+    // The dry hop shares Fermentation with fermentation-stage lines, so it keeps its name.
+    expect(recipe).toContain("Dry hop · 1.2 lb / bbl");
     // Spec D4: one place holds the mash temperature, and it is the schedule.
     expect(recipe).not.toMatch(/Mash temp/);
     // Spec D3: quantities are per barrel; the batch names its size on Brew day.
@@ -120,10 +127,12 @@ describe("SCREENS", () => {
   it("draws the Recipe frame from the shared schedule helpers, with its saved date and no gate", () => {
     const recipe = SCREENS.find((s) => s.name === "Recipe")!;
     const drawn = text("Recipe");
-    // The water row is titled Water, as on the live draft; the Water frame names the source.
+    // The water row says what it opens under the Water heading; the Water frame names the source.
     expect(drawn).not.toContain("Water · Municipal Denver");
     expect(drawn).toContain("Target Hazy target · 3 additions");
-    expect(recipe.to?.Water).toBe("Water");
+    expect(recipe.to?.["Profile and additions"]).toBe("Water");
+    expect(recipe.to?.["Schedule · 3 steps"]).toBe("Mash schedule");
+    expect(recipe.to?.["Schedule · 4 stages"]).toBe("Fermentation schedule");
     expect(text("Water")).toContain("Municipal · Denver");
     expect(drawn).toContain("Total 85 min · 152 °F saccharification rest");
     expect(drawn).toContain("Saved");
@@ -135,6 +144,21 @@ describe("SCREENS", () => {
     expect(states).toEqual(expect.arrayContaining(["not written yet", "unsaved changes", "as brewed"]));
     expect(String(recipe.job) + spec + (recipe.states ?? []).flat().join(" ")).not.toMatch(/New recipe version|Versions links|\(current\)/);
     expect(states).not.toContain("no price group");
+  });
+
+  it("says nothing of versions on Recipes, New batch or the recipe's sheets", () => {
+    const recipes = text("Recipes");
+    expect(recipes).not.toMatch(/version|\bv\d\b/i);
+    expect(recipes).toContain("Not written yet");
+    expect(SCREENS.find((s) => s.name === "Recipes")!.states?.map(([name]) => name)).toContain("not written yet");
+    // New batch offers recipes by name; the batch is scheduled on what is saved.
+    expect(text("New batch")).not.toMatch(/\bv\d\b/);
+    // The captions name the command (create_recipe_version) in `writes`; nothing else says "version".
+    for (const name of ["Recipes", "Ingredient", "Mash schedule", "Mash step", "Fermentation schedule", "Fermentation stage", "Water", "Water addition"]) {
+      const s = SCREENS.find((screen) => screen.name === name)!;
+      const captions = [s.job, s.reads, s.spec, ...(s.states ?? []).flat(), String(s.writes).replace(/create_recipe_version/g, "")].join(" ");
+      expect(captions, name).not.toMatch(/\bversions?\b/i);
+    }
   });
 
   it("keeps water profiles in the catalog, with their ion values", () => {

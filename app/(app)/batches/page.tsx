@@ -18,7 +18,7 @@ import { historyPage, pageCursor, type HistoryPage, type HistoryRow } from "@/li
 export const metadata = { title: navTitle("/batches") };
 
 type Brand = { id: string; name: string };
-type Recipe = { id: string; name: string; brand_id: string | null; latest_version_id: string | null; latest_version: number | null };
+type Recipe = { id: string; name: string; brand_id: string | null; latest_version_id: string | null };
 
 export default async function BatchesPage({ searchParams }: { searchParams: Promise<{ recipe?: string; completedCursor?: string | string[]; cancelledCursor?: string | string[] }> }) {
   const [params, brewery] = await Promise.all([searchParams, getActiveBrewery()]);
@@ -36,7 +36,7 @@ export default async function BatchesPage({ searchParams }: { searchParams: Prom
   const completedPage = historyPage(completed, "/batches", completedCursor, { recipe: linkedRecipe, cancelledCursor }, "completedCursor");
   const cancelledPage = historyPage(cancelled, "/batches", cancelledCursor, { recipe: linkedRecipe, completedCursor }, "cancelledCursor");
   const recipeVersions = recipes.flatMap(recipe =>
-    recipe.latest_version_id ? [{ id: recipe.latest_version_id, label: recipe.name + " v" + recipe.latest_version, brandId: recipe.brand_id }] : []);
+    recipe.latest_version_id ? [{ id: recipe.latest_version_id, label: recipe.name, brandId: recipe.brand_id }] : []);
   const today = breweryDate(brewery.timeZone);
   // A link naming no listed recipe, or one without a version, opens nothing: the page reads as plain Batches.
   const linkedVersionId = recipes.find(recipe => recipe.id === linkedRecipe)?.latest_version_id ?? undefined;

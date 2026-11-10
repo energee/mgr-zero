@@ -1,8 +1,9 @@
 // lib/mgr/recipe-process-view.ts — the recipe process spec as the sheets edit
 // it and the recipe page reads it: ordered mash steps, fermentation stages and
-// water additions on a draft version (recipe-builder spec D2: repetition earns
+// water additions on the unsaved sheet (recipe-builder spec D2: repetition earns
 // a surface), pure list helpers, the summary lines the schedule screens print,
-// and the labelled read-out of a cut version's process scalars and water.
+// the titles of the rows that open them, and the labelled read-out of a saved
+// copy's process scalars and water.
 import { sentenceCase } from "./labels";
 import { plural } from "./plural";
 import { isNumber, isPositive, numberNotationError } from "./quantity-input";
@@ -18,7 +19,7 @@ export type IngredientStage = (typeof INGREDIENT_STAGES)[number];
 /** Stages whose materials are confirmed on brew day; later stages post from cellar additions. */
 export const BREW_DAY_STAGES = ["mash", "boil", "whirlpool"] as const satisfies readonly IngredientStage[];
 export const isBrewDayStage = (stage: string): stage is (typeof BREW_DAY_STAGES)[number] => (BREW_DAY_STAGES as readonly string[]).includes(stage);
-/** One ingredient line as the editor holds it: strings until the version is built. */
+/** One ingredient line as the editor holds it: strings until the sheet is saved. */
 export type IngredientLine = { materialId: string; perBblQty: string; stage: IngredientStage; timingMinutes: string };
 export const lineReady = (l: IngredientLine) => l.materialId !== "" && Number(l.perBblQty) > 0 && (l.timingMinutes === "" || Number.isInteger(Number(l.timingMinutes)));
 
@@ -70,9 +71,11 @@ export function ingredientReason(fields: IngredientFields, limits: TimingLimits)
 /** A per-bbl quantity to three significant digits: 40.909091 reads "40.9", 0.011364 reads "0.0114".
  *  Two fixed fraction digits would round small hop rates by 10-12%, so callers format with this before ingredientDetail. */
 export const perBblDisplay = (n: number): string => n.toLocaleString("en-US", { maximumSignificantDigits: 3 });
-/** "Dry hop · 4 min · 1.2 lb / bbl": the row detail for a line, drawn the same on the draft and on a cut version. */
+/** "4 min · 1.2 lb / bbl", or "day 3 · 1.2 lb / bbl" for a stage timed in days: a line's timing and amount, the same on
+ *  the sheet and on a saved copy. The stage is not named: the recipe page draws a line under its step's heading, and a
+ *  caller with no such heading (Brew day's cellar plan) names the stage itself. */
 export const ingredientDetail = (stage: string, timingMinutes: number | string | null, perBbl: number | string, unit?: string) =>
-  `${sentenceCase(stage)}${timingMinutes !== null && timingMinutes !== "" ? (timedInDays(stage) ? ` · day ${Number(timingMinutes) / MINUTES_PER_DAY}` : ` · ${timingMinutes} min`) : ""} · ${perBbl}${unit ? ` ${unit}` : ""} / bbl`;
+  `${timingMinutes !== null && timingMinutes !== "" ? (timedInDays(stage) ? `day ${Number(timingMinutes) / MINUTES_PER_DAY} · ` : `${timingMinutes} min · `) : ""}${perBbl}${unit ? ` ${unit}` : ""} / bbl`;
 /** Name and base unit by material id, for rows that name a material the command returned. */
 export function materialLookup<M extends { id: string; name: string; base_uom: string }>(materials: readonly M[]) {
   const byId = new Map(materials.map((m) => [m.id, m]));
@@ -106,11 +109,17 @@ export const upsertAt = <T>(list: readonly T[], index: number | undefined, item:
 
 export const removeAt = <T>(list: readonly T[], index: number): T[] => list.filter((_, i) => i !== index);
 
-/** The Mash schedule sheet's footer: the total, then which rest (if any) is recorded as the version's mash temperature. */
+/** The Mash schedule sheet's footer: the total, then which rest (if any) is recorded as the recipe's mash temperature. */
 export function mashSummary(steps: readonly MashStep[]): string {
   const rest = saccharificationRest(steps);
   return `Total ${totalMinutes(steps)} min. ${rest ? `The ${rest.tempF} °F rest is recorded as the mash temperature.` : "No rest falls between 144 and 162 °F, so no mash temperature is recorded."}`;
 }
+
+/** The rows on the recipe page that open a step's sheet. Each sits under its step's heading (Mash, Fermentation, Water),
+ *  so its title says what it opens without repeating that heading. */
+export const mashRowTitle = (steps: number) => `Schedule · ${plural(steps, "step")}`;
+export const fermentationRowTitle = (stages: number) => `Schedule · ${plural(stages, "stage")}`;
+export const WATER_ROW_TITLE = "Profile and additions";
 
 /** The one-line mash summary a recipe row shows: "Total 60 min · 152 °F saccharification rest". */
 export function mashRowSummary(steps: readonly MashStep[]): string {
@@ -118,10 +127,10 @@ export function mashRowSummary(steps: readonly MashStep[]): string {
   return `Total ${totalMinutes(steps)} min · ${rest ? `${rest.tempF} °F saccharification rest` : "no saccharification rest"}`;
 }
 
-/** A water addition row's detail, "4 g · Mash": on the Water sheet and on a cut version's read-out. */
+/** A water addition row's detail, "4 g · Mash": on the Water sheet and on a saved copy's read-out. */
 export const waterAdditionDetail = (a: { qty: number; unit: string; stage: string }) => `${a.qty} ${a.unit} · ${sentenceCase(a.stage)}`;
 
-/** The Water row detail, "Target Hazy target · 3 additions" or "No target · 0 additions": on the recipe draft and on the Water sheet's trigger. */
+/** The Water row detail, "Target Hazy target · 3 additions" or "No target · 0 additions": on the recipe sheet and on the Water sheet's trigger. */
 export const waterRowSummary = (targetName: string | undefined, additions: number) =>
   `${targetName ? `Target ${targetName}` : "No target"} · ${plural(additions, "addition")}`;
 
@@ -143,7 +152,7 @@ export type ProcessColumns = {
   target_water_profile_id: string | null; source_water_profile_id: string | null; mash_water_gal: number | null; sparge_water_gal: number | null; target_mash_ph: number | null;
 };
 
-/** Label and value for each process fact a cut version carries; absent facts print nothing. */
+/** Label and value for each process fact a saved copy carries; absent facts print nothing. */
 export function processReadout(v: ProcessColumns, profileName: (id: string | null) => string | null): [string, string][] {
   const whirlpool = v.whirlpool_minutes === null ? null
     : `${v.whirlpool_minutes} min${v.whirlpool_temp_f !== null ? ` at ${v.whirlpool_temp_f} °F` : ""}${v.whirlpool_rest_minutes !== null ? ` · ${v.whirlpool_rest_minutes} min rest` : ""}`;

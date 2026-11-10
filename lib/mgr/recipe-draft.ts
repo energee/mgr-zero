@@ -1,9 +1,11 @@
-// lib/mgr/recipe-draft.ts — the unsaved recipe draft kept in sessionStorage per
-// actor, brewery and recipe, so leaving the page in the same tab does not lose it
-// (decision 6). It holds editor text only, never a command or its result. A sibling
-// of pick-counts.ts: a recipe draft has its own shape, so it has its own schema.
-// The draft starts as a copy of the current version (versionToDraft), so it is
-// kept only once it differs from that copy (shouldKeepDraft).
+// lib/mgr/recipe-draft.ts — the recipe page's unsaved change, kept in
+// sessionStorage per actor, brewery and recipe, so leaving the page in the same
+// tab does not lose it (decision 6). It holds editor text only, never a command
+// or its result. A sibling of pick-counts.ts: a recipe draft has its own shape,
+// so it has its own schema. The editor starts as the current saved copy
+// (versionToDraft), so the sheet counts as changed only once it differs from
+// that copy (shouldKeepDraft): that is when the page shows its save bar, when
+// the draft is kept, and whether Use this again has anything to load.
 import { z } from "zod";
 import type { CommandContextExpectation } from "@/lib/commands/registry";
 import { INGREDIENT_STAGES } from "./recipe-process-view";

@@ -1,7 +1,9 @@
 // components/mgr/views/recipe.tsx — Recipe: the one brewsheet. It reads top to
 // bottom as the brew day runs (RECIPE_SECTIONS): each step draws its process
-// numbers, the ingredients used there, an add row and its schedule. The
-// inventory draws it static from a fixture. The live editor
+// numbers, the ingredients used there, an add row and its schedule. A line
+// reads its timing and amount; it names its stage only where the step's
+// heading does not (a dry hop under Fermentation). The inventory draws it
+// static from a fixture. The live editor
 // (recipes/[id]/recipe-version-form.tsx) passes `controls`: the fields become
 // controlled, the schedule, ingredient and add rows open their sheets through
 // `slots`, and a save bar (what is still needed, Discard, Save changes) sticks
@@ -23,6 +25,7 @@ import { Fragment, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
+import { sentenceCase } from "@/lib/mgr/labels";
 import { isNumber } from "@/lib/mgr/quantity-input";
 import type { IngredientStage } from "@/lib/mgr/recipe-process-view";
 import { batchTotalText, packRounding, RECIPE_NUMBERS, RECIPE_SECTIONS, type RecipeIngredientView, type RecipeNumberKey, type RecipeScheduleView, type RecipeSection, type RecipeViewModel } from "@/lib/mgr/recipe-view";
@@ -102,13 +105,15 @@ export function RecipeView({
     const plan = key === "water" || key === "mash" || key === "fermentation" ? schedule(model[key], slots[key], title) : null;
     // A read-out skips a step the copy says nothing about. The editor draws every step, and Packaging and other once it has a line.
     if (readOnly ? !(fields.length || rows.length || plan) : key === "other" && rows.length === 0) return null;
+    // The heading already names a line's stage when they match; a stage sharing the step (dry hop under Fermentation) names itself.
+    const lineDetail = (row: RecipeIngredientView) => (sentenceCase(row.stage) === title ? row.detail : `${sentenceCase(row.stage)} · ${row.detail}`);
     const add = stages.length && !readOnly ? E.row(`Add ${title.toLowerCase()} ingredient`, "Material, amount and timing", "") : null;
     return (
       <Fragment key={key}>
         {E.group(title)}
         {readOnly ? fields.map(([number, label]) => <Fragment key={number}>{E.fld(label, model[number])}</Fragment>) : null}
         {!readOnly && fields.length ? E.cols(...fields.map(([number, label, bounds]) => E.edit(label, model[number] ?? "", "number", undefined, controls ? { ...bounds, ...bind(number) } : undefined))) : null}
-        {rows.map((row) => <Fragment key={row.key}>{E.row(row.title, row.detail, row.action ?? row.qty, "", undefined, packFoot(row))}</Fragment>)}
+        {rows.map((row) => <Fragment key={row.key}>{E.row(row.title, lineDetail(row), row.action ?? row.qty, "", undefined, packFoot(row))}</Fragment>)}
         {add && slots.addIngredient ? slots.addIngredient(stages[0], add) : add}
         {plan}
       </Fragment>

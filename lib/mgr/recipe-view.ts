@@ -11,7 +11,8 @@
 // batchTotalText), and the editor offers rounding it to whole packs
 // (packRounding). Batch actuals is the text of get_recipe_outcomes: one row per
 // brewed batch (outcomeTape) and the gap for the shown copy (outcomeSummary).
-// As brewed lists the earlier copies those batches brewed (recipeHistory).
+// As brewed lists the earlier copies those batches brewed (recipeHistory); Use
+// this again loads one into the editor and says where it came from (loadedNotice).
 // The database calls a saved copy a recipe version; the page never says so.
 import type { ReactNode } from "react";
 import { formatDate } from "@/lib/date-format";
@@ -26,7 +27,7 @@ import { sentenceCase } from "./labels";
 import { submitReason } from "./submit-reason";
 import { READING_BOUNDS } from "@/lib/composer/offline-policy";
 import {
-  fermentationStageDetail, fermentationSummary, ingredientDetail, isBrewDayStage, lineReady, mashRowSummary, mashStepDetail, materialLookup, perBblDisplay, processReadout, scheduleDays, timingOutOfRange, toIngredientFields, waterAdditionDetail,
+  fermentationRowTitle, fermentationStageDetail, fermentationSummary, mashRowTitle, ingredientDetail, isBrewDayStage, lineReady, mashRowSummary, mashStepDetail, materialLookup, perBblDisplay, processReadout, scheduleDays, timingOutOfRange, toIngredientFields, waterAdditionDetail,
   type FermentationStage, type IngredientLine, type IngredientStage, type MashStep, type ProcessColumns, type RecipeMaterial, type WaterDraft,
 } from "./recipe-process-view";
 /** A brew-day line's per-bbl amount, its material's pack size (base units per pack; 1 = no pack) and base unit. */
@@ -321,6 +322,12 @@ export function recipeHistory(outcomes: RecipeOutcome[], shownVersion: number, l
   });
 }
 
+/** What the editor says after Use this again loaded the copy `version` as an unsaved change: the batches that brewed it, and what saving does. */
+export function loadedNotice(outcomes: RecipeOutcome[], version: number, latestVersion: number): string {
+  const brewed = recipeHistory(outcomes, version, latestVersion).find((h) => h.selected);
+  return `Loaded ${brewed ? `the recipe as brewed in ${brewed.title}` : "an earlier recipe no batch brewed"}. Save changes to make it the current recipe.`;
+}
+
 /** "68–71%", or "68%" when the lowest and highest round alike. */
 function percentRange(fractions: number[]): string {
   const [low, high] = [Math.min(...fractions), Math.max(...fractions)].map((n) => Math.round(n * 100));
@@ -387,9 +394,9 @@ export function toRecipePageModel(
       qty: "", stage: i.stage as IngredientStage, pack: ingredientPack(i.stage, Number(i.per_bbl_qty), material.get(i.material_id)),
     })),
     ...versionNumbers(v),
-    mash: { title: `Mash schedule · ${plural(v.mash_schedule.length, "step")}`, detail: mashRowSummary(v.mash_schedule), rows: v.mash_schedule.map((m) => ({ title: m.name, detail: mashStepDetail(m) })) },
+    mash: { title: mashRowTitle(v.mash_schedule.length), detail: mashRowSummary(v.mash_schedule), rows: v.mash_schedule.map((m) => ({ title: m.name, detail: mashStepDetail(m) })) },
     fermentation: {
-      title: `Fermentation schedule · ${plural(v.fermentation_schedule.length, "stage")}`,
+      title: fermentationRowTitle(v.fermentation_schedule.length),
       detail: v.fermentation_schedule.length ? fermentationSummary(v.fermentation_schedule) : "No stages yet",
       rows: v.fermentation_schedule.map((f) => ({ title: f.name, detail: fermentationStageDetail(f) })),
     },

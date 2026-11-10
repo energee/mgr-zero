@@ -1922,7 +1922,7 @@ export const SCREENS: Screen[] = [
     job: "Set date and planned barrels; recipe and brand are intent, not commitments",
     reads: "get_brew_day · list_recipes · list_brands",
     writes: "schedule_batch [single planned-batch row; both the recipe version and the intended brand are nullable]",
-    states: [["permission", "brewer or admin required", 1], ["planned", "Schedule batch is the one verb"], ["no recipe yet", "date and barrels alone hold the slot"], ["no brand yet", "identity waits for packaging, which already requires one"], ["brew day", "Record brew day is its own screen"], ["from a recipe", "Recipe's Schedule batch opens this sheet with that recipe's current version and its brand chosen"]],
+    states: [["permission", "brewer or admin required", 1], ["planned", "Schedule batch is the one verb"], ["no recipe yet", "date and barrels alone hold the slot"], ["no brand yet", "identity waits for packaging, which already requires one"], ["brew day", "Record brew day is its own screen"], ["from a recipe", "Recipe's Schedule batch opens this sheet with that recipe and its brand chosen"]],
     spec: "The planned mode of brew day: date, planned barrels, and two optional statements of intent. Only date and barrels commit anything: they reserve the slot. The recipe version is already optional in the schema, and revision 2 makes the brand optional too, because identity is optional at brew and required at packaging, where every finished lot must already name a brand. Requiring either here enforces nothing the lot does not, and only forces the decision earlier than the business makes it. Keeping brand as intent is also what keeps the gap between what a batch was meant to be and what it shipped as worth querying, rather than rewriting history when a batch blends or turns into something else. Record brew day is a separate screen so this sheet has one primary.",
     body: <ScheduleBatchView model={scheduleBatchHazy} />,
   },
@@ -2318,8 +2318,8 @@ export const SCREENS: Screen[] = [
     job: "Find a recipe and start the next one",
     reads: "list_recipes",
     writes: "none [a recipe is created and changed on Recipe]",
-    states: [["no version yet", "a recipe saved without a version reads No version yet, in the warning style"], ["empty", "no recipes yet: New recipe, with the Water profiles row below"]],
-    spec: "The More landing's Recipes row opens this list, and its back returns to More. Each row shows the recipe's name, its current version and its brand, and the name opens Recipe at that version; New recipe opens Recipe as a blank sheet: the parent fields above it, one save. A Water profiles row under the list opens the catalog a recipe picks its source and target water from.",
+    states: [["not written yet", "a recipe saved by name, with no sheet saved yet, reads Not written yet under its name, in the warning style"], ["empty", "no recipes yet: New recipe, with the Water profiles row below"]],
+    spec: "The More landing's Recipes row opens this list, and its back returns to More. Each row shows the recipe's name and its brand, and the name opens Recipe on what is saved; the list numbers no copy of a recipe. New recipe opens Recipe as a blank sheet: the parent fields above it, one save. A Water profiles row under the list opens the catalog a recipe picks its source and target water from.",
     body: <RecipesView model={toRecipesViewProps(recipesList)} controls={<ListControls resultCount={recipesList.recipes.length} search={{ label: "Search recipes", value: "", keep: {} }} />} />,
   },
   {
@@ -2328,7 +2328,7 @@ export const SCREENS: Screen[] = [
     tab: "More",
     name: "Recipe",
     // The Round choices rewrite the line's per bbl in place, so they stay on Recipe. An As brewed row opens the same screen on that earlier copy.
-    to: { "Schedule batch": "New batch", "B-0356 to B-0371": "Recipe", "Round to 19 × 50 lb": "Recipe", "Round to 20 × 50 lb": "Recipe", "Round to 1 × 44 lb": "Recipe", "Add mash ingredient": "Ingredient", "Add boil ingredient": "Ingredient", "Add whirlpool ingredient": "Ingredient", "Add fermentation ingredient": "Ingredient", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", Water: "Water" },
+    to: { "Schedule batch": "New batch", "B-0356 to B-0371": "Recipe", "Round to 19 × 50 lb": "Recipe", "Round to 20 × 50 lb": "Recipe", "Round to 1 × 44 lb": "Recipe", "Add mash ingredient": "Ingredient", "Add boil ingredient": "Ingredient", "Add whirlpool ingredient": "Ingredient", "Add fermentation ingredient": "Ingredient", "Schedule · 3 steps": "Mash schedule", "Schedule · 4 stages": "Fermentation schedule", "Profile and additions": "Water" },
     job: "Write the recipe as one brewsheet; every save keeps a frozen copy for the batches that brew it; actuals keep predictions honest",
     reads: "list_recipes · get_recipe · list_brands [the parent row's Brand picker] · get_recipe_outcomes [Batch actuals: each brewed batch's OG/FG/ABV, attenuation and efficiency from its readings and knockout, against the copy it was brewed from; computed on read, never stored. As brewed is derived from the same rows]",
     writes: "create_recipe [mutable parent row] · set_recipe_brand [change the parent row's brand after creation] · create_recipe_version [Save changes; one RPC: an immutable copy + ingredients + mash and fermentation schedules + water and additions, with assumption and process-spec columns on recipe_versions and per-ingredient extract and alpha acid snapshot on recipe_ingredients]",
@@ -2344,9 +2344,9 @@ export const SCREENS: Screen[] = [
     name: "Ingredient",
     to: { "Save ingredient": "Recipe", "Delete ingredient": "Recipe" },
     job: "One line of the bill: which material, where it enters, how much per barrel",
-    reads: "list_materials · none [draft: the version form’s state]",
-    writes: "create_recipe_version [written with the version, never alone]",
-    states: [["permission", "brewer or admin required", 1], ["draft", "editable until the version is cut"], ["frozen", "a cut version reads only", 1]],
+    reads: "list_materials · none [unsaved: the recipe sheet’s state]",
+    writes: "create_recipe_version [written by Recipe’s Save changes, never alone]",
+    states: [["permission", "brewer or admin required", 1], ["unsaved", "editable on the recipe sheet; nothing is written until Save changes"], ["as brewed", "an earlier copy does not open this sheet; Recipe reads it out", 1]],
     spec: "The add-ingredient row on Recipe opens this sheet straight into the fields; there is no list to pass through because the recipe page is the list. Quantity is per barrel in the material's own base unit so the batch size scales it and no unit is retyped; timing is optional and in minutes, since a dry hop’s day is a fermentation stage, not an ingredient fact.",
     body: (<>
       <IngredientView fields={{ materialId: "citra", stage: "dry_hop", perBblQty: "1.2", timing: "" }} materials={[{ id: "2row", name: "2-row", unit: "lb", category: "malt" }, { id: "citra", name: "Citra", unit: "lb", category: "hop" }, { id: "cans", name: "Cans · 16 oz", unit: "each", category: "packaging" }]} />
@@ -2359,10 +2359,10 @@ export const SCREENS: Screen[] = [
     name: "Mash schedule",
     to: { Edit: "Mash step", "Add step": "Mash step", "Mash-in": "Mash step", Saccharification: "Mash step", "Mash-out": "Mash step" },
     job: "Order the rests a brewer actually holds on the day",
-    reads: "get_recipe [a cut version’s mash schedule] · none [draft: the version form’s state]",
-    writes: "create_recipe_version [the steps are written with their version, never alone]",
-    states: [["permission", "brewer or admin required", 1], ["draft", "steps add, reorder and delete"], ["frozen", "a cut version reads only · create the next version to change it", 1], ["empty", "no steps yet: Add step is the only action"]],
-    spec: "Its own screen because it repeats: add, reorder and delete are verbs a scalar field never needs, and inlining them on Recipe would give that page a second primary. A version is immutable, so this surface is an editor on a draft and a read-out once cut: one whole-screen mode rather than a toggle threaded through a long page. The footer names the conversion rest because Recipe no longer carries a mash temperature of its own; without it the number the prediction reads would have no visible home.",
+    reads: "get_recipe [the saved recipe’s mash schedule] · none [unsaved: the recipe sheet’s state]",
+    writes: "create_recipe_version [the steps are written by Recipe’s Save changes, never alone]",
+    states: [["permission", "brewer or admin required", 1], ["unsaved", "steps add, reorder and delete; nothing is written until Save changes"], ["as brewed", "an earlier copy reads its steps out on Recipe · Use this again to change from it", 1], ["empty", "no steps yet: Add step is the only action"]],
+    spec: "Its own screen because it repeats: add, reorder and delete are verbs a scalar field never needs, and inlining them on Recipe would give that page a second primary. A saved copy is immutable, so this surface edits only the current sheet, and an earlier copy reads its steps out on Recipe: one whole-screen mode rather than a toggle threaded through a long page. The footer names the conversion rest because Recipe no longer carries a mash temperature of its own; without it the number the prediction reads would have no visible home.",
     body: (<>
       <MashScheduleView title="Hazy IPA · Mash schedule" steps={MASH_STEPS} />
     </>),
@@ -2375,9 +2375,9 @@ export const SCREENS: Screen[] = [
     name: "Mash step",
     to: { "Save step": "Mash schedule", "Delete step": "Mash schedule" },
     job: "One rest: what the brewer does, at what temperature, for how long",
-    reads: "none [draft: the version form’s state]",
-    writes: "create_recipe_version [written with the version, never alone]",
-    states: [["permission", "brewer or admin required", 1], ["draft", "editable until the version is cut"], ["frozen", "a cut version reads only", 1]],
+    reads: "none [unsaved: the recipe sheet’s state]",
+    writes: "create_recipe_version [written by Recipe’s Save changes, never alone]",
+    states: [["permission", "brewer or admin required", 1], ["unsaved", "editable on the recipe sheet; nothing is written until Save changes"], ["as brewed", "an earlier copy does not open this sheet; Recipe reads it out", 1]],
     spec: "Type and name both stay: they look redundant until a recipe has two infusion steps, where the type says what the brewer does and the name says which one it is. Position comes from list order, never a typed number.",
     body: (<>
       <MashStepView fields={toMashStepFields(MASH_STEPS[1])} />
@@ -2390,9 +2390,9 @@ export const SCREENS: Screen[] = [
     name: "Fermentation schedule",
     to: { Edit: "Fermentation stage", "Add stage": "Fermentation stage", Primary: "Fermentation stage", "Diacetyl rest": "Fermentation stage", "Cold crash": "Fermentation stage", Conditioning: "Fermentation stage" },
     job: "State the temperatures and days a batch is meant to hold",
-    reads: "get_recipe [a cut version’s fermentation schedule] · none [draft: the version form’s state]",
-    writes: "create_recipe_version [written with their version, never alone]",
-    states: [["permission", "brewer or admin required", 1], ["draft", "stages add, reorder and delete"], ["frozen", "a cut version reads only · create the next version to change it", 1], ["empty", "No stages yet. Add a stage to plan temperatures and timing."]],
+    reads: "get_recipe [the saved recipe’s fermentation schedule] · none [unsaved: the recipe sheet’s state]",
+    writes: "create_recipe_version [the stages are written by Recipe’s Save changes, never alone]",
+    states: [["permission", "brewer or admin required", 1], ["unsaved", "stages add, reorder and delete; nothing is written until Save changes"], ["as brewed", "an earlier copy reads its stages out on Recipe · Use this again to change from it", 1], ["empty", "No stages yet. Add a stage to plan temperatures and timing."]],
     spec: "The same shape as Mash schedule and for the same reason. The footer gives the total days. The separate fermentation-days and conditioning-days fields v1 kept beside this list are dropped, because the list sums to them and two sources for one number is the failure this design keeps removing.",
     body: (<>
       <FermentationScheduleView title="Hazy IPA · Fermentation" stages={FERM_STAGES} />
@@ -2406,9 +2406,9 @@ export const SCREENS: Screen[] = [
     name: "Fermentation stage",
     to: { "Save stage": "Fermentation schedule", "Delete stage": "Fermentation schedule" },
     job: "One stage: a temperature held for a number of days",
-    reads: "none [draft: the version form’s state]",
-    writes: "create_recipe_version [written with the version, never alone]",
-    states: [["permission", "brewer or admin required", 1], ["draft", "editable until the version is cut"], ["frozen", "a cut version reads only", 1]],
+    reads: "none [unsaved: the recipe sheet’s state]",
+    writes: "create_recipe_version [written by Recipe’s Save changes, never alone]",
+    states: [["permission", "brewer or admin required", 1], ["unsaved", "editable on the recipe sheet; nothing is written until Save changes"], ["as brewed", "an earlier copy does not open this sheet; Recipe reads it out", 1]],
     spec: "Stage type and name both stay, as on Mash step: two custom stages need the type to say what happens and the name to say which one. Position comes from list order.",
     body: (<>
       <FermentationStageView fields={toStageFields(FERM_STAGES[1])} />
@@ -2420,11 +2420,11 @@ export const SCREENS: Screen[] = [
     tab: "More",
     name: "Water",
     to: { "Water profiles": "Water profiles", Add: "Water addition", Edit: "Water addition", "Add addition": "Water addition", Gypsum: "Water addition", "Calcium chloride": "Water addition", "Lactic acid": "Water addition" },
-    job: "State the water a version starts from, aims at, and what goes in it",
-    reads: "get_recipe [a cut version’s water] · list_water_profiles · none [draft: the version form’s state]",
-    writes: "create_recipe_version [water values and the water additions are written with the version]",
-    states: [["permission", "brewer or admin required", 1], ["source profile", "the version picks its source from Water profiles, which this sheet links to"], ["second source", "an osmosis blend or a second supply is another profile"], ["draft", "additions add, reorder and delete"], ["frozen", "a cut version reads only", 1], ["suggestions hidden", "post-v1 scope; Suggest additions and the ion read-out are not drawn until materials carry a salt identity, as in the live sheet"], ["off target", "post-v1 scope; once unlocked, an ion more than 20 ppm from target warns", 1]],
-    spec: "Source water is what comes out of the tap. Settings has no brewery-wide source default: each version picks its source from the Water profiles catalog, which Settings → Water profiles opens for Admin and the Water profiles row here opens for Brewer (Brewer has no Catalog), and an osmosis blend or a second supply is just another profile. v1 stored the ions per recipe, so every recipe repeated the same municipal profile and a new water report meant editing all of them; a catalog profile is edited once. Each addition carries one stage, not v1’s pair of timing and target: for water chemistry those are one axis wearing two hats, since a salt added at mash time goes into the mash by definition. Post-v1 scope: Suggest additions and the Against target read-out are hidden here and live until materials carry a salt identity; when they open, both run the one shared water formula (waterChemistry) over mash plus sparge water. pH prediction is still not built.",
+    job: "State the water a recipe starts from, aims at, and what goes in it",
+    reads: "get_recipe [the saved recipe’s water] · list_water_profiles · none [unsaved: the recipe sheet’s state]",
+    writes: "create_recipe_version [water values and the water additions are written by Recipe’s Save changes]",
+    states: [["permission", "brewer or admin required", 1], ["source profile", "the recipe picks its source from Water profiles, which this sheet links to"], ["second source", "an osmosis blend or a second supply is another profile"], ["unsaved", "additions add, reorder and delete; nothing is written until Save changes"], ["as brewed", "an earlier copy reads its water out on Recipe", 1], ["suggestions hidden", "post-v1 scope; Suggest additions and the ion read-out are not drawn until materials carry a salt identity, as in the live sheet"], ["off target", "post-v1 scope; once unlocked, an ion more than 20 ppm from target warns", 1]],
+    spec: "Source water is what comes out of the tap. Settings has no brewery-wide source default: each recipe picks its source from the Water profiles catalog, which Settings → Water profiles opens for Admin and the Water profiles row here opens for Brewer (Brewer has no Catalog), and an osmosis blend or a second supply is just another profile. v1 stored the ions per recipe, so every recipe repeated the same municipal profile and a new water report meant editing all of them; a catalog profile is edited once. Each addition carries one stage, not v1’s pair of timing and target: for water chemistry those are one axis wearing two hats, since a salt added at mash time goes into the mash by definition. Post-v1 scope: Suggest additions and the Against target read-out are hidden here and live until materials carry a salt identity; when they open, both run the one shared water formula (waterChemistry) over mash plus sparge water. pH prediction is still not built.",
     body: (<>
       <WaterView title="Hazy IPA · Water" water={WATER_HAZY} profiles={WATER_PROFILE_OPTIONS} materials={SALT_OPTIONS} />
     </>),
@@ -2437,9 +2437,9 @@ export const SCREENS: Screen[] = [
     name: "Water addition",
     to: { "Save addition": "Water", "Delete addition": "Water" },
     job: "One salt or acid, its amount, and where it goes",
-    reads: "list_materials · none [draft: the version form’s state]",
-    writes: "create_recipe_version [written with the version, never alone]",
-    states: [["permission", "brewer or admin required", 1], ["draft", "editable until the version is cut"], ["frozen", "a cut version reads only", 1]],
+    reads: "list_materials · none [unsaved: the recipe sheet’s state]",
+    writes: "create_recipe_version [written by Recipe’s Save changes, never alone]",
+    states: [["permission", "brewer or admin required", 1], ["unsaved", "editable on the recipe sheet; nothing is written until Save changes"], ["as brewed", "an earlier copy does not open this sheet; Recipe reads it out", 1]],
     spec: "One stage field, never a timing and a target both. The material comes from the materials catalog that already exists, so a salt is bought, stocked and consumed like any other input.",
     body: (<>
       <WaterAdditionView fields={toAdditionFields(WATER_HAZY.additions[0])} materials={SALT_OPTIONS} />

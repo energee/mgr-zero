@@ -12,8 +12,7 @@ import type { ScheduleBatchViewModel } from "@/lib/mgr/schedule-batch-view";
 import type { VesselDetailViewModel } from "@/lib/mgr/vessel-detail-view";
 import type { CellarMapViewModel } from "@/lib/mgr/cellar-map-view";
 import { ibuText, recipeIbu } from "@/lib/recipe-ibu";
-import { fermentationSummary, ingredientDetail, mashRowSummary, waterRowSummary, type FermentationStage, type MashStep, type WaterDraft } from "@/lib/mgr/recipe-process-view";
-import { plural } from "@/lib/mgr/plural";
+import { fermentationRowTitle, fermentationSummary, ingredientDetail, mashRowSummary, mashRowTitle, WATER_ROW_TITLE, waterRowSummary, type FermentationStage, type MashStep, type WaterDraft } from "@/lib/mgr/recipe-process-view";
 import { waterProfiles } from "./catalog";
 
 export const cellarMapBrewer: CellarMapViewModel = {
@@ -63,8 +62,8 @@ export const batchesEmpty: BatchesSnapshot = {
 
 export const scheduleBatchHazy: ScheduleBatchViewModel = {
   recipeId: "hazy-v4",
-  recipe: "Hazy IPA v4",
-  recipeOptions: [{ id: "hazy-v4", label: "Hazy IPA v4" }, { id: "pils-v3", label: "Pils v3" }, { id: "stout-v2", label: "Stout v2" }],
+  recipe: "Hazy IPA",
+  recipeOptions: [{ id: "hazy-v4", label: "Hazy IPA" }, { id: "pils-v3", label: "Pils" }, { id: "stout-v2", label: "Stout" }],
   brandId: "hazy",
   brand: "Hazy IPA",
   brandOptions: [{ id: "hazy", label: "Hazy IPA" }, { id: "pils", label: "Pils" }, { id: "stout", label: "Stout" }],
@@ -238,7 +237,7 @@ export const runClosedHazy: RunClosedViewModel = {
 /** Brands the Create recipe sheet offers; a recipe is brewed toward one, optionally. */
 export const recipeBrandOptions = [{ id: "hazy", name: "Hazy IPA" }, { id: "pils", name: "Pils" }, { id: "stout", name: "Stout" }];
 
-/** list_recipes rows, drawn by the live adapter: two with a current version, one saved without one. */
+/** list_recipes rows, drawn by the live adapter: two written recipes, and one saved by name with no sheet yet. */
 export const recipesList: RecipesSnapshot = {
   recipes: [
     { id: "hazy", name: "Hazy IPA", brand: "Hazy IPA", latest_version: 4 },
@@ -310,10 +309,10 @@ export const recipeHazyV4: RecipeViewModel = {
   knockoutTemp: "65",
   efficiency: "72",
   attenuation: "78",
-  mash: { title: `Mash schedule · ${plural(MASH_STEPS.length, "step")}`, detail: mashRowSummary(MASH_STEPS) },
-  fermentation: { title: `Fermentation schedule · ${plural(FERM_STAGES.length, "stage")}`, detail: fermentationSummary(FERM_STAGES) },
-  // The live draft's Water row: target and addition count (recipe-version-form.tsx); the Water frame names the source.
-  water: { title: "Water", detail: waterRowSummary(waterProfiles.find((p) => p.id === WATER_HAZY.targetProfileId)?.name, WATER_HAZY.additions.length) },
+  mash: { title: mashRowTitle(MASH_STEPS.length), detail: mashRowSummary(MASH_STEPS) },
+  fermentation: { title: fermentationRowTitle(FERM_STAGES.length), detail: fermentationSummary(FERM_STAGES) },
+  // The live sheet's Water row: target and addition count (recipe-version-form.tsx); the Water frame names the source.
+  water: { title: WATER_ROW_TITLE, detail: waterRowSummary(waterProfiles.find((p) => p.id === WATER_HAZY.targetProfileId)?.name, WATER_HAZY.additions.length) },
   notes: "Whirlpool hard, knock out cold.",
   predicted: "Predicted: OG 15.2 °P · FG 3.5 °P · ABV 6.3%",
   bitterness: ibuText(HAZY_IBU, { saved: true }),

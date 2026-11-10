@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { FermentationScheduleView } from "../components/mgr/views/fermentation-schedule";
-import { fermentationStageDetail, fermentationSummary, fromIngredientFields, ingredientDetail, ingredientReason, mashStepReason, stageReason, toIngredientFields, ionReadout, mashRowSummary, mashStepDetail, mashSummary, moveItem, perBblDisplay, processReadout, profileIons, splitByStage, suggestAdditions, upsertAt, waterAdditionDetail, waterRowSummary, type FermentationStage, type MashStep, type SaltMaterial, type WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { fermentationRowTitle, fermentationStageDetail, fermentationSummary, fromIngredientFields, ingredientDetail, mashRowTitle, WATER_ROW_TITLE, ingredientReason, mashStepReason, stageReason, toIngredientFields, ionReadout, mashRowSummary, mashStepDetail, mashSummary, moveItem, perBblDisplay, processReadout, profileIons, splitByStage, suggestAdditions, upsertAt, waterAdditionDetail, waterRowSummary, type FermentationStage, type MashStep, type SaltMaterial, type WaterDraft } from "@/lib/mgr/recipe-process-view";
 
 const mash: MashStep[] = [
   { name: "Mash-in", kind: "infusion", tempF: 104, minutes: 15 },
@@ -42,11 +42,18 @@ describe("schedule drafts", () => {
     expect(mashSummary([{ name: "Mash-out", kind: "direct heat", tempF: 168, minutes: 10 }])).toBe("Total 10 min. No rest falls between 144 and 162 °F, so no mash temperature is recorded.");
     expect(fermentationSummary(ferm)).toBe("Total 6 days.");
   });
-  it("an ingredient row names its stage in sentence case, as the Stage pick does (#1139)", () => {
-    expect(ingredientDetail("whirlpool", 4, "1.2", "lb")).toBe("Whirlpool · 4 min · 1.2 lb / bbl");
+  it("an ingredient row reads its timing and amount, and leaves the stage to whoever draws it", () => {
+    // The brewsheet draws a line under its step's heading, so the detail does not repeat the step.
+    expect(ingredientDetail("whirlpool", 4, "1.2", "lb")).toBe("4 min · 1.2 lb / bbl");
     // Fermentation and dry hop are timed in days from the start of fermentation (#1478).
-    expect(ingredientDetail("dry_hop", 3 * 1440, "1.2", "lb")).toBe("Dry hop · day 3 · 1.2 lb / bbl");
-    expect(ingredientDetail("mash", null, "40.9")).toBe("Mash · 40.9 / bbl");
+    expect(ingredientDetail("dry_hop", 3 * 1440, "1.2", "lb")).toBe("day 3 · 1.2 lb / bbl");
+    expect(ingredientDetail("mash", null, "40.9")).toBe("40.9 / bbl");
+  });
+  it("a step's schedule row says what it opens without repeating the step's heading", () => {
+    expect(mashRowTitle(3)).toBe("Schedule · 3 steps");
+    expect(mashRowTitle(1)).toBe("Schedule · 1 step");
+    expect(fermentationRowTitle(4)).toBe("Schedule · 4 stages");
+    expect(WATER_ROW_TITLE).toBe("Profile and additions");
   });
   it("a water addition row reads its amount and its stage in sentence case (#1139)", () => {
     expect(waterAdditionDetail({ qty: 4, unit: "g", stage: "mash" })).toBe("4 g · Mash");

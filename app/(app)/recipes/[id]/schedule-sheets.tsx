@@ -14,7 +14,7 @@ import { FermentationScheduleView, FermentationStageView } from "@/components/mg
 import { IngredientView, type IngredientMaterial } from "@/components/mgr/views/ingredient";
 import { MashScheduleView, MashStepView } from "@/components/mgr/views/mash-schedule";
 import { WaterAdditionView, WaterView } from "@/components/mgr/views/water";
-import { additionReason, fromIngredientFields, mashStepReason, moveItem, removeAt, stageReason, toAdditionFields, toIngredientFields, toMashStepFields, toStageFields, upsertAt, waterRowSummary, type FermentationStage, type IngredientFields, type IngredientLine, type IngredientStage, type MashStep, type TimingLimits, type SaltMaterial, type WaterAddition, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
+import { additionReason, fermentationRowTitle, fromIngredientFields, mashRowTitle, mashStepReason, moveItem, removeAt, stageReason, toAdditionFields, toIngredientFields, toMashStepFields, toStageFields, upsertAt, waterRowSummary, type FermentationStage, type IngredientFields, type IngredientLine, type IngredientStage, type MashStep, type TimingLimits, type SaltMaterial, type WaterAddition, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 
 type Editing = { index?: number } | null;
 type ListProps<T> = { items: T[]; onEdit: (index: number) => void; onMove: (index: number, by: -1 | 1) => void; add: ReactNode; onAdd: () => void };
@@ -54,7 +54,7 @@ function ListSheet<T, F>({ sheetTitle, trigger, addLabel, saveLabel, items, onCh
 }
 
 export function MashScheduleSheet({ steps, onChange, trigger }: { steps: MashStep[]; onChange: (steps: MashStep[]) => void; trigger?: ReactNode }) {
-  return <ListSheet sheetTitle="Mash schedule" trigger={trigger ?? `Mash schedule · ${steps.length} steps`} addLabel="Add step" saveLabel="Save step"
+  return <ListSheet sheetTitle="Mash schedule" trigger={trigger ?? mashRowTitle(steps.length)} addLabel="Add step" saveLabel="Save step"
     items={steps} onChange={onChange} toFields={toMashStepFields} reason={mashStepReason}
     toItem={(f) => ({ name: f.name.trim(), kind: f.kind, tempF: Number(f.tempF), minutes: Number(f.minutes) })}
     list={(p) => <MashScheduleView steps={p.items} onEdit={p.onEdit} onMove={p.onMove} header={p.add} />}
@@ -62,7 +62,7 @@ export function MashScheduleSheet({ steps, onChange, trigger }: { steps: MashSte
 }
 
 export function FermentationScheduleSheet({ stages, onChange, trigger }: { stages: FermentationStage[]; onChange: (stages: FermentationStage[]) => void; trigger?: ReactNode }) {
-  return <ListSheet sheetTitle="Fermentation schedule" trigger={trigger ?? `Fermentation schedule · ${stages.length} stages`} addLabel="Add stage" saveLabel="Save stage"
+  return <ListSheet sheetTitle="Fermentation schedule" trigger={trigger ?? fermentationRowTitle(stages.length)} addLabel="Add stage" saveLabel="Save stage"
     items={stages} onChange={onChange} toFields={toStageFields} reason={stageReason}
     toItem={(f) => ({ name: f.name.trim(), kind: f.kind, tempF: Number(f.tempF), days: Number(f.days) })}
     list={(p) => <FermentationScheduleView stages={p.items} onEdit={p.onEdit} onMove={p.onMove} header={p.add} />}
