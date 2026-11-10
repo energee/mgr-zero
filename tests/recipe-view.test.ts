@@ -25,7 +25,7 @@ import { sgToPlato } from "@/lib/recipe-gravity";
 const version: NonNullable<RecipeSnapshot["version"]> = {
   id: "v1", version: 3, created_at: "2026-10-01T15:00:00Z", mash_temp_f: null,
   brewhouse_efficiency: 0.725, yeast_attenuation: 0.07, boil_minutes: 60, note: "Less crystal",
-  pre_boil_bbl: 16.8, whirlpool_minutes: 20, whirlpool_temp_f: null, whirlpool_rest_minutes: null, knockout_temp_f: 66,
+  batch_bbl: null, pre_boil_bbl: 16.8, whirlpool_minutes: 20, whirlpool_temp_f: null, whirlpool_rest_minutes: null, knockout_temp_f: 66,
   target_water_profile_id: "p-target", source_water_profile_id: null, mash_water_gal: 120, sparge_water_gal: null, target_mash_ph: 5.3,
   mash_schedule: [{ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 }],
   fermentation_schedule: [{ name: "Primary", kind: "primary", tempF: 68, days: 7 }],
@@ -251,7 +251,7 @@ describe("draftBlocker", () => {
 
 describe("draftIbu", () => {
   const text = (...args: Parameters<typeof draftIbu>) => { const ibu = draftIbu(...args); return ibu && ibuText(ibu, { saved: false }); };
-  const hop = { id: "m-hop", name: "Citra", category: "hop", base_uom: "lb", extract_potential: null, alpha_acid: 10, purchase_uom_factor: 44 };
+  const hop = { id: "m-hop", name: "Citra", category: "hop", base_uom: "lb", extract_potential: null, alpha_acid: 10, purchase_uom_factor: 44, pack_name: null };
   const line = { materialId: "m-hop", perBblQty: "1", stage: "boil" as const, timingMinutes: "60" };
   const og = sgToPlato(1.05);
 
@@ -275,9 +275,9 @@ describe("draftIbu", () => {
 
 describe("toRecipePageModel", () => {
   const materials = [
-    { id: "m-malt", name: "Fieldstone White Wheat", category: "malt", base_uom: "lb", extract_potential: 1.037, alpha_acid: null, purchase_uom_factor: 50 },
-    { id: "m-hop", name: "Citra", category: "hop", base_uom: "lb", extract_potential: null, alpha_acid: 12.5, purchase_uom_factor: 44 },
-    { id: "m-gypsum", name: "Gypsum", category: "salt", base_uom: "g", extract_potential: null, alpha_acid: null, purchase_uom_factor: 1 },
+    { id: "m-malt", name: "Fieldstone White Wheat", category: "malt", base_uom: "lb", extract_potential: 1.037, alpha_acid: null, purchase_uom_factor: 50, pack_name: null },
+    { id: "m-hop", name: "Citra", category: "hop", base_uom: "lb", extract_potential: null, alpha_acid: 12.5, purchase_uom_factor: 44, pack_name: null },
+    { id: "m-gypsum", name: "Gypsum", category: "salt", base_uom: "g", extract_potential: null, alpha_acid: null, purchase_uom_factor: 1, pack_name: null },
   ];
   const ctx = { materials, profiles: [{ id: "p-target", name: "Pale ale" }], unit: "plato" as const, timeZone: "America/Los_Angeles", outcomes: [] as RecipeOutcome[] };
   const predicted = { ...snapshot, ogPlato: 12.5, fgPlato: 2.5, abv: 5.25 };
@@ -393,7 +393,7 @@ describe("toRecipePageModel", () => {
 });
 
 describe("the sheet", () => {
-  const materials = [{ id: "m-malt", name: "Fieldstone White Wheat", category: "malt", base_uom: "lb", extract_potential: 1.037, alpha_acid: null, purchase_uom_factor: 50 }];
+  const materials = [{ id: "m-malt", name: "Fieldstone White Wheat", category: "malt", base_uom: "lb", extract_potential: 1.037, alpha_acid: null, purchase_uom_factor: 50, pack_name: null }];
   const saved = toRecipePageModel(snapshot, { materials, profiles: [], unit: "plato", timeZone: "UTC", outcomes: [] });
   const headings = (html: string) => [...html.matchAll(/<h2[^>]*>([^<]*)<\/h2>/g)].map((m) => m[1]);
   const steps: string[] = RECIPE_SECTIONS.map((s) => s.title);

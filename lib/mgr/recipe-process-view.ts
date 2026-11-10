@@ -4,6 +4,7 @@
 // a surface), pure list helpers, the summary lines the schedule screens print,
 // the titles the recipe page gives each schedule, and the labelled read-out of
 // the sheet's water.
+import type { PackName } from "./enums";
 import { sentenceCase } from "./labels";
 import { plural } from "./plural";
 import { isNumber, isPositive, numberNotationError } from "./quantity-input";
@@ -85,9 +86,10 @@ export function materialLookup<M extends { id: string; name: string; base_uom: s
 }
 /** The material fields the recipe editor reads; both recipe pages project list_materials to this.
  *  Lives here, not in the "use client" editor, because the server pages call it (#440).
- *  purchase_uom_factor is base units per purchase pack (1 = no pack); the page totals brew-day lines in packs with it. */
-export type RecipeMaterial = { id: string; name: string; category: string; base_uom: string; extract_potential: number | null; alpha_acid: number | null; purchase_uom_factor: number };
-export const toRecipeMaterial = ({ id, name, category, base_uom, extract_potential, alpha_acid, purchase_uom_factor }: RecipeMaterial): RecipeMaterial => ({ id, name, category, base_uom, extract_potential, alpha_acid, purchase_uom_factor });
+ *  purchase_uom_factor is base units per purchase pack (1 = no pack); the page totals brew-day lines in packs with it.
+ *  pack_name is the word that pack is sold by ("bag"), or null when the material has none. */
+export type RecipeMaterial = { id: string; name: string; category: string; base_uom: string; extract_potential: number | null; alpha_acid: number | null; purchase_uom_factor: number; pack_name: PackName | null };
+export const toRecipeMaterial = ({ id, name, category, base_uom, extract_potential, alpha_acid, purchase_uom_factor, pack_name }: RecipeMaterial): RecipeMaterial => ({ id, name, category, base_uom, extract_potential, alpha_acid, purchase_uom_factor, pack_name });
 export type FermentationStage = { name: string; kind: string; tempF: number; days: number };
 export type WaterAddition = { materialId: string; qty: number; unit: string; stage: string };
 export type WaterDraft = { targetProfileId: string; sourceProfileId: string; mashGal: string; spargeGal: string; targetMashPh: string; additions: WaterAddition[] };
@@ -148,9 +150,9 @@ export const fermentationStageDetail = (stage: FermentationStage) => `${stage.te
 /** The schedule's total days. */
 export const fermentationSummary = (stages: readonly FermentationStage[]) => `Total ${scheduleDays(stages)} days.`;
 
-/** The process columns get_recipe returns on a version. */
+/** The process columns get_recipe returns on a version. batch_bbl is the batch the copy is written for; null means it has none. */
 export type ProcessColumns = {
-  pre_boil_bbl: number | null; whirlpool_minutes: number | null; whirlpool_temp_f: number | null; whirlpool_rest_minutes: number | null; knockout_temp_f: number | null;
+  batch_bbl: number | null; pre_boil_bbl: number | null; whirlpool_minutes: number | null; whirlpool_temp_f: number | null; whirlpool_rest_minutes: number | null; knockout_temp_f: number | null;
   target_water_profile_id: string | null; source_water_profile_id: string | null; mash_water_gal: number | null; sparge_water_gal: number | null; target_mash_ph: number | null;
 };
 

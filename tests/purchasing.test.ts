@@ -69,7 +69,7 @@ describe("vendors, materials, contracts", () => {
     const { error } = await ctx.db.rpc("upsert_material", {
       p_brewery: ctx.breweryId, p_material: mosaic.id, p_name: hop.name, p_category: hop.category, p_base_uom: hop.baseUom,
       p_purchase_uom: hop.purchaseUom, p_purchase_uom_factor: 453.59237, p_lot_tracked: null, p_default_vendor: null,
-      p_reorder_point: null, p_active: null, p_extract_potential: null, p_alpha_acid: null, p_request_id: crypto.randomUUID(),
+      p_reorder_point: null, p_active: null, p_extract_potential: null, p_alpha_acid: null, p_pack_name: null, p_request_id: crypto.randomUUID(),
     });
     expect(error?.message).toMatch(/materials_purchase_uom_factor_four_decimals/);
   });
@@ -383,6 +383,37 @@ describe("purchase orders: draft, mark sent, receive", () => {
     expect(listed.map((row) => Number(row.alpha_acid))).toEqual([11]);
     await expect(runCommand("upsert_material", { name: "Typo hop", ...base, alphaAcid: 40 }, ctx)).rejects.toThrow();
     await expect(runCommand("upsert_material", { name: "Typo hop", ...base, alphaAcid: 0 }, ctx)).rejects.toThrow();
+  });
+
+  it("stores the word a material is sold by, lists it, keeps it on an edit that omits it, and refuses a word off the list", async () => {
+    const base = { category: "malt", baseUom: "lb", purchaseUom: "each", purchaseUomFactor: 55 } as const;
+    const m = (await runCommand("upsert_material", { name: "Pack word malt", ...base, packName: "bag" }, ctx)) as { id: string; pack_name: string | null };
+    expect(m.pack_name).toBe("bag");
+    const edited = (await runCommand("upsert_material", { id: m.id, name: "Pack word malt 2", ...base }, ctx)) as { pack_name: string | null };
+    expect(edited.pack_name).toBe("bag");
+    const changed = (await runCommand("upsert_material", { id: m.id, name: "Pack word malt 2", ...base, packName: "sack" }, ctx)) as { pack_name: string | null };
+    expect(changed.pack_name).toBe("sack");
+    const plain = (await runCommand("upsert_material", { name: "Pack word none", ...base }, ctx)) as { pack_name: string | null };
+    expect(plain.pack_name).toBeNull();
+    const listed = (await runCommand("list_materials", { q: "Pack word" }, ctx)) as { name: string; pack_name: string | null }[];
+    expect(listed.map((row) => [row.name, row.pack_name])).toEqual([["Pack word malt 2", "sack"], ["Pack word none", null]]);
+    await expect(runCommand("upsert_material", { name: "Typo pack", ...base, packName: "crate" }, ctx)).rejects.toMatchObject({ code: "invalid_input" });
+    // Past the command's own check: the column refuses a word off the list from any writer.
+    const { error } = await ctx.db.rpc("upsert_material", {
+      p_brewery: ctx.breweryId, p_material: m.id, p_name: "Pack word malt 2", p_category: base.category, p_base_uom: base.baseUom,
+      p_purchase_uom: base.purchaseUom, p_purchase_uom_factor: null, p_lot_tracked: null, p_default_vendor: null,
+      p_reorder_point: null, p_active: null, p_extract_potential: null, p_alpha_acid: null, p_pack_name: "crate", p_request_id: crypto.randomUUID(),
+    });
+    expect(error?.message).toMatch(/materials_pack_name_check/);
+    // A caller that predates the pack word sends no p_pack_name: hosted takes the migration before the new app is
+    // live, so the old app must still save a material, and the saved word must survive it.
+    const older = await ctx.db.rpc("upsert_material", {
+      p_brewery: ctx.breweryId, p_material: m.id, p_name: "Pack word malt 2", p_category: base.category, p_base_uom: base.baseUom,
+      p_purchase_uom: base.purchaseUom, p_purchase_uom_factor: null, p_lot_tracked: null, p_default_vendor: null,
+      p_reorder_point: null, p_active: null, p_extract_potential: null, p_alpha_acid: null, p_request_id: crypto.randomUUID(),
+    });
+    expect(older.error).toBeNull();
+    expect((older.data as { pack_name: string | null }).pack_name).toBe("sack");
   });
 
   // #452: stock recorded without a lot cannot be counted, consumed, or moved

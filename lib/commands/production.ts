@@ -4,7 +4,9 @@
 // edited: `create_recipe_version` writes the next one (version = max+1) with
 // its ingredients in a single RPC, snapshotting each material's extract
 // potential and alpha acid so an old version's predicted gravity and IBU cannot
-// move when the material is retyped. `get_recipe` predicts OG/FG/ABV and IBU
+// move when the material is retyped. A version may also carry the batch size it
+// is written for (`batch_bbl`); ingredient amounts stay per barrel, and batch
+// amounts are derived from the two. `get_recipe` predicts OG/FG/ABV and IBU
 // here in TypeScript (lib/recipe-gravity.ts, lib/recipe-ibu.ts) — the schema
 // stores assumptions, never results.
 // `get_recipe_outcomes` measures each brewed batch the same way, on read.
@@ -29,11 +31,15 @@ import { MASH_STEP_KINDS, FERMENTATION_STAGE_KINDS, WATER_ADDITION_STAGES, WATER
 // Process temperatures share the reading range, so a typo such as -500 °F is refused, not frozen into a recipe version
 // or brew record (#1476, #1478).
 const processTempF = z.number().min(READING_BOUNDS.tempF.min).max(READING_BOUNDS.tempF.max);
+/** A barrel volume stored in numeric(10,3) (#427). */
+const bbl = z.number().positive().max(9_999_999.999);
 const mashStep = z.object({ name: z.string().trim().min(1).describe("The mash step's name"), kind: z.enum(MASH_STEP_KINDS).describe("The mash step's method"), tempF: processTempF, minutes: z.number().int().positive() });
 const fermentationStage = z.object({ name: z.string().trim().min(1).describe("The fermentation stage's name"), kind: z.enum(FERMENTATION_STAGE_KINDS).describe("The fermentation stage's type"), tempF: processTempF, days: z.number().positive() });
 const processInput = z.object({
   preBoilBbl: z.number().positive().optional(), whirlpoolMinutes: z.number().int().nonnegative().optional(), whirlpoolTempF: processTempF.optional(),
   whirlpoolRestMinutes: z.number().int().nonnegative().optional(), knockoutTempF: processTempF.optional(),
+  // Each version carries its own: one saved without a batch size has none, whatever the version before it had.
+  batchBbl: bbl.optional().describe("The batch size this version is written for, in bbl; ingredient amounts stay per barrel"),
 });
 const waterInput = z.object({
   targetProfileId: z.string().uuid().optional(), sourceProfileId: z.string().uuid().optional(),
@@ -71,7 +77,7 @@ defineCommand({
 
 defineCommand({
   name: "create_recipe_version",
-  description: "Add the next version of a recipe: its mash and fermentation schedules, whirlpool/knockout/pre-boil, water and additions, assumptions and ingredients; versions are immutable and snapshot each material's extract potential",
+  description: "Add the next version of a recipe: its mash and fermentation schedules, whirlpool/knockout/pre-boil, the batch size it is written for, water and additions, assumptions and ingredients; versions are immutable and snapshot each material's extract potential and alpha acid",
   compensation: "Cannot be undone; versions are immutable, so add a corrected one with create_recipe_version.",
   input: z.object({
     recipeId: z.string().uuid(),
@@ -108,7 +114,7 @@ defineCommand({
     // Absent keys read as NULL through `p_process ->> key`, so undefined is left as is.
     p_process: {
       pre_boil_bbl: i.process?.preBoilBbl, whirlpool_minutes: i.process?.whirlpoolMinutes, whirlpool_temp_f: i.process?.whirlpoolTempF,
-      whirlpool_rest_minutes: i.process?.whirlpoolRestMinutes, knockout_temp_f: i.process?.knockoutTempF,
+      whirlpool_rest_minutes: i.process?.whirlpoolRestMinutes, knockout_temp_f: i.process?.knockoutTempF, batch_bbl: i.process?.batchBbl,
       target_water_profile_id: i.water?.targetProfileId, source_water_profile_id: i.water?.sourceProfileId,
       mash_water_gal: i.water?.mashGal, sparge_water_gal: i.water?.spargeGal, target_mash_ph: i.water?.targetMashPh,
       water_additions: (i.water?.additions ?? []).map((a) => ({ material_id: a.materialId, qty: a.qty, unit: a.unit, stage: a.stage })),
@@ -238,7 +244,7 @@ function byBrewingOrder(a: { stage: string; timing_minutes: number | null }, b: 
 
 defineQuery({
   name: "get_recipe",
-  description: "One recipe with its requested version (latest by default), all version numbers, that version's ingredients in brewing order, the OG/FG/ABV they predict, and its estimated IBU or why there is none",
+  description: "One recipe with its requested version (latest by default) and the batch size that version is written for when it has one, all version numbers, that version's ingredients in brewing order, the OG/FG/ABV they predict, and its estimated IBU or why there is none",
   input: z.object({ recipeId: z.string().uuid(), version: z.number().int().positive().optional() }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {
     const versionQuery = ctx.db.from("recipe_versions").select("*").eq("recipe_id", i.recipeId);
@@ -337,8 +343,6 @@ defineQuery({
 
 // ------------------------------------------------------------ vessels, batches
 const VESSEL_KINDS = ["fermenter", "brite", "barrel", "kettle", "other"] as const;
-/** A barrel volume stored in numeric(10,3) (#427). */
-const bbl = z.number().positive().max(9_999_999.999);
 
 defineCommand({
   name: "upsert_vessel", description: "Create or rename a vessel: its name, kind and capacity. Contents are never stored here — they are derived from the open occupancy",
