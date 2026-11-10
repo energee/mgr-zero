@@ -1,6 +1,6 @@
 # Recipe as one brewsheet page
 
-Status: Phase 1 plan, awaiting approval. Branch `feat/recipes`, worktree
+Status: approved 2026-11-10, in build. Branch `feat/recipes`, worktree
 `.agents/worktrees/feat-recipes`, PR to `main`. Checked against `origin/main`
 fc6c7a9bc.
 
@@ -78,15 +78,14 @@ and nothing there changes.
   today.
 - No compare view between two copies.
 
-## Open questions for the owner
+## Owner decisions (2026-11-10)
 
 1. **Scheduled batches keep the copy they were scheduled with.** After a
    save, a batch already on the calendar still brews the earlier recipe. With
-   versions hidden that will surprise. Fixing it means moving unbrewed batches
-   to the new copy on save, which is an RPC change. Recommendation: do it as
-   the next PR, not here.
-2. **Recipe name and note are fixed after creation.** Should a follow-up add
-   an edit for them?
+   versions hidden that will surprise. Decided: the next PR moves unbrewed
+   batches to the new copy on save. It is an RPC change, so it is not here.
+2. **Recipe name and note are fixed after creation.** Decided: a follow-up
+   adds an edit for them.
 
 ## Known ceiling
 
