@@ -596,7 +596,7 @@ describe("Recipes view", () => {
     expect(htmlOf(screen("Recipes").body)).toContain("Water profiles");
     expect(resolveTap(screen("Recipes"), "Water profiles")).toBe("Water profiles");
     // Each step's add row opens the Ingredient record.
-    for (const step of ["mash", "boil", "whirlpool", "fermentation"]) expect(resolveTap(screen("Recipe"), `Add ${step} ingredient`)).toBe("Ingredient");
+    for (const step of ["mash", "boil", "whirlpool", "fermentation"]) expect(resolveTap(screen("Recipe"), `Add ingredient to ${step}`)).toBe("Ingredient");
   });
 
   it("draws the inventory list through the live adapter, a recipe not written yet included", () => {
@@ -614,11 +614,12 @@ describe("Recipes view", () => {
 
   it("the fixture's Batch actuals are computed, and its prediction agrees with their brackets", () => {
     expect(recipeHazyV4.tape?.[0]).toEqual(["B-0413 · Oct 3, 2026", "OG 14.8 °P (15.2) · FG 3.5 °P (3.5) · ABV 6.1% (6.3%) · attenuation 77% (78%) · efficiency 68% (72%)"]);
-    expect(recipeHazyV4.predicted).toBe("Predicted: OG 15.2 °P · FG 3.5 °P · ABV 6.3%");
+    expect(recipeHazyV4.figures?.slice(0, 3)).toEqual([["15.2 °P", "OG"], ["3.5 °P", "FG"], ["6.3%", "ABV"]]);
   });
 
   it("the fixture's IBU is computed from its boil hop, and its dry hop adds nothing", () => {
-    expect(recipeHazyV4.bitterness).toBe("IBU 15");
+    expect(recipeHazyV4.figures?.at(-1)).toEqual(["15", "IBU"]);
+    expect(recipeHazyV4.figureNotes).toEqual([]);
   });
 
   it("the live Recipe page reads the outcomes and hands them to the page model", () => {
@@ -640,14 +641,17 @@ describe("Recipes view", () => {
     expect(body.props.model).toEqual(recipeHazyV4);
   });
 
-  it("renders each step's recipe numbers in a responsive grid (Whirlpool's three as the one four-column grid) without React key warnings", () => {
+  it("renders each step's recipe numbers beside its heading, each under its own label, without React key warnings", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const html = htmlOf(createElement(RecipeView, { model: recipeHazyV4 }));
     const errors = error.mock.calls.flat().join(" ");
     error.mockRestore();
 
     expect(errors).not.toContain('unique "key" prop');
-    expect(html.match(/grid-cols-2 md:grid-cols-4/g)).toHaveLength(1);
+    // The numbers share the heading's line instead of a grid of their own; no field is drawn label-beside-control.
+    expect(html).not.toMatch(/grid-cols-2 md:grid-cols-4/);
+    expect(html).not.toMatch(/data-orientation="horizontal"/);
+    expect(html).toMatch(/<h2[^>]*>Whirlpool<\/h2><\/div>(?:(?!<h2)[\s\S])*Whirlpool min(?:(?!<h2)[\s\S])*Whirlpool temp °F(?:(?!<h2)[\s\S])*Whirlpool rest min/);
   });
 
   it("the live recipe page mounts RecipeEditor on the current copy and RecipeView, read only, on an earlier one", () => {

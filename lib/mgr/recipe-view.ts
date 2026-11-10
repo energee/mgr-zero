@@ -5,8 +5,13 @@
 // (RecipeSnapshot), a saved copy as the draft the editor starts from
 // (versionToDraft), why a draft cannot be saved yet (draftBlocker), the page's
 // model of a saved copy (toRecipePageModel) and why a prediction is missing
-// (gravityBlockerText, noMashText). A saved copy prints the IBU get_recipe
-// estimated; a draft previews it (draftIbuText). A brew-day line also totals in
+// (gravityBlockerText, noMashText). The headline figures (figureStrip) are what
+// get_recipe predicted for a saved copy, frozen at its save, or the editor's
+// preview from current Materials (draftIbu); when the two differ on an unchanged
+// sheet, materialsNowGive words the offer to Refresh from Materials. Each line
+// reads its amount and timing in columns (ingredientCells), and each schedule
+// lists its rows (mashView, fermentationView, waterView), the same on the
+// editor and a saved copy. A brew-day line also totals in
 // packs at the batch size typed into Show totals at (ingredientPack,
 // batchTotalText), and the editor offers rounding it to whole packs
 // (packRounding). Batch actuals is the text of get_recipe_outcomes: one row per
@@ -27,15 +32,23 @@ import { sentenceCase } from "./labels";
 import { submitReason } from "./submit-reason";
 import { READING_BOUNDS } from "@/lib/composer/offline-policy";
 import {
-  fermentationRowTitle, fermentationStageDetail, fermentationSummary, mashRowTitle, ingredientDetail, isBrewDayStage, lineReady, mashRowSummary, mashStepDetail, materialLookup, perBblDisplay, processReadout, scheduleDays, timingOutOfRange, toIngredientFields, waterAdditionDetail,
+  fermentationRowTitle, fermentationStageDetail, fermentationSummary, mashRowTitle, ingredientTiming, isBrewDayStage, lineReady, mashRowSummary, mashStepDetail, materialLookup, perBblDisplay, scheduleDays, timingOutOfRange, toIngredientFields, waterAdditionDetail, waterReadout, WATER_ROW_TITLE,
   type FermentationStage, type IngredientLine, type IngredientStage, type MashStep, type ProcessColumns, type RecipeMaterial, type WaterDraft,
 } from "./recipe-process-view";
 /** A brew-day line's per-bbl amount, its material's pack size (base units per pack; 1 = no pack) and base unit. */
 export type RecipePack = { perBbl: number; factor: number; unit: string };
-/** `stage` places the line in its section (RECIPE_SECTIONS). `action` (a live Edit) draws in place of `qty` on the
- *  editor. `pack` lets the page total the line at a batch size; `onRound` (the live editor only) takes the per-bbl
- *  amount a Round choice picked. */
-export type RecipeIngredientView = { key: string; title: string; detail: string; qty: string; stage: IngredientStage; action?: ReactNode; pack?: RecipePack; onRound?: (perBbl: number) => void };
+/** One line of a step's table. `stage` places it in its section (RECIPE_SECTIONS); `amount` is per bbl ("40.9 lb")
+ *  and `timing` is "60 min" or "day 3", or "" (ingredientCells). `edit` (the live editor only) takes the line's
+ *  name as a trigger and returns the Ingredient sheet it opens. `pack` lets the page total the line at a batch size;
+ *  `onRound` (the live editor only) takes the per-bbl amount a Round choice picked. */
+export type RecipeIngredientView = {
+  key: string; title: string; stage: IngredientStage; amount: string; timing: string;
+  edit?: (trigger: ReactNode) => ReactNode; pack?: RecipePack; onRound?: (perBbl: number) => void;
+};
+/** A line's stage, per-bbl amount to three significant digits and timing, the same on the editor and a saved copy. */
+export const ingredientCells = (stage: IngredientStage, timingMinutes: number | string | null, perBbl: number | string, unit?: string) => ({
+  stage, amount: `${perBblDisplay(Number(perBbl))}${unit ? ` ${unit}` : ""}`, timing: ingredientTiming(stage, timingMinutes),
+});
 
 /** Input bounds mirroring create_recipe_version, so the browser refuses a
  * decimal minute or a zero volume before the command answers with a raw
@@ -67,7 +80,23 @@ export const RECIPE_SECTIONS: readonly RecipeSection[] = [
   { key: "other", title: "Packaging and other", stages: ["packaging", "other"], numbers: [] },
 ];
 
-export type RecipeScheduleView = { title: string; detail: string; rows?: { title: string; detail: string }[] };
+/** A step's schedule as the page lists it: its count ("Schedule · 3 steps") and summary over one row per entry. */
+export type RecipeScheduleView = { title: string; detail: string; rows: { title: string; detail: string }[] };
+export const mashView = (steps: readonly MashStep[]): RecipeScheduleView => ({
+  title: mashRowTitle(steps.length), detail: mashRowSummary(steps), rows: steps.map((m) => ({ title: m.name, detail: mashStepDetail(m) })),
+});
+export const fermentationView = (stages: readonly FermentationStage[]): RecipeScheduleView => ({
+  title: fermentationRowTitle(stages.length), detail: stages.length ? fermentationSummary(stages) : "No stages yet",
+  rows: stages.map((f) => ({ title: f.name, detail: fermentationStageDetail(f) })),
+});
+/** The sheet's water: its profiles, volumes and target pH (waterReadout), then each addition. "None yet" when it holds nothing. */
+export function waterView(water: WaterDraft, profiles: readonly { id: string; name: string }[], materialName: (id: string) => string): RecipeScheduleView {
+  const rows = [
+    ...waterReadout(water, (id) => profiles.find((p) => p.id === id)?.name).map(([title, detail]) => ({ title, detail })),
+    ...water.additions.map((a) => ({ title: materialName(a.materialId), detail: waterAdditionDetail(a) })),
+  ];
+  return { title: WATER_ROW_TITLE, detail: rows.length ? "" : "None yet", rows };
+}
 
 /** One earlier copy of the recipe, named by the batches that brewed it. `href` opens it read only; fixtures leave it out. */
 type RecipeHistoryRow = { title: string; detail: string; href?: string; selected: boolean };
@@ -102,14 +131,13 @@ export type RecipeViewModel = {
   knockoutTemp?: string;
   efficiency?: string;
   attenuation?: string;
-  /** A schedule row; `rows` present means it is read out inline (a saved copy read only) instead of opening. */
   mash?: RecipeScheduleView;
   fermentation?: RecipeScheduleView;
   water?: RecipeScheduleView;
   notes?: string;
-  predicted?: string;
-  /** The IBU line (ibuText), drawn under `predicted`. */
-  bitterness?: string;
+  /** The headline figures as value and label (["15.2 °P", "OG"]), and the lines under them (figureStrip). */
+  figures?: [string, string][];
+  figureNotes?: string[];
   /** Batch actuals: one row per brewed batch of any copy, then the gap for the shown copy. */
   tape?: [string, string][];
   actualsNote?: string;
@@ -208,7 +236,7 @@ export function draftBlocker(input: {
 }
 
 /** Why there is no prediction, naming the first blocked line, or null when nothing blocks it.
- * `saved` tells a saved copy (which froze the gap, so the fix is picked up by the next save) from a draft (fixed under Materials).
+ * `saved` tells a saved copy (which froze the gap, so the fix is picked up by Refresh from Materials) from a draft (fixed under Materials).
  * nameOf and unitOf take a blocker's index into the ingredient list that gravityBlockers was given. */
 export function gravityBlockerText(blockers: GravityBlocker[], nameOf: (index: number) => string, unitOf: (index: number) => string | undefined, { saved }: { saved: boolean }): string | null {
   const first = blockers[0];
@@ -216,7 +244,7 @@ export function gravityBlockerText(blockers: GravityBlocker[], nameOf: (index: n
   const name = nameOf(first.index);
   if (first.reason === "no_weight") return `${name} is stocked in ${unitOf(first.index) ?? "no unit"}, which has no weight, so nothing is predicted.`;
   return saved
-    ? `${name} had no extract potential when this recipe was saved; set it under Materials, then save a change to this recipe.`
+    ? `${name} had no extract potential when this recipe was saved; set it under Materials, then Refresh from Materials on the current recipe.`
     : `${name} has no extract potential; set it under Materials.`;
 }
 
@@ -226,10 +254,10 @@ export function noMashText(stages: string[]): string | null {
   return stages.length > 0 && !stages.includes("mash") ? "No mash ingredient, so nothing is predicted." : null;
 }
 
-/** The draft's IBU line, from each material's current alpha acid, which saving freezes. Undefined with no lines, since
+/** The editor's IBU preview, from each material's current alpha acid, which saving freezes. Undefined with no lines, since
  *  draftBlocker already asks for one. A line whose material the picker hides (an inactive one) reads as a hop with neither
  *  alpha acid nor a unit, so the preview shows the gap instead of silently dropping the line. */
-export function draftIbuText(lines: IngredientLine[], ogPlato: number | null, materials: RecipeMaterial[]): string | undefined {
+export function draftIbu(lines: IngredientLine[], ogPlato: number | null, materials: RecipeMaterial[]): RecipeIbu | undefined {
   if (lines.length === 0) return undefined;
   const material = materialLookup(materials);
   const ibuLines = lines.map((l) => {
@@ -239,7 +267,40 @@ export function draftIbuText(lines: IngredientLine[], ogPlato: number | null, ma
       unit: m?.base_uom, timingMinutes: l.timingMinutes ? Number(l.timingMinutes) : null, alphaAcid: m?.alpha_acid ?? null,
     };
   });
-  return ibuText(recipeIbu({ ogPlato, lines: ibuLines }), { saved: false });
+  return recipeIbu({ ogPlato, lines: ibuLines });
+}
+
+/** What a recipe predicts: get_recipe's figures for a saved copy, frozen at its save, or the editor's preview from
+ *  current Materials. `ibu` is absent on a sheet with no line yet. */
+export type RecipeFigures = { ogPlato: number | null; fgPlato: number | null; abv: number | null; ibu?: RecipeIbu };
+
+/** The headline strip: each figure the recipe predicts as value and label, and the lines under it. A figure that cannot
+ *  be predicted is not drawn; `why` says why there is no gravity, and the IBU line says what its figure leaves out
+ *  (whirlpool hops, a gap) or why there is none. `saved` words a gap's fix for a saved copy, as ibuText does. */
+export function figureStrip(f: RecipeFigures, unit: GravityUnit, { saved, why }: { saved: boolean; why?: string | null }): { figures: [string, string][]; notes: string[] } {
+  const figures: [string, string][] = [];
+  if (f.ogPlato !== null && f.fgPlato !== null && f.abv !== null) figures.push([formatGravity(f.ogPlato, unit), "OG"], [formatGravity(f.fgPlato, unit), "FG"], [`${f.abv.toFixed(1)}%`, "ABV"]);
+  if (f.ibu?.kind === "estimate") figures.push([String(f.ibu.ibu), "IBU"]);
+  if (f.ibu?.kind === "lowerBound") figures.push([`≥ ${f.ibu.ibu}`, "IBU"]);
+  // A plain estimate is all in its figure.
+  const ibuNote = f.ibu && !(f.ibu.kind === "estimate" && !f.ibu.whirlpool) ? ibuText(f.ibu, { saved }) : undefined;
+  return { figures, notes: [f.ogPlato === null ? why : undefined, ibuNote].filter((note): note is string => Boolean(note)) };
+}
+
+/** The numbers of a prediction as the strip prints them (gravity and ABV to a tenth), plus how many hops still have a gap. */
+const figureKey = (f: RecipeFigures) => JSON.stringify([
+  ...[f.ogPlato, f.fgPlato, f.abv].map((n) => (n === null ? null : Math.round(n * 10))),
+  f.ibu?.kind, f.ibu && "ibu" in f.ibu ? f.ibu.ibu : null, f.ibu && "gaps" in f.ibu ? f.ibu.gaps.length : 0,
+]);
+
+/** The line that offers Refresh from Materials on an unchanged sheet: what the saved recipe would predict from current
+ *  Materials (`now`), when that differs from what the saved copy froze (`saved`). Undefined when the numbers match, so
+ *  a refresh would change nothing, and when `now` is null: the page cannot see one of the lines' materials (an
+ *  inactive one), so it cannot tell what a refresh would give. */
+export function materialsNowGive(saved: RecipeFigures, now: RecipeFigures | null, unit: GravityUnit): string | undefined {
+  if (!now || figureKey(saved) === figureKey(now)) return undefined;
+  const { figures } = figureStrip(now, unit, { saved: false });
+  return `Materials now give ${figures.length ? figures.map(([value, label]) => `${label} ${value}`).join(" · ") : "no prediction"}.`;
 }
 
 /** The pack a line totals with: brew-day stages only, a positive amount, and a known material; else none. */
@@ -361,23 +422,20 @@ export function toRecipePageModel(
   s: RecipeSnapshot,
   ctx: { materials: RecipeMaterial[]; profiles: { id: string; name: string }[]; unit: GravityUnit; timeZone: string; outcomes: RecipeOutcome[] },
 ): RecipeViewModel {
-  const { recipe, version: v, ingredients, waterAdditions } = s;
+  const { recipe, version: v, ingredients } = s;
   const material = materialLookup(ctx.materials);
-  const profileName = (pid: string | null) => (pid && ctx.profiles.find((p) => p.id === pid)?.name) || null;
   const base = { title: recipePageTitle(s), backHref: "/recipes", recipeNote: recipe.note?.replace(IMPORT_ID, "") || undefined };
-  if (!v) return base;
+  const draft = versionToDraft(s);
+  if (!v || !draft) return base;
   const latest = s.versions[0];
   const history = recipeHistory(ctx.outcomes, v.version, latest);
   const shown = history.find((h) => h.selected);
 
-  // The water rows leave out the process scalars processReadout also returns; the Boil, Whirlpool and Knockout steps show those.
-  const waterFacts = processReadout(v, profileName).filter(([k]) => !/^(Pre-boil|Whirlpool|Knockout)/.test(k));
-  // The prediction get_recipe made, or why it made none: the saved line's own snapshot and unit, as get_recipe read them.
+  // Why get_recipe predicted no gravity: the saved line's own snapshot and unit, as get_recipe read them.
   const blockers = gravityBlockers(ingredients.map((i) => ({ perBblQty: Number(i.per_bbl_qty), extractPotential: i.extract_snapshot, stage: i.stage, unit: i.materials?.base_uom })));
-  const predicted = s.ogPlato !== null && s.fgPlato !== null && s.abv !== null
-    ? `Predicted: OG ${formatGravity(s.ogPlato, ctx.unit)} · FG ${formatGravity(s.fgPlato, ctx.unit)} · ABV ${s.abv.toFixed(1)}%`
-    : gravityBlockerText(blockers, (n) => material.name(ingredients[n].material_id), (n) => ingredients[n].materials?.base_uom, { saved: true })
-      ?? noMashText(ingredients.map((i) => i.stage)) ?? undefined;
+  const why = gravityBlockerText(blockers, (n) => material.name(ingredients[n].material_id), (n) => ingredients[n].materials?.base_uom, { saved: true })
+    ?? noMashText(ingredients.map((i) => i.stage));
+  const { figures, notes: figureNotes } = figureStrip(s, ctx.unit, { saved: true, why });
   return {
     ...base,
     ...(v.version === latest
@@ -390,23 +448,15 @@ export function toRecipePageModel(
     history,
     ingredients: ingredients.map((i) => ({
       key: i.id, title: material.name(i.material_id),
-      detail: ingredientDetail(i.stage, i.timing_minutes, perBblDisplay(Number(i.per_bbl_qty)), material.unit(i.material_id)),
-      qty: "", stage: i.stage as IngredientStage, pack: ingredientPack(i.stage, Number(i.per_bbl_qty), material.get(i.material_id)),
+      ...ingredientCells(i.stage as IngredientStage, i.timing_minutes, i.per_bbl_qty, material.unit(i.material_id)),
+      pack: ingredientPack(i.stage, Number(i.per_bbl_qty), material.get(i.material_id)),
     })),
     ...versionNumbers(v),
-    mash: { title: mashRowTitle(v.mash_schedule.length), detail: mashRowSummary(v.mash_schedule), rows: v.mash_schedule.map((m) => ({ title: m.name, detail: mashStepDetail(m) })) },
-    fermentation: {
-      title: fermentationRowTitle(v.fermentation_schedule.length),
-      detail: v.fermentation_schedule.length ? fermentationSummary(v.fermentation_schedule) : "No stages yet",
-      rows: v.fermentation_schedule.map((f) => ({ title: f.name, detail: fermentationStageDetail(f) })),
-    },
-    water: {
-      title: "Water", detail: "",
-      rows: [...waterFacts.map(([k, val]) => ({ title: k, detail: val })), ...waterAdditions.map((a) => ({ title: material.name(a.material_id), detail: waterAdditionDetail(a) }))],
-    },
+    mash: mashView(v.mash_schedule),
+    fermentation: fermentationView(v.fermentation_schedule),
+    water: waterView(draft.water, ctx.profiles, material.name),
     notes: v.note ?? "",
-    predicted,
-    bitterness: ibuText(s.ibu, { saved: true }),
+    figures, figureNotes,
     tape: outcomeTape(ctx.outcomes, ctx.unit, latest),
     actualsNote: outcomeSummary(ctx.outcomes, v.version),
   };

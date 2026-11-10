@@ -62,12 +62,13 @@ describe("Recipe creation", () => {
     const live = renderToStaticMarkup(createElement(RecipeView, { model: { title: "New recipe", preBoil: "16.8", notes: "" }, controls: { set, onSubmit: () => {}, dirty: true, submitLabel: "Create recipe" } }));
     expect(live).toMatch(/<form\b/);
     expect(live).toMatch(/value="16.8"/);
-    expect(live).toMatch(/grid-cols-2 md:grid-cols-4/);
+    // The step's numbers share its heading's line, each under its own label.
+    expect(live).toMatch(/<label[^>]*>Pre-boil volume bbl<\/label>/);
     expect(live).toMatch(/<button[^>]*type="submit"[^>]*>Create recipe</);
     // A saved copy read only is text, its schedules as rows under their headings.
     const cut = renderToStaticMarkup(createElement(RecipeView, { readOnly: true, model: { title: "Hazy", preBoil: "16.8", mash: { title: "Mash schedule · 1 step", detail: "60 min", rows: [{ title: "Sacch", detail: "152 °F · 60 min" }] } } }));
     expect(cut).toMatch(/Sacch/);
-    expect(cut).not.toMatch(/<form\b|Add \w+ ingredient|Open/);
+    expect(cut).not.toMatch(/<form\b|Add ingredient|Edit schedule|Open/);
     // No scale chips: they previewed a batch size nothing supplies.
     expect(fixture).not.toMatch(/15 bbl|30 bbl/);
     // Not written yet: no number is invented, and nothing says "version".
@@ -109,7 +110,7 @@ describe("Recipe creation", () => {
   });
 
   describe("the read-out and the draft blocker (plan task 8)", () => {
-    const versioned = { title: "Hazy", preBoil: "16.8", efficiency: "72.5", notes: "", ingredients: [{ key: "m", title: "2-row", detail: "Mash · 40.9 lb / bbl", qty: "", stage: "mash" as const }] };
+    const versioned = { title: "Hazy", preBoil: "16.8", efficiency: "72.5", notes: "", ingredients: [{ key: "m", title: "2-row", amount: "40.9 lb", timing: "", stage: "mash" as const }] };
     const draw = (props: Parameters<typeof RecipeView>[0]) => renderToStaticMarkup(createElement(RecipeView, props));
     const draft = (blockedReason?: string) => draw({ model: { title: "Hazy", notes: "" }, controls: { set: () => {}, onSubmit: () => {}, dirty: true, blockedReason } });
 
@@ -158,13 +159,13 @@ describe("Recipe creation", () => {
 
     it("shows the recipe note, the saved date and a change note, with each step under its heading", () => {
       const html = draw({ readOnly: true, model: { ...versioned, recipeNote: "House IPA", saved: "Aug 28, 2026", notes: "Knock out cold." } });
-      expect(html).toMatch(/Recipe note[^]*House IPA/);
-      expect(html).toMatch(/<dt[^>]*>Saved<\/dt><dd[^>]*>Aug 28, 2026<\/dd>/);
+      // The saved date and the recipe's own note share one quiet line.
+      expect(html).toContain("Saved Aug 28, 2026 · House IPA");
       expect(html).toMatch(/<dt[^>]*>Change note<\/dt><dd[^>]*>Knock out cold\.<\/dd>/);
       expect(html).toMatch(/<h2[^>]*>Mash<\/h2>/);
       expect(html).toMatch(/<h2[^>]*>Boil<\/h2>/);
       expect(html).not.toMatch(/<h2[^>]*>(Ingredients|Process)<\/h2>/);
-      expect(draw({ readOnly: true, model: versioned })).not.toMatch(/Recipe note|Change note/);
+      expect(draw({ readOnly: true, model: versioned })).not.toMatch(/Saved|Change note/);
       expect(draft()).toMatch(/aria-label="Change note · optional"|>Change note · optional</);
     });
   });
@@ -186,8 +187,12 @@ describe("Recipe creation", () => {
     expect(form).toMatch(/<RecipeView\b/);
     expect(form).toMatch(/<NewRecipeFieldsView\b/);
     // The save bar is up only while the sheet differs from what is saved (always while creating), and Discard puts it back.
-    expect(form).toMatch(/dirty: creating \|\| shouldKeepDraft\(start, draft\)/);
+    expect(form).toMatch(/const dirty = creating \|\| shouldKeepDraft\(start, draft\)/);
     expect(form).toMatch(/onDiscard: creating \? undefined : discard/);
+    // An unchanged saved sheet offers Refresh from Materials when its live preview differs from what the copy froze,
+    // and never guesses when it cannot see a line's material.
+    expect(form).toMatch(/materialsNowGive\(saved, lines\.every\(\(l\) => material\.get\(l\.materialId\)\) \? live : null, unit\)/);
+    expect(form).toMatch(/refresh: refreshText \? \{ text: refreshText, onRefresh: \(\) => void submit\(\) \} : undefined/);
     // Nothing the editor says to the brewer names a version.
     expect(form).not.toMatch(/["`][^"`\n]*\bversions?\b[^"`\n]*["`]/i);
     expect(form).not.toMatch(/<CommandForm\b|grid-cols-2|<Label\b|id="rv-/);
@@ -228,9 +233,8 @@ describe("recipe form copy (#1139)", () => {
   });
 
   it("each step's add-ingredient row reads like every other create action", () => {
-    const draft = html(createElement(RecipeView, { model: { title: "Hazy", notes: "" } }));
-    expect(draft).toContain("Add mash ingredient");
-    expect(draft).toContain("Material, amount and timing");
+    const draft = html(createElement(RecipeView, { model: { title: "Hazy", notes: "" } })).replace(/<[^>]+>/g, "");
+    expect(draft).toContain("Add ingredient to mash");
     expect(draft).not.toMatch(/\+ add ingredient|material · stage · timing/);
   });
 

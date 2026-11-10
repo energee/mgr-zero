@@ -1,7 +1,8 @@
 // app/(app)/recipes/[id]/page.tsx — the one recipe page. It opens the current
 // saved copy in the editor (recipe-version-form.tsx), every field live, with the
 // brand picker on top and, from toRecipePageModel, the saved date, Schedule
-// batch, Batch actuals (get_recipe_outcomes) and As brewed around the sheet. A
+// batch, the figures the saved copy froze, Batch actuals (get_recipe_outcomes)
+// and As brewed around the sheet. A
 // recipe not saved yet opens the blank sheet. ?v=N naming an earlier copy reads
 // that copy out read only (RecipeView); ?v= naming the current copy is the
 // editor. ?from=N is Use this again: the editor opens on the current copy with
@@ -60,14 +61,16 @@ export default async function RecipePage({ params, searchParams }: Props) {
   const loaded = earlier?.version && draft && initial && shouldKeepDraft(initial, draft)
     ? { draft, notice: loadedNotice(outcomes.batches, earlier.version.version, latest) }
     : undefined;
-  const { saved, scheduleHref, recipeNote, tape, actualsNote, history } = model;
+  const { saved, scheduleHref, recipeNote, tape, actualsNote, history, figures, figureNotes } = model;
   return (
     <RecipeEditor
       // A save makes a new current copy, so the editor remounts on it with nothing unsaved.
       key={version?.id ?? "unsaved"}
       recipeId={recipe.id} title={model.title} backHref="/recipes"
       parentForm={<RecipeBrandPicker recipeId={recipe.id} brandId={recipe.brand_id} brands={brands} />}
-      page={{ saved, scheduleHref, recipeNote, tape, actualsNote, history }}
+      page={{ saved, scheduleHref, recipeNote, tape, actualsNote, history, figures, figureNotes }}
+      // What get_recipe predicted for the saved copy; the editor compares its live preview against these.
+      saved={version ? { ogPlato: snapshot.ogPlato, fgPlato: snapshot.fgPlato, abv: snapshot.abv, ibu: snapshot.ibu } : undefined}
       initial={initial} baseVersionId={version?.id ?? null} loaded={loaded}
       materials={materials.map(toRecipeMaterial)} profiles={profiles.map(toWaterProfileOption)} unit={gravityUnit.effective}
     />

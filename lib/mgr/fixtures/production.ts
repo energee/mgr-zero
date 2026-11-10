@@ -4,15 +4,15 @@ import type { BatchesSnapshot } from "@/lib/mgr/batches-view";
 import type { BrewDayViewModel } from "@/lib/mgr/brew-day-view";
 import { cellarPlanRows, startAtPlan, waterAdditionRows, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import type { ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
-import { outcomeSummary, outcomeTape, recipeHistory, type RecipeOutcome, type RecipeViewModel } from "@/lib/mgr/recipe-view";
+import { fermentationView, figureStrip, ingredientCells, mashView, outcomeSummary, outcomeTape, recipeHistory, waterView, type RecipeOutcome, type RecipeViewModel } from "@/lib/mgr/recipe-view";
 import type { RecipesSnapshot } from "@/lib/mgr/recipes-view";
 import type { RunClosedViewModel } from "@/lib/mgr/run-closed-view";
 import { DEMO_TIME_ZONE } from "@/lib/mgr/fixtures/settings";
 import type { ScheduleBatchViewModel } from "@/lib/mgr/schedule-batch-view";
 import type { VesselDetailViewModel } from "@/lib/mgr/vessel-detail-view";
 import type { CellarMapViewModel } from "@/lib/mgr/cellar-map-view";
-import { ibuText, recipeIbu } from "@/lib/recipe-ibu";
-import { fermentationRowTitle, fermentationSummary, ingredientDetail, mashRowSummary, mashRowTitle, WATER_ROW_TITLE, waterRowSummary, type FermentationStage, type MashStep, type WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { recipeIbu } from "@/lib/recipe-ibu";
+import type { FermentationStage, MashStep, WaterDraft } from "@/lib/mgr/recipe-process-view";
 import { waterProfiles } from "./catalog";
 
 export const cellarMapBrewer: CellarMapViewModel = {
@@ -269,6 +269,9 @@ export const WATER_HAZY: WaterDraft = {
   additions: [{ materialId: "gypsum", qty: 4, unit: "g", stage: "mash" }, { materialId: "cacl", qty: 6, unit: "g", stage: "mash" }, { materialId: "lactic", qty: 3, unit: "mL", stage: "sparge" }],
 };
 
+/** The names of WATER_HAZY's additions, as list_materials would give them to the recipe page. */
+const WATER_HAZY_NAMES: Record<string, string> = { gypsum: "Gypsum", cacl: "Calcium chloride", lactic: "Lactic acid" };
+
 /** Hazy IPA's brewed batches as get_recipe_outcomes returns them: two closed on the current copy (4), then two on the copy
  *  before it (3), which assumed more efficiency. Batch actuals and As brewed are computed from these. */
 const HAZY_V4 = { version: 4, closed: true, predicted: { ogPlato: 15.2, fgPlato: 3.5, abv: 6.3 }, assumedEfficiency: 0.72, assumedAttenuation: 0.78 };
@@ -296,9 +299,9 @@ export const recipeHazyV4: RecipeViewModel = {
   priceGroupOptions: ["Not decided", "1", "2", "3", "4", "5", "6", "7", "8"],
   // 2-row comes in 50 lb sacks and Citra in 44 lb boxes; the dry hop is a cellar stage, so it has no pack total.
   ingredients: [
-    { key: "malt", title: "2-row", detail: ingredientDetail("mash", null, 44, "lb"), qty: "", stage: "mash", pack: { perBbl: 44, factor: 50, unit: "lb" } },
-    { key: "boil", title: "Citra", detail: ingredientDetail("boil", 10, 0.4, "lb"), qty: "", stage: "boil", pack: { perBbl: 0.4, factor: 44, unit: "lb" } },
-    { key: "dh", title: "Citra", detail: ingredientDetail("dry_hop", null, 1.2, "lb"), qty: "", stage: "dry_hop" },
+    { key: "malt", title: "2-row", ...ingredientCells("mash", null, 44, "lb"), pack: { perBbl: 44, factor: 50, unit: "lb" } },
+    { key: "boil", title: "Citra", ...ingredientCells("boil", 10, 0.4, "lb"), pack: { perBbl: 0.4, factor: 44, unit: "lb" } },
+    { key: "dh", title: "Citra", ...ingredientCells("dry_hop", null, 1.2, "lb") },
   ],
   totalsAtBbl: "22",
   preBoil: "16.8",
@@ -309,13 +312,12 @@ export const recipeHazyV4: RecipeViewModel = {
   knockoutTemp: "65",
   efficiency: "72",
   attenuation: "78",
-  mash: { title: mashRowTitle(MASH_STEPS.length), detail: mashRowSummary(MASH_STEPS) },
-  fermentation: { title: fermentationRowTitle(FERM_STAGES.length), detail: fermentationSummary(FERM_STAGES) },
-  // The live sheet's Water row: target and addition count (recipe-version-form.tsx); the Water frame names the source.
-  water: { title: WATER_ROW_TITLE, detail: waterRowSummary(waterProfiles.find((p) => p.id === WATER_HAZY.targetProfileId)?.name, WATER_HAZY.additions.length) },
+  // The schedules and the water list their rows, as the live sheet does; the Mash schedule, Fermentation schedule and Water frames edit them.
+  mash: mashView(MASH_STEPS),
+  fermentation: fermentationView(FERM_STAGES),
+  water: waterView(WATER_HAZY, waterProfiles, (id) => WATER_HAZY_NAMES[id]),
   notes: "Whirlpool hard, knock out cold.",
-  predicted: "Predicted: OG 15.2 °P · FG 3.5 °P · ABV 6.3%",
-  bitterness: ibuText(HAZY_IBU, { saved: true }),
+  ...(({ figures, notes }) => ({ figures, figureNotes: notes }))(figureStrip({ ...HAZY_V4.predicted, ibu: HAZY_IBU }, "plato", { saved: true })),
   tape: outcomeTape(HAZY_OUTCOMES, "plato", 4),
   actualsNote: outcomeSummary(HAZY_OUTCOMES, 4),
   // The inventory's rows open nothing by address; the Recipe record's `to` says where a tap goes.

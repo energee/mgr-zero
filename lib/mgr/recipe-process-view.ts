@@ -2,8 +2,8 @@
 // it and the recipe page reads it: ordered mash steps, fermentation stages and
 // water additions on the unsaved sheet (recipe-builder spec D2: repetition earns
 // a surface), pure list helpers, the summary lines the schedule screens print,
-// the titles of the rows that open them, and the labelled read-out of a saved
-// copy's process scalars and water.
+// the titles the recipe page gives each schedule, and the labelled read-out of
+// the sheet's water.
 import { sentenceCase } from "./labels";
 import { plural } from "./plural";
 import { isNumber, isPositive, numberNotationError } from "./quantity-input";
@@ -71,11 +71,13 @@ export function ingredientReason(fields: IngredientFields, limits: TimingLimits)
 /** A per-bbl quantity to three significant digits: 40.909091 reads "40.9", 0.011364 reads "0.0114".
  *  Two fixed fraction digits would round small hop rates by 10-12%, so callers format with this before ingredientDetail. */
 export const perBblDisplay = (n: number): string => n.toLocaleString("en-US", { maximumSignificantDigits: 3 });
-/** "4 min · 1.2 lb / bbl", or "day 3 · 1.2 lb / bbl" for a stage timed in days: a line's timing and amount, the same on
- *  the sheet and on a saved copy. The stage is not named: the recipe page draws a line under its step's heading, and a
- *  caller with no such heading (Brew day's cellar plan) names the stage itself. */
+/** A line's timing, "4 min", or "day 3" for a stage timed in days; "" when the line has none. */
+export const ingredientTiming = (stage: string, timingMinutes: number | string | null) =>
+  timingMinutes === null || timingMinutes === "" ? "" : timedInDays(stage) ? `day ${Number(timingMinutes) / MINUTES_PER_DAY}` : `${timingMinutes} min`;
+/** "4 min · 1.2 lb / bbl", or "day 3 · 1.2 lb / bbl": a line's timing and amount as one phrase, for Brew day's cellar
+ *  plan. The stage is not named; that caller names it. The recipe page prints the two in columns of their own (ingredientCells). */
 export const ingredientDetail = (stage: string, timingMinutes: number | string | null, perBbl: number | string, unit?: string) =>
-  `${timingMinutes !== null && timingMinutes !== "" ? (timedInDays(stage) ? `day ${Number(timingMinutes) / MINUTES_PER_DAY} · ` : `${timingMinutes} min · `) : ""}${perBbl}${unit ? ` ${unit}` : ""} / bbl`;
+  [ingredientTiming(stage, timingMinutes), `${perBbl}${unit ? ` ${unit}` : ""} / bbl`].filter(Boolean).join(" · ");
 /** Name and base unit by material id, for rows that name a material the command returned. */
 export function materialLookup<M extends { id: string; name: string; base_uom: string }>(materials: readonly M[]) {
   const byId = new Map(materials.map((m) => [m.id, m]));
@@ -115,8 +117,8 @@ export function mashSummary(steps: readonly MashStep[]): string {
   return `Total ${totalMinutes(steps)} min. ${rest ? `The ${rest.tempF} °F rest is recorded as the mash temperature.` : "No rest falls between 144 and 162 °F, so no mash temperature is recorded."}`;
 }
 
-/** The rows on the recipe page that open a step's sheet. Each sits under its step's heading (Mash, Fermentation, Water),
- *  so its title says what it opens without repeating that heading. */
+/** What the recipe page calls each step's schedule, over its rows. Each sits under its step's heading (Mash,
+ *  Fermentation, Water), so the title does not repeat that heading. */
 export const mashRowTitle = (steps: number) => `Schedule · ${plural(steps, "step")}`;
 export const fermentationRowTitle = (stages: number) => `Schedule · ${plural(stages, "stage")}`;
 export const WATER_ROW_TITLE = "Profile and additions";
@@ -152,21 +154,17 @@ export type ProcessColumns = {
   target_water_profile_id: string | null; source_water_profile_id: string | null; mash_water_gal: number | null; sparge_water_gal: number | null; target_mash_ph: number | null;
 };
 
-/** Label and value for each process fact a saved copy carries; absent facts print nothing. */
-export function processReadout(v: ProcessColumns, profileName: (id: string | null) => string | null): [string, string][] {
-  const whirlpool = v.whirlpool_minutes === null ? null
-    : `${v.whirlpool_minutes} min${v.whirlpool_temp_f !== null ? ` at ${v.whirlpool_temp_f} °F` : ""}${v.whirlpool_rest_minutes !== null ? ` · ${v.whirlpool_rest_minutes} min rest` : ""}`;
-  const rows: [string, string | null][] = [
-    ["Pre-boil volume", v.pre_boil_bbl === null ? null : `${v.pre_boil_bbl} bbl`],
-    ["Whirlpool", whirlpool],
-    ["Knockout temp", v.knockout_temp_f === null ? null : `${v.knockout_temp_f} °F`],
-    ["Source profile", profileName(v.source_water_profile_id) ?? "No source"],
-    ["Target profile", profileName(v.target_water_profile_id) ?? "No target"],
-    ["Mash water", v.mash_water_gal === null ? null : `${v.mash_water_gal} gal`],
-    ["Sparge water", v.sparge_water_gal === null ? null : `${v.sparge_water_gal} gal`],
-    ["Target mash pH", v.target_mash_ph === null ? null : String(v.target_mash_ph)],
+/** Label and value for each water fact the sheet holds, as typed; a fact it does not hold, or a profile the page
+ *  cannot name, prints nothing. */
+export function waterReadout(w: Omit<WaterDraft, "additions">, profileName: (id: string) => string | undefined): [string, string][] {
+  const rows: [string, string | undefined][] = [
+    ["Source profile", profileName(w.sourceProfileId)],
+    ["Target profile", profileName(w.targetProfileId)],
+    ["Mash water", w.mashGal && `${w.mashGal} gal`],
+    ["Sparge water", w.spargeGal && `${w.spargeGal} gal`],
+    ["Target mash pH", w.targetMashPh],
   ];
-  return rows.filter((r): r is [string, string] => r[1] !== null);
+  return rows.filter((r): r is [string, string] => Boolean(r[1]));
 }
 
 // Sheet field shapes (strings, as typed) and why each Save is withheld (null when

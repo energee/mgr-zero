@@ -1,6 +1,6 @@
 // app/(app)/recipes/[id]/recipe-brand-picker.tsx — the recipe's Brand picker,
 // which saves on pick (set_recipe_brand) and toasts "Brand saved" (Sonner's
-// polite live region). It stays enabled while a save runs, so focus never
+// polite live region). A quiet hint under it says so. It stays enabled while a save runs, so focus never
 // drops; a pick made meanwhile is ignored. Batches already scheduled keep
 // their brand.
 "use client";
@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { NONE } from "@/components/ui/select";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { E } from "@/components/mgr/e";
+import { FieldDescription } from "@/components/ui/field";
 import { nameWithAlias } from "@/lib/mgr/labels";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 
@@ -24,8 +25,9 @@ export function RecipeBrandPicker({ recipeId, brandId, brands }: {
   };
   return (
     <>
-      {E.pick("Brand · optional", brandId ?? NONE, [{ value: NONE, label: "Not decided" }, ...brands.map((b) => ({ value: b.id, label: nameWithAlias(b) }))], { onChange: pick })}
-      {E.info("Saves when you pick. Batches already scheduled keep their brand.")}
+      {E.pick("Brand · optional", brandId ?? NONE, [{ value: NONE, label: "Not decided" }, ...brands.map((b) => ({ value: b.id, label: nameWithAlias(b) }))], {
+        onChange: pick, description: <FieldDescription>Saves when you pick. Batches already scheduled keep their brand.</FieldDescription>,
+      })}
       <CommandFormMessage error={error} />
     </>
   );

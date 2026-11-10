@@ -1,10 +1,10 @@
 // app/(app)/recipes/[id]/schedule-sheets.tsx — the draft sheets the Recipe
-// editor opens from its rows: Ingredients, Mash schedule, Fermentation
-// schedule and Water. One ListSheet owns the open/close, the list-or-editor
-// swap and the save and delete verbs; each sheet supplies its list view,
-// item editor and field shape. `trigger` is the RecipeView row itself, so
-// the draft looks like the inventory drawing. They edit the editor's draft;
-// nothing is written until Save changes.
+// editor opens: Ingredients, Mash schedule, Fermentation schedule and Water.
+// One ListSheet owns the open/close, the list-or-editor swap and the save and
+// delete verbs; each sheet supplies its list view, item editor and field
+// shape. `trigger` is the button RecipeView drew (a line's name, a step's Add
+// ingredient or Edit schedule), so the editor looks like the inventory
+// drawing. They edit the editor's draft; nothing is written until Save changes.
 "use client";
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";

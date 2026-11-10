@@ -132,11 +132,13 @@ describe("hint roles", () => {
     expect(cards(renderToStaticMarkup(createElement(ChatLinkConsentView, { intent: null })), "alert")).toContain("This link is missing, expired");
   });
 
-  it("RecipeView renders Predicted inside a polite status region, not an alert", () => {
+  it("RecipeView renders its predicted figures inside a polite status region, not an alert", () => {
     const html = renderToStaticMarkup(createElement(RecipeView, { model: recipeHazyV4 }));
-    expect(statusRegion(html)).toContain("Predicted: OG 15.2 °P");
-    expect(statusRegion(html)).toContain("IBU 15");
-    expect(html).not.toMatch(/role="alert"[^>]*>(?:(?!<\/div>)[\s\S])*Predicted:/);
+    // The figures are nested blocks, so the region is read up to the next one instead of through statusRegion.
+    const status = html.slice(html.indexOf('<div role="status">')).split('role="status"')[1];
+    expect(status).toMatch(/15\.2 °P<\/div><div[^>]*>OG</);
+    expect(status).toMatch(/>15<\/div><div[^>]*>IBU</);
+    expect(html).not.toMatch(/role="alert"[^>]*>(?:(?!<\/div>)[\s\S])*15\.2 °P/);
   });
 
   it("RecipeView keeps the status region mounted before anything is predicted", () => {

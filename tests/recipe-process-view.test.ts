@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { FermentationScheduleView } from "../components/mgr/views/fermentation-schedule";
-import { fermentationRowTitle, fermentationStageDetail, fermentationSummary, fromIngredientFields, ingredientDetail, mashRowTitle, WATER_ROW_TITLE, ingredientReason, mashStepReason, stageReason, toIngredientFields, ionReadout, mashRowSummary, mashStepDetail, mashSummary, moveItem, perBblDisplay, processReadout, profileIons, splitByStage, suggestAdditions, upsertAt, waterAdditionDetail, waterRowSummary, type FermentationStage, type MashStep, type SaltMaterial, type WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { fermentationRowTitle, fermentationStageDetail, fermentationSummary, fromIngredientFields, ingredientDetail, ingredientTiming, mashRowTitle, WATER_ROW_TITLE, ingredientReason, mashStepReason, stageReason, toIngredientFields, ionReadout, mashRowSummary, mashStepDetail, mashSummary, moveItem, perBblDisplay, waterReadout, profileIons, splitByStage, suggestAdditions, upsertAt, waterAdditionDetail, waterRowSummary, type FermentationStage, type MashStep, type SaltMaterial, type WaterDraft } from "@/lib/mgr/recipe-process-view";
 
 const mash: MashStep[] = [
   { name: "Mash-in", kind: "infusion", tempF: 104, minutes: 15 },
@@ -31,11 +31,12 @@ describe("schedule drafts", () => {
   it("the longest in-range rest wins over the first, as the RPC derives mash_temp_f", () => {
     expect(mashSummary([{ name: "Beta", kind: "rest", tempF: 145, minutes: 20 }, { name: "Alpha", kind: "rest", tempF: 158, minutes: 40 }])).toBe("Total 60 min. The 158 °F rest is recorded as the mash temperature.");
   });
-  it("reads a cut version's process facts out, skipping what it does not carry", () => {
-    const names = (id: string | null) => (id === "hazy" ? "Hazy target" : null);
-    expect(processReadout({ pre_boil_bbl: 12.5, whirlpool_minutes: 20, whirlpool_temp_f: 180, whirlpool_rest_minutes: null, knockout_temp_f: null, target_water_profile_id: "hazy", source_water_profile_id: null, mash_water_gal: 9.5, sparge_water_gal: null, target_mash_ph: 5.35 }, names)).toEqual([
-      ["Pre-boil volume", "12.5 bbl"], ["Whirlpool", "20 min at 180 °F"], ["Source profile", "No source"], ["Target profile", "Hazy target"], ["Mash water", "9.5 gal"], ["Target mash pH", "5.35"],
+  it("reads the sheet's water facts out, skipping what it does not hold", () => {
+    const names = (id: string) => (id === "hazy" ? "Hazy target" : undefined);
+    expect(waterReadout({ targetProfileId: "hazy", sourceProfileId: "", mashGal: "9.5", spargeGal: "", targetMashPh: "5.35" }, names)).toEqual([
+      ["Target profile", "Hazy target"], ["Mash water", "9.5 gal"], ["Target mash pH", "5.35"],
     ]);
+    expect(waterReadout({ targetProfileId: "gone", sourceProfileId: "hazy", mashGal: "", spargeGal: "4", targetMashPh: "" }, names)).toEqual([["Source profile", "Hazy target"], ["Sparge water", "4 gal"]]);
   });
   it("summaries name the recorded mash-temperature rest and the total days", () => {
     expect(mashSummary(mash)).toBe("Total 85 min. The 152 °F rest is recorded as the mash temperature.");
@@ -48,6 +49,10 @@ describe("schedule drafts", () => {
     // Fermentation and dry hop are timed in days from the start of fermentation (#1478).
     expect(ingredientDetail("dry_hop", 3 * 1440, "1.2", "lb")).toBe("day 3 · 1.2 lb / bbl");
     expect(ingredientDetail("mash", null, "40.9")).toBe("40.9 / bbl");
+    // The brewsheet prints the timing in its own column.
+    expect(ingredientTiming("whirlpool", 4)).toBe("4 min");
+    expect(ingredientTiming("dry_hop", 3 * 1440)).toBe("day 3");
+    expect([ingredientTiming("mash", null), ingredientTiming("boil", "")]).toEqual(["", ""]);
   });
   it("a step's schedule row says what it opens without repeating the step's heading", () => {
     expect(mashRowTitle(3)).toBe("Schedule · 3 steps");

@@ -76,16 +76,16 @@ describe("SCREENS", () => {
     expect(recipe).not.toMatch(/version|\bv\d\b/i);
     expect(recipe).toContain("Schedule batch");
     expect(recipe).not.toMatch(/Save changes|Discard/);
-    // A step's rows do not repeat its heading: a schedule row says what it opens, and a line reads its timing and amount.
+    // A step's rows do not repeat its heading: a schedule is listed under its count, and a line reads its amount and timing in columns.
     expect(recipe).toContain("Schedule · 3 steps");
     expect(recipe).toContain("Schedule · 4 stages");
     expect(recipe).not.toMatch(/Mash schedule ·|Fermentation schedule ·/);
-    expect(recipe).toMatch(/Profile and additions\s+Target /);
-    expect(recipe).toContain("44 lb / bbl");
-    expect(recipe).toContain("10 min · 0.4 lb / bbl");
-    expect(recipe).not.toMatch(/Mash · 44|Boil · 10 min/);
-    // The dry hop shares Fermentation with fermentation-stage lines, so it keeps its name.
-    expect(recipe).toContain("Dry hop · 1.2 lb / bbl");
+    expect(recipe).toMatch(/Profile and additions[\s\S]*Target profile\s+Hazy target/);
+    expect(recipe).toMatch(/Ingredient\s+Per bbl\s+At 22 bbl[\s\S]*2-row\s+44 lb/);
+    expect(recipe).toMatch(/Citra\s+0\.4 lb\s+10 min/);
+    expect(recipe).not.toMatch(/Mash · 44|Boil · 10 min|lb \/ bbl/);
+    // The dry hop shares Fermentation with fermentation-stage lines, so it keeps its name, in the Timing column.
+    expect(recipe).toMatch(/Citra\s+1\.2 lb\s+Dry hop/);
     // Spec D4: one place holds the mash temperature, and it is the schedule.
     expect(recipe).not.toMatch(/Mash temp/);
     // Spec D3: quantities are per barrel; the batch names its size on Brew day.
@@ -119,7 +119,7 @@ describe("SCREENS", () => {
 
   it("draws the recipe's IBU beside its prediction, and states what a gap reads", () => {
     const recipe = SCREENS.find((s) => s.name === "Recipe")!;
-    expect(text("Recipe")).toContain("IBU 15");
+    expect(text("Recipe")).toMatch(/15\s+IBU/);
     expect(recipe.states?.map(([name]) => name)).toEqual(expect.arrayContaining(["some hops lack alpha acid", "no IBU"]));
     expect(String(recipe.writes)).toMatch(/alpha acid snapshot/);
   });
@@ -127,12 +127,15 @@ describe("SCREENS", () => {
   it("draws the Recipe frame from the shared schedule helpers, with its saved date and no gate", () => {
     const recipe = SCREENS.find((s) => s.name === "Recipe")!;
     const drawn = text("Recipe");
-    // The water row says what it opens under the Water heading; the Water frame names the source.
+    // The sheet lists the water it holds under the Water heading; one action opens the Water frame to edit it.
     expect(drawn).not.toContain("Water · Municipal Denver");
-    expect(drawn).toContain("Target Hazy target · 3 additions");
-    expect(recipe.to?.["Profile and additions"]).toBe("Water");
-    expect(recipe.to?.["Schedule · 3 steps"]).toBe("Mash schedule");
-    expect(recipe.to?.["Schedule · 4 stages"]).toBe("Fermentation schedule");
+    expect(drawn).toMatch(/Source profile\s+Municipal · Denver/);
+    expect(drawn).toMatch(/Gypsum\s+4 g · Mash/);
+    expect(recipe.to?.["Edit water"]).toBe("Water");
+    expect(recipe.to?.["Edit schedule for mash"]).toBe("Mash schedule");
+    expect(recipe.to?.["Edit schedule for fermentation"]).toBe("Fermentation schedule");
+    // A line's name opens its Ingredient sheet.
+    expect(recipe.to?.["Edit 2-row"]).toBe("Ingredient");
     expect(text("Water")).toContain("Municipal · Denver");
     expect(drawn).toContain("Total 85 min · 152 °F saccharification rest");
     expect(drawn).toContain("Saved");
