@@ -27,7 +27,7 @@ and knockout temperatures, take 25 to 212. A value outside these ranges returns
 `400 invalid_input` with the field's path.
 
 `create_recipe_version` takes the batch size a version is written for as
-`process.batchBbl`, in barrels and above 0. It is optional. A version saved
+`process.batchBbl`, in barrels, above 0 and at most 9,999,999.999. It is optional. A version saved
 without one has none, whatever the version before it had. `get_recipe` returns
 it as `version.batch_bbl`, which is `null` when the version has none. Ingredient
 amounts stay per barrel in `perBblQty`.

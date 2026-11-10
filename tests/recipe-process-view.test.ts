@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { FermentationScheduleView } from "../components/mgr/views/fermentation-schedule";
-import { fermentationRowTitle, fermentationStageDetail, fermentationSummary, fromIngredientFields, ingredientDetail, ingredientTiming, mashRowTitle, WATER_ROW_TITLE, ingredientReason, mashStepReason, stageReason, toIngredientFields, ionReadout, mashRowSummary, mashStepDetail, mashSummary, moveItem, perBblDisplay, waterReadout, profileIons, splitByStage, suggestAdditions, upsertAt, waterAdditionDetail, waterRowSummary, type FermentationStage, type MashStep, type SaltMaterial, type WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { fermentationRowTitle, fermentationStageDetail, fermentationSummary, fromIngredientFields, ingredientDetail, ingredientTiming, mashRowTitle, packsFieldText, packsLabel, packsToPerBbl, WATER_ROW_TITLE, ingredientReason, mashStepReason, stageReason, toIngredientFields, ionReadout, mashRowSummary, mashStepDetail, mashSummary, moveItem, perBblDisplay, waterReadout, profileIons, splitByStage, suggestAdditions, upsertAt, waterAdditionDetail, waterRowSummary, type FermentationStage, type MashStep, type SaltMaterial, type WaterDraft } from "@/lib/mgr/recipe-process-view";
 
 const mash: MashStep[] = [
   { name: "Mash-in", kind: "infusion", tempF: 104, minutes: 15 },
@@ -167,5 +167,39 @@ describe("ingredient timing and schedule rows (#1478)", () => {
     expect(stageReason({ name: "Primary", kind: "primary", tempF: "68", days: "1e1" })).toBe("Still needed: a duration above zero.");
     expect(stageReason({ name: "Primary", kind: "primary", tempF: "-10", days: "7" })).toBe("Still needed: a temperature from 25 to 212 °F.");
     expect(stageReason({ name: "Primary", kind: "primary", tempF: "68", days: "7" })).toBeNull();
+  });
+});
+
+describe("an ingredient typed in packs", () => {
+  const bags = { factor: 55, unit: "lb", packName: "bag" as const, batchBbl: 22 };
+  const sacks = { ...bags, factor: 50, packName: null };
+  it("works the per-bbl amount out from a count of packs: packs × pack size ÷ batch size, to 6 decimals", () => {
+    expect(packsToPerBbl("23", bags)).toBe("57.5");
+    expect(packsToPerBbl("2.5", bags)).toBe("6.25");
+    expect(packsToPerBbl("1", sacks)).toBe("2.272727");
+  });
+  it("gives no per-bbl amount while the count is not a number", () => {
+    expect(packsToPerBbl("", bags)).toBe("");
+    expect(packsToPerBbl("1e1", bags)).toBe("");
+  });
+  it("reads a per-bbl amount as its count of packs, so the two fields stay in step", () => {
+    expect(packsFieldText("57.5", "", bags)).toBe("23");
+    expect(packsFieldText("44", "", bags)).toBe("17.6");
+    // 2.272727 lb/bbl at 22 bbl is 49.999994 lb, which is 50 lb to the 4 decimals a material quantity keeps.
+    expect(packsFieldText("2.272727", "", sacks)).toBe("1");
+    expect(packsFieldText("", "", bags)).toBe("");
+    expect(packsFieldText("0", "", bags)).toBe("");
+  });
+  it("keeps the count as typed while the per-bbl amount is still the one it gave", () => {
+    // Mid-typing "2.5": the dot must not snap back to "2".
+    expect(packsFieldText("5", "2.", bags)).toBe("2.");
+    expect(packsFieldText("", "", bags)).toBe("");
+    // The per-bbl field was edited since, so the count follows it.
+    expect(packsFieldText("57.5", "2.", bags)).toBe("23");
+  });
+  it("labels the count with the pack word, the pack size and the batch it is for", () => {
+    expect(packsLabel(bags)).toBe("Bags (55 lb) for 22 bbl");
+    expect(packsLabel({ ...bags, factor: 44, packName: "box" })).toBe("Boxes (44 lb) for 22 bbl");
+    expect(packsLabel(sacks)).toBe("Packs (50 lb) for 22 bbl");
   });
 });

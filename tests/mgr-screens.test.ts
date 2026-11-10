@@ -56,7 +56,7 @@ describe("SCREENS", () => {
     expect(SCREENS.find((s) => s.name === "Settings")!.to?.["Water profiles"]).toBe("Water profiles");
   });
 
-  it("draws the recipe as one brewsheet in brew-day order, without restating the batch size", () => {
+  it("draws the recipe as one brewsheet in brew-day order, with the batch size it is written for", () => {
     const recipe = text("Recipe");
     expect(recipe).toContain("Pre-boil volume");
     expect(recipe).toContain("Boil time");
@@ -81,15 +81,23 @@ describe("SCREENS", () => {
     expect(recipe).toContain("Schedule · 4 stages");
     expect(recipe).not.toMatch(/Mash schedule ·|Fermentation schedule ·/);
     expect(recipe).toMatch(/Profile and additions[\s\S]*Target profile\s+Hazy target/);
-    expect(recipe).toMatch(/2-row\s+44 lb\s+\/ bbl\s+At 22 bbl:\s+968 lb = 19 × 50 lb \+ 18 lb/);
-    expect(recipe).toMatch(/Citra\s+10 min\s+0\.4 lb\s+\/ bbl/);
+    // A mash line reads its share of the grain bill, its amount per bbl, then its amount for the batch: in bags where the
+    // material has a pack word, as a count of the pack size where it has none.
+    expect(recipe).toMatch(/2-row\s+83%\s+of the grain bill\s+45 lb\s+\/ bbl\s+At 22 bbl:\s+18 bags/);
+    expect(recipe).toMatch(/Flaked oats\s+17%\s+of the grain bill\s+9\.09 lb\s+\/ bbl\s+At 22 bbl:\s+4 × 50 lb/);
+    // An amount that is not whole packs stays in its unit and offers Round, named in the pack word.
+    expect(recipe).toMatch(/Citra\s+10 min\s+0\.4 lb\s+\/ bbl\s+At 22 bbl:\s+8\.8 lb\s+Round to 1 box/);
+    expect(SCREENS.find((s) => s.name === "Recipe")!.to?.["Round to 1 box"]).toBe("Recipe");
     expect(recipe).not.toMatch(/Mash · 44|Boil · 10 min/);
     // The dry hop shares Fermentation with fermentation-stage lines, so it keeps its name, where the timing goes.
-    expect(recipe).toMatch(/Citra\s+Dry hop\s+1\.2 lb\s+\/ bbl/);
+    expect(recipe).toMatch(/Citra\s+Dry hop\s+1\.2 lb\s+\/ bbl\s+At 22 bbl:\s+26\.4 lb/);
     // Spec D4: one place holds the mash temperature, and it is the schedule.
     expect(recipe).not.toMatch(/Mash temp/);
-    // Spec D3: quantities are per barrel; the batch names its size on Brew day.
-    expect(recipe).not.toMatch(/Batch size|Knockout volume/);
+    // Quantities are stored per barrel. The recipe saves the batch size it is written for (recipe run sheet plan), and
+    // the page-only Show totals at it replaced is gone; the batch still names its own size on Brew day.
+    expect(recipe).toContain("Batch size bbl");
+    expect(body("Recipe")).toMatch(/<input[^>]*aria-label="Batch size bbl"[^>]*value="22"/);
+    expect(recipe).not.toMatch(/Show totals at|Knockout volume/);
     // The process-spec columns landed (#278 slice 5): no gate on the record.
     const gate = String(SCREENS.find((s) => s.name === "Recipe")!.writes);
     expect(gate).not.toMatch(/SCHEMA-GATE/);
@@ -112,6 +120,15 @@ describe("SCREENS", () => {
     expect(recipe.to?.["B-0356 to B-0371"]).toBe("Recipe");
     expect(drawn).toContain("2 batches: efficiency 68–71% against 72% assumed; attenuation 77–78% against 78% assumed.");
     expect(drawn).not.toMatch(/Lower the assumption/);
+  });
+
+  it("draws the word a material is sold by, and an ingredient typed in that word for the recipe's batch", () => {
+    expect(text("Edit material")).toMatch(/Sold by\s+Box/);
+    expect(SCREENS.find((s) => s.name === "Edit material")!.states?.map(([name]) => name)).toContain("sold by");
+    const ingredient = SCREENS.find((s) => s.name === "Ingredient")!;
+    expect(body("Ingredient")).toMatch(/<input[^>]*aria-label="Bags \(55 lb\) for 22 bbl"[^>]*value="18"/);
+    expect(body("Ingredient")).toMatch(/<input[^>]*aria-label="Quantity per bbl \(lb\)"[^>]*value="45"/);
+    expect(ingredient.states?.map(([name]) => name)).toContain("in packs");
   });
 
   it("asks for alpha acid on the hop the Edit material frame draws", () => {

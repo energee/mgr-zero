@@ -1,24 +1,27 @@
 // components/mgr/views/recipe.tsx — Recipe: the one brewsheet. Under the title
 // one band holds the recipe's own fields (parentForm: the brand, or name, brand
 // and note while it is being created), the headline figures (OG, FG, ABV, IBU)
-// and Show totals at, a page-only batch size that is never saved. The sheet
+// and Batch size, the batch the recipe is written for: saved with the sheet,
+// and optional. The sheet
 // then reads as the brew day runs (RECIPE_SECTIONS): each step is a card, and
 // from about 670px of page width the cards flow down two columns, in order.
 // A card's heading line holds its process numbers, each a small field under
 // its label. Under it sit the ingredients used there, one tight row each
 // (name, timing, amount per bbl; a stage is named only where the heading does
-// not, as a dry hop under Fermentation), then Add ingredient, then the step's
+// not, as a dry hop under Fermentation; a mash line reads its share of the
+// grain bill there too), then Add ingredient, then the step's
 // schedule listed row by row under its count and summary with Edit schedule
-// beside it. With a batch size typed, each brew-day line adds its total in
-// packs on a second line, and off a read-out each line not in whole packs
-// offers "Round to N × size", down and up. The inventory draws it static from
+// beside it. With a batch size, each line adds its amount for the batch on a
+// second line, as a count of packs when it is whole packs ("23 bags"), and off
+// a read-out each line not in whole packs offers Round choices, down and up.
+// The inventory draws it static from
 // a fixture. The live editor (recipes/[id]/recipe-version-form.tsx) passes
 // `controls`: the fields become controlled, a line's name, a step's Add
 // ingredient and its Edit schedule open their sheets through `edit` and
 // `slots`, and a save bar (what is still needed, Discard, Save changes) sticks
 // to the bottom only while `controls.dirty`. `controls.refresh` offers Refresh
 // from Materials under the figures. An earlier copy (`readOnly`) is a
-// read-out: numbers and change note as text, nothing that edits it, `asBrewed`
+// read-out: numbers, batch size and change note as text, nothing that edits it, `asBrewed`
 // naming the batches that brewed it and Use this again in the title row.
 // Otherwise the title row holds Schedule batch (to New batch on Batches) once
 // the recipe is saved and has no unsaved change. Batch actuals follows the
@@ -27,16 +30,15 @@
 // the earlier copies batches brewed, each opening read only. The page never
 // says "version".
 "use client";
-import { Fragment, useState, type ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { FieldDescription } from "@/components/ui/field";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { sentenceCase } from "@/lib/mgr/labels";
-import { isNumber } from "@/lib/mgr/quantity-input";
 import type { IngredientStage } from "@/lib/mgr/recipe-process-view";
-import { batchTotalText, packRounding, RECIPE_NUMBERS, RECIPE_SECTIONS, type RecipeActuals, type RecipeIngredientView, type RecipeNumberKey, type RecipeSection, type RecipeViewModel } from "@/lib/mgr/recipe-view";
+import { BATCH_BBL_BOUNDS, batchSize, batchTotalText, packRounding, RECIPE_NUMBERS, RECIPE_SECTIONS, wholePercent, type RecipeActuals, type RecipeIngredientView, type RecipeNumberKey, type RecipeSection, type RecipeViewModel } from "@/lib/mgr/recipe-view";
 import { cn } from "@/lib/utils";
 
 /** The steps that hold a schedule; the model carries one under the same key. */
@@ -105,7 +107,7 @@ function Actuals({ actuals }: { actuals: RecipeActuals }) {
 }
 
 export type RecipeControls = {
-  set: (key: RecipeNumberKey | "notes", value: string) => void;
+  set: (key: RecipeNumberKey | "notes" | "batchBbl", value: string) => void;
   onSubmit: () => void;
   submitLabel?: string;
   busy?: boolean;
@@ -134,23 +136,29 @@ export function RecipeView({
   model: RecipeViewModel;
   parentForm?: ReactNode;
   controls?: RecipeControls;
-  /** A saved copy read out: numbers and notes as text, schedules as rows, nothing that edits it (Show totals at only sizes the totals). */
+  /** A saved copy read out: numbers, batch size and notes as text, schedules as rows, nothing that edits it. */
   readOnly?: boolean;
   slots?: RecipeSlots;
 }) {
-  const [totalsAt, setTotalsAt] = useState(model.totalsAtBbl ?? "");
-  // Exponent notation such as 1e1 is not a batch size: the field shows why, and no totals are drawn.
-  const bbl = isNumber(totalsAt) ? Number(totalsAt) : 0;
+  // Exponent notation such as 1e1 is not a batch size: the field shows why, and no batch amounts are drawn.
+  const bbl = batchSize(model.batchBbl);
   const lines = model.ingredients ?? [];
   const packed = lines.some((row) => row.pack);
-  const bind = (key: RecipeNumberKey | "notes") => (controls ? { onChange: (value: string) => controls.set(key, value) } : undefined);
+  const bind = (key: RecipeNumberKey | "notes" | "batchBbl") => (controls ? { onChange: (value: string) => controls.set(key, value) } : undefined);
+  // A number of a saved copy read out: its label small, its value under it.
+  const readNumber = (label: string, value: ReactNode) => (
+    <dl className="text-right">
+      <dt className="text-muted-foreground text-xs">{label}</dt>
+      <dd className="font-medium text-sm tabular-nums">{value}</dd>
+    </dl>
+  );
   // A line's name. On the sheet it opens the line's Ingredient sheet; the fixture draws the same button static.
   const name = (row: RecipeIngredientView) => {
     if (readOnly) return row.title;
     const trigger = <Button type="button" variant="link" className="h-auto whitespace-normal p-0 text-left"><span className="sr-only">Edit </span>{row.title}</Button>;
     return row.edit ? row.edit(trigger) : trigger;
   };
-  // A brew-day line's total at the typed size, then Whole packs or (off a read-out) its Round choices.
+  // A line's amount at the batch size, then Whole packs or (off a read-out) its Round choices.
   const total = ({ pack, onRound }: RecipeIngredientView) => {
     if (!pack) return null;
     const rounding = packRounding(pack, bbl);
@@ -176,7 +184,8 @@ export function RecipeView({
     if (readOnly ? !(fields.length || rows.length || plan) : key === "other" && rows.length === 0) return null;
     // The heading already names a line's stage when they match; a stage sharing the step (dry hop under Fermentation) names itself beside its timing.
     const when = (row: RecipeIngredientView) => (sentenceCase(row.stage) === title ? row.timing : [sentenceCase(row.stage), row.timing].filter(Boolean).join(" · "));
-    const timed = rows.some(when);
+    // The quiet middle column: a mash line's share of the grain bill, then its stage and timing.
+    const timed = rows.some((row) => row.share !== undefined || when(row));
     const totals = bbl > 0;
     // Each action says its step after its words, for a screen reader and the inventory's tap map; the heading above it says it on screen.
     const add = stages.length && !readOnly ? <Button type="button" variant="ghost" size="sm" className="-ml-2.5 text-muted-foreground">Add ingredient<span className="sr-only"> to {title.toLowerCase()}</span></Button> : null;
@@ -193,10 +202,7 @@ export function RecipeView({
           {fields.length ? (
             <div className="flex items-end gap-x-3">
               {fields.map(([number, label, bounds]) => (readOnly ? (
-                <dl key={number} className="text-right">
-                  <dt className="text-muted-foreground text-xs">{label}</dt>
-                  <dd className="font-medium text-sm tabular-nums">{model[number]}</dd>
-                </dl>
+                <Fragment key={number}>{readNumber(label, model[number])}</Fragment>
               ) : (
                 <div key={number}>{E.edit(label, model[number] ?? "", "number", undefined, { compact: true, ...(controls ? { ...bounds, ...bind(number) } : undefined) })}</div>
               )))}
@@ -208,7 +214,12 @@ export function RecipeView({
             {rows.map((row) => (
               <li key={row.key} className="col-span-full grid grid-cols-subgrid items-baseline gap-y-1 border-t py-1.5 first:border-t-0">
                 <span className="min-w-0">{name(row)}</span>
-                {timed ? <span className="text-right text-muted-foreground">{when(row)}</span> : null}
+                {timed ? (
+                  <span className="text-right text-muted-foreground">
+                    {row.share !== undefined ? <>{wholePercent(row.share)}<span className="sr-only"> of the grain bill</span>{when(row) ? " · " : null}</> : null}
+                    {when(row)}
+                  </span>
+                ) : null}
                 <span className="text-right tabular-nums">{row.amount}<span className="text-muted-foreground"> / bbl</span></span>
                 {totals ? total(row) : null}
               </li>
@@ -243,7 +254,7 @@ export function RecipeView({
   const about = [
     [model.saved && `Saved ${model.saved}`, model.recipeNote].filter(Boolean).join(" · "),
     ...(model.figureNotes ?? []),
-    packed && !(bbl > 0) ? "Enter a batch size to see totals in packs." : "",
+    packed && !(bbl > 0) && !readOnly ? "Enter a batch size to see each amount for the batch." : "",
   ].filter(Boolean);
   const sheet = (
     <div className="@container flex min-w-0 flex-col gap-3">
@@ -267,12 +278,10 @@ export function RecipeView({
             <div role="status" className={cn("flex gap-x-4 @3xl:gap-x-6", !figures.length && "hidden")}>
               {figures.map(([value, label]) => <Figure key={label} value={value} label={label} />)}
             </div>
-            {packed ? (
-              // Page-only, never saved: Enter here must not submit the sheet around it.
-              <div onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }}>
-                {E.edit("Show totals at (bbl)", totalsAt, "number", undefined, { onChange: setTotalsAt, min: 0, compact: true })}
-              </div>
-            ) : null}
+            {/* The batch the recipe is written for. A read-out prints it only when the copy holds one. */}
+            {readOnly
+              ? (model.batchBbl ? readNumber("Batch size bbl", model.batchBbl) : null)
+              : <div>{E.edit("Batch size bbl", model.batchBbl ?? "", "number", undefined, { compact: true, ...(controls ? { ...BATCH_BBL_BOUNDS, ...bind("batchBbl") } : undefined) })}</div>}
         </div>
       </div>
       {controls?.refresh ? (

@@ -11,10 +11,12 @@
 // sheet, materialsNowGive words the offer to Refresh from Materials. Each line
 // reads its timing and its amount per bbl (ingredientCells), and each schedule
 // lists its rows (mashView, fermentationView, waterView), the same on the
-// editor and a saved copy. A brew-day line also totals in
-// packs at the batch size typed into Show totals at (ingredientPack,
+// editor and a saved copy. The batch size is saved on each copy and optional
+// (batchSize reads the field). With one, every line also reads its amount for
+// the batch, as a count of packs when it is whole packs (ingredientPack,
 // batchTotalText), and the editor offers rounding it to whole packs
-// (packRounding). Batch actuals is the table of get_recipe_outcomes: what the
+// (packRounding). Each mash line carries its share of the grain bill by
+// weight (gristShares). Batch actuals is the table of get_recipe_outcomes: what the
 // shown copy predicts, then one row per brewed batch (outcomeTable), and the gap
 // for the shown copy (outcomeSummary).
 // As brewed lists the earlier copies those batches brewed (recipeHistory); Use
@@ -22,29 +24,31 @@
 // The database calls a saved copy a recipe version; the page never says so.
 import type { ReactNode } from "react";
 import { formatDate } from "@/lib/date-format";
-import { gravityBlockers, type GravityBlocker, type RecipeGravityResult } from "@/lib/recipe-gravity";
+import { gravityBlockers, LB_PER, type GravityBlocker, type RecipeGravityResult } from "@/lib/recipe-gravity";
 import { ibuText, recipeIbu, type RecipeIbu } from "@/lib/recipe-ibu";
 import { batNo } from "./doc-no";
 import { formatGravity, type GravityUnit } from "./gravity-unit";
-import { splitPacks, withPacks } from "./pack-qty";
+import { batchQty, fromPacks, hasPack, packText, perBblForPacks, splitPacks, type Pack } from "./pack-qty";
 import { plural } from "./plural";
-import { fromTicks, isNumber, numberNotationError, percent, toTicks } from "./quantity-input";
+import { isNumber, numberNotationError, percent } from "./quantity-input";
 import { sentenceCase } from "./labels";
+import { plannedBarrelsError } from "./schedule-batch-view";
 import { submitReason } from "./submit-reason";
 import { READING_BOUNDS } from "@/lib/composer/offline-policy";
 import {
-  fermentationRowTitle, fermentationStageDetail, fermentationSummary, mashRowTitle, ingredientTiming, isBrewDayStage, lineReady, mashRowSummary, mashStepDetail, materialLookup, perBblDisplay, scheduleDays, timingOutOfRange, toIngredientFields, waterAdditionDetail, waterReadout, WATER_ROW_TITLE,
+  fermentationRowTitle, fermentationStageDetail, fermentationSummary, mashRowTitle, ingredientTiming, lineReady, mashRowSummary, mashStepDetail, materialLookup, perBblDisplay, scheduleDays, timingOutOfRange, toIngredientFields, waterAdditionDetail, waterReadout, WATER_ROW_TITLE,
   type FermentationStage, type IngredientLine, type IngredientStage, type MashStep, type ProcessColumns, type RecipeMaterial, type WaterDraft,
 } from "./recipe-process-view";
-/** A brew-day line's per-bbl amount, its material's pack size (base units per pack; 1 = no pack) and base unit. */
-export type RecipePack = { perBbl: number; factor: number; unit: string };
+/** A line's per-bbl amount with its material's pack: its size (base units per pack), base unit and pack word (hasPack says whether it has one). */
+export type RecipePack = Pack & { perBbl: number };
 /** One ingredient line of a step. `stage` places it in its section (RECIPE_SECTIONS); `amount` is per bbl ("40.9 lb")
  *  and `timing` is "60 min" or "day 3", or "" (ingredientCells). `edit` (the live editor only) takes the line's
- *  name as a trigger and returns the Ingredient sheet it opens. `pack` lets the page total the line at a batch size;
- *  `onRound` (the live editor only) takes the per-bbl amount a Round choice picked. */
+ *  name as a trigger and returns the Ingredient sheet it opens. `pack` lets the page read the line's amount for the
+ *  batch; `onRound` (the live editor only) takes the per-bbl amount a Round choice picked. `share` is a mash line's
+ *  part of the grain bill by weight, from 0 to 1 (gristShares). */
 export type RecipeIngredientView = {
   key: string; title: string; stage: IngredientStage; amount: string; timing: string;
-  edit?: (trigger: ReactNode) => ReactNode; pack?: RecipePack; onRound?: (perBbl: number) => void;
+  edit?: (trigger: ReactNode) => ReactNode; pack?: RecipePack; onRound?: (perBbl: number) => void; share?: number;
 };
 /** A line's stage, per-bbl amount to three significant digits and timing, the same on the editor and a saved copy. */
 export const ingredientCells = (stage: IngredientStage, timingMinutes: number | string | null, perBbl: number | string, unit?: string) => ({
@@ -64,6 +68,11 @@ export const RECIPE_NUMBERS = [
   ["whirlpoolRest", "Whirlpool rest min", WHOLE_MINUTES_OR_NONE], ["knockoutTemp", "Knockout temp °F", {}], ["efficiency", "Brewhouse efficiency %", {}], ["attenuation", "Yeast attenuation %", {}],
 ] as const;
 export type RecipeNumberKey = (typeof RECIPE_NUMBERS)[number][0];
+/** The Batch size field's bounds: what recipe_versions.batch_bbl, a positive numeric(10,3), stores. */
+export const BATCH_BBL_BOUNDS = { min: 0.001, max: 9_999_999.999 } as const;
+/** The batch size as a number, or 0 when the field is blank or holds a size a copy cannot store (zero, exponent
+ *  notation): then no line reads an amount for the batch. The same rule as New batch's planned barrels. */
+export const batchSize = (text: string | undefined): number => (text !== undefined && isNumber(text) && !plannedBarrelsError(text) ? Number(text) : 0);
 
 /** One step of the sheet: the ingredient stages drawn under it and the process numbers it holds. */
 export type RecipeSection = {
@@ -122,8 +131,8 @@ export type RecipeViewModel = {
   priceGroup?: string;
   priceGroupOptions?: string[];
   ingredients?: RecipeIngredientView[];
-  /** Show totals at's starting text. The live pages leave it blank (never saved); the inventory fixture fills it. */
-  totalsAtBbl?: string;
+  /** The batch the recipe is written for, in bbl, as field text; blank or absent means it has none, and amounts read per bbl only. */
+  batchBbl?: string;
   preBoil?: string;
   boilMin?: string;
   whirlpoolMin?: string;
@@ -163,6 +172,8 @@ type SnapshotVersion = NonNullable<RecipeSnapshot["version"]>;
 
 /** Everything the draft editor holds, as typed strings where it has a field. */
 export type RecipeDraft = {
+  /** The batch size in bbl; "" saves the copy without one. */
+  batchBbl: string;
   numbers: Record<RecipeNumberKey, string>; notes: string; lines: IngredientLine[];
   mashSchedule: MashStep[]; fermentationSchedule: FermentationStage[]; water: WaterDraft;
 };
@@ -185,6 +196,7 @@ export function versionToDraft(s: RecipeSnapshot): RecipeDraft | null {
   const v = s.version;
   if (!v) return null;
   return {
+    batchBbl: text(v.batch_bbl),
     numbers: versionNumbers(v),
     notes: "",
     lines: s.ingredients.map((i) => ({ materialId: i.material_id, perBblQty: text(i.per_bbl_qty), stage: i.stage as IngredientStage, timingMinutes: text(i.timing_minutes) })),
@@ -213,7 +225,7 @@ const wholeAtLeast = (min: number) => (n: number) => Number.isInteger(n) && n >=
  * edited (#1478). */
 export function draftBlocker(input: {
   name?: string; lines: IngredientLine[]; mashSchedule: MashStep[]; efficiency: string; attenuation: string;
-  numbers?: Partial<Record<RecipeNumberKey, string>>; fermentationSchedule?: FermentationStage[];
+  numbers?: Partial<Record<RecipeNumberKey, string>>; fermentationSchedule?: FermentationStage[]; batchBbl?: string;
 }): string | null {
   const n = input.numbers ?? {};
   const limits = { boilMinutes: n.boilMin?.trim() ? Number(n.boilMin) : undefined, fermentationDays: scheduleDays(input.fermentationSchedule ?? []) };
@@ -227,6 +239,8 @@ export function draftBlocker(input: {
     [input.mashSchedule.length === 0, "a mash step"],
     [!validPercent(input.efficiency), "brewhouse efficiency from 0 to 100%"],
     [!validPercent(input.attenuation), "yeast attenuation from 0 to 100%"],
+    // Optional; a typed one must be a size the copy can store (batchSize is 0 otherwise).
+    [Boolean(input.batchBbl?.trim()) && batchSize(input.batchBbl) === 0, "a batch size above zero, up to 9,999,999.999 bbl"],
     [!optionalOk(n.preBoil, (v) => v > 0), "a pre-boil volume above zero"],
     [!optionalOk(n.boilMin, wholeAtLeast(1)), "a boil time of one or more whole minutes"],
     [!optionalOk(n.whirlpoolMin, wholeAtLeast(0)), "a whirlpool time of zero or more whole minutes"],
@@ -304,28 +318,38 @@ export function materialsNowGive(saved: RecipeFigures, now: RecipeFigures | null
   return `Materials now give ${figures.length ? figures.map(([value, label]) => `${label} ${value}`).join(" · ") : "no prediction"}.`;
 }
 
-/** The pack a line totals with: brew-day stages only, a positive amount, and a known material; else none. */
-export function ingredientPack(stage: string, perBbl: number, material: Pick<RecipeMaterial, "base_uom" | "purchase_uom_factor"> | undefined): RecipePack | undefined {
-  if (!isBrewDayStage(stage) || !(perBbl > 0) || !material) return undefined;
-  return { perBbl, factor: Number(material.purchase_uom_factor), unit: material.base_uom };
+/** The pack a line reads its batch amount with, at any stage: a positive amount and a known material; else none. */
+export function ingredientPack(perBbl: number, material: Pick<RecipeMaterial, "base_uom" | "purchase_uom_factor" | "pack_name"> | undefined): RecipePack | undefined {
+  if (!(perBbl > 0) || !material) return undefined;
+  return { perBbl, factor: Number(material.purchase_uom_factor), unit: material.base_uom, packName: material.pack_name };
 }
 
-/** The line's batch total at `bbl`, to the 4 decimals material quantities store (as brew day scales it). */
-const batchQty = (p: RecipePack, bbl: number) => fromTicks(toTicks(p.perBbl * bbl));
+/** The amount the page draws under "At 22 bbl": "23 bags" or "4 × 50 lb" when it is whole packs, else "220 lb" (packText). */
+export const batchTotalText = (p: RecipePack, bbl: number): string => packText(batchQty(p.perBbl, bbl), p);
 
-/** The total the page draws under "At 22 bbl": "220 lb = 4 × 50 lb + 20 lb", or just "220 lb" with no pack or under one pack. */
-export const batchTotalText = (p: RecipePack, bbl: number): string => withPacks(batchQty(p, bbl), p.factor, p.unit);
+/** Each line's share of the grain bill by weight, from 0 to 1, in the lines' order: a mash line's pounds over all mash
+ *  lines' pounds. Shares are the same at any batch size, so they are worked from the per-bbl amounts. A line that is
+ *  not a mash line, or is stocked by volume or count, has no share and adds nothing to the bill. */
+export function gristShares(lines: readonly { stage: string; perBbl: number; unit?: string }[]): (number | undefined)[] {
+  // A mash line whose unit is unknown (its material is not in the page's list, an inactive one) has an unknown weight.
+  // Counting it as nothing would read every other malt too high, so then no share is given.
+  if (lines.some((l) => l.stage === "mash" && l.perBbl > 0 && l.unit === undefined)) return lines.map(() => undefined);
+  const pounds = lines.map((l) => (l.stage === "mash" && l.perBbl > 0 ? l.perBbl * (LB_PER[l.unit ?? ""] ?? 0) : 0));
+  const bill = pounds.reduce((sum, lb) => sum + lb, 0);
+  return pounds.map((lb) => (lb > 0 ? lb / bill : undefined));
+}
 
-/** At `bbl`: whole when the total is already whole packs, else "Round to N × size" down (from one pack up) and up,
- *  each with the per-bbl amount that gives that many packs, to the 6 decimals per_bbl_qty stores. Null with no pack.
+/** At `bbl`: whole when the total is already whole packs, else a Round choice down (from one pack up) and up, each
+ *  named as the line will read once chosen ("Round to 4 × 50 lb", or "Round to 18 bags" with a pack word) and
+ *  carrying the per-bbl amount that gives that many packs (perBblForPacks). Null with no pack.
  *  ponytail: that rounding error grows with `bbl`; from about 100 bbl it can pass half a tick (950.0001 lb for 19 × 50 lb
  *  at 300 bbl), so the line still offers Round. Exact whole packs at that size need per_bbl_qty to keep more decimals. */
 export function packRounding(p: RecipePack, bbl: number): { whole: boolean; choices: { label: string; perBbl: number }[] } | null {
-  if (p.factor === 1) return null;
-  const split = splitPacks(batchQty(p, bbl), p.factor);
+  if (!hasPack(p)) return null;
+  const split = splitPacks(batchQty(p.perBbl, bbl), p.factor);
   if (split.packs > 0 && split.loose === 0) return { whole: true, choices: [] };
   const counts = split.packs > 0 ? [split.packs, split.packs + 1] : [1];
-  return { whole: false, choices: counts.map((n) => ({ label: `Round to ${n} × ${p.factor} ${p.unit}`, perBbl: Number((n * p.factor / bbl).toFixed(6)) })) };
+  return { whole: false, choices: counts.map((n) => ({ label: `Round to ${packText(fromPacks(n, 0, p.factor), p)}`, perBbl: perBblForPacks(n, p.factor, bbl) })) };
 }
 
 /** What get_recipe_outcomes returns for one brewed batch: its measured figures beside what its own copy (`version`)
@@ -337,7 +361,8 @@ export type RecipeOutcome = {
   predicted: RecipeGravityResult | null; assumedEfficiency: number; assumedAttenuation: number;
 };
 
-const wholePercent = (fraction: number) => `${Math.round(fraction * 100)}%`;
+/** A fraction as a whole percent: 0.657 reads "66%". */
+export const wholePercent = (fraction: number) => `${Math.round(fraction * 100)}%`;
 
 /** One figure of Batch actuals: what the batch measured, and what its own copy predicted or assumed when that copy is
  *  not the one shown (the top row already says the shown copy's). Either is "" when there is none. */
@@ -458,6 +483,7 @@ export function toRecipePageModel(
   const why = gravityBlockerText(blockers, (n) => material.name(ingredients[n].material_id), (n) => ingredients[n].materials?.base_uom, { saved: true })
     ?? noMashText(ingredients.map((i) => i.stage));
   const { figures, notes: figureNotes } = figureStrip(s, ctx.unit, { saved: true, why });
+  const shares = gristShares(ingredients.map((i) => ({ stage: i.stage, perBbl: Number(i.per_bbl_qty), unit: i.materials?.base_uom ?? material.unit(i.material_id) })));
   return {
     ...base,
     ...(v.version === latest
@@ -469,11 +495,13 @@ export function toRecipePageModel(
     // The current copy's change note rides on the saved line; an earlier copy prints it as its own field (`notes`).
     saved: [formatDate(v.created_at, ctx.timeZone), v.version === latest && v.note].filter(Boolean).join(" · "),
     history,
-    ingredients: ingredients.map((i) => ({
+    ingredients: ingredients.map((i, n) => ({
       key: i.id, title: material.name(i.material_id),
       ...ingredientCells(i.stage as IngredientStage, i.timing_minutes, i.per_bbl_qty, material.unit(i.material_id)),
-      pack: ingredientPack(i.stage, Number(i.per_bbl_qty), material.get(i.material_id)),
+      pack: ingredientPack(Number(i.per_bbl_qty), material.get(i.material_id)),
+      share: shares[n],
     })),
+    batchBbl: draft.batchBbl,
     ...versionNumbers(v),
     mash: mashView(v.mash_schedule),
     fermentation: fermentationView(v.fermentation_schedule),

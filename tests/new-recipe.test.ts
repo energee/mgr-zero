@@ -103,6 +103,21 @@ describe("Recipe creation", () => {
       expect(html.match(/step="any"/g)).toHaveLength(2);
     });
 
+    it("takes a count of packs beside the per-barrel amount, when the recipe has a batch size and the material a pack size", () => {
+      const pils = { id: "pils", name: "Pilsner malt", unit: "lb", category: "malt", packSize: 55, packName: "bag" as const };
+      const sheet = (batchBbl: number | undefined, material: Omit<typeof pils, "packName"> & { packName?: "bag" } = pils) => renderToStaticMarkup(createElement(IngredientView, { fields: { materialId: "pils", stage: "mash", perBblQty: "57.5", timing: "" }, materials: [material], batchBbl }));
+      const html = sheet(22);
+      expect(html).toMatch(/<label[^>]*>Bags \(55 lb\) for 22 bbl<\/label>/);
+      expect(html).toMatch(/<input[^>]*aria-label="Bags \(55 lb\) for 22 bbl"[^>]*value="23"/);
+      // The per-barrel field stays, after the count.
+      expect(html).toMatch(/<input[^>]*aria-label="Quantity per bbl \(lb\)"[^>]*value="57.5"/);
+      expect(html.indexOf("for 22 bbl")).toBeLessThan(html.indexOf("Quantity per bbl"));
+      // No pack word: the count is of packs.
+      expect(sheet(22, { ...pils, packSize: 50, packName: null as never })).toContain("Packs (50 lb) for 22 bbl");
+      // No batch size, or a material with no pack size: per barrel only.
+      for (const without of [sheet(undefined), sheet(0), sheet(22, { ...pils, packSize: 1, packName: undefined })]) expect(without).not.toMatch(/bbl<\/label>[^]*bbl<\/label>|Bags \(|Packs \(/);
+    });
+
     it("the material trigger acts in place on the Ingredient record", () => {
       expect(isInertOn(screen("Ingredient"), "Material")).toBe(true);
       expect(isInertOn(screen("Cycle count"), "Material")).toBe(false);
@@ -193,6 +208,12 @@ describe("Recipe creation", () => {
     // and never guesses when it cannot see a line's material.
     expect(form).toMatch(/materialsNowGive\(savedFigures, lines\.every\(\(l\) => material\.get\(l\.materialId\)\) \? live : null, unit\)/);
     expect(form).toMatch(/refresh: refreshText \? \{ text: refreshText, onRefresh: \(\) => void submit\(\) \} : undefined/);
+    // The batch size is part of the sheet: sent with every save (blank sends none), and checked before it.
+    expect(form).toMatch(/process: \{ batchBbl: num\(batchBbl\),/);
+    expect(form).toMatch(/draftBlocker\(\{[^}]*\bbatchBbl\b/);
+    // The Ingredient sheet gets the batch size and each material's pack, so a line can be typed in packs.
+    expect(form).toMatch(/batchBbl: batchSize\(batchBbl\)/);
+    expect(form).toMatch(/packSize: Number\(m\.purchase_uom_factor\), packName: m\.pack_name/);
     // Nothing the editor says to the brewer names a version.
     expect(form).not.toMatch(/["`][^"`\n]*\bversions?\b[^"`\n]*["`]/i);
     expect(form).not.toMatch(/<CommandForm\b|grid-cols-2|<Label\b|id="rv-/);

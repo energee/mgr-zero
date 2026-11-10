@@ -27,9 +27,12 @@
 // recipeGravity the server uses (lib/recipe-gravity.ts), or names why there is
 // none (gravityBlockerText, noMashText). The IBU preview (draftIbu) reads each
 // material's current alpha acid. Efficiency and attenuation are typed as percents, as the
-// inventory draws them, and sent as fractions. Each brew-day line carries its
-// pack (ingredientPack), so RecipeView's Round choices rewrite that line's
-// per-bbl amount through the same change().
+// inventory draws them, and sent as fractions. The batch size is part of the
+// draft: every save sends it, and a copy saved with the field blank has none.
+// Each line carries its pack (ingredientPack), so RecipeView's Round choices
+// rewrite that line's per-bbl amount through the same change(), and each mash
+// line its share of the grain bill (gristShares). The Ingredient sheet takes
+// the batch size and each material's pack, so a line can be typed in packs.
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
@@ -42,7 +45,7 @@ import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 import { useCommandContext } from "@/lib/brewery-provider";
 import { gravityBlockers, recipeGravity } from "@/lib/recipe-gravity";
 import { readRecipeDraft, recipeDraftKey, shouldKeepDraft, writeRecipeDraft } from "@/lib/mgr/recipe-draft";
-import { draftBlocker, draftIbu, fermentationView, figureStrip, gravityBlockerText, ingredientCells, ingredientPack, mashView, materialsNowGive, noMashText, RECIPE_NUMBERS, waterView, type RecipeDraft, type RecipeFigures, type RecipeNumberKey, type RecipeViewModel } from "@/lib/mgr/recipe-view";
+import { batchSize, draftBlocker, draftIbu, fermentationView, figureStrip, gravityBlockerText, gristShares, ingredientCells, ingredientPack, mashView, materialsNowGive, noMashText, RECIPE_NUMBERS, waterView, type RecipeDraft, type RecipeFigures, type RecipeNumberKey, type RecipeViewModel } from "@/lib/mgr/recipe-view";
 import { EMPTY_WATER, lineReady, materialLookup, optionalNumber as num, removeAt, scheduleDays, upsertAt, type RecipeMaterial, type MashStep, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 import { FermentationScheduleSheet, IngredientSheet, MashScheduleSheet, WaterSheet } from "./schedule-sheets";
 
@@ -52,7 +55,7 @@ const DEFAULT_MASH: MashStep[] = [{ name: "Saccharification", kind: "infusion", 
 const DEFAULTS: Partial<Numbers> = { efficiency: "75", attenuation: "78" };
 const BLANK_NUMBERS = Object.fromEntries(RECIPE_NUMBERS.map(([k]) => [k, DEFAULTS[k] ?? ""])) as Numbers;
 /** The sheet before a recipe is first saved: the default mash step, 75% efficiency, 78% attenuation, nothing else. */
-const BLANK_DRAFT: RecipeDraft = { numbers: BLANK_NUMBERS, notes: "", lines: [], mashSchedule: DEFAULT_MASH, fermentationSchedule: [], water: EMPTY_WATER };
+const BLANK_DRAFT: RecipeDraft = { batchBbl: "", numbers: BLANK_NUMBERS, notes: "", lines: [], mashSchedule: DEFAULT_MASH, fermentationSchedule: [], water: EMPTY_WATER };
 const pctToFraction = (s: string) => Number(s) / 100;
 const NOT_KEPT = "Your changes could not be kept in this tab; they are lost if you leave the page before saving.";
 
@@ -81,7 +84,7 @@ export function RecipeEditor({ recipeId, title, backHref, brands = [], parentFor
   const [parent, setParent] = useState(BLANK_RECIPE);
   const [draft, setDraft] = useState(loaded?.draft ?? start);
   const [notice, setNotice] = useState<string | null>(loaded?.notice ?? null);
-  const { numbers, notes, lines, mashSchedule, fermentationSchedule, water } = draft;
+  const { batchBbl, numbers, notes, lines, mashSchedule, fermentationSchedule, water } = draft;
 
   const { setError } = action;
   useEffect(() => {
@@ -143,7 +146,7 @@ export function RecipeEditor({ recipeId, title, backHref, brands = [], parentFor
   const eff = pctToFraction(numbers.efficiency), att = pctToFraction(numbers.attenuation);
   const build = (id: string) => ({
     recipeId: id, mashSchedule, fermentationSchedule,
-    process: { preBoilBbl: num(numbers.preBoil), whirlpoolMinutes: num(numbers.whirlpoolMin), whirlpoolTempF: num(numbers.whirlpoolTemp), whirlpoolRestMinutes: num(numbers.whirlpoolRest), knockoutTempF: num(numbers.knockoutTemp) },
+    process: { batchBbl: num(batchBbl), preBoilBbl: num(numbers.preBoil), whirlpoolMinutes: num(numbers.whirlpoolMin), whirlpoolTempF: num(numbers.whirlpoolTemp), whirlpoolRestMinutes: num(numbers.whirlpoolRest), knockoutTempF: num(numbers.knockoutTemp) },
     water: { targetProfileId: water.targetProfileId || undefined, sourceProfileId: water.sourceProfileId || undefined, mashGal: num(water.mashGal), spargeGal: num(water.spargeGal), targetMashPh: num(water.targetMashPh), additions: water.additions },
     brewhouseEfficiency: eff, yeastAttenuation: att,
     boilMinutes: num(numbers.boilMin), note: notes || undefined,
@@ -185,7 +188,7 @@ export function RecipeEditor({ recipeId, title, backHref, brands = [], parentFor
     });
   }
   // What the sheet still lacks, named for the brewer; Save stays disabled until it is null.
-  const blockedReason = draftBlocker({ name: creating ? parent.name : undefined, lines, mashSchedule, fermentationSchedule, numbers, efficiency: numbers.efficiency, attenuation: numbers.attenuation });
+  const blockedReason = draftBlocker({ name: creating ? parent.name : undefined, lines, mashSchedule, fermentationSchedule, numbers, batchBbl, efficiency: numbers.efficiency, attenuation: numbers.attenuation });
   // A recipe being created has nothing saved to differ from: its bar is always up.
   const dirty = creating || shouldKeepDraft(start, draft);
   // An unchanged saved sheet shows what its copy froze; a changed or unsaved one shows the live preview.
@@ -196,16 +199,21 @@ export function RecipeEditor({ recipeId, title, backHref, brands = [], parentFor
     ? materialsNowGive(savedFigures, lines.every((l) => material.get(l.materialId)) ? live : null, unit)
     : undefined;
   const parentLocked = creating && createdId !== "";
-  const sheetMaterials = materials.map((m) => ({ id: m.id, name: m.name, unit: m.base_uom, category: m.category }));
+  const sheetMaterials = materials.map((m) => ({ id: m.id, name: m.name, unit: m.base_uom, category: m.category, packSize: Number(m.purchase_uom_factor), packName: m.pack_name }));
+  // What both Ingredient sheets take: the materials with their packs, the timing limits, and the batch size a line
+  // can be typed in packs for (0 while the recipe has no usable one).
+  const ingredientSheet = { materials: sheetMaterials, limits: timingLimits, batchBbl: batchSize(batchBbl) };
+  const shares = gristShares(lines.map((l) => ({ stage: l.stage, perBbl: Number(l.perBblQty), unit: material.unit(l.materialId) })));
   const liveStrip = figureStrip(live, unit, { saved: false, why: gravityWhy });
   return (
     <RecipeView
       model={{
-        ...page, title, backHref, ...numbers, notes,
+        ...page, title, backHref, batchBbl, ...numbers, notes,
         ingredients: lines.map((l, i) => ({
           key: `${i}-${l.materialId}`, title: material.name(l.materialId), ...ingredientCells(l.stage, l.timingMinutes, l.perBblQty, material.unit(l.materialId)),
-          edit: (trigger) => <IngredientSheet line={l} materials={sheetMaterials} limits={timingLimits} onSave={(f) => change({ lines: upsertAt(draft.lines, i, f) })} onDelete={() => change({ lines: removeAt(draft.lines, i) })} trigger={trigger} />,
-          pack: ingredientPack(l.stage, Number(l.perBblQty), material.get(l.materialId)),
+          edit: (trigger) => <IngredientSheet line={l} {...ingredientSheet} onSave={(f) => change({ lines: upsertAt(draft.lines, i, f) })} onDelete={() => change({ lines: removeAt(draft.lines, i) })} trigger={trigger} />,
+          pack: ingredientPack(Number(l.perBblQty), material.get(l.materialId)),
+          share: shares[i],
           onRound: (perBbl: number) => change({ lines: upsertAt(draft.lines, i, { ...l, perBblQty: String(perBbl) }) }),
         })),
         mash: mashView(mashSchedule), fermentation: fermentationView(fermentationSchedule), water: waterView(water, profiles, material.name),
@@ -221,7 +229,7 @@ export function RecipeEditor({ recipeId, title, backHref, brands = [], parentFor
         {notice && dirty ? <div className="basis-full">{E.info(notice)}</div> : null}
       </>}
       controls={{
-        set: (field, value) => change(field === "notes" ? { notes: value } : { numbers: { ...draft.numbers, [field]: value } }),
+        set: (field, value) => change(field === "notes" || field === "batchBbl" ? { [field]: value } : { numbers: { ...draft.numbers, [field]: value } }),
         onSubmit: () => void submit(), busy: action.busy, blockedReason, error: action.error,
         dirty,
         // A recipe being created has nothing saved to go back to.
@@ -230,7 +238,7 @@ export function RecipeEditor({ recipeId, title, backHref, brands = [], parentFor
         submitLabel: creating && !parentLocked ? "Create recipe" : undefined,
       }}
       slots={{
-        addIngredient: (stage, trigger) => <IngredientSheet stage={stage} materials={sheetMaterials} limits={timingLimits} onSave={(f) => change({ lines: [...draft.lines, f] })} trigger={trigger} />,
+        addIngredient: (stage, trigger) => <IngredientSheet stage={stage} {...ingredientSheet} onSave={(f) => change({ lines: [...draft.lines, f] })} trigger={trigger} />,
         schedule: (key, trigger) => {
           if (key === "mash") return <MashScheduleSheet steps={mashSchedule} onChange={(mashSchedule) => change({ mashSchedule })} trigger={trigger} />;
           if (key === "fermentation") return <FermentationScheduleSheet stages={fermentationSchedule} onChange={(fermentationSchedule) => change({ fermentationSchedule })} trigger={trigger} />;

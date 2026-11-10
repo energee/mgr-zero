@@ -3,9 +3,10 @@
 // reason a draft cannot be saved (draftBlocker), the sheet's sections in
 // brew-day order (RECIPE_SECTIONS), the page's model of a saved copy
 // (toRecipePageModel), the earlier copies batches brewed (recipeHistory) and
-// why a prediction is missing (gravityBlockerText, noMashText), and a brew-day
-// line's batch total in packs at a typed batch size with its whole-pack
-// rounding (ingredientPack, batchTotalText, packRounding), the draft's IBU
+// why a prediction is missing (gravityBlockerText, noMashText), a line's batch
+// amount in packs at the recipe's batch size with its whole-pack rounding
+// (ingredientPack, batchTotalText, packRounding), each mash line's share of the
+// grain bill (gristShares), the draft's IBU
 // preview (draftIbu), the headline figures (figureStrip), the offer to Refresh
 // from Materials (materialsNowGive) and the rows a step lists (ingredientCells,
 // mashView, fermentationView, waterView). No DB. "The sheet" draws RecipeView:
@@ -17,7 +18,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { describe, expect, it } from "vitest";
-import { batchTotalText, draftBlocker, draftIbu, figureStrip, fermentationView, gravityBlockerText, ingredientCells, ingredientPack, loadedNotice, mashView, materialsNowGive, noMashText, packRounding, RECIPE_NUMBERS, RECIPE_SECTIONS, recipeHistory, recipePageTitle, toRecipePageModel, versionNumbers, versionToDraft, waterView, type RecipeFigures, type RecipeOutcome, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
+import { batchTotalText, draftBlocker, draftIbu, figureStrip, fermentationView, gravityBlockerText, gristShares, ingredientCells, ingredientPack, loadedNotice, mashView, materialsNowGive, noMashText, packRounding, RECIPE_NUMBERS, RECIPE_SECTIONS, recipeHistory, recipePageTitle, toRecipePageModel, versionNumbers, versionToDraft, waterView, type RecipeFigures, type RecipeOutcome, type RecipePack, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
 import { ibuText } from "@/lib/recipe-ibu";
 import { INGREDIENT_STAGES, type IngredientLine, type MashStep } from "@/lib/mgr/recipe-process-view";
 import { sgToPlato } from "@/lib/recipe-gravity";
@@ -191,6 +192,12 @@ describe("versionToDraft", () => {
     expect(d.mashSchedule).toEqual(version.mash_schedule);
     expect(d.fermentationSchedule).toEqual(version.fermentation_schedule);
   });
+  it("restores the batch size the copy was saved with, and leaves it empty when the copy has none", () => {
+    expect(versionToDraft(snapshot)!.batchBbl).toBe("");
+    // A Postgres numeric(10,3) may arrive as text.
+    const sized = { ...snapshot, version: { ...version, batch_bbl: "22.000" } } as unknown as RecipeSnapshot;
+    expect(versionToDraft(sized)!.batchBbl).toBe("22");
+  });
   it("coerces string numerics and seeds a null timing as empty", () => {
     const stringy = {
       ...snapshot,
@@ -237,6 +244,11 @@ describe("draftBlocker", () => {
     expect(draftBlocker({ ...ready, numbers: { whirlpoolMin: "1e1" } })).toBe("Still needed: a whirlpool time of zero or more whole minutes.");
     expect(draftBlocker({ ...ready, numbers: { whirlpoolRest: "-1" } })).toBe("Still needed: a whirlpool rest of zero or more whole minutes.");
     expect(draftBlocker({ ...ready, numbers: { preBoil: "7", boilMin: "60", whirlpoolTemp: "180", knockoutTemp: "66", whirlpoolMin: "" } })).toBeNull();
+  });
+  it("takes no batch size, or one above zero that the copy can store", () => {
+    const need = "Still needed: a batch size above zero, up to 9,999,999.999 bbl.";
+    for (const batchBbl of [undefined, "", "22", "0.5", "9999999.999"]) expect(draftBlocker({ ...ready, batchBbl })).toBeNull();
+    for (const batchBbl of ["0", "-22", "1e1", "10000000"]) expect(draftBlocker({ ...ready, batchBbl })).toBe(need);
   });
   it("names a line whose timing is out of range instead of dropping it (#1478)", () => {
     const boil = { ...line, stage: "boil" as const, timingMinutes: "90" };
@@ -299,9 +311,17 @@ describe("toRecipePageModel", () => {
   it("gives each line its stage, which is what places it in a section", () => {
     expect(toRecipePageModel(predicted, ctx).ingredients?.map((i) => i.stage)).toEqual(["mash", "boil"]);
   });
-  it("gives each saved brew-day line its pack, from list_materials' purchase_uom_factor", () => {
-    const model = toRecipePageModel(predicted, ctx);
-    expect(model.ingredients?.map((i) => i.pack)).toEqual([{ perBbl: 40.9, factor: 50, unit: "lb" }, { perBbl: 0.5, factor: 44, unit: "lb" }]);
+  it("gives each saved line its pack, from list_materials' purchase_uom_factor and pack_name", () => {
+    const bagged = materials.map((m) => (m.id === "m-malt" ? { ...m, pack_name: "bag" as const } : m));
+    const model = toRecipePageModel(predicted, { ...ctx, materials: bagged });
+    expect(model.ingredients?.map((i) => i.pack)).toEqual([{ perBbl: 40.9, factor: 50, unit: "lb", packName: "bag" }, { perBbl: 0.5, factor: 44, unit: "lb", packName: null }]);
+  });
+  it("carries the saved batch size, and each mash line's share of the grain bill", () => {
+    expect(toRecipePageModel(predicted, ctx).batchBbl).toBe("");
+    const model = toRecipePageModel({ ...predicted, version: { ...version, batch_bbl: 22 } }, ctx);
+    expect(model.batchBbl).toBe("22");
+    // One malt is the whole grain bill; the boil hop has no share.
+    expect(model.ingredients?.map((i) => i.share)).toEqual([1, undefined]);
   });
   it("counts mash steps and fermentation stages, and says No stages yet when there are none", () => {
     const model = toRecipePageModel({ ...predicted, version: { ...version, fermentation_schedule: [] } }, ctx);
@@ -345,8 +365,8 @@ describe("toRecipePageModel", () => {
     expect(html).not.toContain("Editable brand");
     // The copy being shown is named in the list, not linked to itself.
     expect(html).not.toContain('href="?v=1"');
-    // The one input is Show totals at, a page-only batch size that never edits the copy.
-    expect(html.replace(/<input[^>]*aria-label="Show totals at \(bbl\)"[^>]*>/, "")).not.toMatch(/<input|<select|<form/);
+    // Nothing on an earlier copy is a field: its batch size, when it has one, reads as text.
+    expect(html).not.toMatch(/<input|<select|<form/);
     // No copy says "version" on screen, current or earlier.
     for (const drawn of [html, currentHtml]) expect(drawn.replace(/<[^>]+>/g, " ")).not.toMatch(/version|\bv\d\b/i);
     // An earlier copy no batch brewed is reachable by its address only.
@@ -471,6 +491,32 @@ describe("the sheet", () => {
     expect(renderToStaticMarkup(createElement(RecipeView, { readOnly: true, model: { title: "Pale", ingredients: [malt] } }))).not.toMatch(/<button|Edit /);
   });
 
+  it("reads a mash line's share of the grain bill where a timing goes", () => {
+    const pils = { key: "p", title: "Pilsner malt", amount: "57.5 lb", timing: "", stage: "mash" as const, share: 1265 / 1925 };
+    const oats = { key: "o", title: "Flaked oats", amount: "30 lb", timing: "15 min", stage: "mash" as const, share: 660 / 1925 };
+    const html = renderToStaticMarkup(createElement(RecipeView, { model: { title: "Pale", notes: "", ingredients: [pils, oats] } }));
+    const rows = html.slice(html.indexOf(">Mash</h2>")).match(/<ul[\s\S]*?<\/ul>/)![0].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    expect(rows).toBe("Edit Pilsner malt 66% of the grain bill 57.5 lb / bbl Edit Flaked oats 34% of the grain bill · 15 min 30 lb / bbl");
+  });
+
+  it("holds the batch size as a field of the sheet: typed on the editor, read as text on a saved copy that has one", () => {
+    const draw = (props: Partial<Parameters<typeof RecipeView>[0]>, batchBbl?: string) => renderToStaticMarkup(createElement(RecipeView, { model: { title: "Pale", notes: "", batchBbl }, ...props }));
+    const field = (html: string) => /<input[^>]*aria-label="Batch size bbl"[^>]*>/.exec(html)?.[0] ?? "";
+    // The editor always asks, so a recipe without one can gain one.
+    expect(field(draw({}))).toContain('value=""');
+    const live = field(draw({ controls: { ...controls, dirty: false } }, "22"));
+    expect(live).toContain('value="22"');
+    // The bounds a saved copy can store: above zero, at most 9,999,999.999.
+    expect(live).toMatch(/min="0\.001"/);
+    expect(live).toMatch(/max="9999999\.999"/);
+    const read = draw({ readOnly: true }, "22");
+    expect(read).toMatch(/<dt[^>]*>Batch size bbl<\/dt><dd[^>]*>22<\/dd>/);
+    expect(read).not.toMatch(/<input/);
+    expect(draw({ readOnly: true })).not.toContain("Batch size");
+    // The page-only field it replaces is gone.
+    expect(draw({}) + read).not.toContain("Show totals at");
+  });
+
   it("lists a schedule's rows under its count and summary, with one action that opens its sheet", () => {
     const mash = { title: "Schedule · 2 steps", detail: "Total 70 min · 152 °F saccharification rest", rows: [{ title: "Saccharification", detail: "Infusion · 152 °F · 60 min" }, { title: "Mash out", detail: "Infusion · 168 °F · 10 min" }] };
     const draw = (props: Partial<Parameters<typeof RecipeView>[0]>) => renderToStaticMarkup(createElement(RecipeView, { model: { title: "Pale", notes: "", mash }, ...props }));
@@ -504,18 +550,23 @@ describe("the sheet", () => {
   });
 });
 
-describe("batch totals in packs", () => {
-  const malt = { perBbl: 10, factor: 50, unit: "lb" };
-  it("reads a brew-day line's total at the batch size (the text after the arrow), in whole packs plus loose pounds", () => {
-    expect(batchTotalText(malt, 22)).toBe("220 lb = 4 × 50 lb + 20 lb");
-    expect(batchTotalText({ ...malt, perBbl: 2.5, factor: 55 }, 22)).toBe("55 lb = 1 × 55 lb");
+describe("batch amounts in packs", () => {
+  const malt: RecipePack = { perBbl: 10, factor: 50, unit: "lb", packName: null };
+  const bagged: RecipePack = { perBbl: 57.5, factor: 55, unit: "lb", packName: "bag" };
+  it("reads a line's amount at the batch size as a count of packs when it is whole packs", () => {
+    expect(batchTotalText(bagged, 22)).toBe("23 bags");
+    expect(batchTotalText({ ...bagged, perBbl: 2.5 }, 22)).toBe("1 bag");
+    // No pack word: the count of the pack size, as before.
+    expect(batchTotalText({ ...malt, perBbl: 2.5, factor: 55 }, 22)).toBe("1 × 55 lb");
   });
-  it("stays in base units for a material with no pack, or a total under one pack", () => {
+  it("stays in base units when the amount is not whole packs, is under one pack, or the material has no pack", () => {
+    expect(batchTotalText(malt, 22)).toBe("220 lb");
+    expect(batchTotalText({ ...bagged, perBbl: 44 }, 22)).toBe("968 lb");
     expect(batchTotalText({ ...malt, factor: 1 }, 22)).toBe("220 lb");
-    expect(batchTotalText({ perBbl: 0.4, factor: 44, unit: "lb" }, 22)).toBe("8.8 lb");
+    expect(batchTotalText({ perBbl: 0.4, factor: 44, unit: "lb", packName: null }, 22)).toBe("8.8 lb");
   });
   it("totals exactly to the stored 4 decimals, so 9.090909 lb/bbl at 22 bbl is 200 lb", () => {
-    expect(batchTotalText({ ...malt, perBbl: 9.090909 }, 22)).toBe("200 lb = 4 × 50 lb");
+    expect(batchTotalText({ ...malt, perBbl: 9.090909 }, 22)).toBe("4 × 50 lb");
   });
   it("offers rounding down and up to whole packs, each as a per-bbl amount to 6 decimals", () => {
     expect(packRounding(malt, 22)).toEqual({ whole: false, choices: [
@@ -523,48 +574,93 @@ describe("batch totals in packs", () => {
       { label: "Round to 5 × 50 lb", perBbl: 11.363636 },
     ] });
   });
+  it("names a Round choice as the line will read once chosen, with the pack word when the material has one", () => {
+    expect(packRounding({ ...bagged, perBbl: 44 }, 22)).toEqual({ whole: false, choices: [
+      { label: "Round to 17 bags", perBbl: 42.5 },
+      { label: "Round to 18 bags", perBbl: 45 },
+    ] });
+  });
   it("offers only rounding up when the total is under one pack", () => {
-    expect(packRounding({ perBbl: 0.4, factor: 44, unit: "lb" }, 22)).toEqual({ whole: false, choices: [{ label: "Round to 1 × 44 lb", perBbl: 2 }] });
+    expect(packRounding({ perBbl: 0.4, factor: 44, unit: "lb", packName: null }, 22)).toEqual({ whole: false, choices: [{ label: "Round to 1 × 44 lb", perBbl: 2 }] });
+    // 0.253 lb of a 0.25 lb bottle is not whole packs: one bottle and a little loose.
+    expect(packRounding({ perBbl: 0.0115, factor: 0.25, unit: "lb", packName: "bottle" }, 22)).toEqual({ whole: false, choices: [
+      { label: "Round to 1 bottle", perBbl: 0.011364 },
+      { label: "Round to 2 bottles", perBbl: 0.022727 },
+    ] });
   });
   it("says whole packs, with nothing to offer, when the total already is", () => {
     expect(packRounding({ ...malt, perBbl: 9.090909 }, 22)).toEqual({ whole: true, choices: [] });
+    // A material counted in "each" rounds to whole pieces once it has a pack word; without one it has no pack.
+    expect(packRounding({ perBbl: 0.0455, factor: 1, unit: "each", packName: "pitch" }, 22)).toEqual({ whole: false, choices: [
+      { label: "Round to 1 pitch", perBbl: 0.045455 }, { label: "Round to 2 pitches", perBbl: 0.090909 },
+    ] });
+    expect(packRounding({ perBbl: 0.0455, factor: 1, unit: "each", packName: null }, 22)).toBeNull();
+    expect(packRounding(bagged, 22)).toEqual({ whole: true, choices: [] });
   });
   it("offers nothing for a material with no pack", () => {
     expect(packRounding({ ...malt, factor: 1 }, 22)).toBeNull();
   });
   it("shows the real total a rounded per-bbl amount gives, even a hair off whole packs", () => {
-    const [up] = packRounding({ perBbl: 0.01, factor: 50, unit: "lb" }, 3000)!.choices;
+    const [up] = packRounding({ perBbl: 0.01, factor: 50, unit: "lb", packName: null }, 3000)!.choices;
     expect(up).toEqual({ label: "Round to 1 × 50 lb", perBbl: 0.016667 });
-    expect(batchTotalText({ perBbl: up.perBbl, factor: 50, unit: "lb" }, 3000)).toBe("50.001 lb = 1 × 50 lb + 0.001 lb");
+    expect(batchTotalText({ perBbl: up.perBbl, factor: 50, unit: "lb", packName: null }, 3000)).toBe("50.001 lb");
   });
-  it("draws totals only once a batch size is typed, and Round only on the draft", () => {
+  it("draws each line's batch amount only once the recipe has a batch size, and Round only on the editor", () => {
     const model = { title: "Pale", ingredients: [{ key: "i1", title: "2-row", amount: "10 lb", timing: "", stage: "mash" as const, pack: malt }] };
-    const draw = (m: typeof model & { totalsAtBbl?: string }, readOnly: boolean) => renderToStaticMarkup(createElement(RecipeView, { model: m, readOnly }));
-    expect(draw(model, true)).toContain("Enter a batch size to see totals in packs");
-    expect(draw(model, true)).not.toContain("220 lb");
-    const read = draw({ ...model, totalsAtBbl: "22" }, true);
-    // The total takes a line under its ingredient, and names the size for a screen reader.
-    expect(read).toMatch(/At 22 bbl: <\/span>220 lb = 4 × 50 lb \+ 20 lb/);
+    const draw = (m: typeof model & { batchBbl?: string }, readOnly: boolean) => renderToStaticMarkup(createElement(RecipeView, { model: m, readOnly }));
+    expect(draw(model, false)).toContain("Enter a batch size to see each amount for the batch");
+    expect(draw(model, false)).not.toContain("220 lb");
+    // A saved copy read out has no field to type one into, so it does not ask.
+    expect(draw(model, true)).not.toContain("Enter a batch size");
+    const read = draw({ ...model, batchBbl: "22" }, true);
+    // The amount takes a line under its ingredient, and names the size for a screen reader.
+    expect(read).toMatch(/At 22 bbl: <\/span>220 lb</);
     expect(draw(model, true)).not.toMatch(/At \d+ bbl/);
     expect(read).not.toContain("Round to");
-    expect(draw({ ...model, totalsAtBbl: "22" }, false)).toContain("Round to 5 × 50 lb");
-    expect(draw({ ...model, totalsAtBbl: "22", ingredients: [{ ...model.ingredients[0], pack: { ...malt, perBbl: 9.090909 } }] }, false)).toContain("Whole packs");
+    expect(draw({ ...model, batchBbl: "22" }, false)).toContain("Round to 5 × 50 lb");
+    const whole = draw({ ...model, batchBbl: "22", ingredients: [{ ...model.ingredients[0], pack: { ...malt, perBbl: 9.090909 } }] }, false);
+    expect(whole).toMatch(/At 22 bbl: <\/span>4 × 50 lb</);
+    expect(whole).toContain("Whole packs");
+    expect(draw({ ...model, batchBbl: "22", ingredients: [{ ...model.ingredients[0], pack: bagged }] }, true)).toMatch(/At 22 bbl: <\/span>23 bags</);
   });
   it("#1479 reads an exponent batch size as no size, and says why", () => {
-    const model = { title: "Pale", ingredients: [{ key: "i1", title: "2-row", amount: "10 lb", timing: "", stage: "mash" as const, pack: malt }], totalsAtBbl: "1e1" };
-    const html = renderToStaticMarkup(createElement(RecipeView, { model, readOnly: true }));
+    const model = { title: "Pale", ingredients: [{ key: "i1", title: "2-row", amount: "10 lb", timing: "", stage: "mash" as const, pack: malt }], batchBbl: "1e1" };
+    const html = renderToStaticMarkup(createElement(RecipeView, { model }));
     expect(html).not.toContain("100 lb");
     expect(html).toContain("Enter a decimal number, not exponent notation");
   });
-  it("gives a pack to brew-day lines only, from the material's pack size", () => {
-    const material = { base_uom: "lb", purchase_uom_factor: 50 };
-    expect(ingredientPack("whirlpool", 2, material)).toEqual({ perBbl: 2, factor: 50, unit: "lb" });
-    expect(ingredientPack("dry_hop", 2, material)).toBeUndefined();
-    expect(ingredientPack("mash", 2, undefined)).toBeUndefined();
-    expect(ingredientPack("mash", 0, material)).toBeUndefined();
+  it("gives a pack to a line at any stage, from the material's pack size and pack word", () => {
+    const material = { base_uom: "lb", purchase_uom_factor: 50, pack_name: "sack" as const };
+    expect(ingredientPack(2, material)).toEqual({ perBbl: 2, factor: 50, unit: "lb", packName: "sack" });
+    expect(ingredientPack(2, { ...material, pack_name: null })?.packName).toBeNull();
+    expect(ingredientPack(2, undefined)).toBeUndefined();
+    expect(ingredientPack(0, material)).toBeUndefined();
   });
   it("coerces a numeric pack size that arrives as a string", () => {
-    expect(ingredientPack("mash", 10, { base_uom: "lb", purchase_uom_factor: "55.000000" as unknown as number })?.factor).toBe(55);
+    expect(ingredientPack(10, { base_uom: "lb", purchase_uom_factor: "55.000000" as unknown as number, pack_name: null })?.factor).toBe(55);
+  });
+});
+
+describe("gristShares", () => {
+  it("gives each mash line its share of the grain bill by weight, and no other line a share", () => {
+    // 23 and 12 bags of 55 lb at 22 bbl: 1,265 of 1,925 lb is 66%.
+    const shares = gristShares([{ stage: "mash", perBbl: 57.5, unit: "lb" }, { stage: "mash", perBbl: 30, unit: "lb" }, { stage: "boil", perBbl: 0.4, unit: "lb" }]);
+    expect(shares[0]).toBeCloseTo(1265 / 1925, 10);
+    expect(shares.map((share) => share === undefined ? share : Math.round(share * 100))).toEqual([66, 34, undefined]);
+  });
+  it("weighs every weight unit in pounds, and gives no share to a mash line stocked by volume or count", () => {
+    const shares = gristShares([{ stage: "mash", perBbl: 22.0462, unit: "lb" }, { stage: "mash", perBbl: 10, unit: "kg" }, { stage: "mash", perBbl: 5, unit: "ml" }, { stage: "mash", perBbl: 0, unit: "lb" }]);
+    expect(shares.map((share) => share === undefined ? share : Math.round(share * 100))).toEqual([50, 50, undefined, undefined]);
+  });
+  it("has no share to give without a weighed mash line", () => {
+    expect(gristShares([{ stage: "boil", perBbl: 1, unit: "lb" }, { stage: "mash", perBbl: 1, unit: undefined }])).toEqual([undefined, undefined]);
+  });
+  // A mash line whose unit the page cannot see (an inactive material) has an unknown weight, so no line's share is
+  // known. Counting it as nothing would read the other malts too high.
+  it("gives no shares at all when a mash line's unit is unknown", () => {
+    expect(gristShares([{ stage: "mash", perBbl: 10, unit: "lb" }, { stage: "mash", perBbl: 10, unit: undefined }])).toEqual([undefined, undefined]);
+    // A unit that is known and is not a weight (a syrup in ml) still just has no share of its own.
+    expect(gristShares([{ stage: "mash", perBbl: 10, unit: "lb" }, { stage: "mash", perBbl: 10, unit: "ml" }])).toEqual([1, undefined]);
   });
 });
 

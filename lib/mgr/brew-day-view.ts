@@ -1,5 +1,6 @@
 import { BREW_DAY_STAGES, isBrewDayStage, type FermentationStage, type IngredientStage } from "./recipe-process-view";
 import { materialSourceKey, restoreSources } from "./material-source";
+import { batchQty } from "./pack-qty";
 import { fromTicks, toTicks } from "./quantity-input";
 // lib/mgr/brew-day-view.ts — view-model for Brew day.
 export type BrewDayLotView = { key: string; title: string; detail: string };
@@ -69,7 +70,7 @@ export const brewDayLines = (plan: BrewPlan) =>
   (plan.ingredients ?? []).filter((row): row is BrewPlanIngredient & { stage: (typeof BREW_DAY_STAGES)[number] } => isBrewDayStage(row.stage));
 
 /** A line's planned amount for `volume` bbl, exact to the tick. */
-export const plannedIngredientQty = (row: BrewPlanIngredient, volume: number) => fromTicks(toTicks(row.per_bbl_qty * volume));
+export const plannedIngredientQty = (row: BrewPlanIngredient, volume: number) => batchQty(row.per_bbl_qty, volume);
 
 /** The one source holding this material; undefined when none or several do, so the brewer chooses. */
 export function soleSource(sources: BrewMaterialSource[], materialId: string): BrewMaterialSource | undefined {

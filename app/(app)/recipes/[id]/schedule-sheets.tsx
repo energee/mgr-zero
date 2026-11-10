@@ -79,8 +79,9 @@ export function WaterSheet({ water, profiles, materials, onChange, trigger }: { 
 }
 
 /** One ingredient, edited in place: a step's Add ingredient opens a blank editor on that step's `stage`, a line's name opens it
- *  filled from `line`. No list of its own; the recipe page is the list. */
-export function IngredientSheet({ line, stage = "mash", materials, limits, onSave, onDelete, trigger }: { line?: IngredientLine; stage?: IngredientStage; materials: IngredientMaterial[]; limits: TimingLimits; onSave: (line: IngredientLine) => void; onDelete?: () => void; trigger: ReactNode }) {
+ *  filled from `line`. No list of its own; the recipe page is the list. `batchBbl` is the draft's batch size (0 for none):
+ *  with one, a material with a pack size can be typed as a count of packs. */
+export function IngredientSheet({ line, stage = "mash", materials, limits, batchBbl, onSave, onDelete, trigger }: { line?: IngredientLine; stage?: IngredientStage; materials: IngredientMaterial[]; limits: TimingLimits; batchBbl: number; onSave: (line: IngredientLine) => void; onDelete?: () => void; trigger: ReactNode }) {
   const [open, setOpen] = useState(false);
   const start = line ?? { materialId: "", perBblQty: "", stage, timingMinutes: "" };
   // Timing is edited in the stage's unit (days or minutes) and stored as minutes on save (#1478).
@@ -88,7 +89,7 @@ export function IngredientSheet({ line, stage = "mash", materials, limits, onSav
   const patch = (p: Partial<IngredientFields>) => setF((c) => ({ ...c, ...p }));
   return <CommandForm open={open} onOpenChange={(o) => { setOpen(o); if (o) setF(toIngredientFields(start)); }} title={line ? "Edit ingredient" : "Add ingredient"} trigger={asTrigger(trigger)}>
     <div className="flex flex-col gap-4">
-      <IngredientView fields={f} materials={materials} limits={limits} onChange={patch}
+      <IngredientView fields={f} materials={materials} limits={limits} batchBbl={batchBbl} onChange={patch}
         onSave={() => { onSave(fromIngredientFields(f)); setOpen(false); }}
         onDelete={onDelete ? () => { onDelete(); setOpen(false); } : null}
       />

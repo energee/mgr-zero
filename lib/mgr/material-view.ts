@@ -8,6 +8,12 @@ export type MaterialViewModel = {
   baseUnits: string;
   purchaseUnit: string;
   purchaseUnitOptions: string[];
+  /** The word one purchase unit is sold by, the "Sold by" pick: "bag", one of PACK_NAMES. Empty means none picked.
+   * A recipe line of whole packs reads in it ("23 bags"). */
+  soldBy: string;
+  /** The material already has a saved word. The database keeps a saved word when none is sent, so it can be changed
+   * but not cleared, and the pick stops offering None. */
+  soldBySaved?: boolean;
   /** The base unit recipes and counts use, the "Base unit" field: "lb". */
   unit: string;
   unitOptions: string[];

@@ -85,7 +85,10 @@ begin
     jsonb_build_object('brewery', p_brewery, 'material', p_material, 'name', p_name, 'category', p_category,
       'base_uom', p_base_uom, 'purchase_uom', p_purchase_uom, 'purchase_uom_factor', p_purchase_uom_factor,
       'lot_tracked', p_lot_tracked, 'default_vendor', p_default_vendor, 'reorder_point', p_reorder_point, 'active', p_active,
-      'extract_potential', p_extract_potential, 'alpha_acid', p_alpha_acid, 'pack_name', p_pack_name));
+      'extract_potential', p_extract_potential, 'alpha_acid', p_alpha_acid)
+      -- Only a call that sends a pack word adds it, so a call without one keeps the payload it had before this
+      -- migration and a retry that spans it still replays.
+      || case when p_pack_name is null then '{}'::jsonb else jsonb_build_object('pack_name', p_pack_name) end);
   if v_replay is not null then return v_replay; end if;
   if p_material is null then
     insert into public.materials (brewery_id, name, category, base_uom, purchase_uom, purchase_uom_factor, lot_tracked, default_vendor_id, reorder_point, active, extract_potential, alpha_acid, pack_name)

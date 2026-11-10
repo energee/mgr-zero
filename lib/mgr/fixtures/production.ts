@@ -4,7 +4,7 @@ import type { BatchesSnapshot } from "@/lib/mgr/batches-view";
 import type { BrewDayViewModel } from "@/lib/mgr/brew-day-view";
 import { cellarPlanRows, startAtPlan, waterAdditionRows, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import type { ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
-import { fermentationView, figureStrip, ingredientCells, mashView, outcomeSummary, outcomeTable, recipeHistory, waterView, type RecipeOutcome, type RecipeViewModel } from "@/lib/mgr/recipe-view";
+import { fermentationView, figureStrip, gristShares, ingredientCells, ingredientPack, mashView, outcomeSummary, outcomeTable, recipeHistory, waterView, type RecipeOutcome, type RecipeViewModel } from "@/lib/mgr/recipe-view";
 import type { RecipesSnapshot } from "@/lib/mgr/recipes-view";
 import type { RunClosedViewModel } from "@/lib/mgr/run-closed-view";
 import { DEMO_TIME_ZONE } from "@/lib/mgr/fixtures/settings";
@@ -12,7 +12,7 @@ import type { ScheduleBatchViewModel } from "@/lib/mgr/schedule-batch-view";
 import type { VesselDetailViewModel } from "@/lib/mgr/vessel-detail-view";
 import type { CellarMapViewModel } from "@/lib/mgr/cellar-map-view";
 import { recipeIbu } from "@/lib/recipe-ibu";
-import type { FermentationStage, MashStep, WaterDraft } from "@/lib/mgr/recipe-process-view";
+import type { FermentationStage, IngredientStage, MashStep, RecipeMaterial, WaterDraft } from "@/lib/mgr/recipe-process-view";
 import { waterProfiles } from "./catalog";
 
 export const cellarMapBrewer: CellarMapViewModel = {
@@ -290,6 +290,17 @@ const HAZY_IBU = recipeIbu({
   lines: [{ ...HAZY_HOP, stage: "boil", perBblQty: 0.4, timingMinutes: 10 }, { ...HAZY_HOP, stage: "dry_hop", perBblQty: 1.2, timingMinutes: null }],
 });
 
+/** Hazy IPA's lines with each material's pack, as get_recipe and list_materials give them. At the recipe's 22 bbl the
+ *  2-row is 18 bags of 55 lb and the oats 4 packs of 50 lb, sold by no word. Citra comes in 44 lb boxes, so neither hop
+ *  line is whole boxes and each offers Round. */
+const HAZY_LINES: { key: string; title: string; stage: IngredientStage; timing: number | null; perBbl: number; material: Pick<RecipeMaterial, "base_uom" | "purchase_uom_factor" | "pack_name"> }[] = [
+  { key: "malt", title: "2-row", stage: "mash", timing: null, perBbl: 45, material: { base_uom: "lb", purchase_uom_factor: 55, pack_name: "bag" } },
+  { key: "oats", title: "Flaked oats", stage: "mash", timing: null, perBbl: 9.090909, material: { base_uom: "lb", purchase_uom_factor: 50, pack_name: null } },
+  { key: "boil", title: "Citra", stage: "boil", timing: 10, perBbl: 0.4, material: { base_uom: "lb", purchase_uom_factor: 44, pack_name: "box" } },
+  { key: "dh", title: "Citra", stage: "dry_hop", timing: null, perBbl: 1.2, material: { base_uom: "lb", purchase_uom_factor: 44, pack_name: "box" } },
+];
+const HAZY_SHARES = gristShares(HAZY_LINES.map((l) => ({ stage: l.stage, perBbl: l.perBbl, unit: l.material.base_uom })));
+
 /** Hazy IPA as saved (its fourth copy underneath, which the page never names), with no unsaved change. */
 export const recipeHazyV4: RecipeViewModel = {
   title: "Hazy IPA",
@@ -297,13 +308,12 @@ export const recipeHazyV4: RecipeViewModel = {
   recipeNote: "The flagship. Keep it soft and juicy.",
   priceGroup: "3",
   priceGroupOptions: ["Not decided", "1", "2", "3", "4", "5", "6", "7", "8"],
-  // 2-row comes in 50 lb sacks and Citra in 44 lb boxes; the dry hop is a cellar stage, so it has no pack total.
-  ingredients: [
-    { key: "malt", title: "2-row", ...ingredientCells("mash", null, 44, "lb"), pack: { perBbl: 44, factor: 50, unit: "lb" } },
-    { key: "boil", title: "Citra", ...ingredientCells("boil", 10, 0.4, "lb"), pack: { perBbl: 0.4, factor: 44, unit: "lb" } },
-    { key: "dh", title: "Citra", ...ingredientCells("dry_hop", null, 1.2, "lb") },
-  ],
-  totalsAtBbl: "22",
+  // Each line is built as the live page builds it: its cells, its pack and, for a mash line, its share of the grain bill.
+  ingredients: HAZY_LINES.map((l, i) => ({
+    key: l.key, title: l.title, ...ingredientCells(l.stage, l.timing, l.perBbl, l.material.base_uom),
+    pack: ingredientPack(l.perBbl, l.material), share: HAZY_SHARES[i],
+  })),
+  batchBbl: "22",
   preBoil: "16.8",
   boilMin: "60",
   whirlpoolMin: "20",

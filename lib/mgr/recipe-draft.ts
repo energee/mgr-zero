@@ -13,6 +13,8 @@ import type { RecipeDraft } from "./recipe-view";
 
 const draftShape = z.object({
   // Numeric fields are held as typed text; draftBlocker checks them when saving.
+  // A draft kept before the batch size joined it fails here and is dropped, with the form's message.
+  batchBbl: z.string(),
   numbers: z.object({
     preBoil: z.string(), boilMin: z.string(), whirlpoolMin: z.string(), whirlpoolTemp: z.string(),
     whirlpoolRest: z.string(), knockoutTemp: z.string(), efficiency: z.string(), attenuation: z.string(),

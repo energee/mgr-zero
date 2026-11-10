@@ -2,12 +2,14 @@
 // it and the recipe page reads it: ordered mash steps, fermentation stages and
 // water additions on the unsaved sheet (recipe-builder spec D2: repetition earns
 // a surface), pure list helpers, the summary lines the schedule screens print,
-// the titles the recipe page gives each schedule, and the labelled read-out of
-// the sheet's water.
+// the titles the recipe page gives each schedule, the labelled read-out of
+// the sheet's water, and an ingredient typed as a count of packs for the
+// recipe's batch (packsToPerBbl, packsFieldText, packsLabel).
 import type { PackName } from "./enums";
 import { sentenceCase } from "./labels";
+import { batchQty, packNoun, perBblForPacks, type Pack } from "./pack-qty";
 import { plural } from "./plural";
-import { isNumber, isPositive, numberNotationError } from "./quantity-input";
+import { fromTicks, isNumber, isPositive, numberNotationError, toTicks } from "./quantity-input";
 import { READING_BOUNDS } from "@/lib/composer/offline-policy";
 import { saccharificationRest, totalMinutes, type MashStep } from "./recipe-schedule";
 import { gramsOf, IONS, ION_LABELS, suggestSalts, waterChemistry, type Ions, type Salt } from "@/lib/water-chemistry";
@@ -69,6 +71,19 @@ export function ingredientReason(fields: IngredientFields, limits: TimingLimits)
     ...(range ? [range.days ? `${stage} day from 0 to ${range.max}` : `${stage} timing from 0 to ${range.max} minutes`] : []),
   ]);
 }
+/** What the Ingredient sheet needs to take a line as a count of packs: the material's pack and the recipe's batch size in bbl. */
+type PackEntry = Pack & { batchBbl: number };
+/** The count field's label: "Bags (55 lb) for 22 bbl", or "Packs (50 lb) for 22 bbl" for a material with no pack word. */
+export const packsLabel = (e: PackEntry) => `${sentenceCase(packNoun(e.packName))} (${e.factor} ${e.unit}) for ${e.batchBbl} bbl`;
+/** The per-bbl field's text for a typed count of packs (packs × pack size ÷ batch size); "" while the count is not a number. */
+export const packsToPerBbl = (packs: string, e: PackEntry): string => (isNumber(packs) ? String(perBblForPacks(Number(packs), e.factor, e.batchBbl)) : "");
+/** The count field's text. What was typed stands while the per-bbl amount is still the one it gave, so "2." is not
+ *  rewritten to "2" mid-typing. Otherwise the count is worked out from the per-bbl amount (its batch amount over the
+ *  pack size, to 4 decimals), which keeps the two fields in step; "" without a per-bbl amount above zero. */
+export function packsFieldText(perBblQty: string, typed: string, e: PackEntry): string {
+  if (packsToPerBbl(typed, e) === perBblQty) return typed;
+  return Number(perBblQty) > 0 ? String(fromTicks(toTicks(batchQty(Number(perBblQty), e.batchBbl) / e.factor))) : "";
+}
 /** A per-bbl quantity to three significant digits: 40.909091 reads "40.9", 0.011364 reads "0.0114".
  *  Two fixed fraction digits would round small hop rates by 10-12%, so callers format with this before ingredientDetail. */
 export const perBblDisplay = (n: number): string => n.toLocaleString("en-US", { maximumSignificantDigits: 3 });
@@ -86,8 +101,8 @@ export function materialLookup<M extends { id: string; name: string; base_uom: s
 }
 /** The material fields the recipe editor reads; both recipe pages project list_materials to this.
  *  Lives here, not in the "use client" editor, because the server pages call it (#440).
- *  purchase_uom_factor is base units per purchase pack (1 = no pack); the page totals brew-day lines in packs with it.
- *  pack_name is the word that pack is sold by ("bag"), or null when the material has none. */
+ *  purchase_uom_factor is base units per purchase pack (1 with no pack word = no pack, see hasPack); the page reads each line's batch amount in packs
+ *  with it. pack_name is the word that pack is sold by ("bag"), or null when the material has none. */
 export type RecipeMaterial = { id: string; name: string; category: string; base_uom: string; extract_potential: number | null; alpha_acid: number | null; purchase_uom_factor: number; pack_name: PackName | null };
 export const toRecipeMaterial = ({ id, name, category, base_uom, extract_potential, alpha_acid, purchase_uom_factor, pack_name }: RecipeMaterial): RecipeMaterial => ({ id, name, category, base_uom, extract_potential, alpha_acid, purchase_uom_factor, pack_name });
 export type FermentationStage = { name: string; kind: string; tempF: number; days: number };
