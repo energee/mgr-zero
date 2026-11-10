@@ -6,12 +6,13 @@
 // written as each change is made, restored with a notice and Start over on
 // return, and cleared when the version saves; /recipes/new keeps none, since
 // there is no recipe to key it by yet. The ingredient, mash, fermentation and
-// water rows open their sheets (schedule-sheets.tsx), and the OG/FG/ABV preview
+// water rows open their sheets (schedule-sheets.tsx); each step's add row opens
+// the Ingredient sheet on that step's stage. The OG/FG/ABV preview
 // comes from the same pure recipeGravity the server uses (lib/recipe-gravity.ts),
 // or names why there is none (gravityBlockerText, noMashText). The IBU preview
 // (draftIbuText) reads each material's current alpha acid. With a recipeId
-// the bottom button runs create_recipe_version, disabled with draftBlocker's
-// reason until the draft is complete; without one (recipes/new) the
+// the save bar's Save changes runs create_recipe_version, disabled with
+// draftBlocker's reason until the draft is complete; without one (recipes/new) the
 // shared parent fields sit on top and one save runs create_recipe then
 // create_recipe_version, landing on the recipe. Efficiency and attenuation
 // are typed as percents, as the inventory draws them, and sent as fractions.
@@ -22,7 +23,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { E } from "@/components/mgr/e";
-import { ADD_INGREDIENT_ROW, RecipeView } from "@/components/mgr/views/recipe";
+import { RecipeView } from "@/components/mgr/views/recipe";
 import { BLANK_RECIPE, NewRecipeFieldsView, type NewRecipeBrand } from "@/components/mgr/views/new-recipe";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
@@ -158,7 +159,7 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
       model={{
         title, backHref, backLabel, ...numbers, notes,
         ingredients: lines.map((l, i) => ({
-          key: `${i}-${l.materialId}`, title: material.name(l.materialId), detail: ingredientDetail(l.stage, l.timingMinutes, l.perBblQty, material.unit(l.materialId)), qty: "",
+          key: `${i}-${l.materialId}`, title: material.name(l.materialId), detail: ingredientDetail(l.stage, l.timingMinutes, l.perBblQty, material.unit(l.materialId)), qty: "", stage: l.stage,
           action: <IngredientSheet line={l} materials={sheetMaterials} limits={timingLimits} onSave={(f) => change({ lines: upsertAt(draft.lines, i, f) })} onDelete={() => change({ lines: removeAt(draft.lines, i) })} trigger={E.act(<>Edit<span className="sr-only"> {material.name(l.materialId)}</span></>)} />,
           pack: ingredientPack(l.stage, Number(l.perBblQty), material.get(l.materialId)),
           onRound: (perBbl: number) => change({ lines: upsertAt(draft.lines, i, { ...l, perBblQty: String(perBbl) }) }),
@@ -177,10 +178,12 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
       controls={{
         set: (field, value) => change(field === "notes" ? { notes: value } : { numbers: { ...draft.numbers, [field]: value } }),
         onSubmit: () => void submit(), busy: action.busy, blockedReason, error: action.error,
-        submitLabel: creating && !parentLocked ? "Create recipe" : "Create recipe version",
+        // This page is only ever a draft, so its save bar is always up.
+        dirty: true,
+        submitLabel: creating && !parentLocked ? "Create recipe" : undefined,
       }}
       slots={{
-        addIngredient: <IngredientSheet materials={sheetMaterials} limits={timingLimits} onSave={(f) => change({ lines: [...draft.lines, f] })} trigger={ADD_INGREDIENT_ROW} />,
+        addIngredient: (stage, trigger) => <IngredientSheet stage={stage} materials={sheetMaterials} limits={timingLimits} onSave={(f) => change({ lines: [...draft.lines, f] })} trigger={trigger} />,
         mash: <MashScheduleSheet steps={mashSchedule} onChange={(mashSchedule) => change({ mashSchedule })} trigger={E.nav(mashRow.title, mashRow.detail)} />,
         fermentation: <FermentationScheduleSheet stages={fermentationSchedule} onChange={(fermentationSchedule) => change({ fermentationSchedule })} trigger={E.nav(fermentationRow.title, fermentationRow.detail)} />,
         water: <WaterSheet water={water} profiles={profiles} materials={materials} onChange={(water) => change({ water })} trigger={E.nav(waterRow.title, waterRow.detail)} />,

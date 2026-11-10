@@ -85,7 +85,7 @@ function gapsText(gaps: IbuGap[], saved: boolean): string {
   return GAP_REASONS.flatMap((reason) => {
     const names = [...new Set(gaps.filter((gap) => gap.reason === reason).map((gap) => gap.name))];
     if (names.length === 0) return [];
-    const fix = saved && reason === "no alpha acid" ? "; set alpha acid under Materials, then create the next version" : "";
+    const fix = saved && reason === "no alpha acid" ? "; set alpha acid under Materials, then save a change to this recipe" : "";
     return [`${reason}: ${names.join(", ")}${fix}`];
   }).join(" · ");
 }

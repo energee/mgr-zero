@@ -593,8 +593,8 @@ describe("Recipes view", () => {
     // The inventory frame leaves the row for the explorer, which walks it to the Water profiles record.
     expect(htmlOf(screen("Recipes").body)).toContain("Water profiles");
     expect(resolveTap(screen("Recipes"), "Water profiles")).toBe("Water profiles");
-    // The renamed create row still opens the Ingredient record, not the global inert list.
-    expect(resolveTap(screen("Recipe"), "Add ingredient")).toBe("Ingredient");
+    // Each step's add row opens the Ingredient record.
+    for (const step of ["mash", "boil", "whirlpool", "fermentation"]) expect(resolveTap(screen("Recipe"), `Add ${step} ingredient`)).toBe("Ingredient");
   });
 
   it("draws the inventory list through the live adapter, a recipe with no version included", () => {
@@ -606,12 +606,12 @@ describe("Recipes view", () => {
 
 
   it("draws Batch actuals as a heading, the tape, then the summary", () => {
-    const html = htmlOf(createElement(RecipeView, { readOnly: true, model: { title: "Pale v3", tape: [["B-0413 · v4 · Oct 3, 2026", "no gravity readings yet"]], actualsNote: "2 batches: efficiency 68–71% against 72% assumed." } }));
+    const html = htmlOf(createElement(RecipeView, { readOnly: true, model: { title: "Pale", tape: [["B-0413 · Oct 3, 2026", "no gravity readings yet"]], actualsNote: "2 batches: efficiency 68–71% against 72% assumed." } }));
     expect(html).toMatch(/<h2[^>]*>Batch actuals · predicted in brackets<\/h2><ol[^]*no gravity readings yet[^]*<\/ol>[^]*2 batches: efficiency/);
   });
 
   it("the fixture's Batch actuals are computed, and its prediction agrees with their brackets", () => {
-    expect(recipeHazyV4.tape?.[0]).toEqual(["B-0413 · v4 · Oct 3, 2026", "OG 14.8 °P (15.2) · FG 3.5 °P (3.5) · ABV 6.1% (6.3%) · attenuation 77% (78%) · efficiency 68% (72%)"]);
+    expect(recipeHazyV4.tape?.[0]).toEqual(["B-0413 · Oct 3, 2026", "OG 14.8 °P (15.2) · FG 3.5 °P (3.5) · ABV 6.1% (6.3%) · attenuation 77% (78%) · efficiency 68% (72%)"]);
     expect(recipeHazyV4.predicted).toBe("Predicted: OG 15.2 °P · FG 3.5 °P · ABV 6.3%");
   });
 
@@ -638,7 +638,7 @@ describe("Recipes view", () => {
     expect(body.props.model).toEqual(recipeHazyV4);
   });
 
-  it("renders recipe numbers in one compact responsive grid without React key warnings", () => {
+  it("renders each step's recipe numbers in a responsive grid (Whirlpool's three as the one four-column grid) without React key warnings", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const html = htmlOf(createElement(RecipeView, { model: recipeHazyV4 }));
     const errors = error.mock.calls.flat().join(" ");

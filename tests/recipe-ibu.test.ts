@@ -81,7 +81,7 @@ describe("ibuText, the first matching row wins", () => {
 
   it("says how to fix missing alpha acid on a saved version, which a draft does not need", () => {
     const lines = [boil(), boil({ name: "Mosaic", alphaAcid: null })];
-    expect(text(lines, true)).toBe("IBU ≥ 89 · no alpha acid: Mosaic; set alpha acid under Materials, then create the next version");
+    expect(text(lines, true)).toBe("IBU ≥ 89 · no alpha acid: Mosaic; set alpha acid under Materials, then save a change to this recipe");
     expect(text(lines, false)).toBe("IBU ≥ 89 · no alpha acid: Mosaic");
     expect(text([boil({ timingMinutes: null })], true)).toBe("IBU not estimated: no boil time: Citra");
   });

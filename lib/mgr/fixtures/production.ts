@@ -4,7 +4,7 @@ import type { BatchesSnapshot } from "@/lib/mgr/batches-view";
 import type { BrewDayViewModel } from "@/lib/mgr/brew-day-view";
 import { cellarPlanRows, startAtPlan, waterAdditionRows, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import type { ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
-import { outcomeSummary, outcomeTape, type RecipeOutcome, type RecipeViewModel } from "@/lib/mgr/recipe-view";
+import { outcomeSummary, outcomeTape, recipeHistory, type RecipeOutcome, type RecipeViewModel } from "@/lib/mgr/recipe-view";
 import type { RecipesSnapshot } from "@/lib/mgr/recipes-view";
 import type { RunClosedViewModel } from "@/lib/mgr/run-closed-view";
 import { DEMO_TIME_ZONE } from "@/lib/mgr/fixtures/settings";
@@ -270,11 +270,15 @@ export const WATER_HAZY: WaterDraft = {
   additions: [{ materialId: "gypsum", qty: 4, unit: "g", stage: "mash" }, { materialId: "cacl", qty: 6, unit: "g", stage: "mash" }, { materialId: "lactic", qty: 3, unit: "mL", stage: "sparge" }],
 };
 
-/** Two closed batches of v4, as get_recipe_outcomes returns them. The page text is computed from these. */
+/** Hazy IPA's brewed batches as get_recipe_outcomes returns them: two closed on the current copy (4), then two on the copy
+ *  before it (3), which assumed more efficiency. Batch actuals and As brewed are computed from these. */
 const HAZY_V4 = { version: 4, closed: true, predicted: { ogPlato: 15.2, fgPlato: 3.5, abv: 6.3 }, assumedEfficiency: 0.72, assumedAttenuation: 0.78 };
+const HAZY_V3 = { ...HAZY_V4, version: 3, predicted: { ogPlato: 15.6, fgPlato: 3.6, abv: 6.5 }, assumedEfficiency: 0.74 };
 const HAZY_OUTCOMES: RecipeOutcome[] = [
   { ...HAZY_V4, batchId: "b-0413", batchNo: 413, brewedOn: "2026-10-03", ogPlato: 14.8, fgPlato: 3.5, abv: 6.1, apparentAttenuation: 0.77, brewhouseEfficiency: 0.68 },
   { ...HAZY_V4, batchId: "b-0398", batchNo: 398, brewedOn: "2026-09-12", ogPlato: 15.1, fgPlato: 3.4, abv: 6.3, apparentAttenuation: 0.78, brewhouseEfficiency: 0.71 },
+  { ...HAZY_V3, batchId: "b-0371", batchNo: 371, brewedOn: "2026-07-18", ogPlato: 15.0, fgPlato: 3.6, abv: 6.1, apparentAttenuation: 0.77, brewhouseEfficiency: 0.7 },
+  { ...HAZY_V3, batchId: "b-0356", batchNo: 356, brewedOn: "2026-06-27", ogPlato: 14.9, fgPlato: 3.5, abv: 6.1, apparentAttenuation: 0.77, brewhouseEfficiency: 0.69 },
 ];
 
 /** Hazy IPA v4's hop lines as get_recipe reads them, with the alpha acid frozen on v4. The page text is computed from these. */
@@ -284,18 +288,18 @@ const HAZY_IBU = recipeIbu({
   lines: [{ ...HAZY_HOP, stage: "boil", perBblQty: 0.4, timingMinutes: 10 }, { ...HAZY_HOP, stage: "dry_hop", perBblQty: 1.2, timingMinutes: null }],
 });
 
+/** Hazy IPA as saved (its fourth copy underneath, which the page never names), with no unsaved change. */
 export const recipeHazyV4: RecipeViewModel = {
-  title: "Hazy IPA v4",
+  title: "Hazy IPA",
   saved: "Aug 28, 2026",
-  versions: [4, 3, 2, 1].map((number) => ({ number, selected: number === 4, latest: number === 4 })),
   recipeNote: "The flagship. Keep it soft and juicy.",
   priceGroup: "3",
   priceGroupOptions: ["Not decided", "1", "2", "3", "4", "5", "6", "7", "8"],
   // 2-row comes in 50 lb sacks and Citra in 44 lb boxes; the dry hop is a cellar stage, so it has no pack total.
   ingredients: [
-    { key: "malt", title: "2-row", detail: ingredientDetail("mash", null, 44, "lb"), qty: "", pack: { perBbl: 44, factor: 50, unit: "lb" } },
-    { key: "boil", title: "Citra", detail: ingredientDetail("boil", 10, 0.4, "lb"), qty: "", pack: { perBbl: 0.4, factor: 44, unit: "lb" } },
-    { key: "dh", title: "Citra", detail: ingredientDetail("dry_hop", null, 1.2, "lb"), qty: "" },
+    { key: "malt", title: "2-row", detail: ingredientDetail("mash", null, 44, "lb"), qty: "", stage: "mash", pack: { perBbl: 44, factor: 50, unit: "lb" } },
+    { key: "boil", title: "Citra", detail: ingredientDetail("boil", 10, 0.4, "lb"), qty: "", stage: "boil", pack: { perBbl: 0.4, factor: 44, unit: "lb" } },
+    { key: "dh", title: "Citra", detail: ingredientDetail("dry_hop", null, 1.2, "lb"), qty: "", stage: "dry_hop" },
   ],
   totalsAtBbl: "22",
   preBoil: "16.8",
@@ -313,8 +317,10 @@ export const recipeHazyV4: RecipeViewModel = {
   notes: "Whirlpool hard, knock out cold.",
   predicted: "Predicted: OG 15.2 °P · FG 3.5 °P · ABV 6.3%",
   bitterness: ibuText(HAZY_IBU, { saved: true }),
-  tape: outcomeTape(HAZY_OUTCOMES, "plato"),
+  tape: outcomeTape(HAZY_OUTCOMES, "plato", 4),
   actualsNote: outcomeSummary(HAZY_OUTCOMES, 4),
+  // The inventory's rows open nothing by address; the Recipe record's `to` says where a tap goes.
+  history: recipeHistory(HAZY_OUTCOMES, 4, 4).map((row) => ({ ...row, href: undefined })),
 };
 export const cellarTransferPils = {
   fromId: "fv1-occupancy", toId: "bt1", volume: "3.0", loss: "",

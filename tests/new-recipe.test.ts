@@ -44,7 +44,7 @@ describe("Recipe creation", () => {
   });
 
   it("bounds the process numbers as create_recipe_version does, so the browser refuses them first (#447)", () => {
-    const live = renderToStaticMarkup(createElement(RecipeView, { model: { title: "New recipe", notes: "" }, controls: { set: () => {}, onSubmit: () => {} } }));
+    const live = renderToStaticMarkup(createElement(RecipeView, { model: { title: "New recipe", notes: "" }, controls: { set: () => {}, onSubmit: () => {}, dirty: true } }));
     const input = (label: string) => new RegExp(`<input[^>]*aria-label="${label}"[^>]*>`).exec(live)?.[0] ?? "";
     expect(input("Boil time min")).toMatch(/min="1"[^>]*step="1"|step="1"[^>]*min="1"/);
     expect(input("Whirlpool min")).toMatch(/min="0"/);
@@ -56,24 +56,23 @@ describe("Recipe creation", () => {
   it("RecipeView is the one editor: controlled when given controls, static for the fixture", () => {
     const fixture = renderToStaticMarkup(createElement(RecipeView, { model: recipeHazyV4 }));
     expect(fixture).not.toMatch(/<form\b/);
-    expect(fixture).toMatch(/New recipe version/);
+    // The fixture is the saved recipe with no unsaved change: no save bar, and no verb that names a version.
+    expect(fixture).not.toMatch(/New recipe version|Save changes/);
     const set = vi.fn();
-    const live = renderToStaticMarkup(createElement(RecipeView, { model: { title: "New recipe", preBoil: "16.8", notes: "" }, controls: { set, onSubmit: () => {}, submitLabel: "Create recipe" } }));
+    const live = renderToStaticMarkup(createElement(RecipeView, { model: { title: "New recipe", preBoil: "16.8", notes: "" }, controls: { set, onSubmit: () => {}, dirty: true, submitLabel: "Create recipe" } }));
     expect(live).toMatch(/<form\b/);
     expect(live).toMatch(/value="16.8"/);
     expect(live).toMatch(/grid-cols-2 md:grid-cols-4/);
     expect(live).toMatch(/<button[^>]*type="submit"[^>]*>Create recipe</);
-    // A cut version is read out as text, its schedules as rows under their headings.
-    const cut = renderToStaticMarkup(createElement(RecipeView, { readOnly: true, model: { title: "Hazy v1", preBoil: "16.8", mash: { title: "Mash schedule · 1 step", detail: "60 min", rows: [{ title: "Sacch", detail: "152 °F · 60 min" }] } } }));
+    // A saved copy read only is text, its schedules as rows under their headings.
+    const cut = renderToStaticMarkup(createElement(RecipeView, { readOnly: true, model: { title: "Hazy", preBoil: "16.8", mash: { title: "Mash schedule · 1 step", detail: "60 min", rows: [{ title: "Sacch", detail: "152 °F · 60 min" }] } } }));
     expect(cut).toMatch(/Sacch/);
-    expect(cut).not.toMatch(/<form\b|Add ingredient|Open/);
+    expect(cut).not.toMatch(/<form\b|Add \w+ ingredient|Open/);
     // No scale chips: they previewed a batch size nothing supplies.
     expect(fixture).not.toMatch(/15 bbl|30 bbl/);
-    // No version yet: no number is invented.
-    const none = renderToStaticMarkup(createElement(RecipeView, { readOnly: true, model: { title: "Hazy", empty: { title: "No version yet" }, createHref: "/recipes/x/new" } }));
-    expect(none).toMatch(/No version yet/);
-    expect(none).not.toMatch(/Pre-boil volume/);
-    expect(none).toMatch(/href="\/recipes\/x\/new"/);
+    // Not written yet: no number is invented, and nothing says "version".
+    const none = renderToStaticMarkup(createElement(RecipeView, { readOnly: true, model: { title: "Hazy" } }));
+    expect(none).not.toMatch(/No version yet|Pre-boil volume/);
   });
 
   describe("the ingredient sheet fields (plan task 13)", () => {
@@ -110,31 +109,31 @@ describe("Recipe creation", () => {
   });
 
   describe("the read-out and the draft blocker (plan task 8)", () => {
-    const versioned = { title: "Hazy v1", createHref: "/recipes/x/new", preBoil: "16.8", efficiency: "72.5", notes: "", ingredients: [{ key: "m", title: "2-row", detail: "Mash · 40.9 lb / bbl", qty: "" }] };
-    const empty = { title: "Hazy", createHref: "/recipes/x/new", empty: { title: "No version yet" } };
+    const versioned = { title: "Hazy", preBoil: "16.8", efficiency: "72.5", notes: "", ingredients: [{ key: "m", title: "2-row", detail: "Mash · 40.9 lb / bbl", qty: "", stage: "mash" as const }] };
     const draw = (props: Parameters<typeof RecipeView>[0]) => renderToStaticMarkup(createElement(RecipeView, props));
-    const draft = (blockedReason?: string) => draw({ model: { title: "Hazy v2", notes: "" }, controls: { set: () => {}, onSubmit: () => {}, blockedReason } });
+    const draft = (blockedReason?: string) => draw({ model: { title: "Hazy", notes: "" }, controls: { set: () => {}, onSubmit: () => {}, dirty: true, blockedReason } });
 
-    it("a cut version reads its numbers as text, with no input", () => {
+    it("a saved copy read only shows its numbers as text, with no input", () => {
       const cut = draw({ readOnly: true, model: versioned });
       expect(cut).toMatch(/<dt[^>]*>Pre-boil volume bbl<\/dt>/);
       expect(cut).toMatch(/<dd[^>]*>16.8<\/dd>/);
       expect(cut).not.toMatch(/<input/);
-      // Only the numbers the version holds are read out.
+      // Only the numbers the copy holds are read out.
       expect(cut).not.toMatch(/Boil time min/);
     });
 
-    it("the one New recipe version sits in the title row, empty or versioned, read-only or not", () => {
-      for (const model of [versioned, empty]) {
-        for (const readOnly of [true, false]) {
-          const html = draw({ model, readOnly, parentForm: createElement("p", null, "PARENT") });
-          expect(html.match(/New recipe version/g)).toHaveLength(1);
-          const verb = html.indexOf("New recipe version");
-          expect(verb).toBeGreaterThan(html.indexOf("</h1>"));
-          expect(verb).toBeLessThan(html.indexOf("PARENT"));
-          expect(html).toMatch(/href="\/recipes\/x\/new"/);
-        }
+    it("the title row holds Schedule batch once the recipe is saved, read-only or not, and never a version verb", () => {
+      for (const readOnly of [true, false]) {
+        const html = draw({ model: { ...versioned, saved: "Aug 28, 2026", scheduleHref: "/batches?recipe=x" }, readOnly, parentForm: createElement("p", null, "PARENT") });
+        expect(html.match(/Schedule batch/g)).toHaveLength(1);
+        const verb = html.indexOf("Schedule batch");
+        expect(verb).toBeGreaterThan(html.indexOf("</h1>"));
+        expect(verb).toBeLessThan(html.indexOf("PARENT"));
+        expect(html).toMatch(/href="\/batches\?recipe=x"/);
+        expect(html).not.toContain("New recipe version");
       }
+      // Not saved yet: nothing to schedule, so the title row has no verb.
+      expect(draw({ model: versioned, readOnly: true })).not.toContain("Schedule batch");
     });
 
     it("a live page draws no Default price group; the inventory keeps its picker", () => {
@@ -157,15 +156,16 @@ describe("Recipe creation", () => {
       expect(draw({ model: recipeHazyV4 })).toMatch(/<ol\b/);
     });
 
-    it("shows the recipe note, the saved date and a version note under headings", () => {
+    it("shows the recipe note, the saved date and a change note, with each step under its heading", () => {
       const html = draw({ readOnly: true, model: { ...versioned, recipeNote: "House IPA", saved: "Aug 28, 2026", notes: "Knock out cold." } });
       expect(html).toMatch(/Recipe note[^]*House IPA/);
       expect(html).toMatch(/<dt[^>]*>Saved<\/dt><dd[^>]*>Aug 28, 2026<\/dd>/);
-      expect(html).toMatch(/<dt[^>]*>Version note<\/dt><dd[^>]*>Knock out cold\.<\/dd>/);
-      expect(html).toMatch(/<h2[^>]*>Ingredients<\/h2>/);
-      expect(html).toMatch(/<h2[^>]*>Process<\/h2>/);
-      expect(draw({ readOnly: true, model: versioned })).not.toMatch(/Recipe note|Version note/);
-      expect(draft()).toMatch(/aria-label="Version note"|>Version note</);
+      expect(html).toMatch(/<dt[^>]*>Change note<\/dt><dd[^>]*>Knock out cold\.<\/dd>/);
+      expect(html).toMatch(/<h2[^>]*>Mash<\/h2>/);
+      expect(html).toMatch(/<h2[^>]*>Boil<\/h2>/);
+      expect(html).not.toMatch(/<h2[^>]*>(Ingredients|Process)<\/h2>/);
+      expect(draw({ readOnly: true, model: versioned })).not.toMatch(/Recipe note|Change note/);
+      expect(draft()).toMatch(/aria-label="Change note · optional"|>Change note · optional</);
     });
   });
 
@@ -222,10 +222,10 @@ describe("recipe form copy (#1139)", () => {
     expect(fields).not.toMatch(/intent only|identity is required|New batches start/);
   });
 
-  it("the add-ingredient row reads like every other create action", () => {
-    const draft = html(createElement(RecipeView, { model: { title: "Hazy v2", notes: "" } }));
-    expect(draft).toContain("Add ingredient");
-    expect(draft).toContain("Material, stage and timing");
+  it("each step's add-ingredient row reads like every other create action", () => {
+    const draft = html(createElement(RecipeView, { model: { title: "Hazy", notes: "" } }));
+    expect(draft).toContain("Add mash ingredient");
+    expect(draft).toContain("Material, amount and timing");
     expect(draft).not.toMatch(/\+ add ingredient|material · stage · timing/);
   });
 

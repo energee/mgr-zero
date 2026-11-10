@@ -1,17 +1,19 @@
-// lib/mgr/recipe-view.ts — view-model for Recipe: the inventory editor and
-// the live page (read-out of a cut version, or the draft editor). Also the
-// get_recipe result shape (RecipeSnapshot), the copy of a saved version a new
-// draft starts from (versionToDraft), why a draft cannot be saved yet
-// (draftBlocker), the read page's model of a saved version (toRecipePageModel)
-// and why a prediction is missing (gravityBlockerText, noMashText). The read
-// page prints the IBU get_recipe estimated; a draft previews it (draftIbuText).
-// A brew-day line also totals in packs at the batch size typed into Show totals
-// at (ingredientPack, batchTotalText), and the draft offers rounding it to whole
-// packs (packRounding). Batch actuals is the text of get_recipe_outcomes: one
-// row per brewed batch (outcomeTape) and the gap for the shown version
-// (outcomeSummary).
+// lib/mgr/recipe-view.ts — view-model for Recipe, the one brewsheet page: the
+// inventory frame, the live editor and the read-out of an earlier copy. The
+// sheet's sections in brew-day order, with the ingredient stages and process
+// numbers each holds (RECIPE_SECTIONS). Also the get_recipe result shape
+// (RecipeSnapshot), a saved copy as the draft the editor starts from
+// (versionToDraft), why a draft cannot be saved yet (draftBlocker), the page's
+// model of a saved copy (toRecipePageModel) and why a prediction is missing
+// (gravityBlockerText, noMashText). A saved copy prints the IBU get_recipe
+// estimated; a draft previews it (draftIbuText). A brew-day line also totals in
+// packs at the batch size typed into Show totals at (ingredientPack,
+// batchTotalText), and the editor offers rounding it to whole packs
+// (packRounding). Batch actuals is the text of get_recipe_outcomes: one row per
+// brewed batch (outcomeTape) and the gap for the shown copy (outcomeSummary).
+// As brewed lists the earlier copies those batches brewed (recipeHistory).
+// The database calls a saved copy a recipe version; the page never says so.
 import type { ReactNode } from "react";
-import type { EmptyState } from "./empty-state";
 import { formatDate } from "@/lib/date-format";
 import { gravityBlockers, type GravityBlocker, type RecipeGravityResult } from "@/lib/recipe-gravity";
 import { ibuText, recipeIbu, type RecipeIbu } from "@/lib/recipe-ibu";
@@ -29,9 +31,10 @@ import {
 } from "./recipe-process-view";
 /** A brew-day line's per-bbl amount, its material's pack size (base units per pack; 1 = no pack) and base unit. */
 export type RecipePack = { perBbl: number; factor: number; unit: string };
-/** `action` (a live Edit) draws in place of `qty` when the page is a draft. `pack` lets the page total the line
- *  at a batch size; `onRound` (the live draft only) takes the per-bbl amount a Round choice picked. */
-export type RecipeIngredientView = { key: string; title: string; detail: string; qty: string; action?: ReactNode; pack?: RecipePack; onRound?: (perBbl: number) => void };
+/** `stage` places the line in its section (RECIPE_SECTIONS). `action` (a live Edit) draws in place of `qty` on the
+ *  editor. `pack` lets the page total the line at a batch size; `onRound` (the live editor only) takes the per-bbl
+ *  amount a Round choice picked. */
+export type RecipeIngredientView = { key: string; title: string; detail: string; qty: string; stage: IngredientStage; action?: ReactNode; pack?: RecipePack; onRound?: (perBbl: number) => void };
 
 /** Input bounds mirroring create_recipe_version, so the browser refuses a
  * decimal minute or a zero volume before the command answers with a raw
@@ -40,31 +43,50 @@ export type RecipeIngredientView = { key: string; title: string; detail: string;
 const WHOLE_MINUTES = { min: 1, step: 1 } as const;
 const WHOLE_MINUTES_OR_NONE = { min: 0, step: 1 } as const;
 
-/** The eight process numbers drawn in one grid, in drawing order, with their bounds. */
+/** The eight process numbers with their labels and bounds; RECIPE_SECTIONS says which step draws each. */
 export const RECIPE_NUMBERS = [
   ["preBoil", "Pre-boil volume bbl", { min: 0.01 }], ["boilMin", "Boil time min", WHOLE_MINUTES], ["whirlpoolMin", "Whirlpool min", WHOLE_MINUTES_OR_NONE], ["whirlpoolTemp", "Whirlpool temp °F", {}],
   ["whirlpoolRest", "Whirlpool rest min", WHOLE_MINUTES_OR_NONE], ["knockoutTemp", "Knockout temp °F", {}], ["efficiency", "Brewhouse efficiency %", {}], ["attenuation", "Yeast attenuation %", {}],
 ] as const;
 export type RecipeNumberKey = (typeof RECIPE_NUMBERS)[number][0];
 
+/** One step of the sheet: the ingredient stages drawn under it and the process numbers it holds. */
+export type RecipeSection = {
+  key: "water" | "mash" | "boil" | "whirlpool" | "knockout" | "fermentation" | "other";
+  title: string; stages: readonly IngredientStage[]; numbers: readonly RecipeNumberKey[];
+};
+/** The sheet top to bottom, as the brew day runs. Water, Mash and Fermentation also hold the schedule of the same key. */
+export const RECIPE_SECTIONS: readonly RecipeSection[] = [
+  { key: "water", title: "Water", stages: [], numbers: [] },
+  { key: "mash", title: "Mash", stages: ["mash"], numbers: ["efficiency"] },
+  { key: "boil", title: "Boil", stages: ["boil"], numbers: ["preBoil", "boilMin"] },
+  { key: "whirlpool", title: "Whirlpool", stages: ["whirlpool"], numbers: ["whirlpoolMin", "whirlpoolTemp", "whirlpoolRest"] },
+  { key: "knockout", title: "Knockout", stages: [], numbers: ["knockoutTemp"] },
+  { key: "fermentation", title: "Fermentation", stages: ["fermentation", "dry_hop"], numbers: ["attenuation"] },
+  { key: "other", title: "Packaging and other", stages: ["packaging", "other"], numbers: [] },
+];
+
 export type RecipeScheduleView = { title: string; detail: string; rows?: { title: string; detail: string }[] };
+
+/** One earlier copy of the recipe, named by the batches that brewed it. `href` opens it read only; fixtures leave it out. */
+type RecipeHistoryRow = { title: string; detail: string; href?: string; selected: boolean };
 
 export type RecipeViewModel = {
   backHref?: string;
-  /** The back link's text; "Recipes" unless the page sits under a recipe (the draft). */
+  /** The back link's text; "Recipes" unless the page sits under the recipe (an earlier copy). */
   backLabel?: string;
-  /** Where New recipe version goes on a cut version; the draft editor submits instead. */
-  createHref?: string;
-  /** Where Schedule batch goes: Batches, with New batch open on this recipe's current version. Only a recipe with a version has one. */
+  /** Where Schedule batch goes: Batches, with New batch open on this recipe as saved. Only a saved recipe has one. */
   scheduleHref?: string;
-  /** A recipe with no version yet: drawn instead of the editor, so no number is invented. */
-  empty?: EmptyState;
   title: string;
-  /** When the shown version was saved, as a date in the brewery's zone. */
+  /** When the shown copy was saved, as a date in the brewery's zone. Absent until the recipe is first saved. */
   saved?: string;
-  versions?: { number: number; href?: string; selected: boolean; latest: boolean }[];
-  historical?: boolean;
-  /** The recipe's own note (not the version note, which is `notes`). */
+  /** An earlier copy's read-only note ("As brewed in B-0041 to B-0045 · read only"); absent on the current recipe. */
+  asBrewed?: string;
+  /** Where Use this again goes from an earlier copy: the current page, with this copy loaded as an unsaved change. */
+  useAgainHref?: string;
+  /** As brewed: the earlier copies batches brewed, newest first. */
+  history?: RecipeHistoryRow[];
+  /** The recipe's own note (not the change note, which is `notes`). */
   recipeNote?: string;
   priceGroup?: string;
   priceGroupOptions?: string[];
@@ -79,7 +101,7 @@ export type RecipeViewModel = {
   knockoutTemp?: string;
   efficiency?: string;
   attenuation?: string;
-  /** A schedule row; `rows` present means it is read out inline (a cut version) instead of opening. */
+  /** A schedule row; `rows` present means it is read out inline (a saved copy read only) instead of opening. */
   mash?: RecipeScheduleView;
   fermentation?: RecipeScheduleView;
   water?: RecipeScheduleView;
@@ -87,7 +109,7 @@ export type RecipeViewModel = {
   predicted?: string;
   /** The IBU line (ibuText), drawn under `predicted`. */
   bitterness?: string;
-  /** Batch actuals: one row per brewed batch of any version, then the gap for the shown version. */
+  /** Batch actuals: one row per brewed batch of any copy, then the gap for the shown copy. */
   tape?: [string, string][];
   actualsNote?: string;
 };
@@ -185,7 +207,7 @@ export function draftBlocker(input: {
 }
 
 /** Why there is no prediction, naming the first blocked line, or null when nothing blocks it.
- * `saved` tells a saved version (fixed by creating the next one) from a draft (fixed under Materials).
+ * `saved` tells a saved copy (which froze the gap, so the fix is picked up by the next save) from a draft (fixed under Materials).
  * nameOf and unitOf take a blocker's index into the ingredient list that gravityBlockers was given. */
 export function gravityBlockerText(blockers: GravityBlocker[], nameOf: (index: number) => string, unitOf: (index: number) => string | undefined, { saved }: { saved: boolean }): string | null {
   const first = blockers[0];
@@ -193,7 +215,7 @@ export function gravityBlockerText(blockers: GravityBlocker[], nameOf: (index: n
   const name = nameOf(first.index);
   if (first.reason === "no_weight") return `${name} is stocked in ${unitOf(first.index) ?? "no unit"}, which has no weight, so nothing is predicted.`;
   return saved
-    ? `${name} had no extract potential when this version was saved; set it under Materials, then create the next version.`
+    ? `${name} had no extract potential when this recipe was saved; set it under Materials, then save a change to this recipe.`
     : `${name} has no extract potential; set it under Materials.`;
 }
 
@@ -243,8 +265,8 @@ export function packRounding(p: RecipePack, bbl: number): { whole: boolean; choi
   return { whole: false, choices: counts.map((n) => ({ label: `Round to ${n} × ${p.factor} ${p.unit}`, perBbl: Number((n * p.factor / bbl).toFixed(6)) })) };
 }
 
-/** What get_recipe_outcomes returns for one brewed batch: its measured figures beside what its own version predicted
- *  and assumed. A measured figure is null when an input is missing. Efficiency is null until the batch closes, because
+/** What get_recipe_outcomes returns for one brewed batch: its measured figures beside what its own copy (`version`)
+ *  predicted and assumed. A measured figure is null when an input is missing. Efficiency is null until the batch closes, because
  *  nothing records how many turns it will have. The fractions (attenuation, efficiency) run 0 to 1; ABV is a percent. */
 export type RecipeOutcome = {
   batchId: string; batchNo: number | null; version: number; brewedOn: string; closed: boolean;
@@ -272,10 +294,31 @@ function outcomeDetail(o: RecipeOutcome, unit: GravityUnit): string {
   return parts.filter(Boolean).join(" · ");
 }
 
-/** Batch actuals' rows, one per batch in the order given: label, then figures. Undefined with no batches, so no section is drawn. */
-export function outcomeTape(outcomes: RecipeOutcome[], unit: GravityUnit): [string, string][] | undefined {
+/** Batch actuals' rows, one per batch in the order given: label, then figures. A batch brewed from a copy before
+ *  `latestVersion` is marked "earlier recipe". Undefined with no batches, so no section is drawn. */
+export function outcomeTape(outcomes: RecipeOutcome[], unit: GravityUnit, latestVersion: number): [string, string][] | undefined {
   if (outcomes.length === 0) return undefined;
-  return outcomes.map((o) => [`${batNo(o.batchNo)} · v${o.version} · ${formatDate(o.brewedOn)}`, outcomeDetail(o, unit)]);
+  return outcomes.map((o) => [`${batNo(o.batchNo)} · ${formatDate(o.brewedOn)}${o.version === latestVersion ? "" : " · earlier recipe"}`, outcomeDetail(o, unit)]);
+}
+
+/** As brewed: one row per copy before `latestVersion` that a brewed batch used, newest copy first, named by its
+ *  batch numbers ("B-0041 to B-0045") with their count and brew dates. A copy no batch brewed gets no row.
+ *  `selected` marks the copy being shown. */
+export function recipeHistory(outcomes: RecipeOutcome[], shownVersion: number, latestVersion: number): RecipeHistoryRow[] {
+  const earlier = [...new Set(outcomes.map((o) => o.version))].filter((v) => v !== latestVersion).sort((a, b) => b - a);
+  return earlier.map((version) => {
+    const batches = outcomes.filter((o) => o.version === version);
+    const numbers = batches.flatMap((b) => b.batchNo ?? []);
+    const [low, high] = numbers.length ? [Math.min(...numbers), Math.max(...numbers)] : [null, null];
+    // ISO dates sort as text.
+    const days = batches.map((b) => b.brewedOn).sort();
+    const [first, last] = [days[0], days[days.length - 1]].map((day) => formatDate(day));
+    return {
+      title: low === high ? batNo(low) : `${batNo(low)} to ${batNo(high)}`,
+      detail: `${plural(batches.length, "batch", "batches")} · ${first === last ? first : `${first} – ${last}`}`,
+      href: `?v=${version}`, selected: version === shownVersion,
+    };
+  });
 }
 
 /** "68–71%", or "68%" when the lowest and highest round alike. */
@@ -284,7 +327,7 @@ function percentRange(fractions: number[]): string {
   return low === high ? `${low}%` : `${low}–${high}%`;
 }
 
-/** The gap between what `version` assumes and what its closed batches measured, or undefined under two such batches.
+/** The gap between what the copy `version` assumes and what its closed batches measured, or undefined under two such batches.
  *  An open batch is skipped because it has no efficiency and its FG can still move. It states the gap and gives no advice:
  *  the brewer decides what to do with it. */
 export function outcomeSummary(outcomes: RecipeOutcome[], version: number): string | undefined {
@@ -297,18 +340,16 @@ export function outcomeSummary(outcomes: RecipeOutcome[], version: number): stri
   return `${plural(measured.length, "batch", "batches")}: ${efficiency}${attenuation}.`;
 }
 
-/** A recipe with no version; New recipe version in the title row is the next step. */
-const NO_VERSION: EmptyState = { title: "No version yet" };
-
-/** The same saved-version heading for the screen and its browser tab. */
-export function recipePageTitle({ recipe, version }: Pick<RecipeSnapshot, "recipe" | "version">): string {
-  return version ? `${recipe.name} v${version.version}` : recipe.name;
+/** The same heading for the screen and its browser tab: the recipe's name, whichever copy is shown. */
+export function recipePageTitle({ recipe }: Pick<RecipeSnapshot, "recipe">): string {
+  return recipe.name;
 }
 
 /** A source system's record id (a 24-hex Mongo id, as in "Imported from Example Brewing recipe 6720f0…") ending a recipe note; the read page hides it, the stored note keeps it. */
 const IMPORT_ID = /\s+[0-9a-f]{24}$/;
 
-/** The read page's selected saved version, or the empty state before the first version. */
+/** The page's model of the selected saved copy; before the first save, the title and note alone.
+ *  A copy before the newest is read as brewed: its note, Use this again, and a back link to the current recipe. */
 export function toRecipePageModel(
   s: RecipeSnapshot,
   ctx: { materials: RecipeMaterial[]; profiles: { id: string; name: string }[]; unit: GravityUnit; timeZone: string; outcomes: RecipeOutcome[] },
@@ -316,10 +357,13 @@ export function toRecipePageModel(
   const { recipe, version: v, ingredients, waterAdditions } = s;
   const material = materialLookup(ctx.materials);
   const profileName = (pid: string | null) => (pid && ctx.profiles.find((p) => p.id === pid)?.name) || null;
-  const base = { title: recipePageTitle(s), backHref: "/recipes", createHref: `/recipes/${recipe.id}/new`, recipeNote: recipe.note?.replace(IMPORT_ID, "") || undefined };
-  if (!v) return { ...base, empty: NO_VERSION };
+  const base = { title: recipePageTitle(s), backHref: "/recipes", recipeNote: recipe.note?.replace(IMPORT_ID, "") || undefined };
+  if (!v) return base;
+  const latest = s.versions[0];
+  const history = recipeHistory(ctx.outcomes, v.version, latest);
+  const shown = history.find((h) => h.selected);
 
-  // The water rows leave out the process scalars processReadout also returns; the numbers grid shows those.
+  // The water rows leave out the process scalars processReadout also returns; the Boil, Whirlpool and Knockout steps show those.
   const waterFacts = processReadout(v, profileName).filter(([k]) => !/^(Pre-boil|Whirlpool|Knockout)/.test(k));
   // The prediction get_recipe made, or why it made none: the saved line's own snapshot and unit, as get_recipe read them.
   const blockers = gravityBlockers(ingredients.map((i) => ({ perBblQty: Number(i.per_bbl_qty), extractPotential: i.extract_snapshot, stage: i.stage, unit: i.materials?.base_uom })));
@@ -329,14 +373,18 @@ export function toRecipePageModel(
       ?? noMashText(ingredients.map((i) => i.stage)) ?? undefined;
   return {
     ...base,
-    scheduleHref: `/batches?recipe=${recipe.id}`,
+    ...(v.version === latest
+      ? { scheduleHref: `/batches?recipe=${recipe.id}` }
+      : {
+        backHref: `/recipes/${recipe.id}`, backLabel: "Current recipe", useAgainHref: `/recipes/${recipe.id}?from=${v.version}`,
+        asBrewed: `${shown ? `As brewed in ${shown.title}` : "An earlier recipe no batch brewed"} · read only`,
+      }),
     saved: formatDate(v.created_at, ctx.timeZone),
-    historical: v.version !== s.versions[0],
-    versions: s.versions.map((number) => ({ number, href: `?v=${number}`, selected: number === v.version, latest: number === s.versions[0] })),
+    history,
     ingredients: ingredients.map((i) => ({
       key: i.id, title: material.name(i.material_id),
       detail: ingredientDetail(i.stage, i.timing_minutes, perBblDisplay(Number(i.per_bbl_qty)), material.unit(i.material_id)),
-      qty: "", pack: ingredientPack(i.stage, Number(i.per_bbl_qty), material.get(i.material_id)),
+      qty: "", stage: i.stage as IngredientStage, pack: ingredientPack(i.stage, Number(i.per_bbl_qty), material.get(i.material_id)),
     })),
     ...versionNumbers(v),
     mash: { title: `Mash schedule · ${plural(v.mash_schedule.length, "step")}`, detail: mashRowSummary(v.mash_schedule), rows: v.mash_schedule.map((m) => ({ title: m.name, detail: mashStepDetail(m) })) },
@@ -352,7 +400,7 @@ export function toRecipePageModel(
     notes: v.note ?? "",
     predicted,
     bitterness: ibuText(s.ibu, { saved: true }),
-    tape: outcomeTape(ctx.outcomes, ctx.unit),
+    tape: outcomeTape(ctx.outcomes, ctx.unit, latest),
     actualsNote: outcomeSummary(ctx.outcomes, v.version),
   };
 }

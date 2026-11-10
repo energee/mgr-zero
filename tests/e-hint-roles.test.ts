@@ -140,7 +140,7 @@ describe("hint roles", () => {
   });
 
   it("RecipeView keeps the status region mounted before anything is predicted", () => {
-    const html = renderToStaticMarkup(createElement(RecipeView, { model: { title: "New recipe", notes: "" }, controls: { set: noop, onSubmit: noop } }));
+    const html = renderToStaticMarkup(createElement(RecipeView, { model: { title: "New recipe", notes: "" }, controls: { set: noop, onSubmit: noop, dirty: true } }));
     expect(statusRegion(html)).toBe("");
   });
 

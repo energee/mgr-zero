@@ -117,7 +117,6 @@ export const TAPS: [string | RegExp, string][] = [
   ["Add contract", "Contract"],
   [/^Fictional (Hop|Malt) Supply · /, "Contract"],
   ["New recipe", "Recipe"],
-  [/^(Hazy IPA|Pils|Stout) v\d+$/, "Recipe"],
   [/^(January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/, "Monthly compliance"],
   ["Save filed snapshot", "Compliance months"],
   // The months list is titled Compliance on the glass; its children crumb to that (#259).
@@ -232,7 +231,6 @@ export const INERT: (string | RegExp)[] = [
   "Change",
   "Citra \u00b7 44 lb boxes",
   "Complete batch",
-  "New recipe version",
   "Current state",
   "Online payments",
   "Decrease",

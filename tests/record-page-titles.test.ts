@@ -175,7 +175,7 @@ describe("successful record metadata", () => {
     expect(await page.generateMetadata({ params: Promise.resolve({ id: MISSING }), searchParams: Promise.resolve({}) })).toEqual({ title: savedTitle });
   });
 
-  it("names the recipe and selected version instead of its section", async () => {
+  it("names the recipe, whichever copy is selected, instead of its section", async () => {
     const { bindings } = requestBindings();
     const data = loadPage("app/(app)/recipes/recipe-data.ts", {
       ...bindings,
@@ -186,8 +186,8 @@ describe("successful record metadata", () => {
       },
     });
     const page = loadPage("app/(app)/recipes/[id]/page.tsx", { ...bindings, ...data });
-    expect(await page.generateMetadata({ params: Promise.resolve({ id: MISSING }), searchParams: Promise.resolve({ v: "1" }) })).toEqual({ title: "Cedar pale v1" });
-    expect(await page.generateMetadata({ params: Promise.resolve({ id: MISSING }), searchParams: Promise.resolve({}) })).toEqual({ title: "Cedar pale v3" });
+    expect(await page.generateMetadata({ params: Promise.resolve({ id: MISSING }), searchParams: Promise.resolve({ v: "1" }) })).toEqual({ title: "Cedar pale" });
+    expect(await page.generateMetadata({ params: Promise.resolve({ id: MISSING }), searchParams: Promise.resolve({}) })).toEqual({ title: "Cedar pale" });
   });
 
   it("names the next recipe version after its recipe", async () => {

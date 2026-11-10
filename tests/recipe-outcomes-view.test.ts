@@ -1,6 +1,7 @@
 // tests/recipe-outcomes-view.test.ts — the text Batch actuals draws from
-// get_recipe_outcomes: one tape row per batch (outcomeTape) and the summary
-// line for the shown version (outcomeSummary). Pure: no database.
+// get_recipe_outcomes: one tape row per batch (outcomeTape), which marks a
+// batch of an earlier copy and never prints a version number, and the summary
+// line for the shown copy (outcomeSummary). Pure: no database.
 import { describe, expect, it } from "vitest";
 import { outcomeSummary, outcomeTape, type RecipeOutcome } from "../lib/mgr/recipe-view";
 
@@ -10,13 +11,18 @@ const closed: RecipeOutcome = {
   predicted: { ogPlato: 15.2, fgPlato: 3.5, abv: 6.3 }, assumedEfficiency: 0.72, assumedAttenuation: 0.78,
 };
 const oneReading = { fgPlato: null, abv: null, apparentAttenuation: null };
-const detail = (outcome: Partial<RecipeOutcome>, unit: "plato" | "sg" = "plato") => outcomeTape([{ ...closed, ...outcome }], unit)![0][1];
+const detail = (outcome: Partial<RecipeOutcome>, unit: "plato" | "sg" = "plato") => outcomeTape([{ ...closed, ...outcome }], unit, 4)![0][1];
 
 describe("outcomeTape", () => {
   it("labels a batch and compares each figure with its prediction", () => {
-    expect(outcomeTape([closed], "plato")).toEqual([
-      ["B-0413 · v4 · Oct 3, 2026", "OG 14.8 °P (15.2) · FG 3.5 °P (3.5) · ABV 6.1% (6.3%) · attenuation 77% (78%) · efficiency 70% (72%)"],
+    expect(outcomeTape([closed], "plato", 4)).toEqual([
+      ["B-0413 · Oct 3, 2026", "OG 14.8 °P (15.2) · FG 3.5 °P (3.5) · ABV 6.1% (6.3%) · attenuation 77% (78%) · efficiency 70% (72%)"],
     ]);
+  });
+
+  it("marks a batch brewed from an earlier copy, without a version number", () => {
+    const labels = outcomeTape([closed, { ...closed, batchId: "b0", batchNo: 371, version: 3, brewedOn: "2026-07-18" }], "plato", 4)!.map(([label]) => label);
+    expect(labels).toEqual(["B-0413 · Oct 3, 2026", "B-0371 · Jul 18, 2026 · earlier recipe"]);
   });
 
   it("prints gravity in the reader's unit", () => {
@@ -45,7 +51,7 @@ describe("outcomeTape", () => {
   });
 
   it("is undefined with no batches, so the page draws no section", () => {
-    expect(outcomeTape([], "plato")).toBeUndefined();
+    expect(outcomeTape([], "plato", 4)).toBeUndefined();
   });
 });
 

@@ -56,15 +56,26 @@ describe("SCREENS", () => {
     expect(SCREENS.find((s) => s.name === "Settings")!.to?.["Water profiles"]).toBe("Water profiles");
   });
 
-  it("makes a recipe version executable without restating the batch size", () => {
+  it("draws the recipe as one brewsheet in brew-day order, without restating the batch size", () => {
     const recipe = text("Recipe");
     expect(recipe).toContain("Pre-boil volume");
     expect(recipe).toContain("Boil time");
     expect(recipe).toContain("Whirlpool rest");
     expect(recipe).toContain("Knockout temp");
-    expect(recipe).toContain("Version note");
-    expect(recipe).toContain("Ingredients");
-    expect(recipe).toContain("Process");
+    expect(recipe).toContain("Change note · optional");
+    // The steps of the day are the headings, then what the batches measured and the earlier copies they brewed.
+    expect([...body("Recipe").matchAll(/<h2[^>]*>([^<]*)<\/h2>/g)].map((m) => m[1])).toEqual([
+      "Water", "Mash", "Boil", "Whirlpool", "Knockout", "Fermentation", "Batch actuals · predicted in brackets", "As brewed",
+    ]);
+    // Each ingredient sits under the step that uses it: the malt in the mash, the dry hop in fermentation.
+    const at = (label: string) => recipe.indexOf(label);
+    expect(at("2-row")).toBeGreaterThan(at("Mash "));
+    expect(at("2-row")).toBeLessThan(at("Boil "));
+    expect(at("Dry hop")).toBeGreaterThan(at("Fermentation "));
+    // The brewer never sees a version: no number in the title, no version links, no version verb.
+    expect(recipe).not.toMatch(/version|\bv\d\b/i);
+    expect(recipe).toContain("Schedule batch");
+    expect(recipe).not.toMatch(/Save changes|Discard/);
     expect(recipe).toContain("Mash schedule · 3 steps");
     expect(recipe).toContain("Fermentation schedule · 4 stages");
     expect(recipe).toMatch(/Water\s+Target /);
@@ -84,7 +95,12 @@ describe("SCREENS", () => {
     expect(recipe.states?.map(([name]) => name)).toContain("no batches");
     const drawn = text("Recipe");
     expect(drawn).toContain("Batch actuals · predicted in brackets");
-    expect(drawn).toContain("B-0413 · v4 · Oct 3, 2026");
+    expect(drawn).toContain("B-0413 · Oct 3, 2026");
+    expect(drawn).toContain("B-0371 · Jul 18, 2026 · earlier recipe");
+    // As brewed: the earlier copy two batches brewed, told by those batches.
+    expect(drawn).toContain("B-0356 to B-0371");
+    expect(drawn).toContain("2 batches · Jun 27, 2026 – Jul 18, 2026");
+    expect(recipe.to?.["B-0356 to B-0371"]).toBe("Recipe");
     expect(drawn).toContain("2 batches: efficiency 68–71% against 72% assumed; attenuation 77–78% against 78% assumed.");
     expect(drawn).not.toMatch(/Lower the assumption/);
   });
@@ -116,7 +132,8 @@ describe("SCREENS", () => {
     expect(spec).not.toMatch(/schema gate/i);
     expect(spec).toContain("each batch's Brew day keeps the plan it was brewed from");
     const states = (recipe.states ?? []).map(([name]) => name);
-    expect(states).toEqual(expect.arrayContaining(["no version", "draft", "frozen"]));
+    expect(states).toEqual(expect.arrayContaining(["not written yet", "unsaved changes", "as brewed"]));
+    expect(String(recipe.job) + spec + (recipe.states ?? []).flat().join(" ")).not.toMatch(/New recipe version|Versions links|\(current\)/);
     expect(states).not.toContain("no price group");
   });
 

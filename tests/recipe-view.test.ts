@@ -1,19 +1,22 @@
 // tests/recipe-view.test.ts — the recipe page's pure view-model: a saved
-// version copied into a draft (versionToDraft, versionNumbers), the first
-// reason a draft cannot be saved (draftBlocker), the read page's model
-// (toRecipePageModel) and why a prediction is missing (gravityBlockerText,
-// noMashText), and a brew-day line's batch total in packs at a typed batch
-// size with its whole-pack rounding (ingredientPack, batchTotalText,
-// packRounding), and the draft's IBU preview (draftIbuText). No DB.
-// The last block reads the page and brand picker sources: the page draws
-// toRecipePageModel, and the picker never disables itself while it saves.
+// copy turned into a draft (versionToDraft, versionNumbers), the first
+// reason a draft cannot be saved (draftBlocker), the sheet's sections in
+// brew-day order (RECIPE_SECTIONS), the page's model of a saved copy
+// (toRecipePageModel), the earlier copies batches brewed (recipeHistory) and
+// why a prediction is missing (gravityBlockerText, noMashText), and a brew-day
+// line's batch total in packs at a typed batch size with its whole-pack
+// rounding (ingredientPack, batchTotalText, packRounding), and the draft's IBU
+// preview (draftIbuText). No DB. "The sheet" draws RecipeView: sections, add
+// rows and the save bar. The last block reads the page and brand picker
+// sources: the page draws toRecipePageModel, and the picker never disables
+// itself while it saves.
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { describe, expect, it } from "vitest";
-import { batchTotalText, draftBlocker, draftIbuText, gravityBlockerText, ingredientPack, noMashText, packRounding, recipePageTitle, toRecipePageModel, versionNumbers, versionToDraft, type RecipeOutcome, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
-import type { IngredientLine, MashStep } from "@/lib/mgr/recipe-process-view";
+import { batchTotalText, draftBlocker, draftIbuText, gravityBlockerText, ingredientPack, noMashText, packRounding, RECIPE_NUMBERS, RECIPE_SECTIONS, recipeHistory, recipePageTitle, toRecipePageModel, versionNumbers, versionToDraft, type RecipeOutcome, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
+import { INGREDIENT_STAGES, type IngredientLine, type MashStep } from "@/lib/mgr/recipe-process-view";
 import { sgToPlato } from "@/lib/recipe-gravity";
 
 const version: NonNullable<RecipeSnapshot["version"]> = {
@@ -36,10 +39,46 @@ const snapshot: RecipeSnapshot = {
   ogPlato: null, fgPlato: null, abv: null, ibu: { kind: "none", reason: "no predicted OG" },
 };
 
-it("names recipe tabs with the same saved-version heading as the page (#1255)", () => {
-  expect(recipePageTitle(snapshot)).toBe("Pale v3");
-  expect(recipePageTitle({ ...snapshot, version: { ...version, version: 1 } })).toBe("Pale v1");
-  expect(recipePageTitle({ ...snapshot, version: null })).toBe("Pale");
+it("names recipe tabs and the page with the recipe alone, whichever copy is shown (#1255)", () => {
+  expect(recipePageTitle(snapshot)).toBe("Pale");
+  const earlier = { ...snapshot, version: { ...version, version: 1 } };
+  expect(recipePageTitle(earlier)).toBe("Pale");
+});
+
+/** One closed batch of the snapshot's current copy (3), as get_recipe_outcomes returns it. */
+const batch: RecipeOutcome = {
+  batchId: "b1", batchNo: 9, version: 3, brewedOn: "2026-10-03", closed: true, ogPlato: 12.5, fgPlato: 2.5, abv: 5.3, apparentAttenuation: 0.8, brewhouseEfficiency: 0.7,
+  predicted: null, assumedEfficiency: 0.725, assumedAttenuation: 0.07,
+};
+
+describe("RECIPE_SECTIONS", () => {
+  it("runs in brew-day order", () => {
+    expect(RECIPE_SECTIONS.map((s) => s.title)).toEqual(["Water", "Mash", "Boil", "Whirlpool", "Knockout", "Fermentation", "Packaging and other"]);
+  });
+  it("puts every ingredient stage and every process number in exactly one section", () => {
+    expect(RECIPE_SECTIONS.flatMap((s) => s.stages).sort()).toEqual([...INGREDIENT_STAGES].sort());
+    expect(RECIPE_SECTIONS.flatMap((s) => s.numbers).sort()).toEqual(RECIPE_NUMBERS.map(([key]) => key).sort());
+  });
+});
+
+describe("recipeHistory", () => {
+  const earlier = [{ ...batch, batchId: "b7", batchNo: 7, version: 2, brewedOn: "2026-09-01" }, { ...batch, batchId: "b5", batchNo: 5, version: 2, brewedOn: "2026-08-12" }];
+  it("has no row without a batch, or with batches of the current copy only", () => {
+    expect(recipeHistory([], 3, 3)).toEqual([]);
+    expect(recipeHistory([batch], 3, 3)).toEqual([]);
+  });
+  it("gives one row for an earlier copy batches brewed, and none for a copy nobody brewed", () => {
+    expect(recipeHistory([batch, ...earlier], 3, 3)).toEqual([
+      { title: "B-0005 to B-0007", detail: "2 batches · Aug 12, 2026 – Sep 1, 2026", href: "?v=2", selected: false },
+    ]);
+  });
+  it("lists the newest copy first, names one batch alone, and marks the copy being shown", () => {
+    const first = { ...batch, batchId: "b2", batchNo: 2, version: 1, brewedOn: "2026-07-04" };
+    expect(recipeHistory([batch, ...earlier, first], 1, 3)).toEqual([
+      { title: "B-0005 to B-0007", detail: "2 batches · Aug 12, 2026 – Sep 1, 2026", href: "?v=2", selected: false },
+      { title: "B-0002", detail: "1 batch · Jul 4, 2026", href: "?v=1", selected: true },
+    ]);
+  });
 });
 
 describe("versionNumbers", () => {
@@ -156,17 +195,20 @@ describe("toRecipePageModel", () => {
   const ctx = { materials, profiles: [{ id: "p-target", name: "Pale ale" }], unit: "plato" as const, timeZone: "America/Los_Angeles", outcomes: [] as RecipeOutcome[] };
   const predicted = { ...snapshot, ogPlato: 12.5, fgPlato: 2.5, abv: 5.25 };
 
-  it("prints the IBU get_recipe estimated from the frozen alpha acid, with the fix for a saved version", () => {
+  it("prints the IBU get_recipe estimated from the frozen alpha acid, with the fix for a saved copy", () => {
     expect(toRecipePageModel({ ...predicted, ibu: { kind: "estimate", ibu: 31, whirlpool: true } }, ctx).bitterness).toBe("IBU 31 · whirlpool hops at 5%");
     const lowerBound = { kind: "lowerBound" as const, ibu: 31, gaps: [{ name: "Mosaic", reason: "no alpha acid" as const }] };
-    expect(toRecipePageModel({ ...predicted, ibu: lowerBound }, ctx).bitterness).toBe("IBU ≥ 31 · no alpha acid: Mosaic; set alpha acid under Materials, then create the next version");
+    expect(toRecipePageModel({ ...predicted, ibu: lowerBound }, ctx).bitterness).toBe("IBU ≥ 31 · no alpha acid: Mosaic; set alpha acid under Materials, then save a change to this recipe");
   });
 
-  it("titles the page with the version and reads each ingredient per bbl to three significant digits", () => {
+  it("titles the page with the recipe and reads each ingredient per bbl to three significant digits", () => {
     const model = toRecipePageModel({ ...predicted, ingredients: [{ ...snapshot.ingredients[0], per_bbl_qty: 40.909091 }] }, ctx);
-    expect(model.title).toBe("Pale v3");
+    expect(model.title).toBe("Pale");
     expect(model.ingredients?.[0]?.detail).toContain("40.9 lb / bbl");
     expect(model.predicted).toMatch(/^Predicted: OG /);
+  });
+  it("gives each line its stage, which is what places it in a section", () => {
+    expect(toRecipePageModel(predicted, ctx).ingredients?.map((i) => i.stage)).toEqual(["mash", "boil"]);
   });
   it("gives each saved brew-day line its pack, from list_materials' purchase_uom_factor", () => {
     const model = toRecipePageModel(predicted, ctx);
@@ -183,60 +225,61 @@ describe("toRecipePageModel", () => {
     expect(model.water?.title).toBe("Water");
     expect(model.water?.rows?.filter((r) => r.detail === "Pale ale")).toHaveLength(1);
   });
-  it("dates the version in the brewery's zone and carries the recipe note", () => {
+  it("dates the saved copy in the brewery's zone and carries the recipe note", () => {
     const model = toRecipePageModel({ ...predicted, recipe: { ...snapshot.recipe, note: "House pale" }, version: { ...version, created_at: "2026-10-01T03:00:00Z" } }, ctx);
     expect(model.saved).toBe("Sep 30, 2026");
     expect(model.recipeNote).toBe("House pale");
   });
-  it("links every version and distinguishes the current version from the one being viewed", () => {
-    const current = toRecipePageModel(predicted, ctx);
-    expect(current.historical).toBe(false);
-    expect(current.versions).toEqual([
-      { number: 3, href: "?v=3", selected: true, latest: true },
-      { number: 2, href: "?v=2", selected: false, latest: false },
-      { number: 1, href: "?v=1", selected: false, latest: false },
-    ]);
-    const model = toRecipePageModel({ ...predicted, version: { ...version, version: 1 } }, ctx);
-    expect(model.historical).toBe(true);
-    const html = renderToStaticMarkup(createElement(RecipeView, { model, readOnly: true, parentForm: "Editable brand" }));
-    expect(html).toContain('href="?v=3"');
-    const selectedLink = html.match(/<a\b[^>]*href="\?v=1"[^>]*>/)?.[0];
-    expect(selectedLink).toContain('aria-current="page"');
-    expect(html).toContain("v3 (current)");
-    expect(html).toContain("Older version");
-    expect(html).toContain("Less crystal");
-    expect(html).not.toContain("New recipe version");
-    expect(html).not.toContain("Editable brand");
-    // The one input is Show totals at, a page-only batch size that never edits the version.
-    expect(html.replace(/<input[^>]*aria-label="Show totals at \(bbl\)"[^>]*>/, "")).not.toMatch(/<input|<select|<form/);
+  it("lists earlier brewed copies under the current recipe, and reads an earlier copy as brewed, read only", () => {
+    const outcomes = [batch, { ...batch, batchId: "b3", batchNo: 3, version: 1, brewedOn: "2026-08-02" }];
+    const current = toRecipePageModel(predicted, { ...ctx, outcomes });
+    expect(current.asBrewed).toBeUndefined();
+    expect(current.useAgainHref).toBeUndefined();
+    expect(current.backHref).toBe("/recipes");
+    expect(current.history).toEqual([{ title: "B-0003", detail: "1 batch · Aug 2, 2026", href: "?v=1", selected: false }]);
     const currentHtml = renderToStaticMarkup(createElement(RecipeView, { model: current, readOnly: true }));
-    expect(currentHtml).toContain('href="/recipes/r1/new"');
-    expect(currentHtml).toContain("New recipe version");
+    expect(currentHtml).toMatch(/<h2[^>]*>As brewed<\/h2>/);
+    expect(currentHtml).toMatch(/<a\b(?=[^>]*href="\?v=1")[^>]*data-to="Recipe"/);
+
+    const model = toRecipePageModel({ ...predicted, version: { ...version, version: 1 } }, { ...ctx, outcomes });
+    expect(model.asBrewed).toBe("As brewed in B-0003 · read only");
+    expect(model.useAgainHref).toBe("/recipes/r1?from=1");
+    expect([model.backLabel, model.backHref]).toEqual(["Current recipe", "/recipes/r1"]);
+    expect(model.history?.[0]?.selected).toBe(true);
+    const html = renderToStaticMarkup(createElement(RecipeView, { model, readOnly: true, parentForm: "Editable brand" }));
+    expect(html).toContain("As brewed in B-0003 · read only");
+    expect(html).toMatch(/<a\b[^>]*href="\/recipes\/r1\?from=1"[^>]*>Use this again<\/a>/);
+    expect(html).toContain("Less crystal");
+    expect(html).not.toContain("Editable brand");
+    // The copy being shown is named in the list, not linked to itself.
+    expect(html).not.toContain('href="?v=1"');
+    // The one input is Show totals at, a page-only batch size that never edits the copy.
+    expect(html.replace(/<input[^>]*aria-label="Show totals at \(bbl\)"[^>]*>/, "")).not.toMatch(/<input|<select|<form/);
+    // No copy says "version" on screen, current or earlier.
+    for (const drawn of [html, currentHtml]) expect(drawn.replace(/<[^>]+>/g, " ")).not.toMatch(/version|\bv\d\b/i);
+    // An earlier copy no batch brewed is reachable by its address only.
+    expect(toRecipePageModel({ ...predicted, version: { ...version, version: 2 } }, { ...ctx, outcomes }).asBrewed).toBe("An earlier recipe no batch brewed · read only");
   });
-  it("offers Schedule batch beside New recipe version on the current version only (#1581)", () => {
+  it("offers Schedule batch as the one title-row verb, on the current recipe only (#1581)", () => {
     const current = toRecipePageModel(predicted, ctx);
     expect(current.scheduleHref).toBe("/batches?recipe=r1");
     const drawn = (model: typeof current) => renderToStaticMarkup(createElement(RecipeView, { model, readOnly: true }));
     expect(drawn(current)).toContain('href="/batches?recipe=r1"');
     expect(drawn(current)).toContain("Schedule batch");
     expect(drawn(toRecipePageModel({ ...predicted, version: { ...version, version: 1 } }, ctx))).not.toContain("Schedule batch");
-    const empty = toRecipePageModel({ ...snapshot, version: null, ingredients: [], waterAdditions: [] }, ctx);
-    expect(empty.scheduleHref).toBeUndefined();
-    expect(drawn(empty)).not.toContain("Schedule batch");
-    expect(drawn(empty)).toContain("New recipe version");
+    const unwritten = toRecipePageModel({ ...snapshot, version: null, ingredients: [], waterAdditions: [] }, ctx);
+    expect(unwritten.scheduleHref).toBeUndefined();
+    expect(drawn(unwritten)).not.toContain("Schedule batch");
+    for (const model of [current, unwritten]) expect(drawn(model)).not.toContain("New recipe version");
   });
-  it("says nothing is predicted when the version has no mash ingredient", () => {
+  it("says nothing is predicted when the recipe has no mash ingredient", () => {
     const model = toRecipePageModel({ ...snapshot, ingredients: [snapshot.ingredients[1]] }, ctx);
     expect(model.predicted).toBe("No mash ingredient, so nothing is predicted.");
   });
-  it("lists every version's batches and summarizes only the shown version", () => {
-    const batch: RecipeOutcome = {
-      batchId: "b1", batchNo: 9, version: 3, brewedOn: "2026-10-03", closed: true, ogPlato: 12.5, fgPlato: 2.5, abv: 5.3, apparentAttenuation: 0.8, brewhouseEfficiency: 0.7,
-      predicted: null, assumedEfficiency: 0.725, assumedAttenuation: 0.07,
-    };
+  it("lists every copy's batches, marks an earlier copy's, and summarizes only the shown copy", () => {
     const outcomes = [batch, { ...batch, batchId: "b2", batchNo: 8, brewhouseEfficiency: 0.71 }, { ...batch, batchId: "b3", batchNo: 7, version: 2 }];
     const model = toRecipePageModel(predicted, { ...ctx, unit: "sg", outcomes });
-    expect(model.tape?.map(([label]) => label)).toEqual(["B-0009 · v3 · Oct 3, 2026", "B-0008 · v3 · Oct 3, 2026", "B-0007 · v2 · Oct 3, 2026"]);
+    expect(model.tape?.map(([label]) => label)).toEqual(["B-0009 · Oct 3, 2026", "B-0008 · Oct 3, 2026", "B-0007 · Oct 3, 2026 · earlier recipe"]);
     expect(model.tape?.[0]?.[1]).toContain("OG 1.050");
     expect(model.actualsNote).toMatch(/^2 batches: efficiency 70–71% against 73% assumed/);
   });
@@ -245,14 +288,79 @@ describe("toRecipePageModel", () => {
     expect(model.tape).toBeUndefined();
     expect(model.actualsNote).toBeUndefined();
   });
-  it("draws the empty recipe with no invented numbers", () => {
+  it("gives a recipe not written yet a title and nothing invented", () => {
     const model = toRecipePageModel({ ...snapshot, version: null, ingredients: [], waterAdditions: [] }, ctx);
-    expect(model.title).toBe("Pale");
-    expect(model.empty).toEqual({ title: "No version yet" });
+    expect(model).toEqual({ title: "Pale", backHref: "/recipes", recipeNote: undefined });
     const drawn = renderToStaticMarkup(createElement(RecipeView, { readOnly: true, model }));
-    expect(drawn).toContain("No version yet");
-    expect(model.mash).toBeUndefined();
-    expect(model.saved).toBeUndefined();
+    expect(drawn).not.toMatch(/No version yet|<h2|<dt/);
+  });
+});
+
+describe("the sheet", () => {
+  const materials = [{ id: "m-malt", name: "Fieldstone White Wheat", category: "malt", base_uom: "lb", extract_potential: 1.037, alpha_acid: null, purchase_uom_factor: 50 }];
+  const saved = toRecipePageModel(snapshot, { materials, profiles: [], unit: "plato", timeZone: "UTC", outcomes: [] });
+  const headings = (html: string) => [...html.matchAll(/<h2[^>]*>([^<]*)<\/h2>/g)].map((m) => m[1]);
+  const steps: string[] = RECIPE_SECTIONS.map((s) => s.title);
+  const controls = { set: () => {}, onSubmit: () => {} };
+
+  it("reads a saved copy in brew-day order, each ingredient and number under its step", () => {
+    const html = renderToStaticMarkup(createElement(RecipeView, { model: saved, readOnly: true }));
+    expect(headings(html).filter((h) => steps.includes(h))).toEqual(["Water", "Mash", "Boil", "Whirlpool", "Knockout", "Fermentation"]);
+    const at = (text: string) => html.indexOf(text);
+    const between = (text: string, from: string, to: string) => at(text) > at(`>${from}</h2>`) && at(text) < at(`>${to}</h2>`);
+    expect(between("Fieldstone White Wheat", "Mash", "Boil")).toBe(true);
+    expect(between("Brewhouse efficiency %", "Mash", "Boil")).toBe(true);
+    expect(between("Mash schedule · 1 step", "Mash", "Boil")).toBe(true);
+    expect(between("Pre-boil volume bbl", "Boil", "Whirlpool")).toBe(true);
+    expect(between("Whirlpool min", "Whirlpool", "Knockout")).toBe(true);
+    expect(between("Knockout temp °F", "Knockout", "Fermentation")).toBe(true);
+    expect(at("Yeast attenuation %")).toBeGreaterThan(at(">Fermentation</h2>"));
+    // The old flat headings are gone, and so is an empty step.
+    expect(headings(html)).not.toEqual(expect.arrayContaining(["Ingredients"]));
+    expect(headings(html)).not.toEqual(expect.arrayContaining(["Process"]));
+    const bare = renderToStaticMarkup(createElement(RecipeView, { readOnly: true, model: { title: "Pale", boilMin: "60" } }));
+    expect(headings(bare)).toEqual(["Boil"]);
+  });
+
+  it("draws every step on the editor, and Packaging and other only once it has a line", () => {
+    const blank = renderToStaticMarkup(createElement(RecipeView, { model: { title: "Pale", notes: "" } }));
+    expect(headings(blank)).toEqual(["Water", "Mash", "Boil", "Whirlpool", "Knockout", "Fermentation"]);
+    const cans = { key: "c", title: "Cans", detail: "Packaging · 330 each / bbl", qty: "", stage: "packaging" as const };
+    const html = renderToStaticMarkup(createElement(RecipeView, { model: { title: "Pale", notes: "", ingredients: [cans] } }));
+    expect(headings(html)).toContain("Packaging and other");
+    expect(html.indexOf("Cans")).toBeGreaterThan(html.indexOf(">Packaging and other</h2>"));
+  });
+
+  it("adds an ingredient from the step it belongs to", () => {
+    const blank = renderToStaticMarkup(createElement(RecipeView, { model: { title: "Pale", notes: "" } }));
+    for (const label of ["Add mash ingredient", "Add boil ingredient", "Add whirlpool ingredient", "Add fermentation ingredient"]) expect(blank).toContain(label);
+    expect(blank).not.toMatch(/Add (water|knockout|packaging and other) ingredient/);
+    // The live editor's sheet takes the step's first stage and that row as its trigger.
+    const live = renderToStaticMarkup(createElement(RecipeView, { model: { title: "Pale", notes: "" }, controls: { ...controls, dirty: false }, slots: { addIngredient: (stage) => `SHEET:${stage}` } }));
+    expect(live.match(/SHEET:\w+/g)).toEqual(["SHEET:mash", "SHEET:boil", "SHEET:whirlpool", "SHEET:fermentation"]);
+    expect(renderToStaticMarkup(createElement(RecipeView, { model: saved, readOnly: true }))).not.toMatch(/Add \w+ ingredient/);
+  });
+
+  it("draws the save bar only once the sheet differs from what is saved", () => {
+    const model = { title: "Pale", saved: "Oct 1, 2026", scheduleHref: "/batches?recipe=r1", notes: "" };
+    const draw = (dirty: boolean) => renderToStaticMarkup(createElement(RecipeView, { model, controls: { ...controls, dirty, onDiscard: () => {} } }));
+    expect(draw(false)).not.toMatch(/Save changes|Discard/);
+    expect(draw(false)).toContain("Schedule batch");
+    expect(draw(true)).toMatch(/<button[^>]*type="submit"[^>]*>Save changes</);
+    expect(draw(true)).toMatch(/<button[^>]*type="button"[^>]*>Discard</);
+    // Schedule batch would schedule what is saved, not what is on screen.
+    expect(draw(true)).not.toContain("Schedule batch");
+  });
+
+  it("keeps the save bar up while a recipe is being created, with nothing to discard", () => {
+    const html = renderToStaticMarkup(createElement(RecipeView, { model: { title: "New recipe", notes: "" }, controls: { ...controls, dirty: true, submitLabel: "Create recipe" } }));
+    expect(html).toMatch(/<button[^>]*type="submit"[^>]*>Create recipe</);
+    expect(html).not.toContain("Discard");
+  });
+
+  it("asks for a change note, and reads it out on a saved copy", () => {
+    expect(renderToStaticMarkup(createElement(RecipeView, { model: { title: "Pale", notes: "" } }))).toContain("Change note · optional");
+    expect(renderToStaticMarkup(createElement(RecipeView, { model: saved, readOnly: true }))).toMatch(/<dt[^>]*>Change note<\/dt><dd[^>]*>Less crystal<\/dd>/);
   });
 });
 
@@ -290,7 +398,7 @@ describe("batch totals in packs", () => {
     expect(batchTotalText({ perBbl: up.perBbl, factor: 50, unit: "lb" }, 3000)).toBe("50.001 lb = 1 × 50 lb + 0.001 lb");
   });
   it("draws totals only once a batch size is typed, and Round only on the draft", () => {
-    const model = { title: "Pale v3", ingredients: [{ key: "i1", title: "2-row", detail: "Mash · 10 lb / bbl", qty: "", pack: malt }] };
+    const model = { title: "Pale", ingredients: [{ key: "i1", title: "2-row", detail: "Mash · 10 lb / bbl", qty: "", stage: "mash" as const, pack: malt }] };
     const draw = (m: typeof model & { totalsAtBbl?: string }, readOnly: boolean) => renderToStaticMarkup(createElement(RecipeView, { model: m, readOnly }));
     expect(draw(model, true)).toContain("Enter a batch size to see totals in packs");
     expect(draw(model, true)).not.toContain("220 lb");
@@ -301,7 +409,7 @@ describe("batch totals in packs", () => {
     expect(draw({ ...model, totalsAtBbl: "22", ingredients: [{ ...model.ingredients[0], pack: { ...malt, perBbl: 9.090909 } }] }, false)).toContain("Whole packs");
   });
   it("#1479 reads an exponent batch size as no size, and says why", () => {
-    const model = { title: "Pale v3", ingredients: [{ key: "i1", title: "2-row", detail: "Mash · 10 lb / bbl", qty: "", pack: malt }], totalsAtBbl: "1e1" };
+    const model = { title: "Pale", ingredients: [{ key: "i1", title: "2-row", detail: "Mash · 10 lb / bbl", qty: "", stage: "mash" as const, pack: malt }], totalsAtBbl: "1e1" };
     const html = renderToStaticMarkup(createElement(RecipeView, { model, readOnly: true }));
     expect(html).not.toContain("100 lb");
     expect(html).toContain("Enter a decimal number, not exponent notation");
@@ -334,6 +442,10 @@ describe("gravityBlockerText", () => {
   it("speaks of a draft in the present tense", () => {
     expect(gravityBlockerText([{ index: 0, reason: "no_extract" }], () => "Pilsner", () => "lb", { saved: false }))
       .toBe("Pilsner has no extract potential; set it under Materials.");
+  });
+  it("tells a saved copy's reader how to pick the fix up, without naming a version", () => {
+    expect(gravityBlockerText([{ index: 0, reason: "no_extract" }], () => "Pilsner", () => "lb", { saved: true }))
+      .toBe("Pilsner had no extract potential when this recipe was saved; set it under Materials, then save a change to this recipe.");
   });
   it("is null when nothing blocks the prediction", () => {
     expect(gravityBlockerText([], () => "Pilsner", () => "lb", { saved: true })).toBeNull();

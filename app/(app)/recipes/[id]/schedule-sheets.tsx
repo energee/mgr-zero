@@ -4,7 +4,7 @@
 // swap and the save and delete verbs; each sheet supplies its list view,
 // item editor and field shape. `trigger` is the RecipeView row itself, so
 // the draft looks like the inventory drawing. They edit the editor's draft;
-// nothing is written until Create recipe version.
+// nothing is written until Save changes.
 "use client";
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import { FermentationScheduleView, FermentationStageView } from "@/components/mg
 import { IngredientView, type IngredientMaterial } from "@/components/mgr/views/ingredient";
 import { MashScheduleView, MashStepView } from "@/components/mgr/views/mash-schedule";
 import { WaterAdditionView, WaterView } from "@/components/mgr/views/water";
-import { additionReason, fromIngredientFields, mashStepReason, moveItem, removeAt, stageReason, toAdditionFields, toIngredientFields, toMashStepFields, toStageFields, upsertAt, waterRowSummary, type FermentationStage, type IngredientFields, type IngredientLine, type MashStep, type TimingLimits, type SaltMaterial, type WaterAddition, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
+import { additionReason, fromIngredientFields, mashStepReason, moveItem, removeAt, stageReason, toAdditionFields, toIngredientFields, toMashStepFields, toStageFields, upsertAt, waterRowSummary, type FermentationStage, type IngredientFields, type IngredientLine, type IngredientStage, type MashStep, type TimingLimits, type SaltMaterial, type WaterAddition, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 
 type Editing = { index?: number } | null;
 type ListProps<T> = { items: T[]; onEdit: (index: number) => void; onMove: (index: number, by: -1 | 1) => void; add: ReactNode; onAdd: () => void };
@@ -78,15 +78,15 @@ export function WaterSheet({ water, profiles, materials, onChange, trigger }: { 
     item={(p) => <WaterAdditionView fields={p.fields} materials={materials} materialsHref="/materials" onChange={p.onChange} footer={p.footer} />} />;
 }
 
-const emptyLine = (): IngredientLine => ({ materialId: "", perBblQty: "", stage: "mash", timingMinutes: "" });
-
-/** One ingredient, edited in place: "Add ingredient" opens a blank editor, Edit on a row opens it filled. No list of its own; the recipe page is the list. */
-export function IngredientSheet({ line, materials, limits, onSave, onDelete, trigger }: { line?: IngredientLine; materials: IngredientMaterial[]; limits: TimingLimits; onSave: (line: IngredientLine) => void; onDelete?: () => void; trigger: ReactNode }) {
+/** One ingredient, edited in place: a step's add row opens a blank editor on that step's `stage`, Edit on a row opens it
+ *  filled from `line`. No list of its own; the recipe page is the list. */
+export function IngredientSheet({ line, stage = "mash", materials, limits, onSave, onDelete, trigger }: { line?: IngredientLine; stage?: IngredientStage; materials: IngredientMaterial[]; limits: TimingLimits; onSave: (line: IngredientLine) => void; onDelete?: () => void; trigger: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const start = line ?? { materialId: "", perBblQty: "", stage, timingMinutes: "" };
   // Timing is edited in the stage's unit (days or minutes) and stored as minutes on save (#1478).
-  const [f, setF] = useState<IngredientFields>(toIngredientFields(line ?? emptyLine()));
+  const [f, setF] = useState<IngredientFields>(toIngredientFields(start));
   const patch = (p: Partial<IngredientFields>) => setF((c) => ({ ...c, ...p }));
-  return <CommandForm open={open} onOpenChange={(o) => { setOpen(o); if (o) setF(toIngredientFields(line ?? emptyLine())); }} title={line ? "Edit ingredient" : "Add ingredient"} trigger={asTrigger(trigger)}>
+  return <CommandForm open={open} onOpenChange={(o) => { setOpen(o); if (o) setF(toIngredientFields(start)); }} title={line ? "Edit ingredient" : "Add ingredient"} trigger={asTrigger(trigger)}>
     <div className="flex flex-col gap-4">
       <IngredientView fields={f} materials={materials} limits={limits} onChange={patch}
         onSave={() => { onSave(fromIngredientFields(f)); setOpen(false); }}
