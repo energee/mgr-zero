@@ -9,13 +9,14 @@
 // get_recipe predicted for a saved copy, frozen at its save, or the editor's
 // preview from current Materials (draftIbu); when the two differ on an unchanged
 // sheet, materialsNowGive words the offer to Refresh from Materials. Each line
-// reads its amount and timing in columns (ingredientCells), and each schedule
+// reads its timing and its amount per bbl (ingredientCells), and each schedule
 // lists its rows (mashView, fermentationView, waterView), the same on the
 // editor and a saved copy. A brew-day line also totals in
 // packs at the batch size typed into Show totals at (ingredientPack,
 // batchTotalText), and the editor offers rounding it to whole packs
-// (packRounding). Batch actuals is the text of get_recipe_outcomes: one row per
-// brewed batch (outcomeTape) and the gap for the shown copy (outcomeSummary).
+// (packRounding). Batch actuals is the table of get_recipe_outcomes: what the
+// shown copy predicts, then one row per brewed batch (outcomeTable), and the gap
+// for the shown copy (outcomeSummary).
 // As brewed lists the earlier copies those batches brewed (recipeHistory); Use
 // this again loads one into the editor and says where it came from (loadedNotice).
 // The database calls a saved copy a recipe version; the page never says so.
@@ -37,7 +38,7 @@ import {
 } from "./recipe-process-view";
 /** A brew-day line's per-bbl amount, its material's pack size (base units per pack; 1 = no pack) and base unit. */
 export type RecipePack = { perBbl: number; factor: number; unit: string };
-/** One line of a step's table. `stage` places it in its section (RECIPE_SECTIONS); `amount` is per bbl ("40.9 lb")
+/** One ingredient line of a step. `stage` places it in its section (RECIPE_SECTIONS); `amount` is per bbl ("40.9 lb")
  *  and `timing` is "60 min" or "day 3", or "" (ingredientCells). `edit` (the live editor only) takes the line's
  *  name as a trigger and returns the Ingredient sheet it opens. `pack` lets the page total the line at a batch size;
  *  `onRound` (the live editor only) takes the per-bbl amount a Round choice picked. */
@@ -138,8 +139,8 @@ export type RecipeViewModel = {
   /** The headline figures as value and label (["15.2 °P", "OG"]), and the lines under them (figureStrip). */
   figures?: [string, string][];
   figureNotes?: string[];
-  /** Batch actuals: one row per brewed batch of any copy, then the gap for the shown copy. */
-  tape?: [string, string][];
+  /** Batch actuals: one row per brewed batch of any copy (outcomeTable), then the gap for the shown copy. */
+  actuals?: RecipeActuals;
   actualsNote?: string;
 };
 
@@ -338,30 +339,50 @@ export type RecipeOutcome = {
 
 const wholePercent = (fraction: number) => `${Math.round(fraction * 100)}%`;
 
-/** One batch's figures with the prediction in brackets, then what is missing or can still move. */
-function outcomeDetail(o: RecipeOutcome, unit: GravityUnit): string {
-  const { predicted } = o;
-  // The heading says the brackets are predictions, so a Plato bracket drops its unit: "OG 14.8 °P (15.2)".
-  const bracket = (plato: number) => formatGravity(plato, unit).replace(" °P", "");
-  const parts = [
-    o.ogPlato !== null && `OG ${formatGravity(o.ogPlato, unit)}${predicted ? ` (${bracket(predicted.ogPlato)})` : ""}`,
-    o.fgPlato !== null && `FG ${formatGravity(o.fgPlato, unit)}${predicted ? ` (${bracket(predicted.fgPlato)})` : ""}`,
-    o.abv !== null && `ABV ${o.abv.toFixed(1)}%${predicted ? ` (${predicted.abv.toFixed(1)}%)` : ""}`,
-    o.apparentAttenuation !== null && `attenuation ${wholePercent(o.apparentAttenuation)} (${wholePercent(o.assumedAttenuation)})`,
-    o.brewhouseEfficiency !== null && `efficiency ${wholePercent(o.brewhouseEfficiency)} (${wholePercent(o.assumedEfficiency)})`,
-    o.ogPlato === null && "no gravity readings yet",
-    o.ogPlato !== null && o.fgPlato === null && "FG needs a second reading",
-    !o.closed && "still open",
-  ];
-  return parts.filter(Boolean).join(" · ");
-}
+/** One figure of Batch actuals: what the batch measured, and what its own copy predicted or assumed when that copy is
+ *  not the one shown (the top row already says the shown copy's). Either is "" when there is none. */
+type OutcomeCell = { measured: string; predicted: string };
+/** Batch actuals as a table: the five figure columns, what the shown copy predicts and assumes for each, then one row per
+ *  batch. `notes` say what is missing or can still move, and mark a batch another copy brewed. */
+export type RecipeActuals = {
+  columns: string[]; predicted: string[];
+  rows: { key: string; batch: string; brewed: string; notes: string[]; cells: OutcomeCell[] }[];
+};
+/** What a copy predicts and assumes; a brewed batch carries its own copy's. */
+type OutcomeBasis = Pick<RecipeOutcome, "version" | "predicted" | "assumedEfficiency" | "assumedAttenuation">;
 
-/** Batch actuals' rows, one per batch in the order given: label, then figures. A batch brewed from another copy than
- *  the one shown is marked "earlier recipe" or "later recipe". Undefined with no batches, so no section is drawn. */
-export function outcomeTape(outcomes: RecipeOutcome[], unit: GravityUnit, shownVersion: number): [string, string][] | undefined {
+/** Batch actuals: the five figures of each brewed batch, in the order given, under what the shown copy (`shown`) predicts
+ *  and assumes. Gravity is in the reader's unit, named once in its column head. A batch another copy brewed is marked
+ *  "earlier recipe" or "later recipe" and carries that copy's own prediction. Undefined with no batches, so no section is drawn. */
+export function outcomeTable(outcomes: RecipeOutcome[], unit: GravityUnit, shown: OutcomeBasis): RecipeActuals | undefined {
   if (outcomes.length === 0) return undefined;
-  const mark = (version: number) => (version === shownVersion ? "" : version < shownVersion ? " · earlier recipe" : " · later recipe");
-  return outcomes.map((o) => [`${batNo(o.batchNo)} · ${formatDate(o.brewedOn)}${mark(o.version)}`, outcomeDetail(o, unit)]);
+  // The column head names the unit, so a Plato figure drops it: "14.8" under "OG °P".
+  const gravity = (plato: number | null) => (plato === null ? "" : formatGravity(plato, unit).replace(" °P", ""));
+  const percent1 = (n: number | null) => (n === null ? "" : `${n.toFixed(1)}%`);
+  const basis = (b: OutcomeBasis) => [
+    gravity(b.predicted?.ogPlato ?? null), gravity(b.predicted?.fgPlato ?? null), percent1(b.predicted?.abv ?? null),
+    wholePercent(b.assumedAttenuation), wholePercent(b.assumedEfficiency),
+  ];
+  const degrees = unit === "plato" ? " °P" : "";
+  return {
+    columns: [`OG${degrees}`, `FG${degrees}`, "ABV", "Attenuation", "Efficiency"],
+    predicted: basis(shown),
+    rows: outcomes.map((o) => {
+      const own = o.version === shown.version ? null : basis(o);
+      const values = [
+        gravity(o.ogPlato), gravity(o.fgPlato), percent1(o.abv),
+        o.apparentAttenuation === null ? "" : wholePercent(o.apparentAttenuation), o.brewhouseEfficiency === null ? "" : wholePercent(o.brewhouseEfficiency),
+      ];
+      const notes = [
+        o.version < shown.version && "earlier recipe",
+        o.version > shown.version && "later recipe",
+        o.ogPlato === null && "no gravity readings yet",
+        o.ogPlato !== null && o.fgPlato === null && "FG needs a second reading",
+        !o.closed && "still open",
+      ].filter((note): note is string => Boolean(note));
+      return { key: o.batchId, batch: batNo(o.batchNo), brewed: formatDate(o.brewedOn), notes, cells: values.map((value, i) => ({ measured: value, predicted: own?.[i] ?? "" })) };
+    }),
+  };
 }
 
 /** As brewed: one row per copy before `latestVersion` that a brewed batch used, newest copy first, named by its
@@ -459,7 +480,7 @@ export function toRecipePageModel(
     water: waterView(draft.water, ctx.profiles, material.name),
     notes: v.note ?? "",
     figures, figureNotes,
-    tape: outcomeTape(ctx.outcomes, ctx.unit, v.version),
+    actuals: outcomeTable(ctx.outcomes, ctx.unit, { version: v.version, predicted: s.ogPlato !== null && s.fgPlato !== null && s.abv !== null ? { ogPlato: s.ogPlato, fgPlato: s.fgPlato, abv: s.abv } : null, assumedEfficiency: Number(v.brewhouse_efficiency), assumedAttenuation: Number(v.yeast_attenuation) }),
     actualsNote: outcomeSummary(ctx.outcomes, v.version),
   };
 }

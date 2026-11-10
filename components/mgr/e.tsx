@@ -117,6 +117,9 @@ export type FieldControls = Pick<React.InputHTMLAttributes<HTMLInputElement>, "i
   onChange?: (value: string) => void;
   /** Inline row controls already have visible context. */
   hideLabel?: boolean;
+  /** A number field in a dense sheet (Recipe's process numbers): the input alone under a small label, without the
+   *  −/+ buttons. The arrow keys still step it. Only E.edit's number type reads it. */
+  compact?: boolean;
   contextualLabels?: boolean;
   /** What is wrong with the value, shown under the field (#1121). The field is
    *  marked invalid; pass `id` too, so the message (`${id}-error`) is linked.
@@ -350,7 +353,7 @@ export const E = {
   edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[], controls?: FieldControls) => {
     // `error` is drawn under the field (fieldError), never passed to the input.
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { onChange, hideLabel, contextualLabels, error: _error, ...rest } = controls ?? {};
+    const { onChange, hideLabel, contextualLabels, compact, error: _error, ...rest } = controls ?? {};
     const error = fieldError(controls);
     const attributes = { ...rest, "aria-invalid": error.invalid, "aria-describedby": error.describedBy };
     if (type === "date") return <><DatePicker label={label} defaultValue={value} value={onChange ? value : undefined} onChange={onChange} disabled={controls?.disabled} required={controls?.required} name={controls?.name} max={controls?.max === undefined ? undefined : String(controls.max)} invalid={error.invalid} aria-describedby={error.describedBy} />{error.message}</>;
@@ -359,8 +362,8 @@ export const E = {
     if (type === "number") {
       return (
         <Field data-disabled={attributes.disabled} data-invalid={attributes["aria-invalid"]}>
-          {!hideLabel && <FieldLabel htmlFor={attributes.id}>{label}</FieldLabel>}
-          {E.stq(Number(value) || 0, label, { ...attributes, value, onChange, contextualLabels, step: controls?.step ?? "any", required: controls?.required ?? false })}
+          {!hideLabel && <FieldLabel htmlFor={attributes.id} className={compact ? "font-normal text-muted-foreground text-xs" : undefined}>{label}</FieldLabel>}
+          {E.stq(Number(value) || 0, label, { ...attributes, value, onChange, contextualLabels, compact, step: controls?.step ?? "any", required: controls?.required ?? false })}
           {error.message}
         </Field>
       );

@@ -65,7 +65,7 @@ describe("SCREENS", () => {
     expect(recipe).toContain("Change note · optional");
     // The steps of the day are the headings, then what the batches measured and the earlier copies they brewed.
     expect([...body("Recipe").matchAll(/<h2[^>]*>([^<]*)<\/h2>/g)].map((m) => m[1])).toEqual([
-      "Water", "Mash", "Boil", "Whirlpool", "Knockout", "Fermentation", "Batch actuals · predicted in brackets", "As brewed",
+      "Water", "Mash", "Boil", "Whirlpool", "Knockout", "Fermentation", "Batch actuals", "As brewed",
     ]);
     // Each ingredient sits under the step that uses it: the malt in the mash, the dry hop in fermentation.
     const at = (label: string) => recipe.indexOf(label);
@@ -76,16 +76,16 @@ describe("SCREENS", () => {
     expect(recipe).not.toMatch(/version|\bv\d\b/i);
     expect(recipe).toContain("Schedule batch");
     expect(recipe).not.toMatch(/Save changes|Discard/);
-    // A step's rows do not repeat its heading: a schedule is listed under its count, and a line reads its amount and timing in columns.
+    // A step's rows do not repeat its heading: a schedule is listed under its count, and a line reads its timing, then its amount per bbl.
     expect(recipe).toContain("Schedule · 3 steps");
     expect(recipe).toContain("Schedule · 4 stages");
     expect(recipe).not.toMatch(/Mash schedule ·|Fermentation schedule ·/);
     expect(recipe).toMatch(/Profile and additions[\s\S]*Target profile\s+Hazy target/);
-    expect(recipe).toMatch(/Ingredient\s+Per bbl\s+At 22 bbl[\s\S]*2-row\s+44 lb/);
-    expect(recipe).toMatch(/Citra\s+0\.4 lb\s+10 min/);
-    expect(recipe).not.toMatch(/Mash · 44|Boil · 10 min|lb \/ bbl/);
-    // The dry hop shares Fermentation with fermentation-stage lines, so it keeps its name, in the Timing column.
-    expect(recipe).toMatch(/Citra\s+1\.2 lb\s+Dry hop/);
+    expect(recipe).toMatch(/2-row\s+44 lb\s+\/ bbl\s+At 22 bbl:\s+968 lb = 19 × 50 lb \+ 18 lb/);
+    expect(recipe).toMatch(/Citra\s+10 min\s+0\.4 lb\s+\/ bbl/);
+    expect(recipe).not.toMatch(/Mash · 44|Boil · 10 min/);
+    // The dry hop shares Fermentation with fermentation-stage lines, so it keeps its name, where the timing goes.
+    expect(recipe).toMatch(/Citra\s+Dry hop\s+1\.2 lb\s+\/ bbl/);
     // Spec D4: one place holds the mash temperature, and it is the schedule.
     expect(recipe).not.toMatch(/Mash temp/);
     // Spec D3: quantities are per barrel; the batch names its size on Brew day.
@@ -101,9 +101,11 @@ describe("SCREENS", () => {
     expect(String(recipe.reads)).toMatch(/get_recipe_outcomes \[(?!design)/);
     expect(recipe.states?.map(([name]) => name)).toContain("no batches");
     const drawn = text("Recipe");
-    expect(drawn).toContain("Batch actuals · predicted in brackets");
-    expect(drawn).toContain("B-0413 · Oct 3, 2026");
-    expect(drawn).toContain("B-0371 · Jul 18, 2026 · earlier recipe");
+    expect(drawn).toMatch(/Batch actuals\s+Batch\s+OG °P/);
+    // What this recipe predicts heads the table; a batch of an earlier copy carries that copy's own prediction in brackets.
+    expect(drawn).toMatch(/Predicted\s+15\.2\s+3\.5\s+6\.3%\s+78%\s+72%/);
+    expect(drawn).toMatch(/B-0413\s+Oct 3, 2026\s+14\.8\s+3\.5\s+6\.1%\s+77%\s+68%/);
+    expect(drawn).toMatch(/B-0371\s+Jul 18, 2026\s+15\.0\s+\(15\.6\)[\s\S]*earlier recipe/);
     // As brewed: the earlier copy two batches brewed, told by those batches.
     expect(drawn).toContain("B-0356 to B-0371");
     expect(drawn).toContain("2 batches · Jun 27, 2026 – Jul 18, 2026");

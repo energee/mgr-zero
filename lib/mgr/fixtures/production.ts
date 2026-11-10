@@ -4,7 +4,7 @@ import type { BatchesSnapshot } from "@/lib/mgr/batches-view";
 import type { BrewDayViewModel } from "@/lib/mgr/brew-day-view";
 import { cellarPlanRows, startAtPlan, waterAdditionRows, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import type { ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
-import { fermentationView, figureStrip, ingredientCells, mashView, outcomeSummary, outcomeTape, recipeHistory, waterView, type RecipeOutcome, type RecipeViewModel } from "@/lib/mgr/recipe-view";
+import { fermentationView, figureStrip, ingredientCells, mashView, outcomeSummary, outcomeTable, recipeHistory, waterView, type RecipeOutcome, type RecipeViewModel } from "@/lib/mgr/recipe-view";
 import type { RecipesSnapshot } from "@/lib/mgr/recipes-view";
 import type { RunClosedViewModel } from "@/lib/mgr/run-closed-view";
 import { DEMO_TIME_ZONE } from "@/lib/mgr/fixtures/settings";
@@ -318,7 +318,7 @@ export const recipeHazyV4: RecipeViewModel = {
   water: waterView(WATER_HAZY, waterProfiles, (id) => WATER_HAZY_NAMES[id]),
   notes: "Whirlpool hard, knock out cold.",
   ...(({ figures, notes }) => ({ figures, figureNotes: notes }))(figureStrip({ ...HAZY_V4.predicted, ibu: HAZY_IBU }, "plato", { saved: true })),
-  tape: outcomeTape(HAZY_OUTCOMES, "plato", 4),
+  actuals: outcomeTable(HAZY_OUTCOMES, "plato", HAZY_V4),
   actualsNote: outcomeSummary(HAZY_OUTCOMES, 4),
   // The inventory's rows open nothing by address; the Recipe record's `to` says where a tap goes.
   history: recipeHistory(HAZY_OUTCOMES, 4, 4).map((row) => ({ ...row, href: undefined })),

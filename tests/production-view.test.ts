@@ -607,13 +607,18 @@ describe("Recipes view", () => {
   });
 
 
-  it("draws Batch actuals as a heading, the tape, then the summary", () => {
-    const html = htmlOf(createElement(RecipeView, { readOnly: true, model: { title: "Pale", tape: [["B-0413 · Oct 3, 2026", "no gravity readings yet"]], actualsNote: "2 batches: efficiency 68–71% against 72% assumed." } }));
-    expect(html).toMatch(/<h2[^>]*>Batch actuals · predicted in brackets<\/h2><ol[^]*no gravity readings yet[^]*<\/ol>[^]*2 batches: efficiency/);
+  it("draws Batch actuals as a heading, the table, then the summary", () => {
+    const actuals = { columns: ["OG °P", "FG °P", "ABV", "Attenuation", "Efficiency"], predicted: ["15.2", "3.5", "6.3%", "78%", "72%"], rows: [{ key: "b1", batch: "B-0413", brewed: "Oct 3, 2026", notes: ["no gravity readings yet"], cells: ["", "", "", "", ""].map((measured) => ({ measured, predicted: "" })) }] };
+    const html = htmlOf(createElement(RecipeView, { readOnly: true, model: { title: "Pale", actuals, actualsNote: "2 batches: efficiency 68–71% against 72% assumed." } }));
+    expect(html).toMatch(/<h2[^>]*>Batch actuals<\/h2>[^]*<table[^]*Predicted[^]*15\.2[^]*B-0413[^]*Oct 3, 2026[^]*no gravity readings yet[^]*<\/table>[^]*2 batches: efficiency/);
+    // The long column heads keep their word for a screen reader where a phone shows three letters.
+    expect(html).toMatch(/<span aria-hidden="true"[^>]*>Att\.<\/span><span class="sr-only[^"]*">Attenuation<\/span>/);
   });
 
   it("the fixture's Batch actuals are computed, and its prediction agrees with their brackets", () => {
-    expect(recipeHazyV4.tape?.[0]).toEqual(["B-0413 · Oct 3, 2026", "OG 14.8 °P (15.2) · FG 3.5 °P (3.5) · ABV 6.1% (6.3%) · attenuation 77% (78%) · efficiency 68% (72%)"]);
+    expect(recipeHazyV4.actuals?.predicted).toEqual(["15.2", "3.5", "6.3%", "78%", "72%"]);
+    expect(recipeHazyV4.actuals?.rows[0]).toMatchObject({ batch: "B-0413", brewed: "Oct 3, 2026", notes: [] });
+    expect(recipeHazyV4.actuals?.rows[0].cells.map((c) => c.measured)).toEqual(["14.8", "3.5", "6.1%", "77%", "68%"]);
     expect(recipeHazyV4.figures?.slice(0, 3)).toEqual([["15.2 °P", "OG"], ["3.5 °P", "FG"], ["6.3%", "ABV"]]);
   });
 
@@ -651,7 +656,10 @@ describe("Recipes view", () => {
     // The numbers share the heading's line instead of a grid of their own; no field is drawn label-beside-control.
     expect(html).not.toMatch(/grid-cols-2 md:grid-cols-4/);
     expect(html).not.toMatch(/data-orientation="horizontal"/);
-    expect(html).toMatch(/<h2[^>]*>Whirlpool<\/h2><\/div>(?:(?!<h2)[\s\S])*Whirlpool min(?:(?!<h2)[\s\S])*Whirlpool temp °F(?:(?!<h2)[\s\S])*Whirlpool rest min/);
+    expect(html).toMatch(/<h2[^>]*>Whirlpool<\/h2>(?:(?!<h2)[\s\S])*Whirlpool min(?:(?!<h2)[\s\S])*Whirlpool temp °F(?:(?!<h2)[\s\S])*Whirlpool rest min/);
+    // Each is the compact field: its own input under a small label, without the stepper's buttons.
+    expect(html).toMatch(/<label[^>]*text-xs[^>]*>Whirlpool min<\/label>/);
+    expect(html.slice(html.indexOf(">Whirlpool</h2>"), html.indexOf(">Knockout</h2>"))).not.toMatch(/aria-label="(Decrease|Increase)"/);
   });
 
   it("the live recipe page mounts RecipeEditor on the current copy and RecipeView, read only, on an earlier one", () => {

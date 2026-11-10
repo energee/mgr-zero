@@ -150,11 +150,11 @@ describe("Recipe creation", () => {
       expect(draft()).not.toMatch(/<button[^>]*type="submit"[^>]*disabled/);
     });
 
-    it("draws no tape list or Batch actuals heading without a tape", () => {
+    it("draws no table or Batch actuals heading without brewed batches", () => {
       const html = draw({ readOnly: true, model: versioned });
-      expect(html).not.toMatch(/<ol\b/);
+      expect(html).not.toMatch(/<table\b/);
       expect(html).not.toContain("Batch actuals");
-      expect(draw({ model: recipeHazyV4 })).toMatch(/<ol\b/);
+      expect(draw({ model: recipeHazyV4 })).toMatch(/<table\b/);
     });
 
     it("shows the recipe note, the saved date and a change note, with each step under its heading", () => {

@@ -372,13 +372,16 @@ describe("toRecipePageModel", () => {
   it("lists every copy's batches, marks an earlier copy's, and summarizes only the shown copy", () => {
     const outcomes = [batch, { ...batch, batchId: "b2", batchNo: 8, brewhouseEfficiency: 0.71 }, { ...batch, batchId: "b3", batchNo: 7, version: 2 }];
     const model = toRecipePageModel(predicted, { ...ctx, unit: "sg", outcomes });
-    expect(model.tape?.map(([label]) => label)).toEqual(["B-0009 · Oct 3, 2026", "B-0008 · Oct 3, 2026", "B-0007 · Oct 3, 2026 · earlier recipe"]);
-    expect(model.tape?.[0]?.[1]).toContain("OG 1.050");
+    expect(model.actuals?.rows.map((r) => [r.batch, r.brewed, ...r.notes])).toEqual([["B-0009", "Oct 3, 2026"], ["B-0008", "Oct 3, 2026"], ["B-0007", "Oct 3, 2026", "earlier recipe"]]);
+    expect(model.actuals?.columns[0]).toBe("OG");
+    expect(model.actuals?.rows[0].cells[0].measured).toBe("1.050");
+    // The top row is what the shown copy itself assumes: its saved efficiency and attenuation.
+    expect(model.actuals?.predicted.slice(3)).toEqual(["7%", "73%"]);
     expect(model.actualsNote).toMatch(/^2 batches: efficiency 70–71% against 73% assumed/);
   });
   it("has no Batch actuals with no batches", () => {
     const model = toRecipePageModel(predicted, ctx);
-    expect(model.tape).toBeUndefined();
+    expect(model.actuals).toBeUndefined();
     expect(model.actualsNote).toBeUndefined();
   });
   it("gives a recipe not written yet a title and nothing invented", () => {
@@ -452,16 +455,16 @@ describe("the sheet", () => {
     expect(html).not.toContain("Discard");
   });
 
-  it("lists a step's ingredients as a table: amount per bbl, a Timing column only where a line has one, and the name as the line's Edit", () => {
+  it("lists a step's ingredients as tight rows: the name as the line's Edit, its timing only where a line has one, its amount per bbl", () => {
     const hop = { key: "h", title: "Citra", amount: "0.4 lb", timing: "10 min", stage: "boil" as const };
     const malt = { key: "m", title: "2-row", amount: "44 lb", timing: "", stage: "mash" as const };
     const dry = { key: "d", title: "Citra", amount: "1.2 lb", timing: "", stage: "dry_hop" as const };
     const html = renderToStaticMarkup(createElement(RecipeView, { model: { title: "Pale", notes: "", ingredients: [malt, hop, dry] } }));
-    const tableAfter = (heading: string) => html.slice(html.indexOf(`>${heading}</h2>`)).match(/<table[\s\S]*?<\/table>/)![0].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-    expect(tableAfter("Mash")).toBe("Ingredient Per bbl Edit 2-row 44 lb");
-    expect(tableAfter("Boil")).toBe("Ingredient Per bbl Timing Edit Citra 0.4 lb 10 min");
+    const rowsAfter = (heading: string) => html.slice(html.indexOf(`>${heading}</h2>`)).match(/<ul[\s\S]*?<\/ul>/)![0].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    expect(rowsAfter("Mash")).toBe("Edit 2-row 44 lb / bbl");
+    expect(rowsAfter("Boil")).toBe("Edit Citra 10 min 0.4 lb / bbl");
     // A stage that shares its step names itself where the timing goes.
-    expect(tableAfter("Fermentation")).toBe("Ingredient Per bbl Timing Edit Citra 1.2 lb Dry hop");
+    expect(rowsAfter("Fermentation")).toBe("Edit Citra Dry hop 1.2 lb / bbl");
     // The live editor wraps the name in the line's sheet; a read-out draws the name alone.
     const live = renderToStaticMarkup(createElement(RecipeView, { model: { title: "Pale", notes: "", ingredients: [{ ...malt, edit: () => "SHEET:2-row" }] }, controls: { ...controls, dirty: false } }));
     expect(live).toContain("SHEET:2-row");
@@ -472,7 +475,8 @@ describe("the sheet", () => {
     const mash = { title: "Schedule · 2 steps", detail: "Total 70 min · 152 °F saccharification rest", rows: [{ title: "Saccharification", detail: "Infusion · 152 °F · 60 min" }, { title: "Mash out", detail: "Infusion · 168 °F · 10 min" }] };
     const draw = (props: Partial<Parameters<typeof RecipeView>[0]>) => renderToStaticMarkup(createElement(RecipeView, { model: { title: "Pale", notes: "", mash }, ...props }));
     const text = draw({}).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
-    expect(text).toContain("Schedule · 2 steps Total 70 min · 152 °F saccharification rest Saccharification Infusion · 152 °F · 60 min Mash out");
+    expect(text).toContain("Schedule · 2 steps · Total 70 min · 152 °F saccharification rest");
+    expect(text).toContain("Saccharification Infusion · 152 °F · 60 min Mash out");
     // One step is its own summary, on the editor as on a read-out (#1518; tests/standing-help.test.ts pins the read-out).
     const one = { ...mash, title: "Schedule · 1 step", detail: "Total 60 min · 152 °F saccharification rest", rows: [mash.rows[0]] };
     expect(renderToStaticMarkup(createElement(RecipeView, { model: { title: "Pale", notes: "", mash: one } }))).not.toContain("Total 60 min");
@@ -484,7 +488,7 @@ describe("the sheet", () => {
   it("heads the sheet with the predicted figures, and offers Refresh from Materials only when the editor says they are stale", () => {
     const model = { title: "Pale", saved: "Oct 1, 2026", notes: "", figures: [["12.5 °P", "OG"]] as [string, string][], figureNotes: ["IBU not estimated: no predicted OG"] };
     const draw = (refresh?: { text: string; onRefresh: () => void }) => renderToStaticMarkup(createElement(RecipeView, { model, controls: { ...controls, dirty: false, refresh } }));
-    expect(draw()).toMatch(/12\.5 °P<\/div><div[^>]*>OG</);
+    expect(draw()).toMatch(/12\.5<span[^>]*>°P<\/span><\/div><div[^>]*>OG</);
     expect(draw()).toContain("IBU not estimated: no predicted OG");
     expect(draw()).not.toContain("Refresh from Materials");
     // A refresh runs on an unchanged sheet, where there is no save bar: its failure still has to show.
@@ -539,10 +543,9 @@ describe("batch totals in packs", () => {
     expect(draw(model, true)).toContain("Enter a batch size to see totals in packs");
     expect(draw(model, true)).not.toContain("220 lb");
     const read = draw({ ...model, totalsAtBbl: "22" }, true);
-    // The total has a column of its own, headed by the size.
-    expect(read).toMatch(/<th[^>]*>At 22 bbl<\/th>/);
-    expect(read).toContain("220 lb = 4 × 50 lb + 20 lb");
-    expect(draw(model, true)).not.toMatch(/<th[^>]*>At /);
+    // The total takes a line under its ingredient, and names the size for a screen reader.
+    expect(read).toMatch(/At 22 bbl: <\/span>220 lb = 4 × 50 lb \+ 20 lb/);
+    expect(draw(model, true)).not.toMatch(/At \d+ bbl/);
     expect(read).not.toContain("Round to");
     expect(draw({ ...model, totalsAtBbl: "22" }, false)).toContain("Round to 5 × 50 lb");
     expect(draw({ ...model, totalsAtBbl: "22", ingredients: [{ ...model.ingredients[0], pack: { ...malt, perBbl: 9.090909 } }] }, false)).toContain("Whole packs");

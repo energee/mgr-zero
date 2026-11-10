@@ -61,7 +61,7 @@ export function RecipeEditor({ recipeId, title, backHref, brands = [], parentFor
   /** The recipe page's brand picker, drawn above the sheet. It saves on its own, apart from the sheet's Save changes. */
   parentForm?: ReactNode;
   /** What the recipe page draws around the sheet from the saved recipe; the sheet's own fields come from the draft. */
-  page?: Pick<RecipeViewModel, "saved" | "scheduleHref" | "recipeNote" | "tape" | "actualsNote" | "history" | "figures" | "figureNotes">;
+  page?: Pick<RecipeViewModel, "saved" | "scheduleHref" | "recipeNote" | "actuals" | "actualsNote" | "history" | "figures" | "figureNotes">;
   /** What the saved copy predicts, frozen at its save (get_recipe). The unchanged sheet shows `page`'s figures, drawn
    *  from these; Refresh from Materials is offered when the live preview gives other numbers. Absent before the first save. */
   savedFigures?: RecipeFigures;
@@ -213,11 +213,12 @@ export function RecipeEditor({ recipeId, title, backHref, brands = [], parentFor
       }}
       parentForm={creating ? <>
         <NewRecipeFieldsView brands={brands} values={parent} onChange={setParent} busy={action.busy || parentLocked} />
-        {parentLocked ? E.info("The recipe is saved under this name; only its sheet is still to save.") : null}
+        {/* The band lays the parent fields out side by side; a notice takes a whole row of it. */}
+        {parentLocked ? <div className="basis-full">{E.info("The recipe is saved under this name; only its sheet is still to save.")}</div> : null}
       </> : <>
         {parentForm}
         {/* The notice is about an unsaved change, so it goes once the sheet is back to what is saved. */}
-        {notice && dirty ? E.info(notice) : null}
+        {notice && dirty ? <div className="basis-full">{E.info(notice)}</div> : null}
       </>}
       controls={{
         set: (field, value) => change(field === "notes" ? { notes: value } : { numbers: { ...draft.numbers, [field]: value } }),

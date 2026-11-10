@@ -28,8 +28,9 @@ function useNumberNotation(input: RefObject<HTMLInputElement | null>, value: str
   return { error, errorId, changed };
 }
 
-/** The same stepper for controlled forms and uncontrolled inventory fields. */
-export function StepQuantity({ label, value, defaultValue, onChange, contextualLabels, ...attributes }: Omit<FieldControls, "hideLabel" | "error"> & { label: string; value?: string; defaultValue?: string }) {
+/** The same stepper for controlled forms and uncontrolled inventory fields. `compact` draws the input without its
+ *  −/+ buttons, for a dense sheet of short numbers (Recipe); the same input, bounds and notation error. */
+export function StepQuantity({ label, value, defaultValue, onChange, contextualLabels, compact, ...attributes }: Omit<FieldControls, "hideLabel" | "error"> & { label: string; value?: string; defaultValue?: string }) {
   const input = useRef<HTMLInputElement>(null);
   const notation = useNumberNotation(input, onChange ? value : undefined, value ?? defaultValue);
   const notationError = attributes["aria-invalid"] ? undefined : notation.error;
@@ -40,18 +41,19 @@ export function StepQuantity({ label, value, defaultValue, onChange, contextualL
     if (onChange) onChange(next);
     else field.value = next;
   };
-  return <div className="flex flex-col gap-2"><ButtonGroup>
+  // Grows with its digits (field-sizing) so a long quantity is not cut off (#493).
+  // eslint-disable-next-line no-restricted-syntax -- Shared E numeric primitive; native spinners are hidden.
+  const control = <Input ref={input} type="number" inputMode="decimal" step="any" aria-label={label} {...attributes}
+    aria-invalid={Boolean(notation.error) || attributes["aria-invalid"]}
+    aria-describedby={[attributes["aria-describedby"], notationError ? notation.errorId : undefined].filter(Boolean).join(" ") || undefined}
+    value={onChange ? value : undefined} defaultValue={onChange ? undefined : value ?? defaultValue}
+    onChange={event => { notation.changed(event.target.value); onChange?.(event.target.value); }}
+    className={cn("field-sizing-content [appearance:textfield] text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none", compact ? "w-full min-w-16 tabular-nums" : "w-auto min-w-14")} />;
+  return <div className="flex flex-col gap-2">{compact ? control : <ButtonGroup>
     <Button type="button" variant="outline" size="icon" data-preview-action aria-label={contextualLabels ? `Decrease ${label}` : "Decrease"} disabled={Boolean(notation.error) || attributes.disabled || attributes.readOnly || Boolean(onChange && attributes.min !== undefined && Number(value) <= Number(attributes.min))} onClick={() => step(-1)}>−</Button>
-    {/* Grows with its digits (field-sizing) so a long quantity is not cut off (#493). */}
-    {/* eslint-disable-next-line no-restricted-syntax -- Shared E numeric primitive; native spinners are hidden. */}
-    <Input ref={input} type="number" inputMode="decimal" step="any" aria-label={label} {...attributes}
-      aria-invalid={Boolean(notation.error) || attributes["aria-invalid"]}
-      aria-describedby={[attributes["aria-describedby"], notationError ? notation.errorId : undefined].filter(Boolean).join(" ") || undefined}
-      value={onChange ? value : undefined} defaultValue={onChange ? undefined : value ?? defaultValue}
-      onChange={event => { notation.changed(event.target.value); onChange?.(event.target.value); }}
-      className="w-auto min-w-14 field-sizing-content [appearance:textfield] text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
+    {control}
     <Button type="button" variant="outline" size="icon" data-preview-action aria-label={contextualLabels ? `Increase ${label}` : "Increase"} disabled={Boolean(notation.error) || attributes.disabled || attributes.readOnly || Boolean(onChange && attributes.max !== undefined && Number(value) >= Number(attributes.max))} onClick={() => step(1)}>+</Button>
-  </ButtonGroup>{notationError && <FieldError id={notation.errorId}>{notationError}</FieldError>}</div>;
+  </ButtonGroup>}{notationError && <FieldError id={notation.errorId}>{notationError}</FieldError>}</div>;
 }
 
 /** A typed quantity under its visible label: the OS keyboard is the keypad, so

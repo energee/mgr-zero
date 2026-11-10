@@ -1,13 +1,16 @@
 // components/mgr/views/recipe.tsx — Recipe: the one brewsheet. Under the title
-// sit the headline figures (OG, FG, ABV, IBU) with what they leave unsaid, and
-// Show totals at, a page-only batch size that is never saved. The sheet then
-// reads top to bottom as the brew day runs (RECIPE_SECTIONS). Each step is one
-// heading line (its process numbers beside it under their labels, its actions at the end) over a
-// compact table of the ingredients used there, then its schedule listed row by
-// row under its count and summary. A line reads its amount per bbl and its
-// timing in columns; it names its stage only where the step's heading does not
-// (a dry hop under Fermentation). With a batch size typed, each brew-day line
-// adds its total in packs, and off a read-out each line not in whole packs
+// one band holds the recipe's own fields (parentForm: the brand, or name, brand
+// and note while it is being created), the headline figures (OG, FG, ABV, IBU)
+// and Show totals at, a page-only batch size that is never saved. The sheet
+// then reads as the brew day runs (RECIPE_SECTIONS): each step is a card, and
+// from about 670px of page width the cards flow down two columns, in order.
+// A card's heading line holds its process numbers, each a small field under
+// its label. Under it sit the ingredients used there, one tight row each
+// (name, timing, amount per bbl; a stage is named only where the heading does
+// not, as a dry hop under Fermentation), then Add ingredient, then the step's
+// schedule listed row by row under its count and summary with Edit schedule
+// beside it. With a batch size typed, each brew-day line adds its total in
+// packs on a second line, and off a read-out each line not in whole packs
 // offers "Round to N × size", down and up. The inventory draws it static from
 // a fixture. The live editor (recipes/[id]/recipe-version-form.tsx) passes
 // `controls`: the fields become controlled, a line's name, a step's Add
@@ -18,26 +21,88 @@
 // read-out: numbers and change note as text, nothing that edits it, `asBrewed`
 // naming the batches that brewed it and Use this again in the title row.
 // Otherwise the title row holds Schedule batch (to New batch on Batches) once
-// the recipe is saved and has no unsaved change. parentForm draws the recipe's
-// parent fields (name, brand and note) at the top. Batch actuals follows the
-// sheet: what brewed batches measured, predictions in brackets, and the gap
-// for the shown copy. It is drawn only with a tape. As brewed comes last: the
-// earlier copies batches brewed, each opening read only. The page never says
-// "version".
+// the recipe is saved and has no unsaved change. Batch actuals follows the
+// sheet as a table: what the shown copy predicts on top, then what each brewed
+// batch measured, and the gap for the shown copy. As brewed sits beside it:
+// the earlier copies batches brewed, each opening read only. The page never
+// says "version".
 "use client";
 import { Fragment, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
+import { FieldDescription } from "@/components/ui/field";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { sentenceCase } from "@/lib/mgr/labels";
 import { isNumber } from "@/lib/mgr/quantity-input";
 import type { IngredientStage } from "@/lib/mgr/recipe-process-view";
-import { batchTotalText, packRounding, RECIPE_NUMBERS, RECIPE_SECTIONS, type RecipeIngredientView, type RecipeNumberKey, type RecipeSection, type RecipeViewModel } from "@/lib/mgr/recipe-view";
+import { batchTotalText, packRounding, RECIPE_NUMBERS, RECIPE_SECTIONS, type RecipeActuals, type RecipeIngredientView, type RecipeNumberKey, type RecipeSection, type RecipeViewModel } from "@/lib/mgr/recipe-view";
+import { cn } from "@/lib/utils";
 
 /** The steps that hold a schedule; the model carries one under the same key. */
 type ScheduleKey = "water" | "mash" | "fermentation";
-/** A table is as wide as its longest cell and scrolls sideways past the column, so on the phone a long name or summary wraps instead (as E.brand does). */
-const wrap = (text: ReactNode) => <span className="inline-block max-w-36 whitespace-normal md:max-w-none">{text}</span>;
+
+/** A headline figure: its number large, its unit (°P, %) small beside it, its name under. */
+function Figure({ value, label }: { value: string; label: string }) {
+  const unit = /^(.*\d)\s?(°P|%)$/.exec(value);
+  return (
+    <div>
+      <div className="font-semibold text-xl tabular-nums leading-tight @3xl:text-2xl">
+        {unit ? <>{unit[1]}<span className="ml-0.5 font-normal text-muted-foreground text-sm">{unit[2]}</span></> : value}
+      </div>
+      <div className="text-muted-foreground text-xs">{label}</div>
+    </div>
+  );
+}
+
+/** Batch actuals: one narrow table at every width. The top row is what the shown copy predicts and assumes; a batch
+ *  another copy brewed prints that copy's own prediction in brackets under its figure. The brew date drops under the
+ *  batch number on a phone, and a batch's notes take a line of their own, so no column has to widen for them. */
+function Actuals({ actuals }: { actuals: RecipeActuals }) {
+  const cell = "px-1.5 py-1 text-right tabular-nums first:pl-0 last:pr-0";
+  return (
+    <Table className="text-sm">
+      <TableHeader>
+        <TableRow className="hover:bg-transparent">
+          <TableHead className="h-8 px-1.5 pl-0 font-normal text-muted-foreground text-xs">Batch</TableHead>
+          {actuals.columns.map((column) => (
+            <TableHead key={column} className="h-8 px-1.5 text-right font-normal text-muted-foreground text-xs last:pr-0">
+              {/* The two long heads shorten on a phone; a screen reader still hears the word. */}
+              {column.length > 8 ? <><span aria-hidden className="@xl:hidden">{column.slice(0, 3)}.</span><span className="sr-only @xl:not-sr-only">{column}</span></> : column}
+            </TableHead>
+          ))}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        <TableRow className="text-muted-foreground hover:bg-transparent">
+          <TableCell className="px-1.5 py-1 pl-0">Predicted</TableCell>
+          {actuals.predicted.map((value, i) => <TableCell key={actuals.columns[i]} className={cell}>{value}</TableCell>)}
+        </TableRow>
+        {actuals.rows.map((row) => (
+          <Fragment key={row.key}>
+            <TableRow className={cn("hover:bg-transparent", row.notes.length && "border-b-0")}>
+              <TableCell className="px-1.5 py-1 pl-0">
+                <span className="font-medium">{row.batch}</span>{" "}
+                <span className="block text-muted-foreground text-xs @xl:inline @xl:text-sm">{row.brewed}</span>
+              </TableCell>
+              {row.cells.map((c, i) => (
+                <TableCell key={actuals.columns[i]} className={cell}>
+                  {c.measured}
+                  {c.predicted ? <span className="block text-muted-foreground text-xs @xl:ml-1 @xl:inline">({c.predicted})</span> : null}
+                </TableCell>
+              ))}
+            </TableRow>
+            {row.notes.length ? (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={actuals.columns.length + 1} className="whitespace-normal px-0 pt-0 pb-1 text-muted-foreground text-xs">{row.notes.join(" · ")}</TableCell>
+              </TableRow>
+            ) : null}
+          </Fragment>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
 
 export type RecipeControls = {
   set: (key: RecipeNumberKey | "notes", value: string) => void;
@@ -81,26 +146,25 @@ export function RecipeView({
   const bind = (key: RecipeNumberKey | "notes") => (controls ? { onChange: (value: string) => controls.set(key, value) } : undefined);
   // A line's name. On the sheet it opens the line's Ingredient sheet; the fixture draws the same button static.
   const name = (row: RecipeIngredientView) => {
-    if (readOnly) return wrap(row.title);
-    const trigger = <Button type="button" variant="link" className="h-auto p-0 text-left">{wrap(<><span className="sr-only">Edit </span>{row.title}</>)}</Button>;
+    if (readOnly) return row.title;
+    const trigger = <Button type="button" variant="link" className="h-auto whitespace-normal p-0 text-left"><span className="sr-only">Edit </span>{row.title}</Button>;
     return row.edit ? row.edit(trigger) : trigger;
   };
   // A brew-day line's total at the typed size, then Whole packs or (off a read-out) its Round choices.
   const total = ({ pack, onRound }: RecipeIngredientView) => {
-    if (!pack) return "";
+    if (!pack) return null;
     const rounding = packRounding(pack, bbl);
     return (
-      <div className="flex flex-col items-end gap-1">
-        <span className="flex items-center gap-2">{batchTotalText(pack, bbl)}{rounding?.whole ? E.status("Whole packs", "ok") : null}</span>
-        {rounding && !readOnly && rounding.choices.length ? (
-          <div className="flex flex-col gap-1 md:flex-row">
-            {rounding.choices.map((c) => <Fragment key={c.label}>{E.btn(c.label, "g", undefined, onRound ? () => onRound(c.perBbl) : undefined)}</Fragment>)}
-          </div>
-        ) : null}
+      <div className="col-span-full flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-muted-foreground tabular-nums">
+        <span><span className="sr-only">At {bbl} bbl: </span>{batchTotalText(pack, bbl)}</span>
+        {rounding?.whole ? E.status("Whole packs", "ok") : null}
+        {rounding && !readOnly ? rounding.choices.map((c) => (
+          <Button key={c.label} type="button" variant="outline" size="xs" onClick={onRound ? () => onRound(c.perBbl) : undefined}>{c.label}</Button>
+        )) : null}
       </div>
     );
   };
-  // One step of the brew day: a heading line with its process numbers and actions, the ingredients used there, and its schedule.
+  // One step of the brew day, as a card: a heading line with its process numbers, the ingredients used there, and its schedule.
   const step = ({ key, title, stages, numbers }: RecipeSection) => {
     const rows = lines.filter((row) => stages.includes(row.stage));
     // A read-out prints only the numbers the copy holds; the editor draws every field.
@@ -113,66 +177,103 @@ export function RecipeView({
     // The heading already names a line's stage when they match; a stage sharing the step (dry hop under Fermentation) names itself beside its timing.
     const when = (row: RecipeIngredientView) => (sentenceCase(row.stage) === title ? row.timing : [sentenceCase(row.stage), row.timing].filter(Boolean).join(" · "));
     const timed = rows.some(when);
-    const totals = bbl > 0 && rows.some((row) => row.pack);
-    // Each action says its step after its words, for a screen reader and the inventory's tap map; the heading beside it says it on screen.
-    const add = stages.length && !readOnly ? <Button type="button" variant="outline" size="sm">Add ingredient<span className="sr-only"> to {title.toLowerCase()}</span></Button> : null;
+    const totals = bbl > 0;
+    // Each action says its step after its words, for a screen reader and the inventory's tap map; the heading above it says it on screen.
+    const add = stages.length && !readOnly ? <Button type="button" variant="ghost" size="sm" className="-ml-2.5 text-muted-foreground">Add ingredient<span className="sr-only"> to {title.toLowerCase()}</span></Button> : null;
     const edit = plan && scheduleKey && !readOnly
-      ? <Button type="button" variant="outline" size="sm">{scheduleKey === "water" ? "Edit water" : <>Edit schedule<span className="sr-only"> for {title.toLowerCase()}</span></>}</Button>
+      ? <Button type="button" variant="ghost" size="sm" className="-mr-2.5 text-muted-foreground">{scheduleKey === "water" ? "Edit water" : <>Edit schedule<span className="sr-only"> for {title.toLowerCase()}</span></>}</Button>
       : null;
+    const body = rows.length > 0 || Boolean(add);
     return (
-      <section key={key} className="flex flex-col gap-1">
-        {/* The heading sits level with the steppers beside it, which stand under their labels. */}
-        <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
-          <div className="pb-1.5">{E.group(title)}</div>
-          {fields.map(([number, label, bounds]) => (
-            <div key={number}>
-              {readOnly ? E.fld(label, model[number]) : E.edit(label, model[number] ?? "", "number", undefined, controls ? { ...bounds, ...bind(number) } : undefined)}
-            </div>
-          ))}
-          {add || edit ? (
-            <div className="ml-auto flex gap-2">
-              {add && slots.addIngredient ? slots.addIngredient(stages[0], add) : add}
-              {edit && scheduleKey && slots.schedule ? slots.schedule(scheduleKey, edit) : edit}
+      <section key={key} className="mb-3 flex break-inside-avoid flex-col gap-1 rounded-lg border p-3">
+        {/* The heading sits level with the fields beside it, which stand under their labels. Where they do not fit
+            beside it (three fields on a phone) they drop under it together, still in one row. */}
+        <div className="flex flex-wrap items-end justify-end gap-x-4 gap-y-2">
+          <h2 className={cn("mr-auto font-semibold text-base", fields.length > 0 && !readOnly && "pb-1")}>{title}</h2>
+          {fields.length ? (
+            <div className="flex items-end gap-x-3">
+              {fields.map(([number, label, bounds]) => (readOnly ? (
+                <dl key={number} className="text-right">
+                  <dt className="text-muted-foreground text-xs">{label}</dt>
+                  <dd className="font-medium text-sm tabular-nums">{model[number]}</dd>
+                </dl>
+              ) : (
+                <div key={number}>{E.edit(label, model[number] ?? "", "number", undefined, { compact: true, ...(controls ? { ...bounds, ...bind(number) } : undefined) })}</div>
+              )))}
             </div>
           ) : null}
         </div>
-        {rows.length ? E.tbl(
-          ["Ingredient", "Per bbl", ...(timed ? ["Timing"] : []), ...(totals ? [`At ${bbl} bbl`] : [])],
-          rows.map((row) => [name(row), row.amount, ...(timed ? [when(row)] : []), ...(totals ? [total(row)] : [])]),
-          ["l", "r", "r", "r"], { sortable: false, dense: true },
+        {rows.length ? (
+          <ul className={cn("grid gap-x-4 text-sm", timed ? "grid-cols-[minmax(0,1fr)_auto_auto]" : "grid-cols-[minmax(0,1fr)_auto]")}>
+            {rows.map((row) => (
+              <li key={row.key} className="col-span-full grid grid-cols-subgrid items-baseline gap-y-1 border-t py-1.5 first:border-t-0">
+                <span className="min-w-0">{name(row)}</span>
+                {timed ? <span className="text-right text-muted-foreground">{when(row)}</span> : null}
+                <span className="text-right tabular-nums">{row.amount}<span className="text-muted-foreground"> / bbl</span></span>
+                {totals ? total(row) : null}
+              </li>
+            ))}
+          </ul>
         ) : null}
-        {/* The schedule's count and summary head its rows. One row is its own summary, so it is not said twice (#1518). */}
-        {plan ? E.tbl([plan.title, plan.rows.length === 1 ? "" : wrap(plan.detail)], plan.rows.map((r) => [wrap(r.title), wrap(r.detail)]), ["l", "r"], { sortable: false, dense: true }) : null}
+        {add ? <div>{slots.addIngredient ? slots.addIngredient(stages[0], add) : add}</div> : null}
+        {plan ? (
+          <div className={cn("flex flex-col", body && "mt-1 border-t pt-2")}>
+            <div className="flex items-center justify-between gap-2">
+              {/* The schedule's count and summary head its rows. One row is its own summary, so it is not said twice (#1518). */}
+              <p className="text-muted-foreground text-xs"><span className="font-medium text-foreground">{plan.title}</span>{plan.detail && plan.rows.length !== 1 ? <> · {plan.detail}</> : null}</p>
+              {edit ? (scheduleKey && slots.schedule ? slots.schedule(scheduleKey, edit) : edit) : null}
+            </div>
+            {plan.rows.length ? (
+              <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 text-sm">
+                {plan.rows.map((r, i) => (
+                  <div key={i} className="col-span-full grid grid-cols-subgrid items-baseline border-t py-1 first:border-t-0">
+                    <dt className="min-w-0">{r.title}</dt>
+                    <dd className="text-right text-muted-foreground">{r.detail}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
+          </div>
+        ) : null}
       </section>
     );
   };
   const figures = model.figures ?? [];
-  const body = (
-    <>
-      {model.asBrewed ? E.note(model.asBrewed) : parentForm}
-      {model.priceGroupOptions
-        ? <>
-          {E.pick("Default price group · optional", model.priceGroup ?? "", model.priceGroupOptions)}
-          {E.info("A pre-fill for the brand a batch packages into, nothing more. The recipe carries no price and no group; changing this does not change the recipe.")}
-        </>
-        : null}
-      {E.polite([model.saved && `Saved ${model.saved}`, model.recipeNote].filter(Boolean).join(" · "))}
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-8">
-        <div className="min-w-0 flex-1">
-          {/* Always mounted and polite: the figures change as the sheet is typed,
-              and an alert (E.info is one) would interrupt the screen reader on every keystroke. */}
-          <div role="status">
-            {figures.length ? <div className="mb-1 flex flex-wrap gap-x-8 gap-y-2">{figures.map(([value, label]) => <Fragment key={label}>{E.num(value, label)}</Fragment>)}</div> : null}
-            {model.figureNotes?.map((note) => <Fragment key={note}>{E.polite(note)}</Fragment>)}
-          </div>
+  // The quiet lines beside the figures: when the copy was saved and the recipe's note, what a figure leaves out, and the batch-size hint.
+  const about = [
+    [model.saved && `Saved ${model.saved}`, model.recipeNote].filter(Boolean).join(" · "),
+    ...(model.figureNotes ?? []),
+    packed && !(bbl > 0) ? "Enter a batch size to see totals in packs." : "",
+  ].filter(Boolean);
+  const sheet = (
+    <div className="@container flex min-w-0 flex-col gap-3">
+      {/* The band: the recipe's own fields side by side at a fixed width, then the figures and the batch size. Beside
+          one field (the brand) the figures share its row; after three or four they take the next, at full width. */}
+      <div className="flex flex-wrap items-start gap-x-6 gap-y-3 [&>[data-slot=field]]:w-full @md:[&>[data-slot=field]]:w-52">
+        {model.asBrewed ? <div className="basis-full">{E.note(model.asBrewed)}</div> : parentForm}
+        {model.priceGroupOptions
+          ? E.pick("Default price group · optional", model.priceGroup ?? "", model.priceGroupOptions, {
+            description: <FieldDescription>A pre-fill for the brand a batch packages into. Changing it does not change the recipe.</FieldDescription>,
+          })
+          : null}
+        {/* Always mounted, so the status regions exist before anything is predicted. */}
+        <div className="flex min-w-0 flex-[1_1_32rem] flex-wrap items-end justify-between gap-x-6 gap-y-3">
+            {/* What the figures leave unsaid reads beside them on the desk and under them on a phone. Always mounted and
+                polite: the figures change as the sheet is typed, and an alert (E.info is one) would interrupt the screen
+                reader on every keystroke. */}
+            <div role="status" className="order-last flex min-w-0 basis-full flex-col gap-1 empty:hidden @3xl:order-first @3xl:flex-1 @3xl:basis-0">
+              {about.map((line) => <Fragment key={line}>{E.polite(line)}</Fragment>)}
+            </div>
+            <div role="status" className={cn("flex gap-x-4 @3xl:gap-x-6", !figures.length && "hidden")}>
+              {figures.map(([value, label]) => <Figure key={label} value={value} label={label} />)}
+            </div>
+            {packed ? (
+              // Page-only, never saved: Enter here must not submit the sheet around it.
+              <div onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }}>
+                {E.edit("Show totals at (bbl)", totalsAt, "number", undefined, { onChange: setTotalsAt, min: 0, compact: true })}
+              </div>
+            ) : null}
         </div>
-        {packed ? (
-          // Page-only, never saved: Enter here must not submit the sheet around it.
-          <div className="flex shrink-0 flex-col gap-1" onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }}>
-            {E.edit("Show totals at (bbl)", totalsAt, "number", undefined, { onChange: setTotalsAt, min: 0 })}
-            {bbl > 0 ? null : E.polite("Enter a batch size to see totals in packs.")}
-          </div>
-        ) : null}
       </div>
       {controls?.refresh ? (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -182,27 +283,45 @@ export function RecipeView({
       ) : null}
       {/* With no unsaved change there is no save bar, so a failed refresh or an unreadable kept change says so here. */}
       {controls && !controls.dirty ? <CommandFormMessage error={controls.error} /> : null}
-      {RECIPE_SECTIONS.map(step)}
+      {/* Cards run down the first column, then the second: brew-day order is reading order. */}
+      <div className="@2xl:columns-2 @2xl:gap-4 [&>*:last-child]:mb-0">{RECIPE_SECTIONS.map(step)}</div>
       {readOnly
         ? (model.notes ? E.fld("Change note", model.notes) : null)
         : E.edit("Change note · optional", model.notes ?? "", "text", undefined, bind("notes"))}
-      {model.tape?.length ? <>{E.ttl("Batch actuals · predicted in brackets")}{E.tape(model.tape)}</> : null}
-      {model.actualsNote ? E.info(model.actualsNote) : null}
-      {model.history?.length ? (
-        <>
-          {E.ttl("As brewed")}
-          {/* The copy being shown is named, not linked to itself. */}
-          {model.history.map((h, i) => <Fragment key={i}>{h.selected ? E.row(h.title, h.detail, "Shown") : E.nav(h.title, h.detail, "", undefined, h.href, "Recipe")}</Fragment>)}
-        </>
+      {model.actuals || model.history?.length ? (
+        <div className={cn("grid items-start gap-x-8 gap-y-3", model.actuals && model.history?.length && "@4xl:grid-cols-[minmax(0,1fr)_18rem]")}>
+          {model.actuals ? (
+            <div className="flex min-w-0 max-w-3xl flex-col gap-2">
+              {E.ttl("Batch actuals")}
+              <Actuals actuals={model.actuals} />
+              {model.actualsNote ? E.polite(model.actualsNote) : null}
+            </div>
+          ) : null}
+          {model.history?.length ? (
+            <div className="flex min-w-0 flex-col">
+              {E.ttl("As brewed")}
+              {/* The copy being shown is named, not linked to itself. */}
+              {model.history.map((h, i) => <Fragment key={i}>{h.selected ? E.row(h.title, h.detail, "Shown") : E.nav(h.title, h.detail, "", undefined, h.href, "Recipe")}</Fragment>)}
+            </div>
+          ) : null}
+        </div>
       ) : null}
+    </div>
+  );
+  const body = (
+    <>
+      {sheet}
       {controls?.dirty ? (
         // Stuck to the bottom of the page's scroll at every width, so the verb is in reach wherever the change was made.
         // The negative offsets reach the page column's padding (app-shell: p-4, md:px-8 md:py-6), as BrewFooter's do on the phone.
         <div className="sticky -bottom-4 z-10 -mx-4 flex flex-col gap-2 border-t bg-background px-4 py-3 md:-bottom-6 md:-mx-8 md:flex-row md:items-center md:justify-end md:px-8">
           <div role="status">{E.polite(controls.blockedReason)}</div>
           <CommandFormMessage error={controls.error} />
-          {controls.onDiscard ? E.btn("Discard", "g", undefined, controls.onDiscard) : null}
-          <Button type="submit" className="w-full md:w-fit" disabled={controls.busy || Boolean(controls.blockedReason)}>{controls.busy ? "Saving…" : controls.submitLabel ?? "Save changes"}</Button>
+          {/* Side by side on a phone, so the bar takes one row of the screen, not two. */}
+          <div className="flex gap-2 *:flex-1 md:*:flex-none">
+            {controls.onDiscard ? E.btn("Discard", "g", undefined, controls.onDiscard) : null}
+            <Button type="submit" className="w-full md:w-fit" disabled={controls.busy || Boolean(controls.blockedReason)}>{controls.busy ? "Saving…" : controls.submitLabel ?? "Save changes"}</Button>
+          </div>
         </div>
       ) : null}
     </>

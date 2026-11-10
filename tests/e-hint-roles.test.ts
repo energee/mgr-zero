@@ -30,7 +30,7 @@ const command = (over: Partial<Record<string, unknown>>) =>
   ({ requestId: null, result: null, failure: null, busy: false, ...over }) as unknown as ExactCommand;
 const noop = () => {};
 /** The inner HTML of the one role="status" region, or null when there is none. */
-const statusRegion = (html: string) => html.match(/<div role="status">([\s\S]*?)<\/div>/)?.[1] ?? null;
+const statusRegion = (html: string) => html.match(/<div role="status"[^>]*>([\s\S]*?)<\/div>/)?.[1] ?? null;
 
 describe("hint roles", () => {
   it.each(["note", "info"] as const)("E.%s defaults to a non-live note and opts errors into alerts", kind => {
@@ -134,11 +134,12 @@ describe("hint roles", () => {
 
   it("RecipeView renders its predicted figures inside a polite status region, not an alert", () => {
     const html = renderToStaticMarkup(createElement(RecipeView, { model: recipeHazyV4 }));
-    // The figures are nested blocks, so the region is read up to the next one instead of through statusRegion.
-    const status = html.slice(html.indexOf('<div role="status">')).split('role="status"')[1];
-    expect(status).toMatch(/15\.2 °P<\/div><div[^>]*>OG</);
+    // The figures are nested blocks in the second status region (the quiet lines beside them are the first),
+    // so it is read up to the next block instead of through statusRegion.
+    const status = html.split('role="status"')[2];
+    expect(status).toMatch(/15\.2<span[^>]*>°P<\/span><\/div><div[^>]*>OG</);
     expect(status).toMatch(/>15<\/div><div[^>]*>IBU</);
-    expect(html).not.toMatch(/role="alert"[^>]*>(?:(?!<\/div>)[\s\S])*15\.2 °P/);
+    expect(html).not.toMatch(/role="alert"[^>]*>(?:(?!<\/div>)[\s\S])*15\.2/);
   });
 
   it("RecipeView keeps the status region mounted before anything is predicted", () => {

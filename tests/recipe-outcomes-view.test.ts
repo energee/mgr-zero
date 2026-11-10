@@ -1,62 +1,91 @@
-// tests/recipe-outcomes-view.test.ts — the text Batch actuals draws from
-// get_recipe_outcomes: one tape row per batch (outcomeTape), which marks a
-// batch of an earlier copy and never prints a version number, and the summary
-// line for the shown copy (outcomeSummary). Pure: no database.
+// tests/recipe-outcomes-view.test.ts — the table Batch actuals draws from
+// get_recipe_outcomes: what the shown copy predicts and assumes on top, then
+// one row per batch (outcomeTable). A batch of another copy is marked and
+// carries its own copy's prediction; no version number is printed. Also the
+// summary line for the shown copy (outcomeSummary). Pure: no database.
 import { describe, expect, it } from "vitest";
-import { outcomeSummary, outcomeTape, type RecipeOutcome } from "../lib/mgr/recipe-view";
+import { outcomeSummary, outcomeTable, type RecipeOutcome } from "../lib/mgr/recipe-view";
 
 const closed: RecipeOutcome = {
   batchId: "b1", batchNo: 413, version: 4, brewedOn: "2026-10-03", closed: true,
   ogPlato: 14.8, fgPlato: 3.5, abv: 6.1, apparentAttenuation: 0.77, brewhouseEfficiency: 0.7,
   predicted: { ogPlato: 15.2, fgPlato: 3.5, abv: 6.3 }, assumedEfficiency: 0.72, assumedAttenuation: 0.78,
 };
+const earlier: RecipeOutcome = { ...closed, batchId: "b0", batchNo: 371, version: 3, brewedOn: "2026-07-18", predicted: { ogPlato: 15.6, fgPlato: 3.6, abv: 6.5 }, assumedEfficiency: 0.74 };
 const oneReading = { fgPlato: null, abv: null, apparentAttenuation: null };
-const detail = (outcome: Partial<RecipeOutcome>, unit: "plato" | "sg" = "plato") => outcomeTape([{ ...closed, ...outcome }], unit, 4)![0][1];
+/** The one row for `outcome`, on the copy `closed` is on. */
+const row = (outcome: Partial<RecipeOutcome>, unit: "plato" | "sg" = "plato") => outcomeTable([{ ...closed, ...outcome }], unit, closed)!.rows[0];
+const measured = (outcome: Partial<RecipeOutcome>) => row(outcome).cells.map((c) => c.measured);
 
-describe("outcomeTape", () => {
-  it("labels a batch and compares each figure with its prediction", () => {
-    expect(outcomeTape([closed], "plato", 4)).toEqual([
-      ["B-0413 · Oct 3, 2026", "OG 14.8 °P (15.2) · FG 3.5 °P (3.5) · ABV 6.1% (6.3%) · attenuation 77% (78%) · efficiency 70% (72%)"],
-    ]);
-  });
-
-  it("marks a batch brewed from an earlier copy, without a version number", () => {
-    const labels = outcomeTape([closed, { ...closed, batchId: "b0", batchNo: 371, version: 3, brewedOn: "2026-07-18" }], "plato", 4)!.map(([label]) => label);
-    expect(labels).toEqual(["B-0413 · Oct 3, 2026", "B-0371 · Jul 18, 2026 · earlier recipe"]);
-  });
-
-  it("marks batches against the copy being shown, so an earlier copy's own batches are unmarked", () => {
-    const labels = outcomeTape([closed, { ...closed, batchId: "b0", batchNo: 371, version: 3, brewedOn: "2026-07-18" }], "plato", 3)!.map(([label]) => label);
-    expect(labels).toEqual(["B-0413 · Oct 3, 2026 · later recipe", "B-0371 · Jul 18, 2026"]);
+describe("outcomeTable", () => {
+  it("heads the columns in the reader's gravity unit, with what the shown copy predicts and assumes on top", () => {
+    const table = outcomeTable([closed], "plato", closed)!;
+    expect(table.columns).toEqual(["OG °P", "FG °P", "ABV", "Attenuation", "Efficiency"]);
+    expect(table.predicted).toEqual(["15.2", "3.5", "6.3%", "78%", "72%"]);
+    expect(table.rows).toEqual([{
+      key: "b1", batch: "B-0413", brewed: "Oct 3, 2026", notes: [],
+      cells: ["14.8", "3.5", "6.1%", "77%", "70%"].map((value) => ({ measured: value, predicted: "" })),
+    }]);
   });
 
   it("prints gravity in the reader's unit", () => {
-    expect(detail({}, "sg")).toContain("OG 1.060 (1.062) · FG 1.014 (1.014)");
+    const table = outcomeTable([closed], "sg", closed)!;
+    expect(table.columns.slice(0, 2)).toEqual(["OG", "FG"]);
+    expect(table.predicted.slice(0, 2)).toEqual(["1.062", "1.014"]);
+    expect(row({}, "sg").cells.slice(0, 2).map((c) => c.measured)).toEqual(["1.060", "1.014"]);
   });
 
-  it("leaves a null metric out", () => {
-    expect(detail({ brewhouseEfficiency: null })).toBe("OG 14.8 °P (15.2) · FG 3.5 °P (3.5) · ABV 6.1% (6.3%) · attenuation 77% (78%)");
+  it("marks a batch of an earlier copy and gives it its own copy's prediction, without a version number", () => {
+    const [current, old] = outcomeTable([closed, earlier], "plato", closed)!.rows;
+    expect(current.notes).toEqual([]);
+    expect(old.notes).toEqual(["earlier recipe"]);
+    expect(old.cells.map((c) => c.predicted)).toEqual(["15.6", "3.6", "6.5%", "78%", "74%"]);
+    expect(JSON.stringify(old)).not.toMatch(/v3|version/);
   });
 
-  it("drops the bracket when the version predicted nothing, and keeps the assumptions", () => {
-    expect(detail({ predicted: null, brewhouseEfficiency: null })).toBe("OG 14.8 °P · FG 3.5 °P · ABV 6.1% · attenuation 77% (78%)");
+  it("marks batches against the copy being shown, so an earlier copy's own batches are unmarked", () => {
+    const table = outcomeTable([closed, earlier], "plato", earlier)!;
+    expect(table.predicted).toEqual(["15.6", "3.6", "6.5%", "78%", "74%"]);
+    expect(table.rows.map((r) => r.notes)).toEqual([["later recipe"], []]);
+    expect(table.rows[0].cells[0]).toEqual({ measured: "14.8", predicted: "15.2" });
+    expect(table.rows[1].cells[0]).toEqual({ measured: "14.8", predicted: "" });
+  });
+
+  it("leaves a null metric blank", () => {
+    expect(measured({ brewhouseEfficiency: null })).toEqual(["14.8", "3.5", "6.1%", "77%", ""]);
+  });
+
+  it("predicts no gravity when the copy predicted nothing, and keeps the assumptions", () => {
+    expect(outcomeTable([closed], "plato", { ...closed, predicted: null })!.predicted).toEqual(["", "", "", "78%", "72%"]);
+    // Another copy's batch that predicted nothing still carries what that copy assumed.
+    expect(outcomeTable([{ ...earlier, predicted: null }], "plato", closed)!.rows[0].cells.map((c) => c.predicted)).toEqual(["", "", "", "78%", "74%"]);
   });
 
   it("says when there are no readings", () => {
-    expect(detail({ ...oneReading, ogPlato: null, brewhouseEfficiency: null })).toBe("no gravity readings yet");
+    const none = row({ ...oneReading, ogPlato: null, brewhouseEfficiency: null });
+    expect(none.cells.every((c) => c.measured === "")).toBe(true);
+    expect(none.notes).toEqual(["no gravity readings yet"]);
   });
 
-  it("ends a one-reading batch by asking for the second reading", () => {
-    expect(detail(oneReading)).toBe("OG 14.8 °P (15.2) · efficiency 70% (72%) · FG needs a second reading");
+  it("asks a one-reading batch for the second reading", () => {
+    const one = row(oneReading);
+    expect(one.cells.map((c) => c.measured)).toEqual(["14.8", "", "", "", "70%"]);
+    expect(one.notes).toEqual(["FG needs a second reading"]);
   });
 
-  it("ends an open batch with still open, its FG being the latest reading", () => {
-    expect(detail({ closed: false, brewhouseEfficiency: null })).toBe("OG 14.8 °P (15.2) · FG 3.5 °P (3.5) · ABV 6.1% (6.3%) · attenuation 77% (78%) · still open");
-    expect(detail({ ...oneReading, closed: false, brewhouseEfficiency: null })).toBe("OG 14.8 °P (15.2) · FG needs a second reading · still open");
+  it("says an open batch is still open, its FG being the latest reading", () => {
+    expect(row({ closed: false, brewhouseEfficiency: null }).notes).toEqual(["still open"]);
+    expect(row({ ...oneReading, closed: false, brewhouseEfficiency: null }).notes).toEqual(["FG needs a second reading", "still open"]);
+    expect(outcomeTable([{ ...earlier, closed: false }], "plato", closed)!.rows[0].notes).toEqual(["earlier recipe", "still open"]);
+  });
+
+  it("names a batch that has no number yet", () => {
+    expect(row({ batchNo: null }).batch).toBe(row({ batchNo: null }).batch.trim());
+    expect(row({ batchNo: null }).batch).not.toBe("");
   });
 
   it("is undefined with no batches, so the page draws no section", () => {
-    expect(outcomeTape([], "plato", 4)).toBeUndefined();
+    expect(outcomeTable([], "plato", closed)).toBeUndefined();
   });
 });
 
