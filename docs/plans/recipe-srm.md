@@ -1,8 +1,9 @@
 # Recipe color (SRM)
 
-Status: Phase 1 plan, awaiting approval. It builds on the recipe brewsheet
-(`docs/plans/recipe-brewsheet.md`, PR #1819), so its branch `feat/recipe-srm`
-is cut from `main` after #1819 lands. PR to `main`.
+Status: Phase 1 plan, awaiting approval. It comes after the three PRs in
+`docs/plans/recipe-run-sheet.md`, which give the sheet its batch size and new
+layout. Its branch `feat/recipe-srm` is cut from `main` once they land. PR to
+`main`.
 
 ## Why
 
