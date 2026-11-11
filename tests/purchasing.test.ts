@@ -561,6 +561,7 @@ describe("material units lock once a stored quantity depends on them", () => {
         // Its quantity is counted in purchase units: neither the unit nor the size of one may move under it.
         await expect(runCommand("upsert_material", { id: m.id, name, ...bag }, owner)).rejects.toThrow(`material is in use by ${usedBy}: ${PURCHASE_LOCKED}`);
         await expect(runCommand("upsert_material", { id: m.id, name, ...lb, purchaseUomFactor: 55 }, owner)).rejects.toThrow(`material is in use by ${usedBy}: ${PURCHASE_LOCKED}`);
+        await expect(runCommand("upsert_material", { id: m.id, name, ...lb, purchaseUom: "each" }, owner)).rejects.toThrow(`material is in use by ${usedBy}: ${PURCHASE_LOCKED}`);
         expect(await units(m.id)).toEqual({ base_uom: "lb", purchase_uom: "lb", purchase_uom_factor: 1, pack_name: null });
       } else {
         await runCommand("upsert_material", { id: m.id, name, ...bag }, owner);

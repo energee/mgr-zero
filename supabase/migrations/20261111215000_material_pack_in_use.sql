@@ -52,6 +52,12 @@
 -- line or pull through the factor to get an amount or a price, so those rows
 -- do not lock the purchase unit or the factor.
 --
+-- Not covered: a purchase-unit number that is typed but not yet saved as an
+-- order line or a contract. An agent's proposed purchase order
+-- (agent_proposals.input, 24 hours) and an open New PO form carry a bare
+-- count. If the purchase unit changes before it is saved, the count is read
+-- in the new unit. The same gap existed before for a material nothing used.
+--
 -- The body is 20261110192920_recipe_batch_size.sql's definition with only the
 -- guard changed and two variables declared for it. The signature is the same,
 -- so create or replace keeps its grants.
@@ -87,13 +93,13 @@ begin
       select string_agg(u.what, ', ' order by u.ord), string_agg(u.what, ', ' order by u.ord) filter (where u.purchase_units)
         into v_uses, v_purchase_uses
       from (values
-        (1, 'a purchase order',                true,  exists (select 1 from public.purchase_order_lines where material_id = p_material)),
-        (2, 'a contract',                      true,  exists (select 1 from public.material_contracts where material_id = p_material)),
-        (3, 'a recipe',                        false, exists (select 1 from public.recipe_ingredients where material_id = p_material)),
-        (4, 'stock movements',                 false, exists (select 1 from public.material_movements where material_id = p_material)),
-        (5, 'a format''s packaging materials', false, exists (select 1 from public.format_bom where material_id = p_material)),
-        (6, 'a transfer',                      false, exists (select 1 from public.stock_transfer_lines where material_id = p_material)),
-        (7, 'a brew prep pull',                false, exists (select 1 from public.brew_pulls where material_id = p_material))
+        (1, 'a purchase order',                true,  exists (select 1 from public.purchase_order_lines where brewery_id = p_brewery and material_id = p_material)),
+        (2, 'a contract',                      true,  exists (select 1 from public.material_contracts where brewery_id = p_brewery and material_id = p_material)),
+        (3, 'a recipe',                        false, exists (select 1 from public.recipe_ingredients where brewery_id = p_brewery and material_id = p_material)),
+        (4, 'stock movements',                 false, exists (select 1 from public.material_movements where brewery_id = p_brewery and material_id = p_material)),
+        (5, 'a format''s packaging materials', false, exists (select 1 from public.format_bom where brewery_id = p_brewery and material_id = p_material)),
+        (6, 'a transfer',                      false, exists (select 1 from public.stock_transfer_lines where brewery_id = p_brewery and material_id = p_material)),
+        (7, 'a brew prep pull',                false, exists (select 1 from public.brew_pulls where brewery_id = p_brewery and material_id = p_material))
       ) as u(ord, what, purchase_units, used)
       where u.used;
       if v_row.base_uom is distinct from p_base_uom and v_uses is not null then
