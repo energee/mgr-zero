@@ -10,6 +10,7 @@ import { batchQty, packNoun, perBblForPacks, type Pack } from "./pack-qty";
 import { plural } from "./plural";
 import { fromTicks, isNumber, isPositive, numberNotationError, toTicks } from "./quantity-input";
 import { READING_BOUNDS } from "@/lib/composer/offline-policy";
+import { MINUTES_PER_DAY } from "@/lib/time-window";
 import { saccharificationRest, totalMinutes, type MashStep } from "./recipe-schedule";
 import { gramsOf, IONS, ION_LABELS, suggestSalts, waterChemistry, type Ions, type Salt } from "@/lib/water-chemistry";
 import { submitReason } from "./submit-reason";
@@ -25,7 +26,6 @@ export const isBrewDayStage = (stage: string): stage is (typeof BREW_DAY_STAGES)
 export type IngredientLine = { materialId: string; perBblQty: string; stage: IngredientStage; timingMinutes: string };
 export const lineReady = (l: IngredientLine) => l.materialId !== "" && Number(l.perBblQty) > 0 && (l.timingMinutes === "" || Number.isInteger(Number(l.timingMinutes)));
 
-const MINUTES_PER_DAY = 1440;
 /** Fermentation and dry-hop additions are timed in whole days from the start of fermentation; the rest in minutes (#1478).
  *  Stored as minutes either way (timing_minutes). */
 export const timedInDays = (stage: string) => stage === "fermentation" || stage === "dry_hop";
@@ -136,11 +136,11 @@ export function mashSummary(steps: readonly MashStep[]): string {
 /** A water addition row's detail on the Water sheet, "4 g · Mash". */
 export const waterAdditionDetail = (a: { qty: number; unit: string; stage: string }) => `${a.qty} ${a.unit} · ${sentenceCase(a.stage)}`;
 
-/** A mash step's row detail, "Infusion · 152 °F · 60 min"; the kind is dropped when it only repeats the step name ("Rest", kind "rest"). */
-export function mashStepDetail(step: MashStep): string {
-  const kind = step.kind.toLowerCase() === step.name.trim().toLowerCase() ? "" : `${sentenceCase(step.kind)} · `;
-  return `${kind}${step.tempF} °F · ${step.minutes} min`;
-}
+/** A mash step's or fermentation stage's kind as words, "Infusion"; "" when it only repeats the name ("Rest", kind "rest"). */
+export const stepKind = ({ name, kind }: { name: string; kind: string }) => (kind.toLowerCase() === name.trim().toLowerCase() ? "" : sentenceCase(kind));
+
+/** A mash step's row detail, "Infusion · 152 °F · 60 min"; the kind is dropped when it only repeats the step name. */
+export const mashStepDetail = (step: MashStep): string => [stepKind(step), `${step.tempF} °F`, `${step.minutes} min`].filter(Boolean).join(" · ");
 
 /** A fermentation stage's row detail, "68 °F · 4 days": on the schedule sheet and in a batch's cellar plan. */
 export const fermentationStageDetail = (stage: FermentationStage) => `${stage.tempF} °F · ${plural(stage.days, "day")}`;

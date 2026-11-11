@@ -60,25 +60,24 @@ describe("SCREENS", () => {
 
   it("draws the recipe as the day at a glance, with each amount for the batch it is written for", () => {
     const recipe = text("Recipe");
-    // Under the name, one sentence: the brand, the batch size, the recipe's note, the saved date and that save's change note.
-    expect(recipe).toMatch(/Brews\s+Hazy IPA\s+at\s+22 bbl\s*, edit recipe numbers\s*\.\s+The flagship\. Keep it soft and juicy\. Saved Aug 28, 2026 · Whirlpool hard, knock out cold\./);
+    // Under the name, one sentence: the brand, the batch size, the recipe's note and the saved date. That save's change note has the next line.
+    expect(recipe).toMatch(/Brews\s+Hazy IPA\s+at\s+22 bbl\s*, edit recipe numbers\s*\.\s+The flagship\. Keep it soft and juicy\. Saved Aug 28, 2026\.\s+Last change: Whirlpool hard, knock out cold\./);
     expect(recipe).toMatch(/Assumes\s+72% efficiency\s*, edit recipe numbers\s+and\s+78% attenuation\s*, edit recipe numbers\s*\./);
     // The day's two lists are the headings, then what the batches measured and the earlier copies they brewed.
     expect([...body("Recipe").matchAll(/<h2[^>]*>([^<]*)<\/h2>/g)].map((m) => m[1])).toEqual(["Goes in on brew day", "In the cellar", "Batch actuals", "As brewed"]);
     // A line over the brew-day list holds its facts: the target water, the mash pH, and the numbers that open their sheet.
     expect(recipe).toMatch(/Hazy target\s*, edit water\s*, mash pH 5\.35\. Boil from\s+24\.5 bbl\s*, edit recipe numbers\s*\. Whirlpool at\s+180 °F\s*, edit recipe numbers\s*, knock out at\s+65 °F/);
-    // Each row is when, what, how much for the batch. The water and its salts come first, then the grain with its
+    // Each row is when, what, how much for the batch. The grain comes first, under the bar of its shares, with its
     // weight and share: in bags where the material has a pack word, as a count of the pack size where it has none.
-    expect(recipe).toMatch(/Mash-in\s+Edit\s+Mash water\s+450 gal\s+Mash-in\s+Edit\s+Gypsum\s+200 g/);
-    expect(recipe).toMatch(/2-row\s+990 lb,\s+83%\s+of the grain bill\s+18 bags/);
-    expect(recipe).toMatch(/Flaked oats\s+200 lb,\s+17%\s+of the grain bill\s+4 × 50 lb/);
+    // The mash water and its salts follow.
+    expect(recipe).toMatch(/Mash-in\s+Edit\s+2-row\s+990 lb,\s+83%\s+of the grain bill\s+18 bags\s+Mash-in\s+Edit\s+Flaked oats\s+200 lb,\s+17%\s+of the grain bill\s+4 × 50 lb\s+Mash-in\s+Edit\s+Mash water\s+450 gal\s+Mash-in\s+Edit\s+Gypsum\s+200 g/);
     expect(recipe).toMatch(/Sparge\s+Edit\s+Sparge water\s+600 gal\s+Sparge\s+Edit\s+Lactic acid\s+150 mL/);
-    // Boil additions run by minutes remaining. An amount that is not whole packs stays in its unit and offers Round, named in the pack word.
-    expect(recipe).toMatch(/Boil, 60 min\s+Edit\s+Magnum\s+2\.2 lb\s+Boil, 10 min\s+Edit\s+Citra\s+8\.8 lb\s+Round to 1 box\s+Whirlpool\s+Edit\s+Citra\s+1 box/);
-    expect(SCREENS.find((s) => s.name === "Recipe")!.to?.["Round to 1 box"]).toBe("Recipe");
-    // The cellar: the pitch, the dry hops by day, then packaging.
+    // Boil additions run by minutes remaining. Part of one box stays in its unit and offers no Round.
+    expect(recipe).toMatch(/Boil, 60 min\s+Edit\s+Magnum\s+2\.2 lb\s+Boil, 10 min\s+Edit\s+Citra\s+8\.8 lb\s+Whirlpool\s+Edit\s+Citra\s+1 box/);
+    // The cellar: the pitch, the dry hops by day, then packaging. A box and a quarter offers Round down and up, named in the pack word.
     expect(recipe).toMatch(/18 days from pitch to package\./);
-    expect(recipe).toMatch(/Pitch\s+Edit\s+House ale yeast\s+1 pitch\s+Day 3\s+Edit\s+Citra\s+2 boxes\s+Day 3\s+Edit\s+Mosaic\s+1 box\s+Packaging\s+Edit\s+Biofine\s+2 L/);
+    expect(recipe).toMatch(/Pitch\s+Edit\s+House ale yeast\s+1 pitch\s+Day 3\s+Edit\s+Citra\s+2 boxes\s+Day 3\s+Edit\s+Mosaic\s+55 lb\s+Round to 1 box\s+Round to 2 boxes\s+Packaging\s+Edit\s+Biofine\s+2 L/);
+    for (const choice of ["Round to 1 box", "Round to 2 boxes"]) expect(SCREENS.find((s) => s.name === "Recipe")!.to?.[choice], choice).toBe("Recipe");
     const at = (label: string) => recipe.indexOf(label);
     expect(at("Goes in on brew day")).toBeLessThan(at("In the cellar"));
     expect(at("House ale yeast")).toBeGreaterThan(at("In the cellar"));
@@ -90,9 +89,9 @@ describe("SCREENS", () => {
     expect(recipe).not.toMatch(/\/ bbl|Saccharification|Mash-out|Diacetyl rest|Cold crash|Municipal/);
     // Spec D4: one place holds the mash temperature, and it is the schedule.
     expect(recipe).not.toMatch(/Mash temp|Show totals at|Knockout volume/);
-    // No number is an always-visible field: the change note is the page's one text field.
+    // No number is an always-visible field, and the change note waits in the save bar for an unsaved change.
     expect(body("Recipe")).not.toMatch(/aria-label="(Batch size bbl|Pre-boil volume bbl|Boil time min)"/);
-    expect(recipe).toContain("Change note · optional");
+    expect(recipe).not.toContain("Change note");
     // The process-spec columns landed (#278 slice 5): no gate on the record.
     const gate = String(SCREENS.find((s) => s.name === "Recipe")!.writes);
     expect(gate).not.toMatch(/SCHEMA-GATE/);
@@ -105,18 +104,21 @@ describe("SCREENS", () => {
     const name = (svg: string) => /aria-label="([^"]*)"/.exec(svg)?.[1];
     expect(drawings).toHaveLength(2);
     const band = drawings[0]!, cellar = drawings[1]!;
-    expect(name(band)).toBe("The brew day by temperature: mash rests at 104 °F for 15 minutes, 152 °F for 60 minutes, and 168 °F for 10 minutes, a 60 minute boil, and a 20 minute whirlpool at 180 °F with a 10 minute rest. Knock out at 65 °F. 3 marks show when a boil or whirlpool addition goes in.");
+    expect(name(band)).toBe("The brew day by temperature: mash rests at 104 °F for 15 minutes, 152 °F for 60 minutes, and 168 °F for 10 minutes, a 60 minute boil, and a 20 minute whirlpool at 180 °F with a 10 minute rest. Knock out at 65 °F. 3 marks show where each boil or whirlpool addition goes in: Magnum; Citra; Citra.");
     // The zones, then each step's temperature and minutes (the boil has no temperature), then the two ends.
-    expect(labels(band)).toEqual(["Mash", "Boil", "Whirlpool", "104 °F", "15 min", "152 °F", "60 min", "168 °F", "10 min", "60 min", "180 °F", "20, rest 10", "Mash-in", "Knock out at 65 °F, 2 hours 55 minutes"]);
+    expect(labels(band)).toEqual(["Mash", "Boil", "Whirlpool", "104 °F", "15 min", "152 °F", "60 min", "168 °F", "10 min", "60 min", "180 °F", "20 min, rest 10", "Mash-in", "Knock out at 65 °F, 2 hours 55 minutes"]);
     expect(band.match(/<circle/g)).toHaveLength(3);
-    expect(name(cellar)).toBe("Fermentation temperature by day: 68 °F for 4 days, 72 °F for 2 days, and 34 °F for 12 days, with a dry hop on day 3.");
+    // Each mark carries what goes in there, for a pointer.
+    expect([...band.matchAll(/<title>([^<]*)<\/title>/g)].map((m) => m[1])).toEqual(["Magnum", "Citra", "Citra"]);
+    expect(name(cellar)).toBe("Fermentation temperature by day: 68 °F for 4 days, 72 °F for 2 days, and 34 °F for 12 days. Marks show the dry hops: Citra and Mosaic on day 3.");
+    expect(cellar).toContain("<title>Citra and Mosaic</title>");
     expect(labels(cellar)).toEqual(["68 °F", "72 °F", "34 °F", "Pitch", "Day 4", "6", "Day 18"]);
     expect(cellar.match(/<circle/g)).toHaveLength(1);
     // The grain bar says its shares too.
     expect(body("Recipe")).toContain('aria-label="Share of the grain bill by weight: 2-row 83% and Flaked oats 17%"');
   });
 
-  it("draws the Recipe numbers sheet with all nine fields, opened by any number Recipe reads out", () => {
+  it("draws the Recipe numbers sheet with all nine fields, opened by a number Recipe reads out in a sentence", () => {
     const sheet = SCREENS.find((s) => s.name === "Recipe numbers")!;
     expect(sheet.surface).toBe("sheet");
     const fields = [...body("Recipe numbers").matchAll(/<input[^>]*aria-label="([^"]*)"[^>]*value="([^"]*)"/g)].map((m) => [m[1], m[2]]);
@@ -172,7 +174,9 @@ describe("SCREENS", () => {
   it("draws the recipe's IBU beside its prediction, and states what a gap reads", () => {
     const recipe = SCREENS.find((s) => s.name === "Recipe")!;
     expect(text("Recipe")).toMatch(/74\s+IBU/);
-    expect(text("Recipe")).toContain("IBU 74 · whirlpool hops at 5%");
+    // The line under the figures says what the figure leaves out, and never the figure again.
+    expect(text("Recipe")).toContain("Whirlpool hops count at 5%.");
+    expect(text("Recipe")).not.toContain("IBU 74");
     expect(recipe.states?.map(([name]) => name)).toEqual(expect.arrayContaining(["some hops lack alpha acid", "no IBU"]));
     expect(String(recipe.writes)).toMatch(/alpha acid snapshot/);
   });

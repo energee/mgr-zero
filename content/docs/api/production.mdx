@@ -244,7 +244,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, brewer
 
-Each brewed batch of a recipe, newest first: OG, FG, ABV, apparent attenuation and brewhouse efficiency from its gravity readings and knockout, beside what its own version predicted and assumed. A batch whose gravity was read in more than one tank comes once per tank, with that tank's vessel name and figures and the batch's efficiency. Also each brewed batch of another recipe whose own version has the same mash lines as the requested version (latest by default), with its recipeName, OG and efficiency and no FG, ABV or attenuation; sameGrainBill marks every batch on that grain bill. A figure is null when an input is missing, and efficiency is null until the batch closes. Computed on read, never stored
+Each brewed batch of a recipe, newest first: OG, FG, ABV, apparent attenuation and brewhouse efficiency from its gravity readings and knockout, beside what its own version predicted and assumed. A batch split across tanks that held beer at the same time comes once per tank, with that tank's vessel name and figures and the batch's efficiency. Also each brewed batch of another recipe whose own version has the same mash lines as the requested version (latest by default), with its recipeName, OG and efficiency and no FG, ABV or attenuation; sameGrainBill marks every batch on that grain bill. A figure is null when an input is missing, and efficiency is null until the batch closes. Computed on read, never stored
 
 | Field | Type | Required |
 | --- | --- | --- |

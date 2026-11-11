@@ -73,10 +73,13 @@ describe("Recipe creation", () => {
     expect(fixture).not.toMatch(/<form\b/);
     // The fixture is the saved recipe with no unsaved change: no save bar, and no verb that names a version.
     expect(fixture).not.toMatch(/New recipe version|Save changes/);
-    const live = renderToStaticMarkup(createElement(RecipeView, { model: { title: "New recipe", preBoil: "16.8", notes: "Less crystal" }, controls: { setNote: () => {}, onSubmit: () => {}, dirty: true, submitLabel: "Create recipe" } }));
+    const live = renderToStaticMarkup(createElement(RecipeView, { model: { title: "New recipe", preBoil: "16.8", notes: "" }, controls: { onSubmit: () => {}, dirty: true, submitLabel: "Create recipe" } }));
     expect(live).toMatch(/<form\b/);
-    // The change note is the page's one field; the numbers read as text that opens their sheet.
-    expect(live).toMatch(/<input[^>]*aria-label="Change note · optional"[^>]*value="Less crystal"/);
+    // A recipe being created is asked for no change note; the numbers read as text that opens their sheet.
+    expect(live).not.toMatch(/Change note|<input/);
+    // A saved recipe with an unsaved change is asked for one, in the save bar.
+    const changed = renderToStaticMarkup(createElement(RecipeView, { model: { title: "Hazy", saved: "Aug 28, 2026", notes: "Less crystal" }, controls: { setNote: () => {}, onSubmit: () => {}, onDiscard: () => {}, dirty: true } }));
+    expect(changed).toMatch(/<input[^>]*aria-label="Change note · optional"[^>]*value="Less crystal"/);
     expect(live).toMatch(/Boil from <button[^>]*>16\.8 bbl<span class="sr-only">, edit recipe numbers<\/span><\/button>\./);
     expect(live).toMatch(/<button[^>]*type="submit"[^>]*>Create recipe</);
     // The Recipe numbers sheet holds the fields, each under its own label.
@@ -191,10 +194,11 @@ describe("Recipe creation", () => {
       expect(draw({ model: recipeHazyV4 })).toMatch(/<table\b/);
     });
 
-    it("shows the recipe note and the saved date with its change note in one sentence, over the day's two lists", () => {
-      const html = draw({ readOnly: true, model: { ...versioned, recipeNote: "House IPA", saved: "Aug 28, 2026 · Knock out cold" } });
-      // The recipe's own note, then the saved date and that save's change note.
-      expect(html).toContain("House IPA. Saved Aug 28, 2026 · Knock out cold.");
+    it("shows the recipe note and the saved date in one sentence and the change note on the next line, over the day's two lists", () => {
+      const html = draw({ readOnly: true, model: { ...versioned, recipeNote: "House IPA", saved: "Aug 28, 2026", savedNote: "Knock out cold" } });
+      // The recipe's own note, then the saved date; that save's change note has its own line.
+      expect(html).toContain("House IPA. Saved Aug 28, 2026.</p>");
+      expect(html).toContain(">Last change: Knock out cold.</p>");
       expect([...html.matchAll(/<h2[^>]*>([^<]*)<\/h2>/g)].map((m) => m[1])).toEqual(["Goes in on brew day"]);
       expect(draw({ readOnly: true, model: versioned })).not.toMatch(/Saved|Change note/);
       expect(draft()).toMatch(/aria-label="Change note · optional"|>Change note · optional</);

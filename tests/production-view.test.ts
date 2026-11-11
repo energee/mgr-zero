@@ -607,12 +607,17 @@ describe("Recipes view", () => {
   });
 
 
-  it("folds Batch actuals to its heading and summary line, over the table", () => {
+  it("folds Batch actuals to its summary line under the heading, over the table", () => {
     const actuals = { columns: ["OG °P", "FG °P", "ABV", "Attenuation", "Efficiency"], predicted: ["15.2", "3.5", "6.3%", "78%", "72%"], batches: 1, rows: [{ key: "b1", batch: "B-0413", brewed: "Oct 3, 2026", notes: ["no gravity readings yet"], cells: ["", "", "", "", ""].map((measured) => ({ measured, predicted: "" })) }] };
     const html = htmlOf(createElement(RecipeView, { readOnly: true, model: { title: "Pale", actuals, actualsNote: "2 batches: efficiency 68–71% against 72% assumed." } }));
-    expect(html).toMatch(/<details[^>]*><summary[^>]*><h2[^>]*>Batch actuals<\/h2>[^]*2 batches: efficiency[^]*Show batches[^]*<\/summary>[^]*<table[^]*Predicted[^]*15\.2[^]*B-0413[^]*Oct 3, 2026[^]*no gravity readings yet[^]*<\/table>[^]*<\/details>/);
+    // The heading comes before the fold: many screen readers drop a heading inside <summary>.
+    expect(html).toMatch(/<h2[^>]*>Batch actuals<\/h2><details[^>]*><summary[^>]*>(?:(?!<h2)[^])*2 batches: efficiency(?:(?!<h2)[^])*Show batches(?:(?!<h2)[^])*<\/summary>[^]*<table[^]*Predicted[^]*15\.2[^]*B-0413[^]*Oct 3, 2026[^]*no gravity readings yet[^]*<\/table>[^]*<\/details>/);
     // Without a summary yet, the line counts this recipe's batches.
     expect(htmlOf(createElement(RecipeView, { readOnly: true, model: { title: "Pale", actuals } }))).toContain("1 batch brewed.");
+    // Only other recipes brewed this grain bill: the table lists their batches, so the line does not say "0 batches brewed."
+    const notHere = htmlOf(createElement(RecipeView, { readOnly: true, model: { title: "Pale", actuals: { ...actuals, batches: 0 } } }));
+    expect(notHere).toContain("Not brewed yet. Other recipes have brewed this grain bill.");
+    expect(notHere).not.toContain("0 batches brewed");
     // The long column heads keep their word for a screen reader where a phone shows three letters.
     expect(html).toMatch(/<span aria-hidden="true"[^>]*>Att\.<\/span><span class="sr-only[^"]*">Attenuation<\/span>/);
   });
@@ -643,7 +648,7 @@ describe("Recipes view", () => {
 
   it("the fixture's IBU is computed from its boil and whirlpool hops, and its dry hops add nothing", () => {
     expect(recipeHazyV4.figures?.at(-1)).toEqual(["74", "IBU"]);
-    expect(recipeHazyV4.figureNotes).toEqual(["IBU 74 · whirlpool hops at 5%"]);
+    expect(recipeHazyV4.figureNotes).toEqual(["Whirlpool hops count at 5%."]);
   });
 
   it("the live Recipe page reads the outcomes and hands them to the page model", () => {
@@ -674,9 +679,9 @@ describe("Recipes view", () => {
     error.mockRestore();
 
     expect(errors).not.toContain('unique "key" prop');
-    // The page holds no number field: the change note is its one input.
-    expect(html.match(/<input\b[^>]*>/g)).toHaveLength(1);
-    expect(html).toMatch(/<input[^>]*aria-label="Change note · optional"/);
+    // The page holds no field of its own: the change note waits in the save bar for an unsaved change.
+    expect(html.match(/<input\b[^>]*>/g)).toBeNull();
+    expect(html).not.toContain("Change note");
     // The sheet holds all nine, the batch size first; no field is drawn label-beside-control.
     expect([...sheet.matchAll(/<label[^>]*>([^<]*)<\/label>/g)].map((m) => m[1])).toEqual([
       "Batch size bbl", "Brewhouse efficiency %", "Yeast attenuation %", "Pre-boil volume bbl", "Boil time min", "Whirlpool min", "Whirlpool rest min", "Whirlpool temp °F", "Knockout temp °F",

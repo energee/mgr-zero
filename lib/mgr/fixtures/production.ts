@@ -306,7 +306,8 @@ const loose = (base_uom: string, alphaAcid?: number): HazyMaterial => ({ base_uo
 
 /** Hazy IPA's lines with each material's pack and alpha acid, as get_recipe and list_materials give them. At the
  *  recipe's 22 bbl the 2-row is 18 bags of 55 lb and the oats 4 packs of 50 lb, sold by no word. Citra and Mosaic come
- *  in 44 lb boxes: the whirlpool and dry hop lines are whole boxes, and the 10 minute Citra is not, so it offers Round.
+ *  in 44 lb boxes: the whirlpool Citra and the dry hop Citra are whole boxes. The 10 minute Citra is part of one box, so
+ *  it reads in pounds and offers no Round. The dry hop Mosaic is a box and a quarter, so it offers Round down and up.
  *  Magnum and Biofine have no pack, so they read in their unit.
  *  The yeast is counted in "each" and sold by the pitch. `timing` is minutes, so day 3 is 3 × 1440. */
 const HAZY_LINES: { key: string; title: string; stage: IngredientStage; timing: number | null; perBbl: number; material: HazyMaterial }[] = [
@@ -317,7 +318,7 @@ const HAZY_LINES: { key: string; title: string; stage: IngredientStage; timing: 
   { key: "wp-citra", title: "Citra", stage: "whirlpool", timing: null, perBbl: 2, material: boxed(12.5) },
   { key: "yeast", title: "House ale yeast", stage: "fermentation", timing: 0, perBbl: 0.045455, material: { base_uom: "each", purchase_uom_factor: 1, pack_name: "pitch" } },
   { key: "dh-citra", title: "Citra", stage: "dry_hop", timing: 3 * 1440, perBbl: 4, material: boxed(12.5) },
-  { key: "dh-mosaic", title: "Mosaic", stage: "dry_hop", timing: 3 * 1440, perBbl: 2, material: boxed(11.5) },
+  { key: "dh-mosaic", title: "Mosaic", stage: "dry_hop", timing: 3 * 1440, perBbl: 2.5, material: boxed(11.5) },
   { key: "fining", title: "Biofine", stage: "packaging", timing: null, perBbl: 0.090909, material: loose("L") },
 ];
 const HAZY_SHARES = gristShares(HAZY_LINES.map((l) => ({ stage: l.stage, perBbl: l.perBbl, unit: l.material.base_uom })));
@@ -330,8 +331,9 @@ const HAZY_IBU = recipeIbu({
 /** Hazy IPA as saved (its fourth copy underneath, which the page never names), with no unsaved change. */
 export const recipeHazyV4: RecipeViewModel = {
   title: "Hazy IPA",
-  // The saved date, then that save's change note.
-  saved: "Aug 28, 2026 · Whirlpool hard, knock out cold",
+  // The saved date, and that save's change note for the Last change line.
+  saved: "Aug 28, 2026",
+  savedNote: "Whirlpool hard, knock out cold",
   recipeNote: "The flagship. Keep it soft and juicy.",
   brand: { value: "hazy", options: [{ value: "", label: "No brand yet" }, ...recipeBrandOptions.map((b) => ({ value: b.id, label: b.name }))] },
   priceGroup: "3",

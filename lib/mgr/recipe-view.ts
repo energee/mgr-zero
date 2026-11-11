@@ -20,7 +20,7 @@
 // weight (gristShares), and two copies have the same grain bill when their mash
 // lines are the same (gristKey). Batch actuals is the table of
 // get_recipe_outcomes: what the shown copy predicts, then one row per brewed
-// batch, or per tank of a batch read in several, and the newest batches other
+// batch, or per tank of a batch split across tanks that held beer at the same time, and the newest batches other
 // recipes brewed on the same grain bill (outcomeTable). Its summary line gives
 // the mash figures for the grain bill and the fermentation figures for the
 // shown copy (outcomeSummary).
@@ -30,7 +30,7 @@
 import type { ReactNode } from "react";
 import { formatDate } from "@/lib/date-format";
 import { gravityBlockers, LB_PER, type GravityBlocker, type RecipeGravityResult } from "@/lib/recipe-gravity";
-import { ibuText, recipeIbu, type RecipeIbu } from "@/lib/recipe-ibu";
+import { ibuNote, recipeIbu, type RecipeIbu } from "@/lib/recipe-ibu";
 import { batNo } from "./doc-no";
 import { formatGravity, type GravityUnit } from "./gravity-unit";
 import { batchQty, fromPacks, hasPack, packText, perBblForPacks, splitPacks, type Pack } from "./pack-qty";
@@ -83,12 +83,13 @@ export const BATCH_BBL_BOUNDS = { min: 0.001, max: 9_999_999.999 } as const;
 export const batchSize = (text: string | undefined): number => (text !== undefined && isNumber(text) && !plannedBarrelsError(text) ? Number(text) : 0);
 
 /** The recipe's water as the page reads it, each fact only when the sheet holds it: the target profile's name, the
- *  target mash pH, the mash and sparge water in gallons, and each addition by name. The source profile is not read
- *  out; it stays in the Water sheet. */
-export type RecipeWaterView = { target?: string; mashPh?: string; mashGal?: string; spargeGal?: string; additions: { name: string; qty: number; unit: string; stage: string }[] };
-/** The sheet's water for the page (RecipeWaterView). A target profile the page cannot name is left out. */
+ *  target mash pH, the mash and sparge water in gallons, and each addition by name. `source` is the source profile's
+ *  name. Only an earlier copy reads it out; the editable page keeps it in the Water sheet. */
+export type RecipeWaterView = { target?: string; source?: string; mashPh?: string; mashGal?: string; spargeGal?: string; additions: { name: string; qty: number; unit: string; stage: string }[] };
+/** The sheet's water for the page (RecipeWaterView). A profile the page cannot name is left out. */
 export const waterFacts = (water: WaterDraft, profiles: readonly { id: string; name: string }[], materialName: (id: string) => string): RecipeWaterView => ({
   target: profiles.find((p) => p.id === water.targetProfileId)?.name,
+  source: profiles.find((p) => p.id === water.sourceProfileId)?.name,
   mashPh: water.targetMashPh || undefined, mashGal: water.mashGal || undefined, spargeGal: water.spargeGal || undefined,
   additions: water.additions.map((a) => ({ name: materialName(a.materialId), qty: a.qty, unit: a.unit, stage: a.stage })),
 });
@@ -103,8 +104,10 @@ export type RecipeViewModel = {
   /** Where Schedule batch goes: Batches, with New batch open on this recipe as saved. Only a saved recipe has one. */
   scheduleHref?: string;
   title: string;
-  /** When the shown copy was saved, as a date in the brewery's zone, then that save's change note. Absent until the recipe is first saved. */
+  /** When the shown copy was saved, as a date in the brewery's zone. Absent until the recipe is first saved. */
   saved?: string;
+  /** The change note the shown copy was saved with, drawn on its own "Last change" line; absent when it has none. */
+  savedNote?: string;
   /** The brand the recipe brews ("" for none) and the brands to pick from, the "" option reading "No brand yet"; the page's sentence holds the pick. Absent
    *  on an earlier copy and while the recipe is being created, where the parent fields hold it. */
   brand?: { value: string; options: { value: string; label: string }[] };
@@ -133,7 +136,7 @@ export type RecipeViewModel = {
   mashSchedule?: MashStep[];
   fermentationSchedule?: FermentationStage[];
   water?: RecipeWaterView;
-  /** The change note being typed for the next save; the saved copy's own rides on `saved`. */
+  /** The change note being typed for the next save; the saved copy's own is `savedNote`. */
   notes?: string;
   /** The headline figures as value and label (["15.2 °P", "OG"]), and the lines under them (figureStrip). */
   figures?: [string, string][];
@@ -282,15 +285,13 @@ export type RecipeFigures = { ogPlato: number | null; fgPlato: number | null; ab
 
 /** The headline strip: each figure the recipe predicts as value and label, and the lines under it. A figure that cannot
  *  be predicted is not drawn; `why` says why there is no gravity, and the IBU line says what its figure leaves out
- *  (whirlpool hops, a gap) or why there is none. `saved` words a gap's fix for a saved copy, as ibuText does. */
+ *  (whirlpool hops, a gap) or why there is none (ibuNote). `saved` words a gap's fix for a saved copy. */
 export function figureStrip(f: RecipeFigures, unit: GravityUnit, { saved, why }: { saved: boolean; why?: string | null }): { figures: [string, string][]; notes: string[] } {
   const figures: [string, string][] = [];
   if (f.ogPlato !== null && f.fgPlato !== null && f.abv !== null) figures.push([formatGravity(f.ogPlato, unit), "OG"], [formatGravity(f.fgPlato, unit), "FG"], [`${f.abv.toFixed(1)}%`, "ABV"]);
   if (f.ibu?.kind === "estimate") figures.push([String(f.ibu.ibu), "IBU"]);
   if (f.ibu?.kind === "lowerBound") figures.push([`≥ ${f.ibu.ibu}`, "IBU"]);
-  // A plain estimate is all in its figure.
-  const ibuNote = f.ibu && !(f.ibu.kind === "estimate" && !f.ibu.whirlpool) ? ibuText(f.ibu, { saved }) : undefined;
-  return { figures, notes: [f.ogPlato === null ? why : undefined, ibuNote].filter((note): note is string => Boolean(note)) };
+  return { figures, notes: [f.ogPlato === null ? why : undefined, f.ibu && ibuNote(f.ibu, { saved })].filter((note): note is string => Boolean(note)) };
 }
 
 /** A prediction exactly as the strip prints it in the brewery's gravity unit, plus how many hops still have a gap.
@@ -314,7 +315,7 @@ export function ingredientPack(perBbl: number, material: Pick<RecipeMaterial, "b
   return { perBbl, factor: Number(material.purchase_uom_factor), unit: material.base_uom, packName: material.pack_name };
 }
 
-/** The amount the page draws under "At 22 bbl": "23 bags" or "4 × 50 lb" when it is whole packs, else "220 lb" (packText). */
+/** A line's amount for a batch of `bbl`: "23 bags" or "4 × 50 lb" when it is whole packs, else "220 lb" (packText). */
 export const batchTotalText = (p: RecipePack, bbl: number): string => packText(batchQty(p.perBbl, bbl), p);
 
 /** Each line's share of the grain bill by weight, from 0 to 1, in the lines' order: a mash line's pounds over all mash
@@ -336,23 +337,24 @@ export function gristKey(mashLines: readonly { materialId: string; perBbl: numbe
   return mashLines.map((line) => `${line.materialId}:${line.perBbl}`).sort().join("|");
 }
 
-/** At `bbl`: whole when the total is already whole packs, else a Round choice down (from one pack up) and up, each
- *  named as the line will read once chosen ("Round to 4 × 50 lb", or "Round to 18 bags" with a pack word) and
- *  carrying the per-bbl amount that gives that many packs (perBblForPacks). Null with no pack.
+/** At `bbl`: whole when the total is already whole packs, else a Round choice down and up, each named as the line
+ *  will read once chosen ("Round to 4 × 50 lb", or "Round to 18 bags" with a pack word) and carrying the per-bbl
+ *  amount that gives that many packs (perBblForPacks). A total under one pack offers no choice: a hop using part
+ *  of a 44 lb box is not meant to be a whole box. Null with no pack.
  *  ponytail: that rounding error grows with `bbl`; from about 100 bbl it can pass half a tick (950.0001 lb for 19 × 50 lb
  *  at 300 bbl), so the line still offers Round. Exact whole packs at that size need per_bbl_qty to keep more decimals. */
 export function packRounding(p: RecipePack, bbl: number): { whole: boolean; choices: { label: string; perBbl: number }[] } | null {
   if (!hasPack(p)) return null;
   const split = splitPacks(batchQty(p.perBbl, bbl), p.factor);
-  if (split.packs > 0 && split.loose === 0) return { whole: true, choices: [] };
-  const counts = split.packs > 0 ? [split.packs, split.packs + 1] : [1];
-  return { whole: false, choices: counts.map((n) => ({ label: `Round to ${packText(fromPacks(n, 0, p.factor), p)}`, perBbl: perBblForPacks(n, p.factor, bbl) })) };
+  if (split.packs === 0) return { whole: false, choices: [] };
+  if (split.loose === 0) return { whole: true, choices: [] };
+  return { whole: false, choices: [split.packs, split.packs + 1].map((n) => ({ label: `Round to ${packText(fromPacks(n, 0, p.factor), p)}`, perBbl: perBblForPacks(n, p.factor, bbl) })) };
 }
 
 /** What get_recipe_outcomes returns for one brewed batch: its measured figures beside what its own copy (`version`)
  *  predicted and assumed. A measured figure is null when an input is missing. Efficiency is null until the batch closes, because
  *  nothing records how many turns it will have. The fractions (attenuation, efficiency) run 0 to 1; ABV is a percent.
- *  A batch whose gravity was read in more than one tank comes once per tank: `vessel` names the tank, OG, FG, ABV and
+ *  A batch split across tanks that held beer at the same time comes once per tank: `vessel` names the tank, OG, FG, ABV and
  *  attenuation are that tank's, and the efficiency is the batch's on each. `sameGrainBill` says the batch's own copy
  *  has the grain bill of the copy asked for (gristKey). `recipeName` is set on a batch another recipe brewed on that
  *  grain bill: its `version` counts that recipe's copies, and its FG, ABV and attenuation are always null, because
@@ -364,7 +366,7 @@ export type RecipeOutcome = {
   sameGrainBill: boolean; vessel?: string; recipeName?: string;
 };
 
-/** How many batches the rows stand for: a batch read in two tanks has two rows. */
+/** How many batches the rows stand for: a batch split across two tanks has two rows. */
 const batchCount = (rows: RecipeOutcome[]) => new Set(rows.map((o) => o.batchId)).size;
 
 /** A fraction as a whole percent: 0.657 reads "66%". */
@@ -425,7 +427,7 @@ export function outcomeTable(outcomes: RecipeOutcome[], unit: GravityUnit, shown
         !o.closed && "still open",
       ].filter((note): note is string => Boolean(note));
       return {
-        // A batch read in two tanks has two rows, told apart by the tank.
+        // A batch split across two tanks has two rows, told apart by the tank.
         key: o.vessel === undefined ? o.batchId : `${o.batchId} ${o.vessel}`, batch: batNo(o.batchNo), brewed: formatDate(o.brewedOn),
         tag: other ? `as ${o.recipeName}` : o.vessel === undefined ? undefined : `in ${o.vessel}`,
         notes, cells: values.map((value, i) => ({ measured: value, predicted: own?.[i] ?? "" })),
@@ -534,8 +536,7 @@ export function toRecipePageModel(
         backHref: `/recipes/${recipe.id}`, backLabel: "Current recipe", useAgainHref: `/recipes/${recipe.id}?from=${v.version}`,
         asBrewed: `${shown ? `As brewed in ${shown.title}` : "An earlier recipe no batch brewed"} · read only`,
       }),
-    // The copy's change note rides on the saved line.
-    saved: [formatDate(v.created_at, ctx.timeZone), v.note].filter(Boolean).join(" · "),
+    saved: formatDate(v.created_at, ctx.timeZone), savedNote: v.note || undefined,
     history,
     ingredients: ingredients.map((i, n) => ({
       key: i.id, title: material.name(i.material_id),

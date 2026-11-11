@@ -85,8 +85,8 @@ export function WaterSheet({ water, profiles, materials, onChange, trigger, ...o
     item={(p) => <WaterAdditionView fields={p.fields} materials={materials} materialsHref="/materials" onChange={p.onChange} footer={p.footer} />} />;
 }
 
-/** One ingredient, edited in place: a step's Add ingredient opens a blank editor on that step's `stage`, a line's name opens it
- *  filled from `line`. No list of its own; the recipe page is the list. `batchBbl` is the draft's batch size (0 for none):
+/** One ingredient, edited in place: Add ingredient under either of the page's lists opens a blank editor on the `stage` a
+ *  line there starts on (mash under brew day, fermentation under the cellar), and a line's name opens it filled from `line`. No list of its own; the recipe page is the list. `batchBbl` is the draft's batch size (0 for none):
  *  with one, a material with a pack size can be typed as a count of packs. */
 export function IngredientSheet({ line, stage = "mash", materials, limits, batchBbl, onSave, onDelete, trigger }: { line?: IngredientLine; stage?: IngredientStage; materials: IngredientMaterial[]; limits: TimingLimits; batchBbl: number; onSave: (line: IngredientLine) => void; onDelete?: () => void; trigger: ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -106,7 +106,7 @@ export function IngredientSheet({ line, stage = "mash", materials, limits, batch
 
 /** The batch size and the eight process numbers in one sheet. Each field changes the editor's draft as it is typed, as
  *  the Water sheet's own fields do, so there is no Save here. `open` is the editor's: Edit recipe numbers opens the
- *  sheet, and so does every number the page reads out. */
+ *  sheet, and so does each number the page reads out in a sentence. */
 export function RecipeNumbersSheet({ values, onChange, trigger, open, onOpenChange }: { values: Record<RecipeNumberField, string>; onChange: (field: RecipeNumberField, value: string) => void; trigger: ReactNode } & Opened) {
   return <CommandForm open={open} onOpenChange={onOpenChange} title="Recipe numbers" trigger={asTrigger(trigger)}>
     <RecipeNumbersView values={values} onChange={onChange} />

@@ -4,20 +4,23 @@
 // components/mgr/views/step-line.tsx): the brew-day band, one temperature line
 // from mash-in to knock-out with a mark where each boil and whirlpool addition
 // goes in (brewDayBand), and the cellar's temperature by day with a mark for
-// each dry hop (cellarProfile). A drawing's x values are percents of its span,
-// and a short step is never drawn too narrow for its labels (spanShares).
+// each dry hop (cellarProfile). A mark names what goes in there. A drawing's x
+// values are percents of its span, and a short step is never drawn too narrow
+// for its labels (spanShares).
 // Under them, everything that goes in, in time order, with each moment said
 // once: brew day (brewDayMoments) and the cellar (cellarMoments). Each row
 // reads its amount for the batch, or per bbl while the recipe has no batch
 // size. Also the sentences above the lists: the two assumptions under the
 // figures (assumptions), the brew day's facts (brewDayFacts) and the cellar's
-// length (cellarFacts).
+// length (cellarFacts); and an earlier copy's mash rests and fermentation
+// stages read out line by line (scheduleReadOut), since it has no sheet to
+// open.
 import { formatDuration, MINUTES_PER_DAY } from "@/lib/time-window";
 import { sentenceCase } from "./labels";
 import { batchQty } from "./pack-qty";
 import { plural } from "./plural";
 import { isNumber } from "./quantity-input";
-import { scheduleDays, type FermentationStage, type MashStep } from "./recipe-process-view";
+import { fermentationStageDetail, mashStepDetail, perBblDisplay, scheduleDays, stepKind, type FermentationStage, type MashStep } from "./recipe-process-view";
 import { batchTotalText, wholePercent, type RecipeIngredientView, type RecipeNumberKey, type RecipeWaterView } from "./recipe-view";
 import { andList } from "./submit-reason";
 
@@ -30,8 +33,8 @@ export type StepLineModel = {
   steps: { from: number; to: number; level: number; temp?: string; note?: string }[];
   /** Named stretches of the span, shaded behind the line: Mash, Boil, Whirlpool. */
   zones: { name: string; from: number; to: number }[];
-  /** Where an addition goes in, on the baseline. */
-  marks: number[];
+  /** Where additions go in, on the baseline, left to right. `title` names what goes in there ("Citra and Mosaic"). */
+  marks: { at: number; title: string }[];
   /** What the baseline says under itself: its ends, and any day between. */
   ticks: { at: number; text: string }[];
 };
@@ -64,8 +67,11 @@ function layOut<T extends { length: number }>(steps: readonly T[], floor: number
 
 /** A point part of the way along a laid-out step. */
 const along = (step: { from: number; to: number }, fraction: number) => step.from + (step.to - step.from) * Math.min(1, Math.max(0, fraction));
-/** Marks left to right, one for additions that go in together. */
-const distinct = (marks: number[]) => [...new Set(marks)].sort((a, b) => a - b);
+/** Each value once. */
+const unique = <T>(values: T[]) => [...new Set(values)];
+/** Marks left to right, one for additions that go in together, named by what goes in there. A hop on two lines is named once. */
+const marksAt = (placed: { at: number; name: string }[]): StepLineModel["marks"] =>
+  unique(placed.map((p) => p.at)).sort((a, b) => a - b).map((at) => ({ at, title: andList(unique(placed.filter((p) => p.at === at).map((p) => p.name))) }));
 /** A typed process number the drawing can use: plain notation, above zero. Anything else reads as not set. */
 const positive = (text: string | undefined) => (text !== undefined && isNumber(text) && Number(text) > 0 ? Number(text) : undefined);
 const degrees = (tempF: number | string) => `${tempF} °F`;
@@ -84,8 +90,8 @@ const brewDay = (mash: readonly MashStep[], numbers: Partial<Record<RecipeNumber
   whirlpoolTemp: positive(numbers.whirlpoolTemp), knockout: positive(numbers.knockoutTemp),
 });
 
-/** The band in a sentence, for a screen reader: each rest, the boil, the whirlpool and its rest, then the knock-out and what the marks are. */
-function bandSummary({ rests, boilMin, whirlpoolMin, restMin, whirlpoolTemp, knockout }: BrewDay, marks: number): string {
+/** The band in a sentence, for a screen reader: each rest, the boil, the whirlpool and its rest, then the knock-out, and what goes in at each mark. */
+function bandSummary({ rests, boilMin, whirlpoolMin, restMin, whirlpoolTemp, knockout }: BrewDay, marks: StepLineModel["marks"]): string {
   const held = rests.map((step) => `${degrees(step.tempF)} for ${plural(step.minutes, "minute")}`);
   const at = whirlpoolTemp ? ` at ${degrees(whirlpoolTemp)}` : "";
   const said = [
@@ -96,23 +102,23 @@ function bandSummary({ rests, boilMin, whirlpoolMin, restMin, whirlpoolTemp, kno
   return [
     `The brew day by temperature: ${andList(said)}.`,
     knockout ? `Knock out at ${degrees(knockout)}.` : "",
-    marks ? `${plural(marks, "mark")} ${marks === 1 ? "shows" : "show"} when a boil or whirlpool addition goes in.` : "",
+    marks.length ? `${plural(marks.length, "mark")} ${marks.length === 1 ? "shows" : "show"} where each boil or whirlpool addition goes in: ${marks.map((mark) => mark.title).join("; ")}.` : "",
   ].filter(Boolean).join(" ");
 }
 
 /** The brew day as one temperature line, mash-in to knock-out: each mash rest at its temperature with its minutes,
  *  then the boil and the whirlpool with its rest, when the recipe holds them. The boil draws at a fixed height with no
  *  temperature, because the boiling point depends on altitude; a whirlpool with no temperature draws level with it.
- *  A mark shows where each boil and whirlpool addition goes in. A boil addition's minutes count down to the end of the
- *  boil, and a whirlpool addition's to the end of the whirlpool, before its rest. A whirlpool addition with no time
- *  goes in as the whirlpool starts; a boil addition with no time has no known place, so it has no mark.
+ *  A mark shows where each boil and whirlpool addition goes in, and names it. A boil addition's minutes count down to
+ *  the end of the boil, and a whirlpool addition's to the end of the whirlpool, before its rest. A whirlpool addition
+ *  with no time goes in as the whirlpool starts; a boil addition with no time has no known place, so it has no mark.
  *  Undefined when the recipe holds none of the three. */
-export function brewDayBand(mash: readonly MashStep[], numbers: Partial<Record<RecipeNumberKey, string>>, lines: readonly Pick<RecipeIngredientView, "stage" | "timingMinutes">[]): StepLineModel | undefined {
+export function brewDayBand(mash: readonly MashStep[], numbers: Partial<Record<RecipeNumberKey, string>>, lines: readonly Pick<RecipeIngredientView, "stage" | "timingMinutes" | "title">[]): StepLineModel | undefined {
   const day = brewDay(mash, numbers);
   const { rests, boilMin, whirlpoolMin, restMin, whirlpoolTemp, knockout } = day;
   const low = Math.min(BAND_LOW_F, ...rests.map((step) => step.tempF));
   const level = (tempF: number | undefined) => (tempF === undefined ? 1 : Math.min(1, Math.max(0, (tempF - low) / (BAND_HIGH_F - low))));
-  const whirlpoolNote = whirlpoolMin && restMin ? `${whirlpoolMin}, rest ${restMin}` : whirlpoolMin ? `${whirlpoolMin} min` : `rest ${restMin} min`;
+  const whirlpoolNote = whirlpoolMin && restMin ? `${whirlpoolMin} min, rest ${restMin}` : whirlpoolMin ? `${whirlpoolMin} min` : `rest ${restMin} min`;
   const steps = layOut([
     ...rests.map((step) => ({ zone: "Mash", length: step.minutes, level: level(step.tempF), temp: degrees(step.tempF), note: `${step.minutes} min` })),
     ...(boilMin ? [{ zone: "Boil", length: boilMin, level: 1, temp: undefined, note: `${boilMin} min` }] : []),
@@ -124,16 +130,16 @@ export function brewDayBand(mash: readonly MashStep[], numbers: Partial<Record<R
     return inZone.length ? [{ name, from: inZone[0].from, to: inZone[inZone.length - 1].to }] : [];
   });
   const boil = steps.find((step) => step.zone === "Boil"), whirlpool = steps.find((step) => step.zone === "Whirlpool");
-  const marks = distinct(lines.flatMap((line) => {
-    if (line.stage === "boil" && boil && line.timingMinutes !== null) return [along(boil, 1 - line.timingMinutes / boil.length)];
-    if (line.stage === "whirlpool" && whirlpool) return [line.timingMinutes === null ? whirlpool.from : along(whirlpool, (whirlpoolMin - line.timingMinutes) / whirlpool.length)];
+  const marks = marksAt(lines.flatMap((line) => {
+    if (line.stage === "boil" && boil && line.timingMinutes !== null) return [{ at: along(boil, 1 - line.timingMinutes / boil.length), name: line.title }];
+    if (line.stage === "whirlpool" && whirlpool) return [{ at: line.timingMinutes === null ? whirlpool.from : along(whirlpool, (whirlpoolMin - line.timingMinutes) / whirlpool.length), name: line.title }];
     return [];
   }));
   // One step already says its minutes, so it is not totalled again (#1518).
   const total = steps.length > 1 ? formatDuration(steps.reduce((sum, step) => sum + step.length, 0)) : "";
   const end = [knockout ? `Knock out at ${degrees(knockout)}` : "", total].filter(Boolean).join(", ");
   return {
-    summary: bandSummary(day, marks.length),
+    summary: bandSummary(day, marks),
     // A temperature is written where it changes.
     steps: steps.map(({ from, to, level, temp, note }, i) => ({ from, to, level, temp: temp && temp !== steps[i - 1]?.temp ? temp : undefined, note })),
     zones, marks,
@@ -147,9 +153,9 @@ const CELLAR_FLOOR = 15;
 const cellarDay = (line: Pick<RecipeIngredientView, "timingMinutes">) => (line.timingMinutes === null ? null : line.timingMinutes / MINUTES_PER_DAY);
 
 /** The cellar's temperature by day: one step per run of stages at one temperature, named by its temperature, with the
- *  pitch, each day the temperature changes and the last day under the baseline, and a mark on each dry hop's day. A
- *  dry hop after the schedule's last day sits at its end. Undefined without a stage. */
-export function cellarProfile(stages: readonly FermentationStage[], lines: readonly Pick<RecipeIngredientView, "stage" | "timingMinutes">[]): StepLineModel | undefined {
+ *  pitch, each day the temperature changes and the last day under the baseline, and a mark on each dry hop's day,
+ *  named by the hops that go in then. A dry hop after the schedule's last day sits at its end. Undefined without a stage. */
+export function cellarProfile(stages: readonly FermentationStage[], lines: readonly Pick<RecipeIngredientView, "stage" | "timingMinutes" | "title">[]): StepLineModel | undefined {
   const runs: { tempF: number; length: number; start: number }[] = [];
   for (const stage of stages.filter((s) => s.days > 0)) {
     const last = runs[runs.length - 1];
@@ -159,17 +165,20 @@ export function cellarProfile(stages: readonly FermentationStage[], lines: reado
   if (runs.length === 0) return undefined;
   const temps = runs.map((run) => run.tempF), low = Math.min(...temps), high = Math.max(...temps);
   const steps = layOut(runs, CELLAR_FLOOR);
-  const hopDays = distinct(lines.flatMap((line) => (line.stage === "dry_hop" ? cellarDay(line) ?? [] : [])));
+  // Each dry hop with a day, by that day.
+  const hops = lines.flatMap((line) => { const day = line.stage === "dry_hop" ? cellarDay(line) : null; return day === null ? [] : [{ at: day, name: line.title }]; });
   const at = (day: number) => {
     const step = steps.find((s) => day < s.start + s.length);
     return step ? along(step, (day - step.start) / step.length) : 100;
   };
   const held = runs.map((run) => `${degrees(run.tempF)} for ${plural(run.length, "day")}`);
+  // The sentence names the hops by day; the marks by place, where every day past the schedule's end is one mark.
+  const byDay = marksAt(hops).map((day) => `${day.title} on day ${day.at}`).join("; ");
   return {
-    summary: `Fermentation temperature by day: ${andList(held)}${hopDays.length ? `, with ${hopDays.length === 1 ? "a dry hop on day" : "dry hops on days"} ${andList(hopDays.map(String))}` : ""}.`,
+    summary: `Fermentation temperature by day: ${andList(held)}.${byDay ? ` Marks show the dry hops: ${byDay}.` : ""}`,
     steps: steps.map(({ from, to, tempF }) => ({ from, to, level: high === low ? 0.5 : (tempF - low) / (high - low), temp: degrees(tempF) })),
     zones: [],
-    marks: distinct(hopDays.map(at)),
+    marks: marksAt(hops.map((hop) => ({ ...hop, at: at(hop.at) }))),
     ticks: [
       { at: 0, text: "Pitch" },
       // "Day" is said once between the ends, and only where it clears "Pitch" on a phone.
@@ -187,12 +196,16 @@ export type GoesInRow = { key: string; title: string; amount: string; weight?: s
 /** The rows that go in at one moment ("Mash-in", "Boil, 10 min", "Day 3"). */
 export type GoesInMoment = { when: string; rows: GoesInRow[] };
 
+/** A batch amount as a person writes it. Thousands are grouped ("1,265"). Under 100 it reads to three significant
+ *  digits, as a per-bbl amount does (perBblDisplay): "0.253", "8.8". From 100 up it keeps one decimal at most
+ *  ("272.7"). Display only; nothing stored is rounded. */
+const batchAmount = (qty: number) => (qty < 100 ? perBblDisplay(qty) : qty.toLocaleString("en-US", { maximumFractionDigits: 1 }));
+
 function lineRow(line: RecipeIngredientView, bbl: number): GoesInRow {
   const share = line.share === undefined ? undefined : wholePercent(line.share);
   if (!(bbl > 0) || !line.pack) return { key: line.key, title: line.title, amount: `${line.amount} / bbl`, share, line };
   const qty = batchQty(line.pack.perBbl, bbl), amount = batchTotalText(line.pack, bbl);
-  // The amount in its unit, with its thousands grouped: "1,265 lb".
-  const inUnit = `${qty.toLocaleString("en-US", { maximumFractionDigits: 4 })} ${line.pack.unit}`;
+  const inUnit = `${batchAmount(qty)} ${line.pack.unit}`;
   // An amount that is not a count of packs is that reading. A grain that reads in bags also reads its weight.
   if (amount === `${qty} ${line.pack.unit}`) return { key: line.key, title: line.title, amount: inUnit, share, line };
   return { key: line.key, title: line.title, amount, weight: share === undefined ? undefined : inUnit, share, line };
@@ -201,28 +214,31 @@ function lineRow(line: RecipeIngredientView, bbl: number): GoesInRow {
 /** The moments that are worth saying: those with a row. */
 const withRows = (moments: GoesInMoment[]) => moments.filter((moment) => moment.rows.length > 0);
 
-/** What goes in on brew day, in time order: the mash water, its salts and the grain at mash-in, the sparge water and
- *  its salts, the kettle salts, each boil addition from the most minutes remaining to the fewest, then the whirlpool.
- *  A boil addition with no time comes last in the boil; a whirlpool addition with no time goes in as it starts. */
+/** What goes in on brew day, in time order: the grain at mash-in, then the mash water and its salts, so the grain
+ *  bar over the list sits on the grain's rows. Then each timed mash addition, the sparge water and its salts, the
+ *  kettle salts, each boil addition, then the whirlpool. A stage's timed additions run as get_recipe orders them:
+ *  boil and whirlpool minutes count down to the end of the stage, so the most minutes come first; mash minutes count
+ *  up from mash-in, so the fewest do. A boil addition with no time comes last in the boil; a whirlpool addition with
+ *  no time goes in as it starts. */
 export function brewDayMoments(lines: readonly RecipeIngredientView[], water: RecipeWaterView | undefined, bbl: number): GoesInMoment[] {
   const row = (line: RecipeIngredientView) => lineRow(line, bbl);
   const at = (stage: string, timed: boolean) => lines.filter((line) => line.stage === stage && (line.timingMinutes !== null) === timed);
-  /** A stage's timed lines, one moment per time, from the most minutes to the fewest. */
-  const countdown = (stage: string, title: string) =>
-    [...new Set(at(stage, true).map((line) => line.timingMinutes!))].sort((a, b) => b - a)
+  /** A stage's timed lines, one moment per time: from the most minutes for a stage that counts down, else from the fewest. */
+  const timed = (stage: string, title: string, countsDown: boolean) =>
+    unique(at(stage, true).map((line) => line.timingMinutes!)).sort((a, b) => (countsDown ? b - a : a - b))
       .map((minutes) => at(stage, true).filter((line) => line.timingMinutes === minutes))
       .map((together) => ({ when: `${title}, ${together[0].timing}`, rows: together.map(row) }));
   const salts = (stage: string) => (water?.additions ?? []).flatMap((a, i) => (a.stage === stage ? [{ key: `water-${i}`, title: a.name, amount: `${a.qty} ${a.unit}` }] : []));
   const poured = (key: string, title: string, gal: string | undefined) => (gal ? [{ key, title, amount: `${gal} gal` }] : []);
   return withRows([
-    { when: "Mash-in", rows: [...poured("water-mash", "Mash water", water?.mashGal), ...salts("mash"), ...at("mash", false).map(row)] },
-    ...countdown("mash", "Mash"),
+    { when: "Mash-in", rows: [...at("mash", false).map(row), ...poured("water-mash", "Mash water", water?.mashGal), ...salts("mash")] },
+    ...timed("mash", "Mash", false),
     { when: "Sparge", rows: [...poured("water-sparge", "Sparge water", water?.spargeGal), ...salts("sparge")] },
     { when: "Kettle", rows: salts("kettle") },
-    ...countdown("boil", "Boil"),
+    ...timed("boil", "Boil", true),
     { when: "Boil", rows: at("boil", false).map(row) },
     { when: "Whirlpool", rows: at("whirlpool", false).map(row) },
-    ...countdown("whirlpool", "Whirlpool"),
+    ...timed("whirlpool", "Whirlpool", true),
   ]);
 }
 
@@ -254,11 +270,14 @@ export function assumptions(numbers: Partial<Record<"efficiency" | "attenuation"
 export type Fact = string | { text: string; opens: "numbers" | "water" };
 
 /** The line over the brew-day list: the target water profile and mash pH, the pre-boil volume, and the whirlpool and
- *  knock-out temperatures, each only when the recipe holds it. Empty when it holds none. */
-export function brewDayFacts(water: Pick<RecipeWaterView, "target" | "mashPh"> | undefined, numbers: Partial<Record<RecipeNumberKey, string>>): Fact[] {
+ *  knock-out temperatures, each only when the recipe holds it. Empty when it holds none. A `source` profile is named
+ *  beside the target; the page passes one only for an earlier copy, which has no Water sheet to hold it. */
+export function brewDayFacts(water: Pick<RecipeWaterView, "target" | "source" | "mashPh"> | undefined, numbers: Partial<Record<RecipeNumberKey, string>>): Fact[] {
   const number = (text: string): Fact => ({ text, opens: "numbers" });
   const sentences: Fact[][] = [];
-  if (water?.target) sentences.push([{ text: water.target, opens: "water" }, water.mashPh ? `, mash pH ${water.mashPh}` : ""]);
+  const mashPh = water?.mashPh ? `, mash pH ${water.mashPh}` : "";
+  if (water?.target) sentences.push([{ text: water.target, opens: "water" }, `${water.source ? ` (source ${water.source})` : ""}${mashPh}`]);
+  else if (water?.source) sentences.push([`Source water ${water.source}${mashPh}`]);
   else if (water?.mashPh) sentences.push([`Mash pH ${water.mashPh}`]);
   if (numbers.preBoil) sentences.push(["Boil from ", number(`${numbers.preBoil} bbl`)]);
   if (numbers.whirlpoolTemp) sentences.push(["Whirlpool at ", number(degrees(numbers.whirlpoolTemp)), ...(numbers.knockoutTemp ? [", knock out at ", number(degrees(numbers.knockoutTemp))] : [])]);
@@ -272,6 +291,15 @@ export function brewDayFacts(water: Pick<RecipeWaterView, "target" | "mashPh"> |
   }
   return facts;
 }
+
+/** An earlier copy's schedules read out, because it has no schedule sheet to open: each mash rest and each
+ *  fermentation stage as its name and its detail (its kind, temperature and length). A schedule of one step is
+ *  already said in full by its drawing, so its line adds only the kind (#1518: nothing is said twice); `detail` is
+ *  "" when the kind only repeats the name. */
+export const scheduleReadOut = (mash: readonly MashStep[], stages: readonly FermentationStage[]) => ({
+  rests: mash.map((step) => ({ name: step.name, detail: mash.length > 1 ? mashStepDetail(step) : stepKind(step) })),
+  stages: stages.map((stage) => ({ name: stage.name, detail: stages.length > 1 ? [stepKind(stage), fermentationStageDetail(stage)].filter(Boolean).join(" · ") : stepKind(stage) })),
+});
 
 /** The line over the cellar list, "18 days from pitch to package."; "" without a stage. */
 export const cellarFacts = (stages: readonly FermentationStage[]) => (stages.length ? `${plural(scheduleDays(stages), "day")} from pitch to package.` : "");

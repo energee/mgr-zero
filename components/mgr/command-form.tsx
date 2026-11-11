@@ -31,18 +31,26 @@ function FormClose({ className, onClose, previewAction }: { className: string; o
 }
 
 /** Radix gives focus back only to a Trigger. A form opened from state (Tap
- *  keg's onClick) has none, so it remembers what had focus as it first opened
- *  and focuses that again once it closes. */
+ *  keg's onClick) has none, and a form with one can be opened by another
+ *  control (a fact in Recipe's sentence opens the sheet Edit recipe numbers
+ *  triggers). So the form remembers what had focus as it first opened and
+ *  focuses that again once it closes. */
 export function rememberOpener(opener: { current: HTMLElement | null }) {
   opener.current ??= document.activeElement as HTMLElement | null;
 }
 
-/** `open` is still true when a resize swaps the phone sheet for the desk
- *  dialog; that swap keeps the opener and leaves focus in the form. */
-export function returnToOpener(opener: { current: HTMLElement | null }, open: boolean) {
-  if (open) return;
-  opener.current?.focus();
+/** Gives focus back to the remembered opener, and says whether focus is
+ *  settled. `open` is still true when a resize swaps the phone sheet for the
+ *  desk dialog; that swap keeps the opener and leaves focus in the form. False
+ *  means there was no control to return to: a tap that focused nothing leaves
+ *  the page body active, and a fact can leave the page while its sheet is open. */
+export function returnToOpener(opener: { current: HTMLElement | null }, open: boolean): boolean {
+  if (open) return true;
+  const control = opener.current;
   opener.current = null;
+  if (!control?.isConnected || control === document.body) return false;
+  control.focus();
+  return true;
 }
 
 export function CommandForm({
@@ -62,7 +70,7 @@ export function CommandForm({
   previewAction?: boolean;
   /** Omit to pin the form open (the screen inventory's frames); dismiss gestures then do nothing. */
   onOpenChange?: (open: boolean) => void;
-  /** Omit when the caller controls `open` itself (Tap keg, the screen inventory's frames); closing then refocuses whatever had focus when it opened. */
+  /** Omit when the caller controls `open` itself (Tap keg, the screen inventory's frames). Either way, closing refocuses the control that had focus when the form opened. */
   trigger?: React.ReactNode;
   title: React.ReactNode;
   /** Stays on screen; the body scrolls. Quantity sheets put the commit verb here. */
@@ -74,10 +82,11 @@ export function CommandForm({
   const foot = (bleed: string) => footer && <div className={cn("shrink-0 border-t px-4 pt-2", bleed)}>{footer}</div>;
   const mobile = useIsMobile();
   const opener = useRef<HTMLElement | null>(null);
-  // Radix's own close handler would focus the missing trigger, so it is prevented.
-  const returnFocus = trigger ? undefined : {
+  // Radix's own close handler focuses the trigger. It is stopped when the opener took focus back, and when there is
+  // no trigger to focus; otherwise (no opener to return to) the trigger is the right place.
+  const returnFocus = {
     onOpenAutoFocus: () => rememberOpener(opener),
-    onCloseAutoFocus: (event: Event) => { event.preventDefault(); returnToOpener(opener, open); },
+    onCloseAutoFocus: (event: Event) => { if (returnToOpener(opener, open) || !trigger) event.preventDefault(); },
   };
   // Explorer-only portal plumbing belongs here, not in generated shadcn files.
   if (container) return (

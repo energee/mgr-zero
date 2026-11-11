@@ -10,8 +10,8 @@
 // here in TypeScript (lib/recipe-gravity.ts, lib/recipe-ibu.ts) — the schema
 // stores assumptions, never results.
 // `get_recipe_outcomes` measures each brewed batch the same way, on read: a
-// row per tank for a batch read in several, and beside them the batches other
-// recipes brewed on the same grain bill.
+// row per tank for a batch split across several, and beside them the batches
+// other recipes brewed on the same grain bill.
 import { z } from "zod";
 import { historyInput, historyResult, newestFirst, type HistoryRow } from "./history";
 import type { VesselReading } from "@/lib/mgr/vessel-detail-view";
@@ -290,27 +290,35 @@ defineQuery({
 // gets it: nothing records how many turns an open batch will have, so turn 1 of
 // two would read about half its true efficiency. A cancelled batch never has
 // brewed_on (batches check), so that filter covers it.
-// A batch whose gravity readings name more than one tank stay gets a row per
-// tank, from that tank's readings; a reading taken on the batch names no tank
-// and stays off those rows. Its efficiency is the batch's, from the batch's
-// first reading, on every row. Two turns into one tank are one stay, so one row.
-// The grain bill is matched on each batch's own copy (gristKey). Ceiling: that
-// reads every saved copy's mash lines in the brewery on each call, several
-// hundred rows today (two pages). If it measures slow, store the key on
-// recipe_versions when a copy is saved and filter by it in the query.
+// A batch split across tanks gets a row per tank, from that tank's readings. It
+// is split when two of the tank stays its gravity readings name held beer at the
+// same time. A reading taken on the batch names no tank and stays off those
+// rows. Its efficiency is the batch's, from the batch's first reading, on every
+// row. A batch handed whole from one tank to the next (fermenter to brite) is
+// one row, read across both stays: the first stay ended as the second began.
+// Two turns into one tank are one stay, so one row.
+// The grain bill is matched on each batch's own copy (gristKey). A copy with no
+// mash line has no grain bill and matches nothing. Only a copy that a brewed
+// batch points at can add a batch, so the mash lines read are those copies' and
+// the shown copy's: the key's columns for another recipe's copy, the whole line
+// for a copy whose batches are returned. A batch brewed as another recipe is
+// read with its first gravity reading alone, and brew records are read for
+// closed batches alone. Ceiling: finding those copies reads one column of every
+// brewed batch in the brewery on each call, a page per 500 batches. If it
+// measures slow, store the key on recipe_versions when a copy is saved and
+// filter by it in the query.
 const OUTCOME_BATCH = "id, batch_no, planned_bbl, brewed_on, closed_at, recipe_version_id, recipe_version:recipe_versions!inner(recipe_id, version, brewhouse_efficiency, yeast_attenuation, recipe:recipes!inner(name))";
+/** A batch brewed as another recipe, with the gravity readings it is measured from: the read keeps only its first. */
+const POOLED_BATCH = `${OUTCOME_BATCH}, fermentation_readings(batch_id, occupancy_id, gravity_plato)` as const;
 defineQuery({
   name: "get_recipe_outcomes",
-  description: "Each brewed batch of a recipe, newest first: OG, FG, ABV, apparent attenuation and brewhouse efficiency from its gravity readings and knockout, beside what its own version predicted and assumed. A batch whose gravity was read in more than one tank comes once per tank, with that tank's vessel name and figures and the batch's efficiency. Also each brewed batch of another recipe whose own version has the same mash lines as the requested version (latest by default), with its recipeName, OG and efficiency and no FG, ABV or attenuation; sameGrainBill marks every batch on that grain bill. A figure is null when an input is missing, and efficiency is null until the batch closes. Computed on read, never stored",
+  description: "Each brewed batch of a recipe, newest first: OG, FG, ABV, apparent attenuation and brewhouse efficiency from its gravity readings and knockout, beside what its own version predicted and assumed. A batch split across tanks that held beer at the same time comes once per tank, with that tank's vessel name and figures and the batch's efficiency. Also each brewed batch of another recipe whose own version has the same mash lines as the requested version (latest by default), with its recipeName, OG and efficiency and no FG, ABV or attenuation; sameGrainBill marks every batch on that grain bill. A figure is null when an input is missing, and efficiency is null until the batch closes. Computed on read, never stored",
   input: z.object({ recipeId: z.string().uuid(), version: z.number().int().positive().optional().describe("The version whose grain bill other recipes' batches are matched on; the latest by default") }), roles: ["admin", "brewer"],
   handler: async (ctx, i): Promise<{ batches: RecipeOutcome[] }> => {
-    const [recipe, versions, mashLines] = await Promise.all([
+    const [recipe, versions] = await Promise.all([
       unwrap(ctx.db.from("recipes").select("id").eq("brewery_id", ctx.breweryId).eq("id", i.recipeId).maybeSingle()),
       completeRows("Recipe versions", start => ctx.db.from("recipe_versions").select("id, version", { count: "exact" })
-        .eq("recipe_id", i.recipeId).order("version").range(start, start + PAGE_SIZE - 1)),
-      completeRows("Recipe mash lines", start => ctx.db.from("recipe_ingredients")
-        .select("recipe_version_id, material_id, per_bbl_qty, extract_snapshot, stage, materials(base_uom)", { count: "exact" })
-        .eq("brewery_id", ctx.breweryId).eq("stage", "mash").order("id").range(start, start + PAGE_SIZE - 1)),
+        .eq("brewery_id", ctx.breweryId).eq("recipe_id", i.recipeId).order("version").range(start, start + PAGE_SIZE - 1)),
     ]);
     if (!recipe) throw new CommandError("recipe not found", 404, "not_found");
     // The version whose grain bill is matched: the one asked for, else the latest.
@@ -319,45 +327,80 @@ defineQuery({
     // A recipe with no saved version has no batch.
     if (!shown) return { batches: [] };
 
-    const bills = Map.groupBy(mashLines, (line) => line.recipe_version_id);
-    const billKey = (versionId: string) => gristKey((bills.get(versionId) ?? []).map((line) => ({ materialId: line.material_id, perBbl: num(line.per_bbl_qty) })));
-    const shownKey = billKey(shown.id);
-    // Every version in `bills` has a mash line, so a shown version without one matches nothing.
-    const sameBill = [...bills.keys()].filter((versionId) => billKey(versionId) === shownKey);
-
-    const brewed = () => ctx.db.from("batches").select(OUTCOME_BATCH, { count: "exact" })
+    const brewed = <Columns extends string>(columns: Columns) => ctx.db.from("batches").select(columns, { count: "exact" })
       .eq("brewery_id", ctx.breweryId).not("brewed_on", "is", null)
       .order("brewed_on", { ascending: false }).order("batch_no", { ascending: false }).order("id");
-    const [own, others] = await Promise.all([
-      completeRows("Batches", start => brewed().eq("recipe_version.recipe_id", i.recipeId).range(start, start + PAGE_SIZE - 1)),
-      inChunks(sameBill, chunk => completeRows("Batches", start => brewed().in("recipe_version_id", chunk)
-        .neq("recipe_version.recipe_id", i.recipeId).range(start, start + PAGE_SIZE - 1))),
+    // This recipe's brewed batches, and the copy each brewed batch in the brewery points at.
+    const [own, brewedCopies] = await Promise.all([
+      completeRows("Batches", start => brewed(OUTCOME_BATCH).eq("recipe_version.recipe_id", i.recipeId).range(start, start + PAGE_SIZE - 1)),
+      completeRows("Batches", start => ctx.db.from("batches").select("recipe_version_id", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).not("brewed_on", "is", null).not("recipe_version_id", "is", null)
+        .order("id").range(start, start + PAGE_SIZE - 1)),
     ]);
+    const ownCopies = new Set(versions.map((v) => v.id));
+    const otherCopies = [...new Set(brewedCopies.map((b) => b.recipe_version_id!))].filter((id) => !ownCopies.has(id));
+
+    /** The whole mash lines of these copies, as recipe-gravity reads them. */
+    const mashLinesOf = (copies: string[]) => inChunks(copies, chunk => completeRows("Recipe mash lines", start => ctx.db.from("recipe_ingredients")
+      .select("recipe_version_id, material_id, per_bbl_qty, extract_snapshot, stage, materials(base_uom)", { count: "exact" })
+      .eq("brewery_id", ctx.breweryId).eq("stage", "mash").in("recipe_version_id", chunk).order("id").range(start, start + PAGE_SIZE - 1)));
+    // The shown copy and the copies this recipe's batches were brewed from, whole. Another recipe's brewed copy, only
+    // what its key needs. Every gravity reading of this recipe's batches.
+    const [ownLines, otherKeyLines, ownReadings] = await Promise.all([
+      mashLinesOf([...new Set([shown.id, ...own.map((b) => b.recipe_version_id!)])]),
+      inChunks(otherCopies, chunk => completeRows("Recipe mash lines", start => ctx.db.from("recipe_ingredients")
+        .select("recipe_version_id, material_id, per_bbl_qty", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).eq("stage", "mash").in("recipe_version_id", chunk).order("id").range(start, start + PAGE_SIZE - 1))),
+      inChunks(own.map((b) => b.id), chunk => completeRows("Fermentation readings", start => ctx.db.from("fermentation_readings")
+        .select("batch_id, occupancy_id, gravity_plato", { count: "exact" }).eq("brewery_id", ctx.breweryId).in("batch_id", chunk)
+        .not("gravity_plato", "is", null).order("at").order("id").range(start, start + PAGE_SIZE - 1))),
+    ]);
+    const keyLines = Map.groupBy([...ownLines, ...otherKeyLines], (line) => line.recipe_version_id);
+    const billKey = (versionId: string) => gristKey((keyLines.get(versionId) ?? []).map((line) => ({ materialId: line.material_id, perBbl: num(line.per_bbl_qty) })));
+    const shownKey = billKey(shown.id);
+    /** This copy has the shown copy's grain bill. A copy with no mash line has none, so it matches nothing. */
+    const onShownBill = (versionId: string) => shownKey !== "" && billKey(versionId) === shownKey;
+    const sameBill = otherCopies.filter(onShownBill);
+    const readingsOf = Map.groupBy(ownReadings, (r) => r.batch_id);
+    // The tank stays of this recipe's batches whose gravity was read in more than one.
+    const readInSeveral = [...readingsOf.values()].flatMap((taken) => {
+      const stays = new Set(taken.flatMap((r) => r.occupancy_id ?? []));
+      return stays.size > 1 ? [...stays] : [];
+    });
+
+    // The batches other recipes brewed on that grain bill, each with its first gravity reading, and their copies' mash
+    // lines. Those tank stays, with each one's vessel and when it held beer.
+    const [others, pooledLines, stays] = await Promise.all([
+      inChunks(sameBill, chunk => completeRows("Batches", start => brewed(POOLED_BATCH).in("recipe_version_id", chunk)
+        .not("fermentation_readings.gravity_plato", "is", null)
+        .order("at", { referencedTable: "fermentation_readings" }).order("id", { referencedTable: "fermentation_readings" })
+        .limit(1, { referencedTable: "fermentation_readings" }).range(start, start + PAGE_SIZE - 1))),
+      mashLinesOf(sameBill),
+      inChunks(readInSeveral, chunk => completeRows("Tank stays", start => ctx.db.from("vessel_occupancies")
+        .select("id, batch_id, vessel_id, started_at, ended_at, vessels(name)", { count: "exact" }).eq("brewery_id", ctx.breweryId).in("id", chunk)
+        .order("id").range(start, start + PAGE_SIZE - 1))),
+    ]);
+    const bills = Map.groupBy([...ownLines, ...pooledLines], (line) => line.recipe_version_id);
+    for (const b of others) readingsOf.set(b.id, b.fermentation_readings);
     // ISO dates sort as text.
     const batches = [...own, ...others].sort((a, b) => b.brewed_on!.localeCompare(a.brewed_on!) || (b.batch_no ?? 0) - (a.batch_no ?? 0));
 
-    const batchIds = batches.map((b) => b.id);
-    const [readings, records] = await Promise.all([
-      inChunks(batchIds, chunk => completeRows("Fermentation readings", start => ctx.db.from("fermentation_readings")
-        .select("batch_id, occupancy_id, gravity_plato", { count: "exact" }).in("batch_id", chunk).not("gravity_plato", "is", null)
-        .order("at").order("id").range(start, start + PAGE_SIZE - 1))),
-      inChunks(batchIds, chunk => completeRows("Brew records", start => ctx.db.from("brew_records")
-        .select("id, batch_id, initial_bbl, corrects_id", { count: "exact" }).in("batch_id", chunk)
-        .order("id").range(start, start + PAGE_SIZE - 1))),
-    ]);
-    const readingsOf = Map.groupBy(readings, (r) => r.batch_id);
+    const vesselOf = new Map(stays.map((stay) => [stay.id, { id: stay.vessel_id, name: stay.vessels.name }]));
+    type Stay = (typeof stays)[number];
+    /** `a` began before `b` ended. A stay still open has not ended. */
+    const beganBeforeEnd = (a: Stay, b: Stay) => b.ended_at === null || Date.parse(a.started_at) < Date.parse(b.ended_at);
+    // Split across tanks: two of the batch's stays held beer at the same time. A whole-batch transfer ends one stay at
+    // the instant the next begins, so those two never did.
+    const split = new Set([...Map.groupBy(stays, (stay) => stay.batch_id)]
+      .filter(([, held]) => held.some((a, n) => held.slice(n + 1).some((b) => beganBeforeEnd(a, b) && beganBeforeEnd(b, a))))
+      .map(([batchId]) => batchId));
+
+    // Only a closed batch gets a knockout, so only the closed batches' brew records are read.
+    const records = await inChunks(batches.filter((b) => b.closed_at !== null).map((b) => b.id), chunk => completeRows("Brew records", start => ctx.db.from("brew_records")
+      .select("id, batch_id, initial_bbl, corrects_id", { count: "exact" }).eq("brewery_id", ctx.breweryId).in("batch_id", chunk)
+      .order("id").range(start, start + PAGE_SIZE - 1)));
     const knockouts = new Map<string, number>();
     for (const r of currentBrewRecords(records)) knockouts.set(r.batch_id, (knockouts.get(r.batch_id) ?? 0) + num(r.initial_bbl));
-
-    // The tank stays of this recipe's batches that were read in more than one, with each stay's vessel.
-    const splitStays = own.flatMap((b) => {
-      const stays = new Set((readingsOf.get(b.id) ?? []).flatMap((r) => r.occupancy_id ?? []));
-      return stays.size > 1 ? [...stays] : [];
-    });
-    const stays = await inChunks(splitStays, chunk => completeRows("Tank stays", start => ctx.db.from("vessel_occupancies")
-      .select("id, vessel_id, vessels(name)", { count: "exact" }).eq("brewery_id", ctx.breweryId).in("id", chunk)
-      .order("id").range(start, start + PAGE_SIZE - 1)));
-    const vesselOf = new Map(stays.map((stay) => [stay.id, { id: stay.vessel_id, name: stay.vessels.name }]));
 
     return {
       batches: batches.flatMap((b): RecipeOutcome[] => {
@@ -365,7 +408,7 @@ defineQuery({
         const ingredients = gravityLines(bills.get(b.recipe_version_id!) ?? []);
         const assumptions = { brewhouseEfficiency: num(copy.brewhouse_efficiency), yeastAttenuation: num(copy.yeast_attenuation) };
         const potential = potentialPointsPerBbl(ingredients);
-        const knockoutBbl = b.closed_at ? knockouts.get(b.id) ?? null : null;
+        const knockoutBbl = knockouts.get(b.id) ?? null;
         /** The figures of one run of gravity readings in time order: the first is the OG, the last the FG. */
         const measure = (gravity: number[]) => {
           const ogPlato = gravity[0] ?? null;
@@ -377,14 +420,14 @@ defineQuery({
         const basis = {
           batchId: b.id, batchNo: b.batch_no, version: copy.version, brewedOn: b.brewed_on!, closed: b.closed_at !== null,
           predicted: recipeGravity({ ...assumptions, ingredients }), assumedEfficiency: assumptions.brewhouseEfficiency, assumedAttenuation: assumptions.yeastAttenuation,
-          sameGrainBill: billKey(b.recipe_version_id!) === shownKey,
+          sameGrainBill: onShownBill(b.recipe_version_id!),
         };
-        // Brewed as another recipe: the first reading alone gives the OG and efficiency. The rest follows that recipe's
-        // yeast and fermentation, so it is not measured here.
-        if (copy.recipe_id !== i.recipeId) return [{ ...basis, ...measure(plato(taken.slice(0, 1))), recipeName: copy.recipe.name }];
         const batch = measure(plato(taken));
-        const tanks = Map.groupBy(taken.filter((r) => vesselOf.has(r.occupancy_id ?? "")), (r) => vesselOf.get(r.occupancy_id!)!.id);
-        if (tanks.size < 2) return [{ ...basis, ...batch }];
+        // Brewed as another recipe: its first reading, the only one read, gives the OG and efficiency. The rest follows
+        // that recipe's yeast and fermentation, so it is not measured here.
+        if (copy.recipe_id !== i.recipeId) return [{ ...basis, ...batch, recipeName: copy.recipe.name }];
+        if (!split.has(b.id)) return [{ ...basis, ...batch }];
+        const tanks = Map.groupBy(taken.filter((r) => r.occupancy_id !== null), (r) => vesselOf.get(r.occupancy_id!)!.id);
         // Each tank's own readings; the mash was one, so the efficiency is the batch's.
         return [...tanks.values()].map((inTank) => ({
           ...basis, ...measure(plato(inTank)), brewhouseEfficiency: batch.brewhouseEfficiency, vessel: vesselOf.get(inTank[0].occupancy_id!)!.name,

@@ -2,10 +2,12 @@
 // (components/mgr/views/recipe.tsx) bound to an unsaved sheet. On
 // /recipes/<id> it starts as the current saved copy (`initial`, from
 // versionToDraft), or blank before the first save, and the page's own parts
-// (`page`: saved date, Schedule batch, Batch actuals, As brewed) sit around the
-// sheet. Nothing is written until Save
+// (`page`: saved date and its change note, Schedule batch, Batch actuals, As
+// brewed) sit around the sheet. Nothing is written until Save
 // changes: the save bar is up only while the sheet differs from what is saved
-// (shouldKeepDraft), and Discard puts it back. An unchanged sheet shows the
+// (shouldKeepDraft), and Discard puts it back and clears a failed save's
+// message. The bar holds the change note for the save, except while a recipe
+// is being created. An unchanged sheet shows the
 // figures the saved copy froze (`saved`); once changed it shows the live
 // preview. When current Materials would give the unchanged recipe other
 // figures (materialsNowGive), Refresh from Materials saves it again as it is,
@@ -13,7 +15,7 @@
 // that: the pick in the page's sentence saves on its own (set_recipe_brand),
 // says "Brand saved", and its refresh leaves the unsaved sheet alone. It
 // stays enabled while that save runs, so focus never drops; a pick made
-// meanwhile is ignored. An unsaved change is kept in sessionStorage per actor, brewery
+// meanwhile is ignored, and so is a pick of the brand it already has. An unsaved change is kept in sessionStorage per actor, brewery
 // and recipe (lib/mgr/recipe-draft.ts), written as each change is made,
 // restored with a notice on return, and cleared on save; /recipes/new keeps
 // none, since there is no recipe to key it by yet. Use this again arrives as
@@ -27,8 +29,9 @@
 // ingredient open the Ingredient sheet, and each schedule's action opens its
 // sheet (schedule-sheets.tsx). The batch size and the eight process numbers
 // have one sheet, Recipe numbers, and the water has one; a fact the page
-// draws opens the same sheet its action does (`sheetOpen`), so the sheet stays
-// open while that fact is retyped. The OG/FG/ABV preview comes from the same pure
+// draws in a sentence opens the same sheet its action does (`sheetOpen`), so
+// the sheet stays open while that fact is retyped, and closing it returns
+// focus to the fact that opened it (CommandForm). The OG/FG/ABV preview comes from the same pure
 // recipeGravity the server uses (lib/recipe-gravity.ts), or names why there is
 // none (gravityBlockerText, noMashText). The IBU preview (draftIbu) reads each
 // material's current alpha acid. Efficiency and attenuation are typed as percents, as the
@@ -73,7 +76,7 @@ export function RecipeEditor({ recipeId, title, backHref, brandId = null, brands
   /** The brands to pick from: in the sentence of a saved recipe, and in the Brand field of one being created. */
   brands?: NewRecipeBrand[];
   /** What the recipe page draws around the sheet from the saved recipe; the sheet's own fields come from the draft. */
-  page?: Pick<RecipeViewModel, "saved" | "scheduleHref" | "recipeNote" | "actuals" | "actualsNote" | "history" | "figures" | "figureNotes">;
+  page?: Pick<RecipeViewModel, "saved" | "savedNote" | "scheduleHref" | "recipeNote" | "actuals" | "actualsNote" | "history" | "figures" | "figureNotes">;
   /** What the saved copy predicts, frozen at its save (get_recipe). The unchanged sheet shows `page`'s figures, drawn
    *  from these; Refresh from Materials is offered when the live preview gives other numbers. Absent before the first save. */
   savedFigures?: RecipeFigures;
@@ -148,10 +151,13 @@ export function RecipeEditor({ recipeId, title, backHref, brandId = null, brands
     if (key !== null) sessionStorage.removeItem(key);
     setDraft(start);
     setNotice(null);
+    // A failed save's message, or the warning that the change could not be kept, is about the change just dropped.
+    setError(null);
   }
-  // The brand saves when it is picked ("" clears it). A pick made while one is saving is ignored.
+  // The brand saves when it is picked ("" clears it). A pick made while one is saving is ignored, and so is a pick of
+  // the brand the recipe already has, which would save nothing and still say "Brand saved".
   function pickBrand(value: string) {
-    if (brandAction.busy) return;
+    if (brandAction.busy || value === (brandId ?? "")) return;
     void brandAction.run("set_recipe_brand", { recipeId, brandId: value || null }, () => toast.success("Brand saved"));
   }
 
@@ -248,7 +254,8 @@ export function RecipeEditor({ recipeId, title, backHref, brandId = null, brands
         ? <div className="basis-full">{E.info(notice)}</div>
         : undefined}
       controls={{
-        setNote: (value) => change({ notes: value }),
+        // A recipe being created has no change to note: its bar asks for none.
+        setNote: creating ? undefined : (value) => change({ notes: value }),
         onSubmit: () => void submit(), busy: action.busy, blockedReason, error: action.error,
         dirty,
         // A recipe being created has nothing saved to go back to.

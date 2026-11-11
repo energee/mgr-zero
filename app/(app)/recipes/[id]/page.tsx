@@ -66,14 +66,14 @@ export default async function RecipePage({ params, searchParams }: Props) {
     ? { draft, notice: loadedNotice(outcomes.batches, earlier.version.version, latest) }
     : undefined;
   if (from !== undefined && !loaded) redirect(`/recipes/${id}`);
-  const { saved, scheduleHref, recipeNote, actuals, actualsNote, history, figures, figureNotes } = model;
+  const { saved, savedNote, scheduleHref, recipeNote, actuals, actualsNote, history, figures, figureNotes } = model;
   return (
     <RecipeEditor
       // A save makes a new current copy, so the editor remounts on it with nothing unsaved.
       key={version?.id ?? "unsaved"}
       recipeId={recipe.id} title={model.title} backHref="/recipes"
       brandId={recipe.brand_id} brands={brands}
-      page={{ saved, scheduleHref, recipeNote, actuals, actualsNote, history, figures, figureNotes }}
+      page={{ saved, savedNote, scheduleHref, recipeNote, actuals, actualsNote, history, figures, figureNotes }}
       // What get_recipe predicted for the saved copy; the editor compares its live preview against these.
       savedFigures={version ? { ogPlato: snapshot.ogPlato, fgPlato: snapshot.fgPlato, abv: snapshot.abv, ibu: snapshot.ibu } : undefined}
       initial={initial} baseVersionId={version?.id ?? null} loaded={loaded}

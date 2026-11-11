@@ -2,7 +2,9 @@
 // that holds the recipe's batch size and its eight process numbers (the two
 // assumptions, the pre-boil volume, the boil time, the whirlpool's minutes,
 // rest and temperature, and the knock-out temperature). The recipe page reads
-// them as text in its sentences and drawings; any of them opens this sheet.
+// them as text. One read in a sentence opens this sheet. The boil time and the
+// two whirlpool times are written on the band, which is not tappable; Edit
+// recipe numbers under the band opens the sheet for them.
 // Each is a small field under its label. The inventory draws a fixture with no
 // onChange; the live sheet (recipes/[id]/schedule-sheets.tsx) edits the
 // recipe's unsaved sheet as each field is typed, so there is no Save here.

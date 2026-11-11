@@ -3,9 +3,10 @@
 // (spanShares), the brew-day band (brewDayBand), the cellar's temperature
 // profile (cellarProfile), what goes in and when (brewDayMoments,
 // cellarMoments), the sentences above them (assumptions, brewDayFacts,
-// cellarFacts) and a note closed as a sentence (sentence). Pure: no database.
+// cellarFacts), an earlier copy's schedules read out (scheduleReadOut) and a
+// note closed as a sentence (sentence). Pure: no database.
 import { describe, expect, it } from "vitest";
-import { assumptions, brewDayBand, brewDayFacts, brewDayMoments, cellarFacts, cellarMoments, cellarProfile, sentence, spanShares } from "@/lib/mgr/recipe-day-view";
+import { assumptions, brewDayBand, brewDayFacts, brewDayMoments, cellarFacts, cellarMoments, cellarProfile, scheduleReadOut, sentence, spanShares } from "@/lib/mgr/recipe-day-view";
 import type { FermentationStage, MashStep } from "@/lib/mgr/recipe-process-view";
 import { ingredientCells, type RecipeIngredientView, type RecipeWaterView } from "@/lib/mgr/recipe-view";
 
@@ -38,7 +39,7 @@ describe("brewDayBand", () => {
   const band = brewDayBand(MASH, NUMBERS, [line("extract", "boil", 60, 0.01), line("citra", "boil", 10, 0.4), line("wp", "whirlpool", null, 0.5), line("late", "whirlpool", 5, 0.5), line("dry", "dry_hop", 3 * 1440, 1.2)])!;
 
   it("draws each mash rest at its temperature with its minutes, then the boil and the whirlpool", () => {
-    expect(band.steps.map((s) => [s.temp, s.note])).toEqual([["104 °F", "15 min"], ["152 °F", "60 min"], ["168 °F", "10 min"], [undefined, "60 min"], ["180 °F", "20, rest 10"]]);
+    expect(band.steps.map((s) => [s.temp, s.note])).toEqual([["104 °F", "15 min"], ["152 °F", "60 min"], ["168 °F", "10 min"], [undefined, "60 min"], ["180 °F", "20 min, rest 10"]]);
     // One line across the page: each step starts where the one before ends.
     expect(band.steps[0].from).toBe(0);
     expect(band.steps.at(-1)!.to).toBeCloseTo(100, 10);
@@ -69,16 +70,20 @@ describe("brewDayBand", () => {
     const wide = (s: typeof boil) => s.to - s.from;
     expect(band.marks).toHaveLength(4);
     // A boil addition counts minutes to the end of the boil: 60 is its start, 10 is five sixths along.
-    expect(band.marks[0]).toBeCloseTo(boil.from, 10);
-    expect(band.marks[1]).toBeCloseTo(boil.from + wide(boil) * 50 / 60, 10);
+    expect(band.marks[0].at).toBeCloseTo(boil.from, 10);
+    expect(band.marks[1].at).toBeCloseTo(boil.from + wide(boil) * 50 / 60, 10);
     // A whirlpool addition with no time goes in as the whirlpool starts; a timed one counts down to its end, before the rest.
-    expect(band.marks[2]).toBeCloseTo(whirlpool.from, 10);
-    expect(band.marks[3]).toBeCloseTo(whirlpool.from + wide(whirlpool) * 15 / 30, 10);
+    expect(band.marks[2].at).toBeCloseTo(whirlpool.from, 10);
+    expect(band.marks[3].at).toBeCloseTo(whirlpool.from + wide(whirlpool) * 15 / 30, 10);
+    // Each mark names what goes in there.
+    expect(band.marks.map((mark) => mark.title)).toEqual(["extract", "citra", "wp", "late"]);
   });
 
-  it("draws one mark for two additions at the same time, and none for a boil addition with no time", () => {
+  it("draws one mark for two additions at the same time, naming both, and none for a boil addition with no time", () => {
     const marks = brewDayBand(MASH, NUMBERS, [line("a", "boil", 10, 1), line("b", "boil", 10, 1), line("c", "boil", null, 1)])!.marks;
-    expect(marks).toHaveLength(1);
+    expect(marks.map((mark) => mark.title)).toEqual(["a and b"]);
+    // One hop written on two lines at one time is named once.
+    expect(brewDayBand(MASH, NUMBERS, [line("a", "boil", 10, 1), line("a", "boil", 10, 2)])!.marks.map((mark) => mark.title)).toEqual(["a"]);
   });
 
   it("closes with the knock-out temperature and the total time", () => {
@@ -87,7 +92,7 @@ describe("brewDayBand", () => {
   });
 
   it("says what it shows in a sentence", () => {
-    expect(band.summary).toBe("The brew day by temperature: mash rests at 104 °F for 15 minutes, 152 °F for 60 minutes, and 168 °F for 10 minutes, a 60 minute boil, and a 20 minute whirlpool at 180 °F with a 10 minute rest. Knock out at 65 °F. 4 marks show when a boil or whirlpool addition goes in.");
+    expect(band.summary).toBe("The brew day by temperature: mash rests at 104 °F for 15 minutes, 152 °F for 60 minutes, and 168 °F for 10 minutes, a 60 minute boil, and a 20 minute whirlpool at 180 °F with a 10 minute rest. Knock out at 65 °F. 4 marks show where each boil or whirlpool addition goes in: extract; citra; wp; late.");
   });
 
   it("draws what a sparse recipe holds: one rest alone is not totalled again, and no rest at all draws nothing", () => {
@@ -139,14 +144,15 @@ describe("cellarProfile", () => {
   it("marks each dry hop on its day, and not the pitch", () => {
     const [primary] = profile.steps;
     expect(profile.marks).toHaveLength(1);
-    expect(profile.marks[0]).toBeCloseTo(primary.to * 3 / 4, 10);
+    expect(profile.marks[0].at).toBeCloseTo(primary.to * 3 / 4, 10);
+    expect(profile.marks[0].title).toBe("citra");
     // A dry hop after the schedule's last day sits at its end; one with no day has no mark.
-    expect(cellarProfile(stages, [line("late", "dry_hop", 30 * 1440, 1), line("some", "dry_hop", null, 1)])!.marks).toEqual([100]);
+    expect(cellarProfile(stages, [line("late", "dry_hop", 30 * 1440, 1), line("some", "dry_hop", null, 1)])!.marks).toEqual([{ at: 100, title: "late" }]);
   });
 
-  it("says what it shows in a sentence", () => {
-    expect(profile.summary).toBe("Fermentation temperature by day: 68 °F for 4 days, 72 °F for 2 days, and 34 °F for 12 days, with a dry hop on day 3.");
-    expect(cellarProfile(stages, [line("a", "dry_hop", 3 * 1440, 1), line("b", "dry_hop", 7 * 1440, 1)])!.summary).toMatch(/with dry hops on days 3 and 7\.$/);
+  it("says what it shows in a sentence, naming the dry hops by day", () => {
+    expect(profile.summary).toBe("Fermentation temperature by day: 68 °F for 4 days, 72 °F for 2 days, and 34 °F for 12 days. Marks show the dry hops: citra on day 3.");
+    expect(cellarProfile(stages, [line("a", "dry_hop", 3 * 1440, 1), line("c", "dry_hop", 3 * 1440, 1), line("b", "dry_hop", 7 * 1440, 1)])!.summary).toMatch(/Marks show the dry hops: a and c on day 3; b on day 7\.$/);
   });
 
   it("draws one temperature as a level line, and nothing without a stage", () => {
@@ -174,9 +180,10 @@ describe("what goes in on brew day", () => {
   const lines = [pils, oats, citra, extract, loose, lateWhirlpool, whirlpool, dry];
   const moments = brewDayMoments(lines, water, 22);
 
-  it("runs in time order, saying each moment once: water and salts, the grain, the sparge, the kettle, each boil addition by minutes remaining, the whirlpool", () => {
+  it("runs in time order, saying each moment once: the grain, then the mash water and its salts, the sparge, the kettle, each boil addition by minutes remaining, the whirlpool", () => {
     expect(moments.map((m) => [m.when, m.rows.map((r) => r.title)])).toEqual([
-      ["Mash-in", ["Mash water", "Gypsum", "Pilsner malt", "Flaked oats"]],
+      // The grain leads, so the grain bar over the list sits on the rows it describes.
+      ["Mash-in", ["Pilsner malt", "Flaked oats", "Mash water", "Gypsum"]],
       ["Sparge", ["Sparge water", "Lactic acid"]],
       ["Kettle", ["Yeast nutrient"]],
       ["Boil, 60 min", ["Hop extract"]],
@@ -185,6 +192,11 @@ describe("what goes in on brew day", () => {
       ["Whirlpool", ["Mosaic"]],
       ["Whirlpool, 5 min", ["Late Citra"]],
     ]);
+  });
+
+  it("lists a timed mash addition after mash-in, from the fewest minutes: mash minutes count up, as get_recipe orders them", () => {
+    const timed = [line("Late salts", "mash", 45, 0.01), line("Enzyme", "mash", 15, 0.01), pils, line("Bittering", "boil", 60, 0.1), line("Aroma", "boil", 5, 0.1)];
+    expect(brewDayMoments(timed, undefined, 0).map((m) => m.when)).toEqual(["Mash-in", "Mash, 15 min", "Mash, 45 min", "Boil, 60 min", "Boil, 5 min"]);
   });
 
   it("reads each amount for the batch: packs where they are whole, the grain with its weight and its share", () => {
@@ -205,8 +217,11 @@ describe("what goes in on brew day", () => {
     const [row] = brewDayMoments([{ ...pils, pack: { ...pils.pack!, perBbl: 44 } }], undefined, 22)[0].rows;
     expect(row).toMatchObject({ amount: "968 lb", share: "81%" });
     expect(row.weight).toBeUndefined();
-    // Thousands are grouped, and the stored four decimals are kept.
-    expect(brewDayMoments([{ ...pils, pack: { ...pils.pack!, perBbl: 57.6 } }, { ...citra, pack: { ...citra.pack!, perBbl: 0.011477 } }], undefined, 22).flatMap((m) => m.rows).map((r) => r.amount)).toEqual(["1,267.2 lb", "0.2525 lb"]);
+    // Thousands are grouped. Under 100, an amount that is not whole reads to three significant digits, as a per-bbl amount does.
+    const amounts = (...perBbl: number[]) => brewDayMoments(perBbl.map((qty) => ({ ...citra, pack: { ...citra.pack!, perBbl: qty } })), undefined, 22).flatMap((m) => m.rows).map((r) => r.amount);
+    expect(amounts(57.6, 0.011477, 0.4, 4.5425, 3)).toEqual(["1,267.2 lb", "0.253 lb", "8.8 lb", "99.9 lb", "66 lb"]);
+    // From 100 up, one decimal at most: a scaled amount does not read "272.7273 lb".
+    expect(amounts(12.396695, 10.330577)).toEqual(["272.7 lb", "227.3 lb"]);
   });
 
   it("reads each amount per barrel without a batch size, as before", () => {
@@ -263,6 +278,23 @@ describe("the sentences above the lists", () => {
     expect(text(brewDayFacts({ target: "Burton" }, { whirlpoolTemp: "180" }))).toBe("Burton. Whirlpool at 180 °F.");
     expect(text(brewDayFacts(undefined, { preBoil: "16.8" }))).toBe("Boil from 16.8 bbl.");
     expect(brewDayFacts(undefined, {})).toEqual([]);
+    // An earlier copy has no Water sheet to open, so its line names the source profile beside the target.
+    expect(text(brewDayFacts({ ...water, source: "City" }, {}))).toBe("Hazy target (source City), mash pH 5.35.");
+    expect(text(brewDayFacts({ source: "City", mashPh: "5.3" }, {}))).toBe("Source water City, mash pH 5.3.");
+    expect(text(brewDayFacts({ source: "City" }, {}))).toBe("Source water City.");
+  });
+
+  it("reads an earlier copy's schedules out line by line: each rest and stage by name, then its kind, temperature and length", () => {
+    const stages: FermentationStage[] = [{ name: "Primary", kind: "primary", tempF: 68, days: 4 }, { name: "Free rise", kind: "diacetyl rest", tempF: 72, days: 1 }];
+    expect(scheduleReadOut(MASH, stages)).toEqual({
+      rests: [{ name: "Mash-in", detail: "Infusion · 104 °F · 15 min" }, { name: "Saccharification", detail: "Infusion · 152 °F · 60 min" }, { name: "Mash-out", detail: "Direct heat · 168 °F · 10 min" }],
+      // A kind that only repeats the name is not said twice.
+      stages: [{ name: "Primary", detail: "68 °F · 4 days" }, { name: "Free rise", detail: "Diacetyl rest · 72 °F · 1 day" }],
+    });
+    expect(scheduleReadOut([], [])).toEqual({ rests: [], stages: [] });
+    // A schedule of one step is said in full by its drawing, so its line adds only the name and the kind (#1518).
+    expect(scheduleReadOut([MASH[1]], [stages[1]])).toEqual({ rests: [{ name: "Saccharification", detail: "Infusion" }], stages: [{ name: "Free rise", detail: "Diacetyl rest" }] });
+    expect(scheduleReadOut([], [stages[0]]).stages).toEqual([{ name: "Primary", detail: "" }]);
   });
 
   it("gives the cellar's length from pitch to package", () => {

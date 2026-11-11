@@ -1,6 +1,6 @@
 // tests/recipe-outcomes-view.test.ts — the table Batch actuals draws from
 // get_recipe_outcomes: what the shown copy predicts and assumes on top, then
-// one row per batch, or per tank of a batch read in several (outcomeTable). A
+// one row per batch, or per tank of a batch split across tanks (outcomeTable). A
 // batch of another copy is marked and carries its own copy's prediction; no
 // version number is printed. A batch another recipe brewed on the same grain
 // bill reads "as <recipe>" with its mash figures only, and past the newest few
@@ -96,7 +96,7 @@ describe("outcomeTable", () => {
     expect(outcomeTable([], "plato", closed)).toBeUndefined();
   });
 
-  it("gives a batch read in two tanks a row per tank, each naming its tank", () => {
+  it("gives a batch split across two tanks a row per tank, each naming its tank", () => {
     const rows = outcomeTable([{ ...closed, vessel: "FV3" }, { ...closed, vessel: "FV5", fgPlato: 3.6 }], "plato", closed)!.rows;
     expect(rows.map((r) => [r.batch, r.tag, r.cells[1].measured])).toEqual([["B-0413", "in FV3", "3.5"], ["B-0413", "in FV5", "3.6"]]);
     expect(new Set(rows.map((r) => r.key)).size).toBe(2);
@@ -157,7 +157,7 @@ describe("outcomeSummary", () => {
     expect(outcomeSummary([second, { ...third, apparentAttenuation: null }], closed)).toBe("2 batches: efficiency 68–71% against 72% assumed.");
   });
 
-  it("counts a batch read in two tanks once, and reads both tanks' attenuation", () => {
+  it("counts a batch split across two tanks once, and reads both tanks' attenuation", () => {
     const tanks = [{ ...third, vessel: "FV3" }, { ...third, vessel: "FV5", apparentAttenuation: 0.8 }];
     expect(outcomeSummary([second, ...tanks], closed)).toBe("2 batches: efficiency 68–71% against 72% assumed; attenuation 75–80% against 78% assumed.");
   });

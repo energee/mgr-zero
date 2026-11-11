@@ -1,11 +1,12 @@
 // tests/recipe-outcomes.test.ts — get_recipe_outcomes against the real schema:
 // which batches count, where OG, FG and knockout come from, and that each batch
 // answers to its own version. Imported history has no open or multi-turn batch,
-// so those cases live here. Then a batch read in two tanks (a row per tank), and
+// so those cases live here. Then a batch split across two tanks that held beer
+// at the same time (a row per tank), a fermenter-to-brite handoff (one row), and
 // the batches other recipes brewed on the same grain bill (pooled, mash figures
 // only, never across breweries). The formulas are pinned in tests/recipe-gravity.test.ts.
 import { beforeAll, describe, expect, it } from "vitest";
-import { makeBrewery, makeStaffCtx, seedMaterial, sql } from "./helpers";
+import { admin, makeBrewery, makeStaffCtx, seedMaterial, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { platoToSg } from "@/lib/recipe-gravity";
@@ -170,6 +171,15 @@ describe("get_recipe_outcomes", () => {
     await expect(runCommand("get_recipe_outcomes", { recipeId }, other)).rejects.toMatchObject({ code: "not_found" });
   });
 
+  it("answers not_found for another brewery's recipe to someone on staff at both", async () => {
+    // Row security shows this person both breweries, so only the handler's own brewery filter can refuse.
+    const both = await makeStaffCtx((await makeBrewery()).id, "brewer");
+    const { error } = await admin.from("brewery_users").insert({ brewery_id: owner.breweryId, user_id: both.userId, roles: ["brewer"] });
+    if (error) throw error;
+    await expect(runCommand("get_recipe_outcomes", { recipeId }, { ...both, breweryId: owner.breweryId })).resolves.toBeTruthy();
+    await expect(runCommand("get_recipe_outcomes", { recipeId }, both)).rejects.toMatchObject({ code: "not_found" });
+  });
+
   it("is for admin and brewer", async () => {
     const sales = await makeStaffCtx(owner.breweryId, "sales");
     await expect(runCommand("get_recipe_outcomes", { recipeId }, sales)).rejects.toThrow(/permission denied/);
@@ -181,7 +191,10 @@ describe("get_recipe_outcomes by tank", () => {
   /** 55 lb of the same malt per barrel: a grain bill no other recipe here has. */
   const potential = (55 * 37) / 31;
   let rows: RecipeOutcome[];
-  const tanks: string[] = [];
+  const tanks: string[] = [], stillSplit: string[] = [];
+  /** Moves `volumeBbl` from a tank stay into a new tank, and answers the stay it opened there. */
+  const transfer = async (fromOccupancyId: string, volumeBbl: number) =>
+    ((await runCommand("record_cellar_transfer", { fromOccupancyId, toVesselId: await tank(), volumeBbl }, brewer)) as { to_occupancy: { id: string } }).to_occupancy.id;
 
   beforeAll(async () => {
     const recipe = await createRecipe("Outcome split");
@@ -194,12 +207,29 @@ describe("get_recipe_outcomes by tank", () => {
     // Taken on the batch at knockout, before the split: it names no tank.
     await reading(ids.split, "2026-10-05", 14.2);
     await tankReading(first.occupancy.id, "2026-10-06", 14);
-    const moved = (await runCommand("record_cellar_transfer", { fromOccupancyId: first.occupancy.id, toVesselId: await tank(), volumeBbl: 10 }, brewer)) as { to_occupancy: { id: string } };
+    const moved = await transfer(first.occupancy.id, 10);
     tanks.push(`FV ${vesselNo}`);
-    await tankReading(moved.to_occupancy.id, "2026-10-07", 13.8);
+    await tankReading(moved, "2026-10-07", 13.8);
     await tankReading(first.occupancy.id, "2026-10-12", 3.4);
-    await tankReading(moved.to_occupancy.id, "2026-10-13", 3.9);
+    await tankReading(moved, "2026-10-13", 3.9);
     await close(ids.split, 20);
+
+    // Split and still fermenting: both tanks hold beer, and neither stay has ended.
+    ids.stillSplit = await schedule(version, 20);
+    const kept = await brewDay(ids.stillSplit, await tank(), 20, "2026-10-18");
+    stillSplit.push(`FV ${vesselNo}`);
+    await tankReading(kept.occupancy.id, "2026-10-19", 13.9);
+    await tankReading(await transfer(kept.occupancy.id, 8), "2026-10-20", 13.7);
+    stillSplit.push(`FV ${vesselNo}`);
+
+    // A fermenter-to-brite handoff: the whole batch moves, so the first tank's stay ends as the second's begins.
+    ids.handoff = await schedule(version, 10);
+    const fermenter = await brewDay(ids.handoff, await tank(), 10, "2026-10-15");
+    await tankReading(fermenter.occupancy.id, "2026-10-16", 14.1);
+    await tankReading(fermenter.occupancy.id, "2026-10-22", 4.2);
+    const brite = await transfer(fermenter.occupancy.id, 10);
+    await tankReading(brite, "2026-10-24", 3.6);
+    await tankReading(brite, "2026-10-26", 3.5);
 
     // A double batch: two turns into one tank, read at the tank and once on the batch.
     ids.double = await schedule(version, 20);
@@ -223,6 +253,18 @@ describe("get_recipe_outcomes by tank", () => {
     for (const row of rows.filter((o) => o.batchId === ids.split)) expect(row.brewhouseEfficiency).toBeCloseTo(efficiency(14.2, 20, 20, potential), 6);
   });
 
+  it("gives a batch still split across two tanks a row per tank", () => {
+    expect(rows.filter((o) => o.batchId === ids.stillSplit).map((o) => [o.vessel, o.ogPlato, o.fgPlato])).toEqual([[stillSplit[0], 13.9, null], [stillSplit[1], 13.7, null]]);
+  });
+
+  it("keeps a batch handed from one tank to the next as one row, read across both tanks", () => {
+    const handoff = rows.filter((o) => o.batchId === ids.handoff);
+    expect(handoff).toHaveLength(1);
+    expect(handoff[0]).toMatchObject({ ogPlato: 14.1, fgPlato: 3.5 });
+    expect(handoff[0].vessel).toBeUndefined();
+    expect(handoff[0].abv).toBeCloseTo((platoToSg(14.1) - platoToSg(3.5)) * 131.25, 6);
+  });
+
   it("keeps a double batch into one tank as one row that names no tank", () => {
     const double = rows.filter((o) => o.batchId === ids.double);
     expect(double).toHaveLength(1);
@@ -238,12 +280,12 @@ describe("get_recipe_outcomes by tank", () => {
 describe("get_recipe_outcomes on a shared grain bill", () => {
   /** The bill the shown copy and its matches share: 50 lb of base malt at 1.036 and 5.5 lb of the 1.037 malt. */
   const potential = (50 * 36 + 5.5 * 37) / 31;
-  let pale: string, pooled: RecipeOutcome[], elsewhere: Ctx;
+  let pale: string, hop: string, shared: Line[], pooled: RecipeOutcome[], elsewhere: Ctx;
 
   beforeAll(async () => {
     const base = await seedMaterial(owner.breweryId, { name: "Pool base malt", category: "malt", extractPotential: 1.036 });
-    const hop = await seedMaterial(owner.breweryId, { name: "Pool hop", category: "hop", alphaAcid: 12 });
-    const shared: Line[] = [{ materialId: base, perBblQty: 50, stage: "mash" }, { materialId: malt, perBblQty: 5.5, stage: "mash" }];
+    hop = await seedMaterial(owner.breweryId, { name: "Pool hop", category: "hop", alphaAcid: 12 });
+    shared = [{ materialId: base, perBblQty: 50, stage: "mash" }, { materialId: malt, perBblQty: 5.5, stage: "mash" }];
     const past = async (name: string, version: string, brewedOn: string, og: number, fg: number) => {
       ids[name] = await schedule(version, 10, brewedOn);
       await historical(ids[name], brewedOn, 10);
@@ -324,6 +366,21 @@ describe("get_recipe_outcomes on a shared grain bill", () => {
     const first = await outcomesOf(pale, 1);
     expect(first.map((o) => [o.batchId, o.sameGrainBill])).toEqual([[ids.paleNow, false], [ids.paleBefore, true]]);
     await expect(runCommand("get_recipe_outcomes", { recipeId: pale, version: 9 }, brewer)).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("pools against a shown copy that nothing has brewed", async () => {
+    const unbrewed = await createRecipe("Pool unbrewed");
+    await bill(unbrewed, shared);
+    expect((await outcomesOf(unbrewed)).map((o) => [o.batchId, o.recipeName, o.sameGrainBill])).toEqual([
+      [ids.hazyOpen, "Pool hazy", true], [ids.hazy, "Pool hazy", true], [ids.paleNow, "Pool pale", true], [ids.beforeChange, "Pool changed", true],
+    ]);
+  });
+
+  it("matches no grain bill for a copy with no mash line, even its own batches", async () => {
+    // Two copies of one recipe, hops only: neither has a grain bill to share.
+    const hopsOnly = await createRecipe("Pool hops only");
+    for (const perBblQty of [1, 2]) await historical(await schedule(await bill(hopsOnly, [{ materialId: hop, perBblQty, stage: "boil" }]), 10, "2025-04-01"), "2025-04-01", 10);
+    expect((await outcomesOf(hopsOnly)).map((o) => o.sameGrainBill)).toEqual([false, false]);
   });
 
   it("never pools another brewery's identical recipe, either way", async () => {
