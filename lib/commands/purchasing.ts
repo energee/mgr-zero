@@ -42,7 +42,7 @@ defineCommand({
 
 defineCommand({
   name: "upsert_material",
-  description: "Create or edit a material definition: kind, base and purchase units with the factor between them, the word one purchase unit is sold by, lot tracking, default vendor, extract potential, alpha acid. Units are refused once movements, recipe ingredients, format BOM lines, PO lines, contracts or transfer lines use the material",
+  description: "Create or edit a material definition: kind, base and purchase units with the factor between them, the word one purchase unit is sold by, lot tracking, default vendor, extract potential, alpha acid. A base unit change is refused once movements, recipe ingredients, format BOM lines, PO lines, contracts, transfer lines or brew pulls use the material; a purchase unit or factor change is refused only once PO lines or contracts do",
   compensation: "Reverse an edit with upsert_material and the previous values; a new material cannot be deleted, only set inactive.",
   input: z.object({
     id: z.string().uuid().optional().describe("The material to edit; omit to create one"),
