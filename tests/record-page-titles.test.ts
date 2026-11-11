@@ -95,7 +95,6 @@ const RECORDS = [
   ["purchase-orders/[id]", "id", "get_purchase_order"],
   ["purchase-orders/[id]/edit", "id", "get_purchase_order"],
   ["recipes/[id]", "id", "get_recipe"],
-  ["recipes/[id]/new", "id", "get_recipe"],
   ["routes/[id]", "id", "list_routes"],
   ["settings/pos/sales/[id]", "id", "get_pos_sale"],
   ["transfers/[id]", "id", "get_stock_transfer"],
@@ -175,7 +174,7 @@ describe("successful record metadata", () => {
     expect(await page.generateMetadata({ params: Promise.resolve({ id: MISSING }), searchParams: Promise.resolve({}) })).toEqual({ title: savedTitle });
   });
 
-  it("names the recipe and selected version instead of its section", async () => {
+  it("names the recipe, whichever copy is selected, instead of its section", async () => {
     const { bindings } = requestBindings();
     const data = loadPage("app/(app)/recipes/recipe-data.ts", {
       ...bindings,
@@ -186,18 +185,8 @@ describe("successful record metadata", () => {
       },
     });
     const page = loadPage("app/(app)/recipes/[id]/page.tsx", { ...bindings, ...data });
-    expect(await page.generateMetadata({ params: Promise.resolve({ id: MISSING }), searchParams: Promise.resolve({ v: "1" }) })).toEqual({ title: "Cedar pale v1" });
-    expect(await page.generateMetadata({ params: Promise.resolve({ id: MISSING }), searchParams: Promise.resolve({}) })).toEqual({ title: "Cedar pale v3" });
-  });
-
-  it("names the next recipe version after its recipe", async () => {
-    const { bindings } = requestBindings();
-    const data = loadPage("app/(app)/recipes/recipe-data.ts", {
-      ...bindings,
-      runPageQuery: async () => ({ recipe: { name: "Cedar pale" } }),
-    });
-    const page = loadPage("app/(app)/recipes/[id]/new/page.tsx", { ...bindings, ...data });
-    expect(await page.generateMetadata({ params: Promise.resolve({ id: MISSING }), searchParams: Promise.resolve({}) })).toEqual({ title: "Cedar pale · new version" });
+    expect(await page.generateMetadata({ params: Promise.resolve({ id: MISSING }), searchParams: Promise.resolve({ v: "1" }) })).toEqual({ title: "Cedar pale" });
+    expect(await page.generateMetadata({ params: Promise.resolve({ id: MISSING }), searchParams: Promise.resolve({}) })).toEqual({ title: "Cedar pale" });
   });
 
   it.each([
@@ -229,5 +218,79 @@ describe("successful record metadata", () => {
       noMembershipModel,
     });
     expect(await page.generateMetadata({ params: Promise.resolve({}), searchParams: Promise.resolve({}) })).toEqual({ title: staff ? "Portal is for customers" : "No brewery yet" });
+  });
+});
+
+// /recipes/<id> is the one recipe page: the editor on the current copy, the read-out of an earlier one.
+describe("the recipe page picks the editor or the read-out", () => {
+  const RecipeEditor = () => null, RecipeView = () => null;
+  type Drawn = { type: unknown; key: string | null; props: Record<string, unknown> };
+  /** The page over a recipe whose saved copies are `copies`, newest first; its reads are stubbed at the command boundary. */
+  function open(searchParams: Record<string, string>, copies = [3, 2, 1]) {
+    const { bindings } = requestBindings();
+    const data = loadPage("app/(app)/recipes/recipe-data.ts", {
+      ...bindings,
+      runPageQuery: async (_name: string, input: { version?: number }) => {
+        if (input.version !== undefined && !copies.includes(input.version)) throw new CommandError("recipe version not found", 404, "not_found");
+        const number = input.version ?? copies[0];
+        return { recipe: { id: MISSING, name: "Cedar pale", brand_id: null }, versions: copies, version: number === undefined ? null : { id: `copy-${number}`, version: number } };
+      },
+    });
+    const page = loadPage("app/(app)/recipes/[id]/page.tsx", {
+      ...bindings, ...data, RecipeEditor, RecipeView,
+      runCommand: async (name: string) => (name === "get_recipe_outcomes" ? { batches: [] } : name === "get_gravity_unit" ? { effective: "plato" } : []),
+      toRecipeMaterial: (m: unknown) => m, toWaterProfileOption: (p: unknown) => p,
+      toRecipePageModel: (s: { recipe: { name: string } }) => ({ title: s.recipe.name, saved: "Nov 3, 2026" }),
+      versionToDraft: (s: { version: { version: number } | null }) => (s.version ? { copy: s.version.version } : null),
+      shouldKeepDraft: (a: unknown, b: unknown) => JSON.stringify(a) !== JSON.stringify(b),
+      loadedNotice: (_outcomes: unknown, version: number) => `loaded ${version}`,
+    });
+    return page.default({ params: Promise.resolve({ id: MISSING }), searchParams: Promise.resolve(searchParams) }) as Promise<Drawn>;
+  }
+
+  it("opens the current copy in the editor, keyed by that copy so a save remounts it", async () => {
+    const drawn = await open({});
+    expect(drawn.type).toBe(RecipeEditor);
+    expect(drawn.key).toBe("copy-3");
+    expect(drawn.props).toMatchObject({ recipeId: MISSING, title: "Cedar pale", backHref: "/recipes", initial: { copy: 3 }, baseVersionId: "copy-3", page: { saved: "Nov 3, 2026" } });
+    expect(drawn.props.loaded).toBeUndefined();
+  });
+
+  // A save makes a newer copy, so an address that still said ?v=3 would turn into the read-out of an earlier copy.
+  it("sends ?v= naming the current copy to the plain address", async () => {
+    await expect(open({ v: "3" })).rejects.toMatchObject({ digest: expect.stringContaining(`NEXT_REDIRECT;replace;/recipes/${MISSING};`) });
+  });
+
+  it("reads an earlier copy out read only", async () => {
+    const drawn = await open({ v: "2" });
+    expect(drawn.type).toBe(RecipeView);
+    expect(drawn.props.readOnly).toBe(true);
+  });
+
+  it("opens the blank sheet before the first save", async () => {
+    const drawn = await open({}, []);
+    expect(drawn.type).toBe(RecipeEditor);
+    expect(drawn.props.initial).toBeUndefined();
+    expect(drawn.props.baseVersionId).toBeNull();
+  });
+
+  it("Use this again loads the earlier copy as an unsaved change over the current one", async () => {
+    const drawn = await open({ from: "2" });
+    expect(drawn.type).toBe(RecipeEditor);
+    expect(drawn.props).toMatchObject({ initial: { copy: 3 }, baseVersionId: "copy-3", loaded: { draft: { copy: 2 }, notice: "loaded 2" } });
+  });
+
+  // A ?from= left in the address would load that copy over the next save.
+  it("sends a ?from= that names what is already saved to the plain address", async () => {
+    await expect(open({ from: "3" })).rejects.toMatchObject({ digest: expect.stringContaining(`NEXT_REDIRECT;replace;/recipes/${MISSING};`) });
+  });
+
+  it("is not found when ?from= or ?v= names no saved copy", async () => {
+    await expect(open({ from: "9" })).rejects.toMatchObject(NOT_FOUND);
+    await expect(open({ v: "9" })).rejects.toMatchObject(NOT_FOUND);
+  });
+
+  it("has no separate new-version route", () => {
+    expect(readdirSync(join(ROOT, "app/(app)/recipes/[id]"))).not.toContain("new");
   });
 });

@@ -1,25 +1,35 @@
 // tests/recipe-view.test.ts — the recipe page's pure view-model: a saved
-// version copied into a draft (versionToDraft, versionNumbers), the first
-// reason a draft cannot be saved (draftBlocker), the read page's model
-// (toRecipePageModel) and why a prediction is missing (gravityBlockerText,
-// noMashText), and a brew-day line's batch total in packs at a typed batch
-// size with its whole-pack rounding (ingredientPack, batchTotalText,
-// packRounding), and the draft's IBU preview (draftIbuText). No DB.
-// The last block reads the page and brand picker sources: the page draws
-// toRecipePageModel, and the picker never disables itself while it saves.
+// copy turned into a draft (versionToDraft, versionNumbers), the first
+// reason a draft cannot be saved (draftBlocker), the eight process numbers in
+// the order their sheet draws them (RECIPE_NUMBERS), the page's model of a saved copy
+// (toRecipePageModel), the earlier copies batches brewed (recipeHistory) and
+// why a prediction is missing (gravityBlockerText, noMashText), a line's batch
+// amount in packs at the recipe's batch size with its whole-pack rounding
+// (ingredientPack, batchTotalText, packRounding), each mash line's share of the
+// grain bill (gristShares), the draft's IBU
+// preview (draftIbu), the headline figures (figureStrip), the offer to Refresh
+// from Materials (materialsNowGive), a line's cells (ingredientCells) and the
+// water the page reads (waterFacts). No DB. "The sheet" draws RecipeView: the
+// sentence, the figures, the band, the two lists, their actions and the save
+// bar (lib/mgr/recipe-day-view.ts works the drawings and rows out, and
+// tests/recipe-day-view.test.ts covers it). The last block reads the page and
+// editor sources: the page draws toRecipePageModel, and the brand pick never
+// disables itself while it saves.
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { RecipeView } from "@/components/mgr/views/recipe";
+import { RecipeNumbersView } from "@/components/mgr/views/recipe-numbers";
 import { describe, expect, it } from "vitest";
-import { batchTotalText, draftBlocker, draftIbuText, gravityBlockerText, ingredientPack, noMashText, packRounding, recipePageTitle, toRecipePageModel, versionNumbers, versionToDraft, type RecipeOutcome, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
+import { batchTotalText, draftBlocker, draftIbu, figureStrip, gravityBlockerText, gristKey, gristShares, ingredientCells, ingredientPack, loadedNotice, materialsNowGive, noMashText, packRounding, RECIPE_NUMBERS, recipeHistory, recipePageTitle, toRecipePageModel, versionNumbers, versionToDraft, waterFacts, type RecipeFigures, type RecipeIngredientView, type RecipeOutcome, type RecipePack, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
+import { ibuText } from "@/lib/recipe-ibu";
 import type { IngredientLine, MashStep } from "@/lib/mgr/recipe-process-view";
 import { sgToPlato } from "@/lib/recipe-gravity";
 
 const version: NonNullable<RecipeSnapshot["version"]> = {
   id: "v1", version: 3, created_at: "2026-10-01T15:00:00Z", mash_temp_f: null,
   brewhouse_efficiency: 0.725, yeast_attenuation: 0.07, boil_minutes: 60, note: "Less crystal",
-  pre_boil_bbl: 16.8, whirlpool_minutes: 20, whirlpool_temp_f: null, whirlpool_rest_minutes: null, knockout_temp_f: 66,
+  batch_bbl: null, pre_boil_bbl: 16.8, whirlpool_minutes: 20, whirlpool_temp_f: null, whirlpool_rest_minutes: null, knockout_temp_f: 66,
   target_water_profile_id: "p-target", source_water_profile_id: null, mash_water_gal: 120, sparge_water_gal: null, target_mash_ph: 5.3,
   mash_schedule: [{ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 }],
   fermentation_schedule: [{ name: "Primary", kind: "primary", tempF: 68, days: 7 }],
@@ -36,10 +46,133 @@ const snapshot: RecipeSnapshot = {
   ogPlato: null, fgPlato: null, abv: null, ibu: { kind: "none", reason: "no predicted OG" },
 };
 
-it("names recipe tabs with the same saved-version heading as the page (#1255)", () => {
-  expect(recipePageTitle(snapshot)).toBe("Pale v3");
-  expect(recipePageTitle({ ...snapshot, version: { ...version, version: 1 } })).toBe("Pale v1");
-  expect(recipePageTitle({ ...snapshot, version: null })).toBe("Pale");
+it("names recipe tabs and the page with the recipe alone, whichever copy is shown (#1255)", () => {
+  expect(recipePageTitle(snapshot)).toBe("Pale");
+  const earlier = { ...snapshot, version: { ...version, version: 1 } };
+  expect(recipePageTitle(earlier)).toBe("Pale");
+});
+
+/** One closed batch of the snapshot's current copy (3), as get_recipe_outcomes returns it. */
+const batch: RecipeOutcome = {
+  batchId: "b1", batchNo: 9, version: 3, brewedOn: "2026-10-03", closed: true, ogPlato: 12.5, fgPlato: 2.5, abv: 5.3, apparentAttenuation: 0.8, brewhouseEfficiency: 0.7,
+  predicted: null, assumedEfficiency: 0.725, assumedAttenuation: 0.07, sameGrainBill: true,
+};
+
+describe("figureStrip", () => {
+  const full: RecipeFigures = { ogPlato: 12.5, fgPlato: 2.5, abv: 5.3, ibu: { kind: "estimate", ibu: 31, whirlpool: false } };
+  it("draws OG, FG, ABV and IBU as figures, with nothing under them when nothing is missing", () => {
+    expect(figureStrip(full, "plato", { saved: true })).toEqual({ figures: [["12.5 °P", "OG"], ["2.5 °P", "FG"], ["5.3%", "ABV"], ["31", "IBU"]], notes: [] });
+    expect(figureStrip(full, "sg", { saved: true }).figures[0]).toEqual(["1.050", "OG"]);
+  });
+  it("keeps what an IBU figure leaves unsaid as a line under the strip, without the number again", () => {
+    expect(figureStrip({ ...full, ibu: { kind: "estimate", ibu: 31, whirlpool: true } }, "plato", { saved: true })).toMatchObject({ figures: expect.arrayContaining([["31", "IBU"]]), notes: ["Whirlpool hops count at 5%."] });
+    const gap = { kind: "lowerBound" as const, ibu: 31, gaps: [{ name: "Mosaic", reason: "no alpha acid" as const }] };
+    expect(figureStrip({ ...full, ibu: gap }, "plato", { saved: false })).toMatchObject({ figures: expect.arrayContaining([["≥ 31", "IBU"]]), notes: ["Not counted in IBU: no alpha acid: Mosaic"] });
+  });
+  it("draws no figure it cannot predict, and says why", () => {
+    const none: RecipeFigures = { ogPlato: null, fgPlato: null, abv: null, ibu: { kind: "none", reason: "no predicted OG" } };
+    expect(figureStrip(none, "plato", { saved: false, why: "Pale malt has no extract potential; set it under Materials." })).toEqual({
+      figures: [], notes: ["Pale malt has no extract potential; set it under Materials.", "IBU not estimated: no predicted OG"],
+    });
+    // A blank sheet has no IBU to speak of: draftBlocker already asks for an ingredient.
+    expect(figureStrip({ ...none, ibu: undefined }, "plato", { saved: false })).toEqual({ figures: [], notes: [] });
+  });
+});
+
+describe("materialsNowGive (Refresh from Materials)", () => {
+  const saved: RecipeFigures = { ogPlato: 12.5, fgPlato: 2.5, abv: 5.3, ibu: { kind: "gaps", gaps: [{ name: "Citra", reason: "no alpha acid" }] } };
+  it("is silent while Materials give what the saved copy froze, to the precision the figures show", () => {
+    expect(materialsNowGive(saved, saved, "plato")).toBeUndefined();
+    expect(materialsNowGive(saved, { ...saved, ogPlato: 12.52, abv: 5.31 }, "plato")).toBeUndefined();
+    // Specific gravity prints coarser than a tenth of a degree Plato: 15.14 and 15.16 °P both read 1.062.
+    expect(materialsNowGive({ ...saved, ogPlato: 15.14 }, { ...saved, ogPlato: 15.16 }, "sg")).toBeUndefined();
+    expect(materialsNowGive({ ...saved, ogPlato: 15.14 }, { ...saved, ogPlato: 15.6 }, "sg")).toContain("Materials now give OG 1.064");
+  });
+  it("names the figures Materials now give once one differs", () => {
+    expect(materialsNowGive(saved, { ...saved, ibu: { kind: "estimate", ibu: 38, whirlpool: false } }, "plato")).toBe("Materials now give OG 12.5 °P · FG 2.5 °P · ABV 5.3% · IBU 38.");
+    expect(materialsNowGive(saved, { ...saved, ogPlato: 13.1 }, "plato")).toBe("Materials now give OG 13.1 °P · FG 2.5 °P · ABV 5.3%.");
+    const blocked: RecipeFigures = { ogPlato: null, fgPlato: null, abv: null, ibu: { kind: "none", reason: "no predicted OG" } };
+    expect(materialsNowGive(blocked, saved, "plato")).toBe("Materials now give OG 12.5 °P · FG 2.5 °P · ABV 5.3%.");
+  });
+  it("counts a hop that gained its alpha acid even when the IBU stays a lower bound", () => {
+    const two = { kind: "lowerBound" as const, ibu: 20, gaps: [{ name: "Citra", reason: "no alpha acid" as const }, { name: "Mosaic", reason: "no alpha acid" as const }] };
+    expect(materialsNowGive({ ...saved, ibu: two }, { ...saved, ibu: { ...two, gaps: [two.gaps[0]] } }, "plato")).toBe("Materials now give OG 12.5 °P · FG 2.5 °P · ABV 5.3% · IBU ≥ 20.");
+  });
+  it("offers nothing when the page cannot tell what a refresh would give (a line whose material it cannot see)", () => {
+    expect(materialsNowGive(saved, null, "plato")).toBeUndefined();
+  });
+});
+
+describe("the sheet's rows", () => {
+  it("reads a line's per-bbl amount to three significant digits, with its timing apart, as words and as a number", () => {
+    expect(ingredientCells("mash", null, 40.909091, "lb")).toEqual({ stage: "mash", amount: "40.9 lb", timing: "", timingMinutes: null });
+    expect(ingredientCells("boil", "60", "0.011364", "lb")).toEqual({ stage: "boil", amount: "0.0114 lb", timing: "60 min", timingMinutes: 60 });
+    // The editor holds a line's timing as field text: blank is none.
+    expect(ingredientCells("boil", "", 1, "lb").timingMinutes).toBeNull();
+    expect(ingredientCells("dry_hop", 3 * 1440, 1.2)).toEqual({ stage: "dry_hop", amount: "1.2", timing: "day 3", timingMinutes: 4320 });
+  });
+  it("reads the water the sheet holds: the target and the source by name, the pH, the volumes and each addition", () => {
+    const water = { targetProfileId: "p-target", sourceProfileId: "p-source", mashGal: "120", spargeGal: "", targetMashPh: "5.3", additions: [{ materialId: "m-gypsum", qty: 40, unit: "g", stage: "mash" }] };
+    const profiles = [{ id: "p-target", name: "Pale ale" }, { id: "p-source", name: "City" }];
+    expect(waterFacts(water, profiles, () => "Gypsum")).toEqual({
+      target: "Pale ale", source: "City", mashPh: "5.3", mashGal: "120", spargeGal: undefined, additions: [{ name: "Gypsum", qty: 40, unit: "g", stage: "mash" }],
+    });
+    // A profile the page cannot name is left out, and so is everything the sheet does not hold.
+    expect(waterFacts({ ...water, targetProfileId: "gone", sourceProfileId: "", mashGal: "", targetMashPh: "", additions: [] }, profiles, () => "")).toEqual({ target: undefined, source: undefined, mashPh: undefined, mashGal: undefined, spargeGal: undefined, additions: [] });
+  });
+});
+
+describe("RECIPE_NUMBERS", () => {
+  it("holds the eight process numbers in the order their sheet draws them, two to a row", () => {
+    expect(RECIPE_NUMBERS.map(([key]) => key)).toEqual(["efficiency", "attenuation", "preBoil", "boilMin", "whirlpoolMin", "whirlpoolRest", "whirlpoolTemp", "knockoutTemp"]);
+  });
+});
+
+describe("recipeHistory", () => {
+  const earlier = [{ ...batch, batchId: "b7", batchNo: 7, version: 2, brewedOn: "2026-09-01" }, { ...batch, batchId: "b5", batchNo: 5, version: 2, brewedOn: "2026-08-12" }];
+  it("has no row without a batch, or with batches of the current copy only", () => {
+    expect(recipeHistory([], 3, 3)).toEqual([]);
+    expect(recipeHistory([batch], 3, 3)).toEqual([]);
+  });
+  it("gives one row for an earlier copy batches brewed, and none for a copy nobody brewed", () => {
+    expect(recipeHistory([batch, ...earlier], 3, 3)).toEqual([
+      { title: "B-0005 to B-0007", detail: "2 batches · Aug 12, 2026 – Sep 1, 2026", href: "?v=2", selected: false },
+    ]);
+  });
+  it("lists the newest copy first, names one batch alone, and marks the copy being shown", () => {
+    const first = { ...batch, batchId: "b2", batchNo: 2, version: 1, brewedOn: "2026-07-04" };
+    expect(recipeHistory([batch, ...earlier, first], 1, 3)).toEqual([
+      { title: "B-0005 to B-0007", detail: "2 batches · Aug 12, 2026 – Sep 1, 2026", href: "?v=2", selected: false },
+      { title: "B-0002", detail: "1 batch · Jul 4, 2026", href: "?v=1", selected: true },
+    ]);
+  });
+});
+
+describe("recipeHistory beside a shared grain bill and split batches", () => {
+  const earlier = { ...batch, batchId: "b7", batchNo: 7, version: 2, brewedOn: "2026-09-01" };
+  it("leaves out the batches other recipes brewed, whose copies are not this recipe's", () => {
+    const other = { ...batch, batchId: "x1", batchNo: 3, version: 2, recipeName: "Session IPA" };
+    expect(recipeHistory([batch, other], 3, 3)).toEqual([]);
+    expect(recipeHistory([batch, other, earlier], 3, 3)).toEqual([{ title: "B-0007", detail: "1 batch · Sep 1, 2026", href: "?v=2", selected: false }]);
+  });
+  it("counts a batch split across two tanks once", () => {
+    expect(recipeHistory([batch, { ...earlier, vessel: "FV3" }, { ...earlier, vessel: "FV5" }], 3, 3)[0].detail).toBe("1 batch · Sep 1, 2026");
+  });
+});
+
+describe("loadedNotice (Use this again)", () => {
+  const earlier = [{ ...batch, batchId: "b7", batchNo: 7, version: 2, brewedOn: "2026-09-01" }, { ...batch, batchId: "b5", batchNo: 5, version: 2, brewedOn: "2026-08-12" }];
+  it("names the batches that brewed the loaded copy and what saving does", () => {
+    expect(loadedNotice([batch, ...earlier], 2, 3)).toBe("Loaded the recipe as brewed in B-0005 to B-0007. Save changes to make it the current recipe.");
+  });
+  it("says so when no batch brewed the loaded copy", () => {
+    expect(loadedNotice([batch, ...earlier], 1, 3)).toBe("Loaded an earlier recipe no batch brewed. Save changes to make it the current recipe.");
+  });
+  it("loads the earlier copy's own amounts, not the current one's", () => {
+    const loaded = versionToDraft({ ...snapshot, version: { ...version, version: 2, note: "Before the Citra change" }, ingredients: snapshot.ingredients.map((i) => ({ ...i, per_bbl_qty: 99 })) })!;
+    expect(loaded.notes).toBe("");
+    expect(loaded.lines.every((l) => l.perBblQty === "99")).toBe(true);
+  });
 });
 
 describe("versionNumbers", () => {
@@ -59,12 +192,18 @@ describe("versionToDraft", () => {
   it("is null when the recipe has no version", () => {
     expect(versionToDraft({ ...snapshot, version: null, ingredients: [], waterAdditions: [] })).toBeNull();
   });
-  it("copies the version note, schedules and numbers", () => {
+  it("copies the schedules and numbers, and starts the change note blank: it describes the next change, not the last", () => {
     const d = versionToDraft(snapshot)!;
-    expect(d.notes).toBe("Less crystal");
+    expect(d.notes).toBe("");
     expect(d.numbers.efficiency).toBe("72.5");
     expect(d.mashSchedule).toEqual(version.mash_schedule);
     expect(d.fermentationSchedule).toEqual(version.fermentation_schedule);
+  });
+  it("restores the batch size the copy was saved with, and leaves it empty when the copy has none", () => {
+    expect(versionToDraft(snapshot)!.batchBbl).toBe("");
+    // A Postgres numeric(10,3) may arrive as text.
+    const sized = { ...snapshot, version: { ...version, batch_bbl: "22.000" } } as unknown as RecipeSnapshot;
+    expect(versionToDraft(sized)!.batchBbl).toBe("22");
   });
   it("coerces string numerics and seeds a null timing as empty", () => {
     const stringy = {
@@ -113,6 +252,11 @@ describe("draftBlocker", () => {
     expect(draftBlocker({ ...ready, numbers: { whirlpoolRest: "-1" } })).toBe("Still needed: a whirlpool rest of zero or more whole minutes.");
     expect(draftBlocker({ ...ready, numbers: { preBoil: "7", boilMin: "60", whirlpoolTemp: "180", knockoutTemp: "66", whirlpoolMin: "" } })).toBeNull();
   });
+  it("takes no batch size, or one above zero that the copy can store", () => {
+    const need = "Still needed: a batch size above zero, up to 9,999,999.999 bbl.";
+    for (const batchBbl of [undefined, "", "22", "0.5", "9999999.999"]) expect(draftBlocker({ ...ready, batchBbl })).toBeNull();
+    for (const batchBbl of ["0", "-22", "1e1", "10000000"]) expect(draftBlocker({ ...ready, batchBbl })).toBe(need);
+  });
   it("names a line whose timing is out of range instead of dropping it (#1478)", () => {
     const boil = { ...line, stage: "boil" as const, timingMinutes: "90" };
     expect(draftBlocker({ ...ready, lines: [line, boil], numbers: { boilMin: "60" } })).toBe("Still needed: boil timing from 0 to 60 minutes.");
@@ -124,150 +268,410 @@ describe("draftBlocker", () => {
   });
 });
 
-describe("draftIbuText", () => {
-  const hop = { id: "m-hop", name: "Citra", category: "hop", base_uom: "lb", extract_potential: null, alpha_acid: 10, purchase_uom_factor: 44 };
+describe("draftIbu", () => {
+  const text = (...args: Parameters<typeof draftIbu>) => { const ibu = draftIbu(...args); return ibu && ibuText(ibu, { saved: false }); };
+  const hop = { id: "m-hop", name: "Citra", category: "hop", base_uom: "lb", extract_potential: null, alpha_acid: 10, purchase_uom_factor: 44, pack_name: null };
   const line = { materialId: "m-hop", perBblQty: "1", stage: "boil" as const, timingMinutes: "60" };
   const og = sgToPlato(1.05);
 
   it("reads each material's current alpha acid, which saving will freeze", () => {
-    expect(draftIbuText([line], og, [hop])).toBe("IBU 89");
-    expect(draftIbuText([line, { ...line, stage: "whirlpool", timingMinutes: "" }], og, [hop])).toBe("IBU 108 · whirlpool hops at 5%");
+    expect(text([line], og, [hop])).toBe("IBU 89");
+    expect(text([line, { ...line, stage: "whirlpool", timingMinutes: "" }], og, [hop])).toBe("IBU 108 · whirlpool hops at 5%");
   });
   it("says what is missing without the saved version's remedy", () => {
-    expect(draftIbuText([line], og, [{ ...hop, alpha_acid: null }])).toBe("IBU not estimated: no alpha acid: Citra");
-    expect(draftIbuText([{ ...line, timingMinutes: "" }], og, [hop])).toBe("IBU not estimated: no boil time: Citra");
-    expect(draftIbuText([line], null, [hop])).toBe("IBU not estimated: no predicted OG");
+    expect(text([line], og, [{ ...hop, alpha_acid: null }])).toBe("IBU not estimated: no alpha acid: Citra");
+    expect(text([{ ...line, timingMinutes: "" }], og, [hop])).toBe("IBU not estimated: no boil time: Citra");
+    expect(text([line], null, [hop])).toBe("IBU not estimated: no predicted OG");
   });
   it("draws nothing before there is a line, because draftBlocker already asks for one", () => {
-    expect(draftIbuText([], og, [hop])).toBeUndefined();
+    expect(text([], og, [hop])).toBeUndefined();
   });
   it("shows a gap for a line whose material is hidden from the picker, instead of dropping it", () => {
     const inactive = { ...line, materialId: "aaaaaaaa-gone" };
-    expect(draftIbuText([line, inactive], og, [hop])).toBe("IBU ≥ 89 · no alpha acid: aaaaaaaa · not by weight: aaaaaaaa");
+    expect(text([line, inactive], og, [hop])).toBe("IBU ≥ 89 · no alpha acid: aaaaaaaa · not by weight: aaaaaaaa");
   });
 });
 
 describe("toRecipePageModel", () => {
   const materials = [
-    { id: "m-malt", name: "Fieldstone White Wheat", category: "malt", base_uom: "lb", extract_potential: 1.037, alpha_acid: null, purchase_uom_factor: 50 },
-    { id: "m-hop", name: "Citra", category: "hop", base_uom: "lb", extract_potential: null, alpha_acid: 12.5, purchase_uom_factor: 44 },
-    { id: "m-gypsum", name: "Gypsum", category: "salt", base_uom: "g", extract_potential: null, alpha_acid: null, purchase_uom_factor: 1 },
+    { id: "m-malt", name: "Fieldstone White Wheat", category: "malt", base_uom: "lb", extract_potential: 1.037, alpha_acid: null, purchase_uom_factor: 50, pack_name: null },
+    { id: "m-hop", name: "Citra", category: "hop", base_uom: "lb", extract_potential: null, alpha_acid: 12.5, purchase_uom_factor: 44, pack_name: null },
+    { id: "m-gypsum", name: "Gypsum", category: "salt", base_uom: "g", extract_potential: null, alpha_acid: null, purchase_uom_factor: 1, pack_name: null },
   ];
   const ctx = { materials, profiles: [{ id: "p-target", name: "Pale ale" }], unit: "plato" as const, timeZone: "America/Los_Angeles", outcomes: [] as RecipeOutcome[] };
   const predicted = { ...snapshot, ogPlato: 12.5, fgPlato: 2.5, abv: 5.25 };
 
-  it("prints the IBU get_recipe estimated from the frozen alpha acid, with the fix for a saved version", () => {
-    expect(toRecipePageModel({ ...predicted, ibu: { kind: "estimate", ibu: 31, whirlpool: true } }, ctx).bitterness).toBe("IBU 31 · whirlpool hops at 5%");
+  it("prints the IBU get_recipe estimated from the frozen alpha acid, with the fix for a saved copy", () => {
+    expect(toRecipePageModel({ ...predicted, ibu: { kind: "estimate", ibu: 31, whirlpool: true } }, ctx)).toMatchObject({ figures: expect.arrayContaining([["31", "IBU"]]), figureNotes: ["Whirlpool hops count at 5%."] });
     const lowerBound = { kind: "lowerBound" as const, ibu: 31, gaps: [{ name: "Mosaic", reason: "no alpha acid" as const }] };
-    expect(toRecipePageModel({ ...predicted, ibu: lowerBound }, ctx).bitterness).toBe("IBU ≥ 31 · no alpha acid: Mosaic; set alpha acid under Materials, then create the next version");
+    expect(toRecipePageModel({ ...predicted, ibu: lowerBound }, ctx).figureNotes).toEqual(["Not counted in IBU: no alpha acid: Mosaic; set alpha acid under Materials, then Refresh from Materials on the current recipe"]);
   });
 
-  it("titles the page with the version and reads each ingredient per bbl to three significant digits", () => {
+  it("titles the page with the recipe and reads each ingredient per bbl to three significant digits", () => {
     const model = toRecipePageModel({ ...predicted, ingredients: [{ ...snapshot.ingredients[0], per_bbl_qty: 40.909091 }] }, ctx);
-    expect(model.title).toBe("Pale v3");
-    expect(model.ingredients?.[0]?.detail).toContain("40.9 lb / bbl");
-    expect(model.predicted).toMatch(/^Predicted: OG /);
+    expect(model.title).toBe("Pale");
+    expect(model.ingredients?.[0]).toMatchObject({ amount: "40.9 lb", timing: "" });
+    // The snapshot's IBU has no estimate, so the strip holds the three gravity figures and the IBU line says why.
+    expect(model.figures).toEqual([["12.5 °P", "OG"], ["2.5 °P", "FG"], ["5.3%", "ABV"]]);
+    expect(model.figureNotes).toEqual(["IBU not estimated: no predicted OG"]);
   });
-  it("gives each saved brew-day line its pack, from list_materials' purchase_uom_factor", () => {
-    const model = toRecipePageModel(predicted, ctx);
-    expect(model.ingredients?.map((i) => i.pack)).toEqual([{ perBbl: 40.9, factor: 50, unit: "lb" }, { perBbl: 0.5, factor: 44, unit: "lb" }]);
+  it("gives each line its stage, which is what places it in a section", () => {
+    expect(toRecipePageModel(predicted, ctx).ingredients?.map((i) => i.stage)).toEqual(["mash", "boil"]);
   });
-  it("counts mash steps and fermentation stages, and says No stages yet when there are none", () => {
+  it("gives each saved line its pack, from list_materials' purchase_uom_factor and pack_name", () => {
+    const bagged = materials.map((m) => (m.id === "m-malt" ? { ...m, pack_name: "bag" as const } : m));
+    const model = toRecipePageModel(predicted, { ...ctx, materials: bagged });
+    expect(model.ingredients?.map((i) => i.pack)).toEqual([{ perBbl: 40.9, factor: 50, unit: "lb", packName: "bag" }, { perBbl: 0.5, factor: 44, unit: "lb", packName: null }]);
+  });
+  it("carries the saved batch size, and each mash line's share of the grain bill", () => {
+    expect(toRecipePageModel(predicted, ctx).batchBbl).toBe("");
+    const model = toRecipePageModel({ ...predicted, version: { ...version, batch_bbl: 22 } }, ctx);
+    expect(model.batchBbl).toBe("22");
+    // One malt is the whole grain bill; the boil hop has no share.
+    expect(model.ingredients?.map((i) => i.share)).toEqual([1, undefined]);
+  });
+  it("carries the saved mash rests and fermentation stages as the copy stores them", () => {
     const model = toRecipePageModel({ ...predicted, version: { ...version, fermentation_schedule: [] } }, ctx);
-    expect(model.mash?.title).toBe("Mash schedule · 1 step");
-    expect(model.mash?.detail).toBe("Total 60 min · 152 °F saccharification rest");
-    expect(model.fermentation?.detail).toBe("No stages yet");
+    expect(model.mashSchedule).toEqual(version.mash_schedule);
+    expect(model.fermentationSchedule).toEqual([]);
   });
-  it("titles the water row Water and names the target once, in its rows", () => {
-    const model = toRecipePageModel(predicted, ctx);
-    expect(model.water?.title).toBe("Water");
-    expect(model.water?.rows?.filter((r) => r.detail === "Pale ale")).toHaveLength(1);
+  it("carries the saved water: its target by name, its volumes, its pH and its additions by name", () => {
+    expect(toRecipePageModel(predicted, ctx).water).toEqual({ target: "Pale ale", mashPh: "5.3", mashGal: "120", spargeGal: undefined, additions: [{ name: "Gypsum", qty: 40, unit: "g", stage: "mash" }] });
   });
-  it("dates the version in the brewery's zone and carries the recipe note", () => {
+  it("dates the saved copy in the brewery's zone and carries the recipe note", () => {
     const model = toRecipePageModel({ ...predicted, recipe: { ...snapshot.recipe, note: "House pale" }, version: { ...version, created_at: "2026-10-01T03:00:00Z" } }, ctx);
-    expect(model.saved).toBe("Sep 30, 2026");
+    expect(model).toMatchObject({ saved: "Sep 30, 2026", savedNote: "Less crystal" });
+    // An earlier copy carries its own change note too; a copy saved without one has the date alone.
+    expect(toRecipePageModel({ ...predicted, versions: [9, 3], version: { ...version, created_at: "2026-10-01T03:00:00Z" } }, ctx)).toMatchObject({ saved: "Sep 30, 2026", savedNote: "Less crystal" });
+    const plain = toRecipePageModel({ ...predicted, version: { ...version, note: null } }, ctx);
+    expect([plain.saved, plain.savedNote]).toEqual(["Oct 1, 2026", undefined]);
     expect(model.recipeNote).toBe("House pale");
   });
-  it("links every version and distinguishes the current version from the one being viewed", () => {
-    const current = toRecipePageModel(predicted, ctx);
-    expect(current.historical).toBe(false);
-    expect(current.versions).toEqual([
-      { number: 3, href: "?v=3", selected: true, latest: true },
-      { number: 2, href: "?v=2", selected: false, latest: false },
-      { number: 1, href: "?v=1", selected: false, latest: false },
-    ]);
-    const model = toRecipePageModel({ ...predicted, version: { ...version, version: 1 } }, ctx);
-    expect(model.historical).toBe(true);
-    const html = renderToStaticMarkup(createElement(RecipeView, { model, readOnly: true, parentForm: "Editable brand" }));
-    expect(html).toContain('href="?v=3"');
-    const selectedLink = html.match(/<a\b[^>]*href="\?v=1"[^>]*>/)?.[0];
-    expect(selectedLink).toContain('aria-current="page"');
-    expect(html).toContain("v3 (current)");
-    expect(html).toContain("Older version");
-    expect(html).toContain("Less crystal");
-    expect(html).not.toContain("New recipe version");
-    expect(html).not.toContain("Editable brand");
-    // The one input is Show totals at, a page-only batch size that never edits the version.
-    expect(html.replace(/<input[^>]*aria-label="Show totals at \(bbl\)"[^>]*>/, "")).not.toMatch(/<input|<select|<form/);
+  it("lists earlier brewed copies under the current recipe, and reads an earlier copy as brewed, read only", () => {
+    const outcomes = [batch, { ...batch, batchId: "b3", batchNo: 3, version: 1, brewedOn: "2026-08-02" }];
+    const current = toRecipePageModel(predicted, { ...ctx, outcomes });
+    expect(current.asBrewed).toBeUndefined();
+    expect(current.useAgainHref).toBeUndefined();
+    expect(current.backHref).toBe("/recipes");
+    expect(current.history).toEqual([{ title: "B-0003", detail: "1 batch · Aug 2, 2026", href: "?v=1", selected: false }]);
     const currentHtml = renderToStaticMarkup(createElement(RecipeView, { model: current, readOnly: true }));
-    expect(currentHtml).toContain('href="/recipes/r1/new"');
-    expect(currentHtml).toContain("New recipe version");
+    expect(currentHtml).toMatch(/<h2[^>]*>As brewed<\/h2>/);
+    expect(currentHtml).toMatch(/<a\b(?=[^>]*href="\?v=1")[^>]*data-to="Recipe"/);
+
+    const model = toRecipePageModel({ ...predicted, version: { ...version, version: 1 } }, { ...ctx, outcomes });
+    expect(model.asBrewed).toBe("As brewed in B-0003 · read only");
+    expect(model.useAgainHref).toBe("/recipes/r1?from=1");
+    expect([model.backLabel, model.backHref]).toEqual(["Current recipe", "/recipes/r1"]);
+    expect(model.history?.[0]?.selected).toBe(true);
+    const html = renderToStaticMarkup(createElement(RecipeView, { model, readOnly: true, parentForm: "Editable brand" }));
+    expect(html).toContain("As brewed in B-0003 · read only");
+    expect(html).toMatch(/<a\b[^>]*href="\/recipes\/r1\?from=1"[^>]*>Use this again<\/a>/);
+    expect(html).toContain("Less crystal");
+    expect(html).not.toContain("Editable brand");
+    // The copy being shown is named in the list, not linked to itself.
+    expect(html).not.toContain('href="?v=1"');
+    // Nothing on an earlier copy is a field: its batch size, when it has one, reads as text.
+    expect(html).not.toMatch(/<input|<select|<form/);
+    // No copy says "version" on screen, current or earlier.
+    for (const drawn of [html, currentHtml]) expect(drawn.replace(/<[^>]+>/g, " ")).not.toMatch(/version|\bv\d\b/i);
+    // An earlier copy no batch brewed is reachable by its address only.
+    expect(toRecipePageModel({ ...predicted, version: { ...version, version: 2 } }, { ...ctx, outcomes }).asBrewed).toBe("An earlier recipe no batch brewed · read only");
   });
-  it("offers Schedule batch beside New recipe version on the current version only (#1581)", () => {
+  it("offers Schedule batch as the one title-row verb, on the current recipe only (#1581)", () => {
     const current = toRecipePageModel(predicted, ctx);
     expect(current.scheduleHref).toBe("/batches?recipe=r1");
     const drawn = (model: typeof current) => renderToStaticMarkup(createElement(RecipeView, { model, readOnly: true }));
     expect(drawn(current)).toContain('href="/batches?recipe=r1"');
     expect(drawn(current)).toContain("Schedule batch");
     expect(drawn(toRecipePageModel({ ...predicted, version: { ...version, version: 1 } }, ctx))).not.toContain("Schedule batch");
-    const empty = toRecipePageModel({ ...snapshot, version: null, ingredients: [], waterAdditions: [] }, ctx);
-    expect(empty.scheduleHref).toBeUndefined();
-    expect(drawn(empty)).not.toContain("Schedule batch");
-    expect(drawn(empty)).toContain("New recipe version");
+    const unwritten = toRecipePageModel({ ...snapshot, version: null, ingredients: [], waterAdditions: [] }, ctx);
+    expect(unwritten.scheduleHref).toBeUndefined();
+    expect(drawn(unwritten)).not.toContain("Schedule batch");
+    for (const model of [current, unwritten]) expect(drawn(model)).not.toContain("New recipe version");
   });
-  it("says nothing is predicted when the version has no mash ingredient", () => {
+  it("says nothing is predicted when the recipe has no mash ingredient", () => {
     const model = toRecipePageModel({ ...snapshot, ingredients: [snapshot.ingredients[1]] }, ctx);
-    expect(model.predicted).toBe("No mash ingredient, so nothing is predicted.");
+    expect(model.figures).toEqual([]);
+    expect(model.figureNotes?.[0]).toBe("No mash ingredient, so nothing is predicted.");
   });
-  it("lists every version's batches and summarizes only the shown version", () => {
-    const batch: RecipeOutcome = {
-      batchId: "b1", batchNo: 9, version: 3, brewedOn: "2026-10-03", closed: true, ogPlato: 12.5, fgPlato: 2.5, abv: 5.3, apparentAttenuation: 0.8, brewhouseEfficiency: 0.7,
-      predicted: null, assumedEfficiency: 0.725, assumedAttenuation: 0.07,
-    };
-    const outcomes = [batch, { ...batch, batchId: "b2", batchNo: 8, brewhouseEfficiency: 0.71 }, { ...batch, batchId: "b3", batchNo: 7, version: 2 }];
+  it("lists every copy's batches, marks an earlier copy's, and leaves a copy with another grain bill out of the summary", () => {
+    const outcomes = [batch, { ...batch, batchId: "b2", batchNo: 8, brewhouseEfficiency: 0.71 }, { ...batch, batchId: "b3", batchNo: 7, version: 2, sameGrainBill: false }];
     const model = toRecipePageModel(predicted, { ...ctx, unit: "sg", outcomes });
-    expect(model.tape?.map(([label]) => label)).toEqual(["B-0009 · v3 · Oct 3, 2026", "B-0008 · v3 · Oct 3, 2026", "B-0007 · v2 · Oct 3, 2026"]);
-    expect(model.tape?.[0]?.[1]).toContain("OG 1.050");
+    expect(model.actuals?.rows.map((r) => [r.batch, r.brewed, ...r.notes])).toEqual([["B-0009", "Oct 3, 2026"], ["B-0008", "Oct 3, 2026"], ["B-0007", "Oct 3, 2026", "earlier recipe"]]);
+    expect(model.actuals?.columns[0]).toBe("OG");
+    expect(model.actuals?.rows[0].cells[0].measured).toBe("1.050");
+    // The top row is what the shown copy itself assumes: its saved efficiency and attenuation.
+    expect(model.actuals?.predicted.slice(3)).toEqual(["7%", "73%"]);
     expect(model.actualsNote).toMatch(/^2 batches: efficiency 70–71% against 73% assumed/);
+  });
+  it("draws another recipe's batch on the same grain bill as that recipe, and keeps it out of As brewed", () => {
+    const other = { ...batch, batchId: "x1", batchNo: 4, version: 1, recipeName: "Session IPA", fgPlato: null, abv: null, apparentAttenuation: null, brewhouseEfficiency: 0.66 };
+    const model = toRecipePageModel(predicted, { ...ctx, outcomes: [batch, other] });
+    expect(model.actuals?.rows.map((r) => [r.batch, r.tag, ...r.notes])).toEqual([["B-0009", undefined], ["B-0004", "as Session IPA"]]);
+    expect(model.actualsNote).toBe("This grain bill, 2 batches across 2 recipes: efficiency 66–70% against 73% assumed.");
+    expect(model.history).toEqual([]);
   });
   it("has no Batch actuals with no batches", () => {
     const model = toRecipePageModel(predicted, ctx);
-    expect(model.tape).toBeUndefined();
+    expect(model.actuals).toBeUndefined();
     expect(model.actualsNote).toBeUndefined();
   });
-  it("draws the empty recipe with no invented numbers", () => {
+  it("gives a recipe not written yet a title and nothing invented", () => {
     const model = toRecipePageModel({ ...snapshot, version: null, ingredients: [], waterAdditions: [] }, ctx);
-    expect(model.title).toBe("Pale");
-    expect(model.empty).toEqual({ title: "No version yet" });
+    expect(model).toEqual({ title: "Pale", backHref: "/recipes", recipeNote: undefined });
     const drawn = renderToStaticMarkup(createElement(RecipeView, { readOnly: true, model }));
-    expect(drawn).toContain("No version yet");
-    expect(model.mash).toBeUndefined();
-    expect(model.saved).toBeUndefined();
+    expect(drawn).not.toMatch(/No version yet|<h2|<svg role="img"|<button/);
   });
 });
 
-describe("batch totals in packs", () => {
-  const malt = { perBbl: 10, factor: 50, unit: "lb" };
-  it("reads a brew-day line's total at the batch size (the text after the arrow), in whole packs plus loose pounds", () => {
-    expect(batchTotalText(malt, 22)).toBe("220 lb = 4 × 50 lb + 20 lb");
-    expect(batchTotalText({ ...malt, perBbl: 2.5, factor: 55 }, 22)).toBe("55 lb = 1 × 55 lb");
+describe("the sheet", () => {
+  const material = (id: string, name: string, base_uom: string) => ({ id, name, category: "other", base_uom, extract_potential: null, alpha_acid: null, purchase_uom_factor: 1, pack_name: null });
+  const materials = [{ ...material("m-malt", "Fieldstone White Wheat", "lb"), extract_potential: 1.037, purchase_uom_factor: 50 }, material("m-hop", "Citra", "lb"), material("m-gypsum", "Gypsum", "g")];
+  const saved = toRecipePageModel(snapshot, { materials, profiles: [{ id: "p-target", name: "Pale ale" }], unit: "plato", timeZone: "UTC", outcomes: [] });
+  const headings = (html: string) => [...html.matchAll(/<h2[^>]*>([^<]*)<\/h2>/g)].map((m) => m[1]);
+  const text = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  /** Each list of what goes in, as its rows' text. */
+  const lists = (html: string) => (html.match(/<ul[\s\S]*?<\/ul>/g) ?? []).map((ul) => (ul.match(/<li[\s\S]*?<\/li>/g) ?? []).map(text));
+  const controls = { setNote: () => {}, onSubmit: () => {} };
+  const draw = (props: Parameters<typeof RecipeView>[0]) => renderToStaticMarkup(createElement(RecipeView, props));
+  const blank = { title: "Pale", notes: "" };
+  /** A line as the page builds it. */
+  const line = (key: string, title: string, stage: Parameters<typeof ingredientCells>[0], timing: number | null, perBbl: number) => ({ key, title, ...ingredientCells(stage, timing, perBbl, "lb") });
+
+  it("reads a saved copy as the day at a glance: the sentence, the assumptions, the band, what goes in on brew day, then the cellar", () => {
+    const html = draw({ model: saved, readOnly: true });
+    const read = text(html);
+    expect(headings(html)).toEqual(["Goes in on brew day", "In the cellar"]);
+    const order = ["Saved Oct 1, 2026.", "Last change: Less crystal.", "Assumes 72.5% efficiency and 7% attenuation.", "Mash-in", "Goes in on brew day", "Pale ale, mash pH 5.3. Boil from 16.8 bbl. Knock out at 66 °F.", "In the cellar", "7 days from pitch to package."];
+    expect(order.map((words) => read.indexOf(words))).toEqual([...order.map((words) => read.indexOf(words))].sort((a, b) => a - b));
+    for (const words of order) expect(read).toContain(words);
+    // The grain with its share, then the water and its salts, then the boil addition by its minutes remaining.
+    expect(lists(html)[0]).toEqual([
+      "Mash-in Fieldstone White Wheat 100% of the grain bill 40.9 lb / bbl", "Mash-in Mash water 120 gal", "Mash-in Gypsum 40 g", "Boil, 60 min Citra 0.5 lb / bbl",
+    ]);
+    // The moment is drawn once: the rows after its first say it to a screen reader only.
+    expect(html.match(/<span class="sr-only">Mash-in<\/span>/g)).toHaveLength(2);
+    // A read-out is text: nothing on it is a control.
+    expect(html).not.toMatch(/<button|<input|<form/);
+    // The old cards and their flat headings are gone.
+    expect(read).not.toMatch(/Schedule ·|Profile and additions|Pre-boil volume/);
+    // A copy that holds one thing reads that and nothing else.
+    const bare = draw({ readOnly: true, model: { title: "Pale", boilMin: "60" } });
+    expect(headings(bare)).toEqual([]);
+    expect(bare).toContain('aria-label="The brew day by temperature: a 60 minute boil."');
   });
-  it("stays in base units for a material with no pack, or a total under one pack", () => {
+
+  it("draws both drawings as images named by a sentence, with their labels as text", () => {
+    const html = draw({ model: saved, readOnly: true });
+    expect(html.match(/<svg role="img" aria-label="([^"]*)"/g)).toEqual([
+      '<svg role="img" aria-label="The brew day by temperature: a mash rest at 152 °F for 60 minutes, a 60 minute boil, and a 20 minute whirlpool. Knock out at 66 °F. 1 mark shows where each boil or whirlpool addition goes in: Citra."',
+      '<svg role="img" aria-label="Fermentation temperature by day: 68 °F for 7 days."',
+    ]);
+    // A mark says what goes in there to a pointer too, and a quiet key under the drawing says what the marks are.
+    expect(html).toMatch(/<circle[^>]*><title>Citra<\/title><\/circle>/);
+    expect(html.match(/Where each addition goes in/g)).toHaveLength(1);
+    const [band, cellar] = (html.match(/<svg role="img"[\s\S]*?<\/svg>/g) ?? []).map((svg) => [...svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((m) => m[1]));
+    expect(band).toEqual(["Mash", "Boil", "Whirlpool", "152 °F", "60 min", "60 min", "20 min", "Mash-in", "Knock out at 66 °F, 2 hours 20 minutes"]);
+    expect(cellar).toEqual(["68 °F", "Pitch", "Day 7"]);
+    // x is a percent of the width and y is in pixels, so the text keeps its size at any width.
+    expect(html).toMatch(/<svg role="img"[^>]*width="100%" height="\d+"/);
+    expect(html).toMatch(/<circle cx="[\d.]+%" cy="\d+" r="5"/);
+    expect(html.match(/<svg role="img"[^>]*>/g)!.join("")).not.toContain("viewBox");
+  });
+
+  it("keeps the boil's minutes clear of a narrow whirlpool's note when the two are drawn level", () => {
+    const note = (html: string, words: string) => new RegExp(`<text[^>]*text-anchor="(\\w+)"[^>]*>${words}</text>`).exec(html)?.[1];
+    const mashSchedule = [{ name: "Rest", kind: "infusion", tempF: 152, minutes: 60 }];
+    // No whirlpool temperature: the whirlpool draws level with the boil, and its note reads back from the right edge.
+    const level = draw({ readOnly: true, model: { title: "Pale", mashSchedule, boilMin: "60", whirlpoolMin: "15", whirlpoolRest: "10" } });
+    expect(note(level, "15 min, rest 10")).toBe("end");
+    expect(level).toMatch(/<text[^>]*text-anchor="start"[^>]*>60 min<\/text><\/g><g>(?:<line[^>]*><\/line>){2}<text[^>]*>15 min, rest 10</);
+    // With its own temperature the whirlpool sits lower, so the boil's minutes stay centred.
+    const lower = draw({ readOnly: true, model: { title: "Pale", mashSchedule, boilMin: "60", whirlpoolMin: "15", whirlpoolRest: "10", whirlpoolTemp: "180" } });
+    expect(lower).toMatch(/<text[^>]*text-anchor="middle"[^>]*>60 min<\/text><\/g><g>(?:<line[^>]*><\/line>){2}<text[^>]*>180 °F</);
+  });
+
+  it("draws both columns on the editor even when they are empty, each saying so, with its actions", () => {
+    const html = draw({ model: blank });
+    const read = text(html);
+    expect(headings(html)).toEqual(["Goes in on brew day", "In the cellar"]);
+    for (const words of ["No batch size yet , edit recipe numbers .", "Assumes no efficiency , edit recipe numbers and no attenuation , edit recipe numbers .", "Nothing goes in yet.", "No fermentation schedule yet."]) expect(read).toContain(words);
+    // Nothing to draw yet: no band, no profile.
+    expect(html).not.toContain('<svg role="img"');
+    // The two polite regions under the name are in the page even while empty, so a figure or a line that appears later is announced.
+    expect(html.match(/<div role="status" class="([^"]*)"><\/div>/g)).toHaveLength(2);
+    expect(html).not.toMatch(/role="status" class="[^"]*\bhidden\b/);
+    // Each action is a quiet button, never link text. It reads its verb on screen, and names what it acts on after it for a screen reader where the verb alone would not.
+    expect([...html.matchAll(/<button[^>]*data-variant="outline"[^>]*data-size="sm"[^>]*>([\s\S]*?)<\/button>/g)].map((m) => text(m[1]))).toEqual([
+      "Edit mash schedule", "Edit recipe numbers", "Add ingredient to brew day", "Edit water", "Add ingredient to the cellar", "Edit schedule for fermentation",
+    ]);
+    expect([...html.matchAll(/<button[^>]*data-variant="link"[^>]*>([\s\S]*?)<\/button>/g)].map((m) => text(m[1])).filter((label) => /^(Add|Edit) /.test(label))).toEqual([]);
+    expect(draw({ model: saved, readOnly: true })).not.toMatch(/Add ingredient|Edit /);
+  });
+
+  it("opens an Ingredient sheet from each column, on the stage a new line there starts on", () => {
+    const live = draw({ model: blank, controls: { ...controls, dirty: false }, slots: { addIngredient: (stage) => `SHEET:${stage}` } });
+    expect(live.match(/SHEET:\w+/g)).toEqual(["SHEET:mash", "SHEET:fermentation"]);
+  });
+
+  it("gives each schedule, the water and the numbers one action that opens its sheet", () => {
+    const live = draw({ model: blank, controls: { ...controls, dirty: false }, slots: { sheet: (key) => `SHEET:${key};` } });
+    expect(live.match(/SHEET:\w+/g)).toEqual(["SHEET:mash", "SHEET:numbers", "SHEET:water", "SHEET:fermentation"]);
+  });
+
+  it("draws the save bar only once the sheet differs from what is saved", () => {
+    const model = { title: "Pale", saved: "Oct 1, 2026", scheduleHref: "/batches?recipe=r1", notes: "" };
+    const bar = (dirty: boolean) => draw({ model, controls: { ...controls, dirty, onDiscard: () => {} } });
+    expect(bar(false)).not.toMatch(/Save changes|Discard/);
+    expect(bar(false)).toContain("Schedule batch");
+    expect(bar(true)).toMatch(/<button[^>]*type="submit"[^>]*>Save changes</);
+    expect(bar(true)).toMatch(/<button[^>]*type="button"[^>]*>Discard</);
+    // Schedule batch would schedule what is saved, not what is on screen.
+    expect(bar(true)).not.toContain("Schedule batch");
+  });
+
+  it("keeps the save bar up while a recipe is being created, with nothing to discard", () => {
+    const html = draw({ model: { title: "New recipe", notes: "" }, controls: { ...controls, dirty: true, submitLabel: "Create recipe" } });
+    expect(html).toMatch(/<button[^>]*type="submit"[^>]*>Create recipe</);
+    expect(html).not.toContain("Discard");
+  });
+
+  it("lists what goes in as rows: when, the name as the line's Edit, how much", () => {
+    const malt = line("m", "2-row", "mash", null, 44), hop = line("h", "Citra", "boil", 10, 0.4), dry = line("d", "Citra", "dry_hop", null, 1.2);
+    const html = draw({ model: { ...blank, ingredients: [malt, hop, dry] } });
+    // Brew day, then the cellar. Without a batch size each row reads per bbl.
+    expect(lists(html)).toEqual([["Mash-in Edit 2-row 44 lb / bbl", "Boil, 10 min Edit Citra 0.4 lb / bbl"], ["Dry hop Edit Citra 1.2 lb / bbl"]]);
+    // The live editor wraps the name in the line's sheet; a read-out draws the name alone.
+    expect(draw({ model: { ...blank, ingredients: [{ ...malt, edit: () => "SHEET:2-row" }] }, controls: { ...controls, dirty: false } })).toContain("SHEET:2-row");
+    expect(lists(draw({ readOnly: true, model: { title: "Pale", ingredients: [malt] } }))).toEqual([["Mash-in 2-row 44 lb / bbl"]]);
+  });
+
+  it("names a water row as its Edit too, and lists the cellar's later additions after the dry hops", () => {
+    const water = { mashGal: "450", additions: [{ name: "Gypsum", qty: 200, unit: "g", stage: "mash" }] };
+    const html = draw({ model: { ...blank, water, ingredients: [line("y", "Ale yeast", "fermentation", 0, 0.05), line("d", "Citra", "dry_hop", 3 * 1440, 1.2), line("f", "Biofine", "packaging", null, 0.09)] } });
+    expect(lists(html)).toEqual([["Mash-in Edit Mash water 450 gal", "Mash-in Edit Gypsum 200 g"], ["Pitch Edit Ale yeast 0.05 lb / bbl", "Day 3 Edit Citra 1.2 lb / bbl", "Packaging Edit Biofine 0.09 lb / bbl"]]);
+  });
+
+  it("draws a whirlpool that has additions and no numbers, and asks for the numbers as links on the editable sheet only", () => {
+    const model = { ...blank, mashSchedule: [{ name: "Rest", kind: "infusion", tempF: 154, minutes: 60 }], boilMin: "60", ingredients: [line("c", "Comet", "whirlpool", null, 0.5), line("m", "Mosaic", "whirlpool", null, 0.5)] };
+    const band = (html: string) => [.../<svg role="img"[\s\S]*?<\/svg>/.exec(html)![0].matchAll(/<(?:text|title)[^>]*>([^<]*)</g)].map((m) => m[1]);
+    const html = draw({ model });
+    // The whirlpool has a zone and its mark, no minutes, and a total that does not count it.
+    expect(band(html)).toEqual(["Mash", "Boil", "Whirlpool", "154 °F", "60 min", "60 min", "Comet and Mosaic", "Mash-in", "2 hours plus the whirlpool"]);
+    // Each number not set is a link in the line over the list, which opens Recipe numbers as a set number does.
+    const links = [...html.matchAll(/<button[^>]*data-variant="link"[^>]*>([\s\S]*?)<\/button>/g)].map((m) => text(m[1]));
+    expect(links).toEqual(expect.arrayContaining(["Whirlpool time and temperature not set , edit recipe numbers", "knock-out temperature not set , edit recipe numbers"]));
+    expect(text(html)).toContain("Goes in on brew day Whirlpool time and temperature not set , edit recipe numbers , knock-out temperature not set , edit recipe numbers . Whirlpool Edit Comet");
+    // An earlier copy draws the same band and says nothing about the numbers it does not have.
+    const copy = draw({ readOnly: true, model });
+    expect(band(copy)).toEqual(band(html));
+    expect(copy).not.toMatch(/not set|<button/);
+  });
+
+  it("reads a mash line's share of the grain bill beside its amount, and draws the shares as a bar", () => {
+    const pils = { ...line("p", "Pilsner malt", "mash", null, 57.5), share: 1265 / 1925 };
+    const oats = { ...line("o", "Flaked oats", "mash", null, 30), share: 660 / 1925 };
+    const html = draw({ model: { ...blank, ingredients: [pils, oats] } });
+    expect(lists(html)[0]).toEqual(["Mash-in Edit Pilsner malt 66% of the grain bill 57.5 lb / bbl", "Mash-in Edit Flaked oats 34% of the grain bill 30 lb / bbl"]);
+    expect(html).toContain('<div role="img" aria-label="Share of the grain bill by weight: Pilsner malt 66% and Flaked oats 34%"');
+    // One grain is the whole bill: no bar.
+    expect(draw({ model: { ...blank, ingredients: [{ ...pils, share: 1 }] } })).not.toContain("Share of the grain bill by weight");
+  });
+
+  it("reads the batch size in the sentence under the name, where it opens the Recipe numbers sheet", () => {
+    const sentence = (props: Partial<Parameters<typeof RecipeView>[0]>, batchBbl?: string) => /<p class="[^"]*">([\s\S]*?)<\/p>/.exec(draw({ model: { ...blank, batchBbl }, ...props }))?.[1] ?? "";
+    // The editor always offers it, so a recipe without one can gain one.
+    expect(text(sentence({}))).toBe("No batch size yet , edit recipe numbers .");
+    expect(sentence({}, "22")).toMatch(/^Written for <button[^>]*type="button"[^>]*>22 bbl<span class="sr-only">, edit recipe numbers<\/span><\/button>\.$/);
+    // A read-out prints it as text, and says nothing of a size the copy does not hold.
+    expect(sentence({ readOnly: true }, "22")).toBe("Written for 22 bbl.");
+    expect(draw({ readOnly: true, model: { title: "Pale" } })).not.toMatch(/batch size|Written for/i);
+    // No number field is drawn on the page itself.
+    expect(draw({ model: { ...blank, batchBbl: "22" } })).not.toMatch(/aria-label="Batch size bbl"/);
+  });
+
+  it("holds the brand in the same sentence as a pick, and leaves it out of a read-out", () => {
+    const options = [{ value: "", label: "No brand yet" }, { value: "b1", label: "Hazy IPA" }];
+    const html = draw({ model: { ...blank, batchBbl: "22", brand: { value: "b1", options } } });
+    expect(html).toMatch(/<p class="[^"]*">Brews <button[^>]*role="combobox"[^>]*aria-label="Brand"[^>]*>[\s\S]*?Hazy IPA[\s\S]*?<\/button>(?:<select[^>]*><\/select>)? at <button/);
+    expect(text(draw({ model: { ...blank, batchBbl: "22", brand: { value: "", options } } }))).toContain("No brand yet , written for 22 bbl , edit recipe numbers .");
+    expect(draw({ readOnly: true, model: { title: "Pale", batchBbl: "22", brand: { value: "b1", options } } })).not.toMatch(/combobox|Brews/);
+    // The pick saves on its own; a failed save says so under the sentence.
+    expect(draw({ model: { ...blank, brand: { value: "b1", options } }, controls: { ...controls, dirty: false, brand: { onChange: () => {}, error: "Brand not saved" } } })).toContain("Brand not saved");
+  });
+
+  it("heads the sheet with the predicted figures, and offers Refresh from Materials only when the editor says they are stale", () => {
+    const model = { title: "Pale", saved: "Oct 1, 2026", notes: "", figures: [["12.5 °P", "OG"]] as [string, string][], figureNotes: ["IBU not estimated: no predicted OG"] };
+    const stale = (refresh?: { text: string; onRefresh: () => void }) => draw({ model, controls: { ...controls, dirty: false, refresh } });
+    expect(stale()).toMatch(/>12\.5 °P<\/div><div[^>]*>OG</);
+    expect(stale()).toContain("IBU not estimated: no predicted OG");
+    expect(stale()).not.toContain("Refresh from Materials");
+    // A refresh runs on an unchanged sheet, where there is no save bar: its failure still has to show.
+    expect(draw({ model, controls: { ...controls, dirty: false, error: "Refresh failed" } })).toContain("Refresh failed");
+    const offered = stale({ text: "Materials now give OG 13.1 °P.", onRefresh: () => {} });
+    expect(offered).toContain("Materials now give OG 13.1 °P.");
+    expect(offered).toMatch(/<button[^>]*type="button"[^>]*>Refresh from Materials</);
+  });
+
+  it("asks for a change note in the save bar, only while a change is unsaved and never for a recipe being created", () => {
+    const model = { title: "Pale", saved: "Oct 1, 2026", notes: "Less crystal" };
+    const bar = (dirty: boolean) => draw({ model, controls: { ...controls, dirty, onDiscard: () => {} } });
+    // In the bar, before its buttons, under its own label.
+    expect(bar(true)).toMatch(/<label[^>]*>Change note · optional<\/label><input[^>]*aria-label="Change note · optional"[^>]*value="Less crystal"[\s\S]*>Discard<[\s\S]*>Save changes</);
+    expect(bar(false)).not.toContain("Change note");
+    // The page itself holds no field: not the fixture's drawing, and not a recipe being created, whose first save changes nothing.
+    expect(draw({ model: blank })).not.toMatch(/Change note|<input/);
+    expect(draw({ model: blank, controls: { onSubmit: () => {}, dirty: true, submitLabel: "Create recipe" } })).not.toContain("Change note");
+  });
+
+  it("reads a saved copy's change note on a line of its own, only when it has one", () => {
+    const read = text(draw({ model: saved, readOnly: true }));
+    expect(read).toContain("Saved Oct 1, 2026. Last change: Less crystal.");
+    expect(read).not.toContain("Change note");
+    expect(draw({ model: { ...saved, savedNote: undefined }, readOnly: true })).not.toContain("Last change");
+    // The line is a paragraph of its own under the sentence.
+    expect(draw({ model: saved, readOnly: true })).toMatch(/Saved Oct 1, 2026\.<\/p><p[^>]*>Last change: Less crystal\.<\/p>/);
+  });
+
+  it("reads an earlier copy's rests, stages and source water out, since it has no sheet that holds them", () => {
+    const stages = [{ name: "Primary", kind: "primary", tempF: 68, days: 5 }, { name: "Free rise", kind: "diacetyl rest", tempF: 72, days: 2 }];
+    const model = { ...saved, fermentationSchedule: stages, water: { ...saved.water!, source: "City" } };
+    const html = draw({ model, readOnly: true });
+    const readOuts = (drawn: string) => [...drawn.matchAll(/<ol aria-label="([^"]*)"[^>]*>([\s\S]*?)<\/ol>/g)].map((m) => [m[1], (m[2].match(/<li[\s\S]*?<\/li>/g) ?? []).map(text)]);
+    expect(readOuts(html)).toEqual([
+      // One rest: the band already gives its temperature and minutes, so the line adds only its name and kind (#1518).
+      ["Mash rests", ["Saccharification · Infusion"]],
+      ["Fermentation stages", ["Primary · 68 °F · 5 days", "Free rise · Diacetyl rest · 72 °F · 2 days"]],
+    ]);
+    expect(text(html)).toContain("Pale ale (source City), mash pH 5.3.");
+    // The editable page keeps all three in its sheets.
+    const editable = draw({ model });
+    expect(readOuts(editable)).toEqual([]);
+    expect(text(editable)).not.toMatch(/Free rise|City/);
+  });
+
+  it("closes the recipe's note as a sentence before the saved date", () => {
+    expect(text(draw({ readOnly: true, model: { title: "Pale", recipeNote: "House IPA", saved: "Aug 28, 2026" } }))).toContain("House IPA. Saved Aug 28, 2026.");
+  });
+});
+
+describe("batch amounts in packs", () => {
+  const malt: RecipePack = { perBbl: 10, factor: 50, unit: "lb", packName: null };
+  const bagged: RecipePack = { perBbl: 57.5, factor: 55, unit: "lb", packName: "bag" };
+  it("reads a line's amount at the batch size as a count of packs when it is whole packs", () => {
+    expect(batchTotalText(bagged, 22)).toBe("23 bags");
+    expect(batchTotalText({ ...bagged, perBbl: 2.5 }, 22)).toBe("1 bag");
+    // No pack word: the count of the pack size, as before.
+    expect(batchTotalText({ ...malt, perBbl: 2.5, factor: 55 }, 22)).toBe("1 × 55 lb");
+  });
+  it("stays in base units when the amount is not whole packs, is under one pack, or the material has no pack", () => {
+    expect(batchTotalText(malt, 22)).toBe("220 lb");
+    expect(batchTotalText({ ...bagged, perBbl: 44 }, 22)).toBe("968 lb");
     expect(batchTotalText({ ...malt, factor: 1 }, 22)).toBe("220 lb");
-    expect(batchTotalText({ perBbl: 0.4, factor: 44, unit: "lb" }, 22)).toBe("8.8 lb");
+    expect(batchTotalText({ perBbl: 0.4, factor: 44, unit: "lb", packName: null }, 22)).toBe("8.8 lb");
   });
   it("totals exactly to the stored 4 decimals, so 9.090909 lb/bbl at 22 bbl is 200 lb", () => {
-    expect(batchTotalText({ ...malt, perBbl: 9.090909 }, 22)).toBe("200 lb = 4 × 50 lb");
+    expect(batchTotalText({ ...malt, perBbl: 9.090909 }, 22)).toBe("4 × 50 lb");
   });
   it("offers rounding down and up to whole packs, each as a per-bbl amount to 6 decimals", () => {
     expect(packRounding(malt, 22)).toEqual({ whole: false, choices: [
@@ -275,46 +679,116 @@ describe("batch totals in packs", () => {
       { label: "Round to 5 × 50 lb", perBbl: 11.363636 },
     ] });
   });
-  it("offers only rounding up when the total is under one pack", () => {
-    expect(packRounding({ perBbl: 0.4, factor: 44, unit: "lb" }, 22)).toEqual({ whole: false, choices: [{ label: "Round to 1 × 44 lb", perBbl: 2 }] });
+  it("names a Round choice as the line will read once chosen, with the pack word when the material has one", () => {
+    expect(packRounding({ ...bagged, perBbl: 44 }, 22)).toEqual({ whole: false, choices: [
+      { label: "Round to 17 bags", perBbl: 42.5 },
+      { label: "Round to 18 bags", perBbl: 45 },
+    ] });
+  });
+  it("offers no rounding under one whole pack: part of a 44 lb box stays what it is", () => {
+    expect(packRounding({ perBbl: 0.4, factor: 44, unit: "lb", packName: null }, 22)).toEqual({ whole: false, choices: [] });
+    expect(packRounding({ perBbl: 0.4, factor: 44, unit: "lb", packName: "box" }, 22)).toEqual({ whole: false, choices: [] });
+    // 0.253 lb of a 0.25 lb bottle is one bottle and a little loose: from one pack up, Round is offered down and up.
+    expect(packRounding({ perBbl: 0.0115, factor: 0.25, unit: "lb", packName: "bottle" }, 22)).toEqual({ whole: false, choices: [
+      { label: "Round to 1 bottle", perBbl: 0.011364 },
+      { label: "Round to 2 bottles", perBbl: 0.022727 },
+    ] });
   });
   it("says whole packs, with nothing to offer, when the total already is", () => {
     expect(packRounding({ ...malt, perBbl: 9.090909 }, 22)).toEqual({ whole: true, choices: [] });
+    // A material counted in "each" rounds to whole pieces once it has a pack word; without one it has no pack.
+    expect(packRounding({ perBbl: 0.0455, factor: 1, unit: "each", packName: "pitch" }, 22)).toEqual({ whole: false, choices: [
+      { label: "Round to 1 pitch", perBbl: 0.045455 }, { label: "Round to 2 pitches", perBbl: 0.090909 },
+    ] });
+    expect(packRounding({ perBbl: 0.0455, factor: 1, unit: "each", packName: null }, 22)).toBeNull();
+    expect(packRounding(bagged, 22)).toEqual({ whole: true, choices: [] });
   });
   it("offers nothing for a material with no pack", () => {
     expect(packRounding({ ...malt, factor: 1 }, 22)).toBeNull();
   });
   it("shows the real total a rounded per-bbl amount gives, even a hair off whole packs", () => {
-    const [up] = packRounding({ perBbl: 0.01, factor: 50, unit: "lb" }, 3000)!.choices;
-    expect(up).toEqual({ label: "Round to 1 × 50 lb", perBbl: 0.016667 });
-    expect(batchTotalText({ perBbl: up.perBbl, factor: 50, unit: "lb" }, 3000)).toBe("50.001 lb = 1 × 50 lb + 0.001 lb");
+    const [down] = packRounding({ perBbl: 0.02, factor: 50, unit: "lb", packName: null }, 3000)!.choices;
+    expect(down).toEqual({ label: "Round to 1 × 50 lb", perBbl: 0.016667 });
+    expect(batchTotalText({ perBbl: down.perBbl, factor: 50, unit: "lb", packName: null }, 3000)).toBe("50.001 lb");
   });
-  it("draws totals only once a batch size is typed, and Round only on the draft", () => {
-    const model = { title: "Pale v3", ingredients: [{ key: "i1", title: "2-row", detail: "Mash · 10 lb / bbl", qty: "", pack: malt }] };
-    const draw = (m: typeof model & { totalsAtBbl?: string }, readOnly: boolean) => renderToStaticMarkup(createElement(RecipeView, { model: m, readOnly }));
-    expect(draw(model, true)).toContain("Enter a batch size to see totals in packs");
-    expect(draw(model, true)).not.toContain("220 lb");
-    const read = draw({ ...model, totalsAtBbl: "22" }, true);
-    expect(read).toMatch(/22 bbl <span data-direction="forward"[^>]*>.*?<\/span> 220 lb = 4 × 50 lb \+ 20 lb/);
+  it("draws each line's batch amount only once the recipe has a batch size, and Round only on the editor", () => {
+    const row: RecipeIngredientView = { key: "i1", title: "2-row", ...ingredientCells("mash", null, 10, "lb"), pack: malt };
+    const model = { title: "Pale", ingredients: [row] };
+    const draw = (m: typeof model & { batchBbl?: string }, readOnly: boolean) => renderToStaticMarkup(createElement(RecipeView, { model: m, readOnly }));
+    const rowText = (html: string) => /<li[\s\S]*?<\/li>/.exec(html)![0].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    expect(draw(model, false)).toContain("Enter a batch size to see each amount for the batch");
+    expect(rowText(draw(model, false))).toBe("Mash-in Edit 2-row 10 lb / bbl");
+    // A saved copy read out has no sheet to type one into, so it does not ask.
+    expect(draw(model, true)).not.toContain("Enter a batch size");
+    // With a batch size the row reads the batch amount alone; the amount per bbl stays in the Ingredient sheet.
+    const read = draw({ ...model, batchBbl: "22" }, true);
+    expect(rowText(read)).toBe("Mash-in 2-row 220 lb");
     expect(read).not.toContain("Round to");
-    expect(draw({ ...model, totalsAtBbl: "22" }, false)).toContain("Round to 5 × 50 lb");
-    expect(draw({ ...model, totalsAtBbl: "22", ingredients: [{ ...model.ingredients[0], pack: { ...malt, perBbl: 9.090909 } }] }, false)).toContain("Whole packs");
+    // Off a read-out, an amount that is not whole packs offers Round under its row, down and up.
+    expect(rowText(draw({ ...model, batchBbl: "22" }, false))).toBe("Mash-in Edit 2-row 220 lb Round to 4 × 50 lb Round to 5 × 50 lb");
+    // Whole packs read as a count, with nothing to round.
+    const whole = draw({ ...model, batchBbl: "22", ingredients: [{ ...row, pack: { ...malt, perBbl: 9.090909 } }] }, false);
+    expect(rowText(whole)).toBe("Mash-in Edit 2-row 4 × 50 lb");
+    // A grain in whole bags also reads its weight and its share.
+    expect(rowText(draw({ ...model, batchBbl: "22", ingredients: [{ ...row, pack: bagged, share: 1 }] }, true))).toBe("Mash-in 2-row 1,265 lb, 100% of the grain bill 23 bags");
   });
-  it("#1479 reads an exponent batch size as no size, and says why", () => {
-    const model = { title: "Pale v3", ingredients: [{ key: "i1", title: "2-row", detail: "Mash · 10 lb / bbl", qty: "", pack: malt }], totalsAtBbl: "1e1" };
-    const html = renderToStaticMarkup(createElement(RecipeView, { model, readOnly: true }));
+  it("#1479 reads an exponent batch size as no size: rows stay per bbl, and the Recipe numbers sheet marks the field", () => {
+    const model = { title: "Pale", ingredients: [{ key: "i1", title: "2-row", ...ingredientCells("mash", null, 10, "lb"), pack: malt }], batchBbl: "1e1" };
+    const html = renderToStaticMarkup(createElement(RecipeView, { model }));
     expect(html).not.toContain("100 lb");
-    expect(html).toContain("Enter a decimal number, not exponent notation");
+    expect(html).toContain("10 lb");
+    expect(renderToStaticMarkup(createElement(RecipeNumbersView, { values: model }))).toContain("Enter a decimal number, not exponent notation");
   });
-  it("gives a pack to brew-day lines only, from the material's pack size", () => {
-    const material = { base_uom: "lb", purchase_uom_factor: 50 };
-    expect(ingredientPack("whirlpool", 2, material)).toEqual({ perBbl: 2, factor: 50, unit: "lb" });
-    expect(ingredientPack("dry_hop", 2, material)).toBeUndefined();
-    expect(ingredientPack("mash", 2, undefined)).toBeUndefined();
-    expect(ingredientPack("mash", 0, material)).toBeUndefined();
+  it("gives a pack to a line at any stage, from the material's pack size and pack word", () => {
+    const material = { base_uom: "lb", purchase_uom_factor: 50, pack_name: "sack" as const };
+    expect(ingredientPack(2, material)).toEqual({ perBbl: 2, factor: 50, unit: "lb", packName: "sack" });
+    expect(ingredientPack(2, { ...material, pack_name: null })?.packName).toBeNull();
+    expect(ingredientPack(2, undefined)).toBeUndefined();
+    expect(ingredientPack(0, material)).toBeUndefined();
   });
   it("coerces a numeric pack size that arrives as a string", () => {
-    expect(ingredientPack("mash", 10, { base_uom: "lb", purchase_uom_factor: "55.000000" as unknown as number })?.factor).toBe(55);
+    expect(ingredientPack(10, { base_uom: "lb", purchase_uom_factor: "55.000000" as unknown as number, pack_name: null })?.factor).toBe(55);
+  });
+});
+
+describe("gristKey", () => {
+  const bill = [{ materialId: "2row", perBbl: 45 }, { materialId: "oats", perBbl: 9.090909 }];
+  it("is the same for the same mash lines in any order", () => {
+    expect(gristKey([...bill].reverse())).toBe(gristKey(bill));
+  });
+  it("differs by any amount, however small, and by any material", () => {
+    expect(gristKey([bill[0], { ...bill[1], perBbl: 9.09091 }])).not.toBe(gristKey(bill));
+    expect(gristKey([bill[0], { ...bill[1], materialId: "wheat" }])).not.toBe(gristKey(bill));
+    expect(gristKey([bill[0]])).not.toBe(gristKey(bill));
+  });
+  it("keeps the lines as written: a malt on two lines is not one line of their sum", () => {
+    expect(gristKey([{ materialId: "2row", perBbl: 20 }, { materialId: "2row", perBbl: 25 }, bill[1]])).not.toBe(gristKey(bill));
+  });
+  it("is empty with no mash line, so a recipe without a grain bill shares none", () => {
+    expect(gristKey([])).toBe("");
+  });
+});
+
+describe("gristShares", () => {
+  it("gives each mash line its share of the grain bill by weight, and no other line a share", () => {
+    // 23 and 12 bags of 55 lb at 22 bbl: 1,265 of 1,925 lb is 66%.
+    const shares = gristShares([{ stage: "mash", perBbl: 57.5, unit: "lb" }, { stage: "mash", perBbl: 30, unit: "lb" }, { stage: "boil", perBbl: 0.4, unit: "lb" }]);
+    expect(shares[0]).toBeCloseTo(1265 / 1925, 10);
+    expect(shares.map((share) => share === undefined ? share : Math.round(share * 100))).toEqual([66, 34, undefined]);
+  });
+  it("weighs every weight unit in pounds, and gives no share to a mash line stocked by volume or count", () => {
+    const shares = gristShares([{ stage: "mash", perBbl: 22.0462, unit: "lb" }, { stage: "mash", perBbl: 10, unit: "kg" }, { stage: "mash", perBbl: 5, unit: "ml" }, { stage: "mash", perBbl: 0, unit: "lb" }]);
+    expect(shares.map((share) => share === undefined ? share : Math.round(share * 100))).toEqual([50, 50, undefined, undefined]);
+  });
+  it("has no share to give without a weighed mash line", () => {
+    expect(gristShares([{ stage: "boil", perBbl: 1, unit: "lb" }, { stage: "mash", perBbl: 1, unit: undefined }])).toEqual([undefined, undefined]);
+  });
+  // A mash line whose unit the page cannot see (an inactive material) has an unknown weight, so no line's share is
+  // known. Counting it as nothing would read the other malts too high.
+  it("gives no shares at all when a mash line's unit is unknown", () => {
+    expect(gristShares([{ stage: "mash", perBbl: 10, unit: "lb" }, { stage: "mash", perBbl: 10, unit: undefined }])).toEqual([undefined, undefined]);
+    // A unit that is known and is not a weight (a syrup in ml) still just has no share of its own.
+    expect(gristShares([{ stage: "mash", perBbl: 10, unit: "lb" }, { stage: "mash", perBbl: 10, unit: "ml" }])).toEqual([1, undefined]);
   });
 });
 
@@ -335,20 +809,33 @@ describe("gravityBlockerText", () => {
     expect(gravityBlockerText([{ index: 0, reason: "no_extract" }], () => "Pilsner", () => "lb", { saved: false }))
       .toBe("Pilsner has no extract potential; set it under Materials.");
   });
+  it("tells a saved copy's reader how to pick the fix up, without naming a version", () => {
+    expect(gravityBlockerText([{ index: 0, reason: "no_extract" }], () => "Pilsner", () => "lb", { saved: true }))
+      .toBe("Pilsner had no extract potential when this recipe was saved; set it under Materials, then Refresh from Materials on the current recipe.");
+  });
   it("is null when nothing blocks the prediction", () => {
     expect(gravityBlockerText([], () => "Pilsner", () => "lb", { saved: true })).toBeNull();
   });
 });
 
-describe("the read page and its brand picker", () => {
+describe("the read page and its brand pick", () => {
   const page = readFileSync("app/(app)/recipes/[id]/page.tsx", "utf8");
-  const picker = readFileSync("app/(app)/recipes/[id]/recipe-brand-picker.tsx", "utf8");
+  const editor = readFileSync("app/(app)/recipes/[id]/recipe-version-form.tsx", "utf8");
   it("builds its model with toRecipePageModel", () => {
     expect(page).toMatch(/import \{[^}]*\btoRecipePageModel\b[^}]*\} from "@\/lib\/mgr\/recipe-view"/);
     expect(page).toContain("toRecipePageModel(");
   });
-  it("keeps the brand picker enabled while it saves, and says so when it has", () => {
-    expect(picker).not.toContain("disabled: busy");
-    expect(picker).toContain('toast.success("Brand saved")');
+  it("keeps the brand pick enabled while it saves, ignores a pick made meanwhile or of the brand it already has, and says so when it has saved", () => {
+    expect(page).toContain("brandId={recipe.brand_id} brands={brands}");
+    // Picking the brand the recipe already has ("No brand yet" when it has none) saves nothing, so it says nothing.
+    expect(editor).toContain('if (brandAction.busy || value === (brandId ?? "")) return;');
+    expect(editor).toContain('brandAction.run("set_recipe_brand", { recipeId, brandId: value || null }, () => toast.success("Brand saved"))');
+    expect(editor).not.toMatch(/disabled: (brandAction\.)?busy/);
+  });
+
+  it("Discard also clears a failed save's message, and a recipe being created is asked for no change note", () => {
+    // The error, or the warning that the change could not be kept in this tab, is about the change Discard drops.
+    expect(editor).toMatch(/function discard\(\) \{[^}]*setDraft\(start\);[^}]*setError\(null\);\s*\}/);
+    expect(editor).toContain("setNote: creating ? undefined : (value) => change({ notes: value }),");
   });
 });

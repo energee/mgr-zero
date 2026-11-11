@@ -90,6 +90,36 @@ it("keeps blank numbers, constraints, and accessible names in the shared stepper
   expect(bounded).toMatch(/aria-label="Decrease"[^>]*disabled=""/);
 });
 
+// A dense sheet of short numbers (Recipe's process numbers) drops the −/+ buttons, never the input's rules.
+// The − and + buttons are part of the number control, so they carry its border (--input) in the light theme too:
+// an outline button's own light border is the fainter page border, which left the box darker than its buttons.
+it("draws the stepper's buttons with the control border, enabled or disabled", () => {
+  const stepper = renderToStaticMarkup(E.edit("Quantity per bbl (lb)", "40.9", "number", undefined, { min: 0, onChange: () => {} }));
+  const buttons = stepper.match(/<button[^>]*aria-label="(Decrease|Increase)"[^>]*>/g) ?? [];
+  expect(buttons).toHaveLength(2);
+  for (const button of buttons) {
+    expect(button).toMatch(/class="[^"]*(?<![:\w-])border-input[^"]*"/);
+    expect(button).toContain("disabled:border-input");
+    expect(button).not.toMatch(/(?<![:\w-])border-border/);
+  }
+});
+
+it("draws a compact number field as the same input under a small label, without the stepper's buttons", () => {
+  const compact = renderToStaticMarkup(E.edit("Boil time min", "1e3", "number", undefined, { compact: true, min: 1, step: 1, onChange: () => {} }));
+  expect(compact).not.toMatch(/aria-label="(Decrease|Increase)"/);
+  expect(compact).toMatch(/<label[^>]*text-xs[^>]*>Boil time min<\/label>/);
+  expect(compact).toMatch(/<input[^>]*type="number"[^>]*aria-label="Boil time min"/);
+  expect(compact).toMatch(/min="1"/);
+  expect(compact).toMatch(/step="1"/);
+  // Exponent notation is still refused under the field.
+  expect(compact).toContain('data-slot="field-error"');
+  expect(compact).not.toMatch(/data-orientation="horizontal"/);
+  // Every other caller keeps the stepper as it was.
+  const stepper = renderToStaticMarkup(E.edit("Boil time min", "60", "number"));
+  expect(stepper).toMatch(/aria-label="Decrease"[\s\S]*aria-label="Increase"/);
+  expect(stepper).not.toMatch(/<label[^>]*text-xs/);
+});
+
 it("explains exponent notation on both numeric primitives", () => {
   for (const field of [E.edit("Amount", "1e3", "number"), createElement(Qty, { value: "1e3", unit: "units", label: "Quantity" })]) {
     const html = renderToStaticMarkup(field);

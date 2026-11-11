@@ -1,6 +1,7 @@
 // lib/recipe-ibu.ts — the one recipe IBU estimate, shared by get_recipe and the
 // editor preview. It lives only here: v1 kept a second copy in SQL, and the two
-// drifted about 2.3x apart.
+// drifted about 2.3x apart. Also its words: the estimate as a line of its own
+// (ibuText), and the line under a drawn IBU figure (ibuNote).
 //
 // Tinseth, for each hop line:
 //   grams per bbl = perBblQty × LB_PER[unit] × 453.59237
@@ -85,17 +86,28 @@ function gapsText(gaps: IbuGap[], saved: boolean): string {
   return GAP_REASONS.flatMap((reason) => {
     const names = [...new Set(gaps.filter((gap) => gap.reason === reason).map((gap) => gap.name))];
     if (names.length === 0) return [];
-    const fix = saved && reason === "no alpha acid" ? "; set alpha acid under Materials, then create the next version" : "";
+    const fix = saved && reason === "no alpha acid" ? "; set alpha acid under Materials, then Refresh from Materials on the current recipe" : "";
     return [`${reason}: ${names.join(", ")}${fix}`];
   }).join(" · ");
 }
 
-/** The line the recipe page and the editor print. `saved` tells a saved version from a draft, as gravityBlockerText does. */
+/** The estimate as one line that stands alone, number included. `saved` tells a saved version from a draft, as gravityBlockerText does. */
 export function ibuText(result: RecipeIbu, { saved }: { saved: boolean }): string {
   switch (result.kind) {
     case "none": return `IBU not estimated: ${result.reason}`;
     case "gaps": return `IBU not estimated: ${gapsText(result.gaps, saved)}`;
     case "lowerBound": return `IBU ≥ ${result.ibu} · ${gapsText(result.gaps, saved)}`;
     case "estimate": return `IBU ${result.ibu}${result.whirlpool ? " · whirlpool hops at 5%" : ""}`;
+  }
+}
+
+/** The line the recipe page prints under its figures, where the IBU is already drawn as a figure: only what that
+ *  figure leaves out, without the number again. Undefined for a plain estimate, which is all in its figure. With no
+ *  figure to draw (none, gaps) it is ibuText's reason. */
+export function ibuNote(result: RecipeIbu, { saved }: { saved: boolean }): string | undefined {
+  switch (result.kind) {
+    case "estimate": return result.whirlpool ? "Whirlpool hops count at 5%." : undefined;
+    case "lowerBound": return `Not counted in IBU: ${gapsText(result.gaps, saved)}`;
+    default: return ibuText(result, { saved });
   }
 }

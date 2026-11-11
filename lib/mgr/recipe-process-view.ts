@@ -1,12 +1,16 @@
 // lib/mgr/recipe-process-view.ts — the recipe process spec as the sheets edit
 // it and the recipe page reads it: ordered mash steps, fermentation stages and
-// water additions on a draft version (recipe-builder spec D2: repetition earns
+// water additions on the unsaved sheet (recipe-builder spec D2: repetition earns
 // a surface), pure list helpers, the summary lines the schedule screens print,
-// and the labelled read-out of a cut version's process scalars and water.
+// and an ingredient typed as a count of packs for the recipe's batch
+// (packsToPerBbl, packsFieldText, packsLabel).
+import type { PackName } from "./enums";
 import { sentenceCase } from "./labels";
+import { batchQty, packNoun, perBblForPacks, type Pack } from "./pack-qty";
 import { plural } from "./plural";
-import { isNumber, isPositive, numberNotationError } from "./quantity-input";
+import { fromTicks, isNumber, isPositive, numberNotationError, toTicks } from "./quantity-input";
 import { READING_BOUNDS } from "@/lib/composer/offline-policy";
+import { MINUTES_PER_DAY } from "@/lib/time-window";
 import { saccharificationRest, totalMinutes, type MashStep } from "./recipe-schedule";
 import { gramsOf, IONS, ION_LABELS, suggestSalts, waterChemistry, type Ions, type Salt } from "@/lib/water-chemistry";
 import { submitReason } from "./submit-reason";
@@ -18,11 +22,10 @@ export type IngredientStage = (typeof INGREDIENT_STAGES)[number];
 /** Stages whose materials are confirmed on brew day; later stages post from cellar additions. */
 export const BREW_DAY_STAGES = ["mash", "boil", "whirlpool"] as const satisfies readonly IngredientStage[];
 export const isBrewDayStage = (stage: string): stage is (typeof BREW_DAY_STAGES)[number] => (BREW_DAY_STAGES as readonly string[]).includes(stage);
-/** One ingredient line as the editor holds it: strings until the version is built. */
+/** One ingredient line as the editor holds it: strings until the sheet is saved. */
 export type IngredientLine = { materialId: string; perBblQty: string; stage: IngredientStage; timingMinutes: string };
 export const lineReady = (l: IngredientLine) => l.materialId !== "" && Number(l.perBblQty) > 0 && (l.timingMinutes === "" || Number.isInteger(Number(l.timingMinutes)));
 
-const MINUTES_PER_DAY = 1440;
 /** Fermentation and dry-hop additions are timed in whole days from the start of fermentation; the rest in minutes (#1478).
  *  Stored as minutes either way (timing_minutes). */
 export const timedInDays = (stage: string) => stage === "fermentation" || stage === "dry_hop";
@@ -67,12 +70,29 @@ export function ingredientReason(fields: IngredientFields, limits: TimingLimits)
     ...(range ? [range.days ? `${stage} day from 0 to ${range.max}` : `${stage} timing from 0 to ${range.max} minutes`] : []),
   ]);
 }
+/** What the Ingredient sheet needs to take a line as a count of packs: the material's pack and the recipe's batch size in bbl. */
+type PackEntry = Pack & { batchBbl: number };
+/** The count field's label: "Bags (55 lb) for 22 bbl", or "Packs (50 lb) for 22 bbl" for a material with no pack word. */
+export const packsLabel = (e: PackEntry) => `${sentenceCase(packNoun(e.packName))} (${e.factor} ${e.unit}) for ${e.batchBbl} bbl`;
+/** The per-bbl field's text for a typed count of packs (packs × pack size ÷ batch size); "" while the count is not a number. */
+export const packsToPerBbl = (packs: string, e: PackEntry): string => (isNumber(packs) ? String(perBblForPacks(Number(packs), e.factor, e.batchBbl)) : "");
+/** The count field's text. What was typed stands while the per-bbl amount is still the one it gave, so "2." is not
+ *  rewritten to "2" mid-typing. Otherwise the count is worked out from the per-bbl amount (its batch amount over the
+ *  pack size, to 4 decimals), which keeps the two fields in step; "" without a per-bbl amount above zero. */
+export function packsFieldText(perBblQty: string, typed: string, e: PackEntry): string {
+  if (packsToPerBbl(typed, e) === perBblQty) return typed;
+  return Number(perBblQty) > 0 ? String(fromTicks(toTicks(batchQty(Number(perBblQty), e.batchBbl) / e.factor))) : "";
+}
 /** A per-bbl quantity to three significant digits: 40.909091 reads "40.9", 0.011364 reads "0.0114".
  *  Two fixed fraction digits would round small hop rates by 10-12%, so callers format with this before ingredientDetail. */
 export const perBblDisplay = (n: number): string => n.toLocaleString("en-US", { maximumSignificantDigits: 3 });
-/** "Dry hop · 4 min · 1.2 lb / bbl": the row detail for a line, drawn the same on the draft and on a cut version. */
+/** A line's timing, "4 min", or "day 3" for a stage timed in days; "" when the line has none. */
+export const ingredientTiming = (stage: string, timingMinutes: number | string | null) =>
+  timingMinutes === null || timingMinutes === "" ? "" : timedInDays(stage) ? `day ${Number(timingMinutes) / MINUTES_PER_DAY}` : `${timingMinutes} min`;
+/** "4 min · 1.2 lb / bbl", or "day 3 · 1.2 lb / bbl": a line's timing and amount as one phrase, for Prep's cellar
+ *  plan (brew-prep-view.ts). The stage is not named; that caller names it. The recipe page prints the two apart (ingredientCells). */
 export const ingredientDetail = (stage: string, timingMinutes: number | string | null, perBbl: number | string, unit?: string) =>
-  `${sentenceCase(stage)}${timingMinutes !== null && timingMinutes !== "" ? (timedInDays(stage) ? ` · day ${Number(timingMinutes) / MINUTES_PER_DAY}` : ` · ${timingMinutes} min`) : ""} · ${perBbl}${unit ? ` ${unit}` : ""} / bbl`;
+  [ingredientTiming(stage, timingMinutes), `${perBbl}${unit ? ` ${unit}` : ""} / bbl`].filter(Boolean).join(" · ");
 /** Name and base unit by material id, for rows that name a material the command returned. */
 export function materialLookup<M extends { id: string; name: string; base_uom: string }>(materials: readonly M[]) {
   const byId = new Map(materials.map((m) => [m.id, m]));
@@ -80,9 +100,10 @@ export function materialLookup<M extends { id: string; name: string; base_uom: s
 }
 /** The material fields the recipe editor reads; both recipe pages project list_materials to this.
  *  Lives here, not in the "use client" editor, because the server pages call it (#440).
- *  purchase_uom_factor is base units per purchase pack (1 = no pack); the page totals brew-day lines in packs with it. */
-export type RecipeMaterial = { id: string; name: string; category: string; base_uom: string; extract_potential: number | null; alpha_acid: number | null; purchase_uom_factor: number };
-export const toRecipeMaterial = ({ id, name, category, base_uom, extract_potential, alpha_acid, purchase_uom_factor }: RecipeMaterial): RecipeMaterial => ({ id, name, category, base_uom, extract_potential, alpha_acid, purchase_uom_factor });
+ *  purchase_uom_factor is base units per purchase pack (1 with no pack word = no pack, see hasPack); the page reads each line's batch amount in packs
+ *  with it. pack_name is the word that pack is sold by ("bag"), or null when the material has none. */
+export type RecipeMaterial = { id: string; name: string; category: string; base_uom: string; extract_potential: number | null; alpha_acid: number | null; purchase_uom_factor: number; pack_name: PackName | null };
+export const toRecipeMaterial = ({ id, name, category, base_uom, extract_potential, alpha_acid, purchase_uom_factor, pack_name }: RecipeMaterial): RecipeMaterial => ({ id, name, category, base_uom, extract_potential, alpha_acid, purchase_uom_factor, pack_name });
 export type FermentationStage = { name: string; kind: string; tempF: number; days: number };
 export type WaterAddition = { materialId: string; qty: number; unit: string; stage: string };
 export type WaterDraft = { targetProfileId: string; sourceProfileId: string; mashGal: string; spargeGal: string; targetMashPh: string; additions: WaterAddition[] };
@@ -106,30 +127,20 @@ export const upsertAt = <T>(list: readonly T[], index: number | undefined, item:
 
 export const removeAt = <T>(list: readonly T[], index: number): T[] => list.filter((_, i) => i !== index);
 
-/** The Mash schedule sheet's footer: the total, then which rest (if any) is recorded as the version's mash temperature. */
+/** The Mash schedule sheet's footer: the total, then which rest (if any) is recorded as the recipe's mash temperature. */
 export function mashSummary(steps: readonly MashStep[]): string {
   const rest = saccharificationRest(steps);
   return `Total ${totalMinutes(steps)} min. ${rest ? `The ${rest.tempF} °F rest is recorded as the mash temperature.` : "No rest falls between 144 and 162 °F, so no mash temperature is recorded."}`;
 }
 
-/** The one-line mash summary a recipe row shows: "Total 60 min · 152 °F saccharification rest". */
-export function mashRowSummary(steps: readonly MashStep[]): string {
-  const rest = saccharificationRest(steps);
-  return `Total ${totalMinutes(steps)} min · ${rest ? `${rest.tempF} °F saccharification rest` : "no saccharification rest"}`;
-}
-
-/** A water addition row's detail, "4 g · Mash": on the Water sheet and on a cut version's read-out. */
+/** A water addition row's detail on the Water sheet, "4 g · Mash". */
 export const waterAdditionDetail = (a: { qty: number; unit: string; stage: string }) => `${a.qty} ${a.unit} · ${sentenceCase(a.stage)}`;
 
-/** The Water row detail, "Target Hazy target · 3 additions" or "No target · 0 additions": on the recipe draft and on the Water sheet's trigger. */
-export const waterRowSummary = (targetName: string | undefined, additions: number) =>
-  `${targetName ? `Target ${targetName}` : "No target"} · ${plural(additions, "addition")}`;
+/** A mash step's or fermentation stage's kind as words, "Infusion"; "" when it only repeats the name ("Rest", kind "rest"). */
+export const stepKind = ({ name, kind }: { name: string; kind: string }) => (kind.toLowerCase() === name.trim().toLowerCase() ? "" : sentenceCase(kind));
 
-/** A mash step's row detail, "Infusion · 152 °F · 60 min"; the kind is dropped when it only repeats the step name ("Rest", kind "rest"). */
-export function mashStepDetail(step: MashStep): string {
-  const kind = step.kind.toLowerCase() === step.name.trim().toLowerCase() ? "" : `${sentenceCase(step.kind)} · `;
-  return `${kind}${step.tempF} °F · ${step.minutes} min`;
-}
+/** A mash step's row detail, "Infusion · 152 °F · 60 min"; the kind is dropped when it only repeats the step name. */
+export const mashStepDetail = (step: MashStep): string => [stepKind(step), `${step.tempF} °F`, `${step.minutes} min`].filter(Boolean).join(" · ");
 
 /** A fermentation stage's row detail, "68 °F · 4 days": on the schedule sheet and in a batch's cellar plan. */
 export const fermentationStageDetail = (stage: FermentationStage) => `${stage.tempF} °F · ${plural(stage.days, "day")}`;
@@ -137,28 +148,11 @@ export const fermentationStageDetail = (stage: FermentationStage) => `${stage.te
 /** The schedule's total days. */
 export const fermentationSummary = (stages: readonly FermentationStage[]) => `Total ${scheduleDays(stages)} days.`;
 
-/** The process columns get_recipe returns on a version. */
+/** The process columns get_recipe returns on a version. batch_bbl is the batch the copy is written for; null means it has none. */
 export type ProcessColumns = {
-  pre_boil_bbl: number | null; whirlpool_minutes: number | null; whirlpool_temp_f: number | null; whirlpool_rest_minutes: number | null; knockout_temp_f: number | null;
+  batch_bbl: number | null; pre_boil_bbl: number | null; whirlpool_minutes: number | null; whirlpool_temp_f: number | null; whirlpool_rest_minutes: number | null; knockout_temp_f: number | null;
   target_water_profile_id: string | null; source_water_profile_id: string | null; mash_water_gal: number | null; sparge_water_gal: number | null; target_mash_ph: number | null;
 };
-
-/** Label and value for each process fact a cut version carries; absent facts print nothing. */
-export function processReadout(v: ProcessColumns, profileName: (id: string | null) => string | null): [string, string][] {
-  const whirlpool = v.whirlpool_minutes === null ? null
-    : `${v.whirlpool_minutes} min${v.whirlpool_temp_f !== null ? ` at ${v.whirlpool_temp_f} °F` : ""}${v.whirlpool_rest_minutes !== null ? ` · ${v.whirlpool_rest_minutes} min rest` : ""}`;
-  const rows: [string, string | null][] = [
-    ["Pre-boil volume", v.pre_boil_bbl === null ? null : `${v.pre_boil_bbl} bbl`],
-    ["Whirlpool", whirlpool],
-    ["Knockout temp", v.knockout_temp_f === null ? null : `${v.knockout_temp_f} °F`],
-    ["Source profile", profileName(v.source_water_profile_id) ?? "No source"],
-    ["Target profile", profileName(v.target_water_profile_id) ?? "No target"],
-    ["Mash water", v.mash_water_gal === null ? null : `${v.mash_water_gal} gal`],
-    ["Sparge water", v.sparge_water_gal === null ? null : `${v.sparge_water_gal} gal`],
-    ["Target mash pH", v.target_mash_ph === null ? null : String(v.target_mash_ph)],
-  ];
-  return rows.filter((r): r is [string, string] => r[1] !== null);
-}
 
 // Sheet field shapes (strings, as typed) and why each Save is withheld (null when
 // ready; ingredientReason's pattern), named beside the button. Pure, so a

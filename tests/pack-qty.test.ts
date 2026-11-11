@@ -1,7 +1,8 @@
 // tests/pack-qty.test.ts — a base-unit amount read and entered as whole packs
-// plus loose base units (lib/mgr/pack-qty.ts).
+// plus loose base units, and a recipe's batch amount read as a count of packs
+// (lib/mgr/pack-qty.ts).
 import { describe, expect, it } from "vitest";
-import { fromPacks, packs, splitPacks } from "@/lib/mgr/pack-qty";
+import { fromPacks, packs, packText, perBblForPacks, splitPacks } from "@/lib/mgr/pack-qty";
 
 describe("packs", () => {
   it("names whole packs when the amount divides evenly", () => {
@@ -45,5 +46,45 @@ describe("fromPacks", () => {
       expect(fromPacks(split.packs, split.loose, 2.204623)).toBe(qty);
       expect(split.loose).toBeGreaterThanOrEqual(0);
     }
+  });
+});
+
+describe("packText", () => {
+  const bag = { factor: 55, unit: "lb", packName: "bag" as const };
+  it("reads whole packs as a count with the material's pack word", () => {
+    expect(packText(1265, bag)).toBe("23 bags");
+    expect(packText(55, bag)).toBe("1 bag");
+    expect(packText(0.25, { factor: 0.25, unit: "lb", packName: "bottle" })).toBe("1 bottle");
+    expect(packText(10, { factor: 10, unit: "l", packName: "pitch" })).toBe("1 pitch");
+    // Sold by the piece: a material counted in "each" is its own pack once it has a word, so one yeast is "1 pitch".
+    const pitch = { factor: 1, unit: "each", packName: "pitch" } as const;
+    expect(packText(1, pitch)).toBe("1 pitch");
+    expect(packText(2, pitch)).toBe("2 pitches");
+    expect(packText(1.5, pitch)).toBe("1.5 each");
+    expect(packText(3, { factor: 1, unit: "each", packName: null })).toBe("3 each");
+  });
+  it("adds -es to the words that take it", () => {
+    expect(packText(20, { factor: 10, unit: "l", packName: "pitch" })).toBe("2 pitches");
+    expect(packText(88, { factor: 44, unit: "lb", packName: "box" })).toBe("2 boxes");
+  });
+  it("reads whole packs as a count of the pack size when the material has no pack word", () => {
+    expect(packText(950, { factor: 50, unit: "lb", packName: null })).toBe("19 × 50 lb");
+  });
+  it("stays in the amount's unit when it is not whole packs", () => {
+    expect(packText(968, { factor: 50, unit: "lb", packName: "sack" })).toBe("968 lb");
+    expect(packText(0.253, { factor: 0.25, unit: "lb", packName: "bottle" })).toBe("0.253 lb");
+    // Under one pack.
+    expect(packText(8.8, { factor: 44, unit: "lb", packName: "box" })).toBe("8.8 lb");
+  });
+  it("stays in the amount's unit when the material has neither a pack size nor a pack word", () => {
+    expect(packText(8.8, { factor: 1, unit: "lb", packName: null })).toBe("8.8 lb");
+    expect(packText(3, { factor: 1, unit: "each", packName: null })).toBe("3 each");
+  });
+});
+
+describe("perBblForPacks", () => {
+  it("gives the per-bbl amount that makes a count of packs at a batch size, to 6 decimals", () => {
+    expect(perBblForPacks(23, 55, 22)).toBe(57.5);
+    expect(perBblForPacks(1, 50, 22)).toBe(2.272727);
   });
 });

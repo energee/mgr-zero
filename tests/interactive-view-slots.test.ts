@@ -90,6 +90,9 @@ it("ListSheet puts focus back on the moved row through data-row-index, and the i
   expect(sheet).toMatch(/requestAnimationFrame\(/);
   expect(sheet).toContain("[data-row-index=");
   expect(sheet).toMatch(/\[data-move=.*\[data-row-action\]|\[data-row-action\][\s\S]*\[data-move=/);
+  // A line's name is its Edit: the view draws it as the sheet's trigger and names the verb for a screen reader.
+  const view = readFileSync("components/mgr/views/recipe.tsx", "utf8");
+  expect(view).toContain('<span className="sr-only">Edit </span>{row.title}');
   const form = readFileSync("app/(app)/recipes/[id]/recipe-version-form.tsx", "utf8");
-  expect(form).toContain('E.act(<>Edit<span className="sr-only"> {material.name(l.materialId)}</span></>)');
+  expect(form).toMatch(/edit: \(trigger\) => <IngredientSheet line=\{l\}/);
 });

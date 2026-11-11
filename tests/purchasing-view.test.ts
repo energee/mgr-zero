@@ -10,6 +10,7 @@ import { ContractView } from "../components/mgr/views/contract";
 import { ContractsView } from "../components/mgr/views/contracts";
 import { CycleCountView, CycleCountFooter } from "../components/mgr/views/cycle-count";
 import { E, splitPinned } from "../components/mgr/e";
+import { NONE } from "../components/ui/select";
 import { MaterialView } from "../components/mgr/views/material";
 import { MaterialsOnHandView } from "../components/mgr/views/materials-on-hand";
 import { NewPoView } from "../components/mgr/views/new-po";
@@ -591,6 +592,52 @@ describe("Materials", () => {
     expect(of("hop")).toContain('value="12.5"');
     expect(of("malt")).not.toMatch(/Alpha acid/);
     expect(of("yeast")).not.toMatch(/Alpha acid/);
+  });
+
+  describe("Sold by, the word one purchase unit is sold by", () => {
+    const words = ["Bag", "Sack", "Box", "Bottle", "Pitch", "Pail", "Drum", "Tote"].map((label) => ({ value: label.toLowerCase(), label }));
+    const picked = (model: Partial<typeof materialCitra>) => {
+      const pick = vi.spyOn(E, "pick");
+      try {
+        const html = htmlOf(createElement(MaterialView, { model: { ...materialCitra, ...model } }));
+        return { html, call: pick.mock.calls.find(([label]) => label === "Sold by")! };
+      } finally { pick.mockRestore(); }
+    };
+
+    it("sits beside Base units per purchase unit and offers the fixed words, with None until one is saved", () => {
+      const { html, call } = picked({ soldBy: "", soldBySaved: false });
+      expect(call[1]).toBe(NONE);
+      expect(call[2]).toEqual([{ value: NONE, label: "None" }, ...words]);
+      // One row: the pack size, then the word for it.
+      const row = html.slice(html.indexOf("Base units per purchase unit"), html.indexOf("Base unit is what recipes"));
+      expect(row).toMatch(/<label[^>]*>Sold by<\/label>/);
+      expect(html).not.toContain("can be changed but not cleared");
+      expect(html).toContain("Sold by is the word for one purchase unit, so a recipe can read 23 bags.");
+      // The warning comes before the first save of a word, not after it: once picked, it cannot go back to None.
+      expect(picked({ soldBy: "bag", soldBySaved: false }).html).toContain("Once saved, this word can be changed but not cleared.");
+    });
+
+    it("offers no None once a word is saved, because a saved word cannot be cleared, and says so", () => {
+      const { html, call } = picked({ soldBy: "box", soldBySaved: true });
+      expect(call[1]).toBe("box");
+      expect(call[2]).toEqual(words);
+      expect(html).toContain("Once saved, this word can be changed but not cleared.");
+    });
+
+    it("the inventory draws a saved word on Edit material and none on Add material", () => {
+      expect(materialCitra).toMatchObject({ soldBy: "box", soldBySaved: true });
+      const create = screen("Add material").body;
+      if (!isValidElement<{ model: typeof materialCitra }>(create)) throw new Error("Add material must mount MaterialView");
+      expect(create.props.model).toMatchObject({ soldBy: "", soldBySaved: false });
+    });
+
+    it("the live material form sends the picked word, none when nothing is picked, seeded from the saved row", () => {
+      const form = src("app/(app)/materials/material-form.tsx");
+      expect(form).toMatch(/useState<string>\(material\?\.pack_name \?\? ""\)/);
+      expect(form).toMatch(/packName: packName \|\| undefined/);
+      expect(form).toMatch(/soldBy: packName, soldBySaved: Boolean\(material\?\.pack_name\)/);
+      expect(form).toMatch(/soldBy: setPackName/);
+    });
   });
 
   it("the live material form sends alpha acid only where the field shows, seeded from the saved row", () => {

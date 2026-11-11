@@ -460,7 +460,9 @@ numeric > 0 default 1` (base units per purchase unit: a 50 lb bag = `each`→`lb
 `reorder_point numeric` (base uom), `active bool`,
 `extract_potential numeric` (SG-style, 1.037 = 37 PPG; recipe gravity reads it),
 `alpha_acid numeric(5,2) check (> 0 and <= 30)` (percent, as on the bag; recipe
-IBU reads it). unique `(brewery_id, name)`.
+IBU reads it), `pack_name text` (the word one purchase unit is sold by, checked
+against bag, sack, box, bottle, pitch, pail, drum, tote; null reads the pack as
+its size). unique `(brewery_id, name)`.
 
 ### `material_lots`
 `material_id → materials, lot_code text, vendor_id → vendors, received_on date, best_by
@@ -557,7 +559,9 @@ unique `(brewery_id, name)`.
 ### `recipe_versions` — immutable
 `recipe_id → recipes, version int, target_og_plato numeric(5,2), target_fg_plato numeric(5,2),
 target_abv numeric(4,2), target_ibu numeric(5,1), boil_minutes int, note text,
-created_by`. unique `(recipe_id, version)`. Revoke update/delete.
+created_by`, `batch_bbl numeric(10,3) check (> 0)` (the batch this version is
+written for; null means none, and ingredient amounts stay per bbl either way).
+unique `(recipe_id, version)`. Revoke update/delete.
 
 ### `recipe_ingredients` — immutable
 `recipe_version_id → recipe_versions, material_id → materials, per_bbl_qty numeric > 0`

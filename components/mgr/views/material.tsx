@@ -1,12 +1,16 @@
-// components/mgr/views/material.tsx — shared Material sheet body.
+// components/mgr/views/material.tsx — shared Material sheet body. Sold by, beside
+// the pack size, is the word one purchase unit is sold by (bag, box…); it offers
+// None only until a word is saved, because a saved word cannot be cleared.
 import { E } from "@/components/mgr/e";
+import { FieldDescription } from "@/components/ui/field";
 import { NONE } from "@/components/ui/select";
+import { PACK_NAMES } from "@/lib/mgr/enums";
 import type { MaterialViewModel } from "@/lib/mgr/material-view";
 import { sentenceCase } from "@/lib/mgr/labels";
 import type { ReactNode } from "react";
 import { Fragment } from "react";
 
-type Controls = Partial<Record<"name" | "kind" | "baseUnits" | "purchaseUnit" | "unit" | "defaultVendorId" | "extractPotential" | "alphaAcid", (value: string) => void>> & {
+type Controls = Partial<Record<"name" | "kind" | "baseUnits" | "purchaseUnit" | "soldBy" | "unit" | "defaultVendorId" | "extractPotential" | "alphaAcid", (value: string) => void>> & {
   lotTracked?: (value: boolean) => void;
   active?: (value: boolean) => void;
 };
@@ -54,6 +58,13 @@ export function MaterialView({ model, controls = {}, messages, footer }: {
   const changeDefaultVendor = controls.defaultVendorId
     ? (value: string) => controls.defaultVendorId?.(value === NONE ? "" : value)
     : undefined;
+  const soldByOptions = [
+    ...(model.soldBySaved ? [] : [{ value: NONE, label: "None" }]),
+    ...PACK_NAMES.map(value => ({ value, label: sentenceCase(value) })),
+  ];
+  const changeSoldBy = controls.soldBy
+    ? (value: string) => controls.soldBy?.(value === NONE ? "" : value)
+    : undefined;
 
   return (
     <>
@@ -63,8 +74,15 @@ export function MaterialView({ model, controls = {}, messages, footer }: {
         pick("Base unit", model.unit, unitOptions, controls.unit),
         pick("Purchase unit", model.purchaseUnit, purchaseUnitOptions, controls.purchaseUnit),
       )}
-      {E.edit("Base units per purchase unit", model.baseUnits, "number", undefined, { onChange: controls.baseUnits, min: 0, step: "any", inputMode: "decimal" })}
-      {E.info("Base unit is what recipes and counts use. Purchase unit is how you order it. For hops bought in 44 lb boxes, set Base unit to lb, Purchase unit to each, and Base units per purchase unit to 44.")}
+      {/* Side by side on the desk, stacked on a phone, where the long label would wrap beside a short one. */}
+      {E.cols(
+        E.edit("Base units per purchase unit", model.baseUnits, "number", undefined, { onChange: controls.baseUnits, min: 0, step: "any", inputMode: "decimal" }),
+        E.pick("Sold by", model.soldBy || NONE, soldByOptions, {
+          onChange: changeSoldBy,
+          description: model.soldBy ? <FieldDescription>Once saved, this word can be changed but not cleared.</FieldDescription> : undefined,
+        }),
+      )}
+      {E.info("Base unit is what recipes and counts use. Purchase unit is how you order it. For hops bought in 44 lb boxes, set Base unit to lb, Purchase unit to each, and Base units per purchase unit to 44. Sold by is the word for one purchase unit, so a recipe can read 23 bags.")}
       {EXTRACT_KINDS.has(model.kind.toLowerCase())
         ? E.edit("Extract potential · optional", model.extractPotential ?? "", "number", undefined, { onChange: controls.extractPotential, min: 1, max: 1.05, step: 0.001, inputMode: "decimal" })
         : null}

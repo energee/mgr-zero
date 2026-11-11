@@ -57,8 +57,8 @@ export function formatWindow(start: number, end: number) {
   return `${formatClock(start)} – ${formatClock(end)} · ${formatDuration(windowMinutes(start, end))}`;
 }
 
-
-function formatDuration(total: number) {
+/** A length in minutes as hours and minutes, leaving out a part that is zero: "9 hours", "45 minutes", "2 hours 55 minutes". */
+export function formatDuration(total: number) {
   const hours = Math.floor(total / 60);
   const minutes = total % 60;
   if (!minutes) return plural(hours, "hour");

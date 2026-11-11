@@ -15,6 +15,11 @@
 /** The material_category enum: a material's type on Materials on hand. */
 export const MATERIAL_CATEGORIES = ["malt", "hop", "yeast", "adjunct", "chemical", "packaging", "other"] as const;
 
+/** The word one purchase unit of a material is sold by (the materials.pack_name check): a recipe line of whole packs
+ *  reads "23 bags". A material without one reads its pack as a size, "× 55 lb". */
+export const PACK_NAMES = ["bag", "sack", "box", "bottle", "pitch", "pail", "drum", "tote"] as const;
+export type PackName = (typeof PACK_NAMES)[number];
+
 /** Every staff role, in the database enum's display order. */
 export const STAFF_ROLES = ["admin", "sales", "warehouse", "brewer", "taproom"] as const;
 

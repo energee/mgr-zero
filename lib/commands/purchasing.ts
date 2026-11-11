@@ -7,7 +7,7 @@ import { MATERIAL_QTY_MAX, PG_INT_MAX } from "@/lib/mgr/quantity-input";
 import { z } from "zod";
 import { email } from "@/lib/mgr/email";
 import { isoDate, completeRows, defineCommand, defineQuery, cents, PAGE_SIZE, phone, unwrap, CommandError } from "./registry";
-import { MATERIAL_CATEGORIES, PAYMENT_TERMS } from "@/lib/mgr/enums";
+import { MATERIAL_CATEGORIES, PACK_NAMES, PAYMENT_TERMS } from "@/lib/mgr/enums";
 import { OPEN_PO_STATUSES } from "@/lib/mgr/receive-po-view";
 import { escapeRegex } from "@/lib/escape-regex";
 import { qboUnmappedFilter, unmappedInput } from "./qbo";
@@ -42,7 +42,7 @@ defineCommand({
 
 defineCommand({
   name: "upsert_material",
-  description: "Create or edit a material definition: kind, base and purchase units with the factor between them, lot tracking, default vendor, extract potential, alpha acid. Units are refused once movements, recipe ingredients, format BOM lines, PO lines, contracts or transfer lines use the material",
+  description: "Create or edit a material definition: kind, base and purchase units with the factor between them, the word one purchase unit is sold by, lot tracking, default vendor, extract potential, alpha acid. Units are refused once movements, recipe ingredients, format BOM lines, PO lines, contracts or transfer lines use the material",
   compensation: "Reverse an edit with upsert_material and the previous values; a new material cannot be deleted, only set inactive.",
   input: z.object({
     id: z.string().uuid().optional().describe("The material to edit; omit to create one"),
@@ -66,13 +66,16 @@ defineCommand({
     // Percent, as printed on the hop bag; recipe IBU reads it (lib/recipe-ibu.ts).
     // Omitted on an edit keeps the alpha acid the material had.
     alphaAcid: z.number().gt(0).max(30).optional(),
+    // Omitted on an edit keeps the word the material had, so an edit cannot clear one.
+    packName: z.enum(PACK_NAMES).optional().describe("The word one purchase unit is sold by, so a recipe line of whole packs reads in them (23 bags)"),
   }),
   roles: [...PURCHASING],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_material", {
     p_brewery: ctx.breweryId, p_material: i.id ?? null, p_name: i.name, p_category: i.category, p_base_uom: i.baseUom,
     p_purchase_uom: i.purchaseUom, p_purchase_uom_factor: i.purchaseUomFactor ?? null, p_lot_tracked: i.lotTracked ?? null,
     p_default_vendor: i.defaultVendorId ?? null, p_reorder_point: i.reorderPoint ?? null, p_active: i.active ?? null,
-    p_extract_potential: i.extractPotential ?? null, p_alpha_acid: i.alphaAcid ?? null, p_request_id: execution.requestId,
+    p_extract_potential: i.extractPotential ?? null, p_alpha_acid: i.alphaAcid ?? null, p_pack_name: i.packName ?? null,
+    p_request_id: execution.requestId,
   })),
 });
 
@@ -172,11 +175,11 @@ defineQuery({
 
 // Serves the Materials list, the recipe ingredient picker (extract_potential:
 // a null one contributes no gravity; alpha_acid: a null one leaves a gap in the
-// IBU preview), PO/count line pickers and the vendor
+// IBU preview; pack_name: a null one reads the pack as its size), PO/count line pickers and the vendor
 // page's default materials (#1586). Inactive materials are hidden unless asked
 // for: history keeps them, pickers do not.
 defineQuery({
-  name: "list_materials", description: "Materials, alphabetical, with kind, units, lot tracking, default vendor, extract potential and alpha acid; optionally only one kind, one default vendor, or those whose name contains q",
+  name: "list_materials", description: "Materials, alphabetical, with kind, units, the word one purchase unit is sold by, lot tracking, default vendor, extract potential and alpha acid; optionally only one kind, one default vendor, or those whose name contains q",
   input: z.object({
     includeInactive: z.boolean().optional(),
     q: z.string().trim().max(100).optional().describe("Only materials whose name contains this text"),
@@ -185,7 +188,7 @@ defineQuery({
   }), roles: [...PURCHASING],
   handler: (ctx, i) => {
     let q = ctx.db.from("materials")
-      .select("id, name, category, base_uom, purchase_uom, purchase_uom_factor, lot_tracked, default_vendor_id, reorder_point, extract_potential, alpha_acid, active")
+      .select("id, name, category, base_uom, purchase_uom, purchase_uom_factor, lot_tracked, default_vendor_id, reorder_point, extract_potential, alpha_acid, pack_name, active")
       .eq("brewery_id", ctx.breweryId).order("name");
     if (!i.includeInactive) q = q.eq("active", true);
     if (i.q) q = q.regexIMatch("name", escapeRegex(i.q));

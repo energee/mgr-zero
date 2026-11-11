@@ -117,6 +117,9 @@ export type FieldControls = Pick<React.InputHTMLAttributes<HTMLInputElement>, "i
   onChange?: (value: string) => void;
   /** Inline row controls already have visible context. */
   hideLabel?: boolean;
+  /** A number field in a dense sheet (Recipe numbers): the input alone under a small label, without the
+   *  −/+ buttons. The arrow keys still step it. Only E.edit's number type reads it. */
+  compact?: boolean;
   contextualLabels?: boolean;
   /** What is wrong with the value, shown under the field (#1121). The field is
    *  marked invalid; pass `id` too, so the message (`${id}-error`) is linked.
@@ -350,7 +353,7 @@ export const E = {
   edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[], controls?: FieldControls) => {
     // `error` is drawn under the field (fieldError), never passed to the input.
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { onChange, hideLabel, contextualLabels, error: _error, ...rest } = controls ?? {};
+    const { onChange, hideLabel, contextualLabels, compact, error: _error, ...rest } = controls ?? {};
     const error = fieldError(controls);
     const attributes = { ...rest, "aria-invalid": error.invalid, "aria-describedby": error.describedBy };
     if (type === "date") return <><DatePicker label={label} defaultValue={value} value={onChange ? value : undefined} onChange={onChange} disabled={controls?.disabled} required={controls?.required} name={controls?.name} max={controls?.max === undefined ? undefined : String(controls.max)} invalid={error.invalid} aria-describedby={error.describedBy} />{error.message}</>;
@@ -359,8 +362,8 @@ export const E = {
     if (type === "number") {
       return (
         <Field data-disabled={attributes.disabled} data-invalid={attributes["aria-invalid"]}>
-          {!hideLabel && <FieldLabel htmlFor={attributes.id}>{label}</FieldLabel>}
-          {E.stq(Number(value) || 0, label, { ...attributes, value, onChange, contextualLabels, step: controls?.step ?? "any", required: controls?.required ?? false })}
+          {!hideLabel && <FieldLabel htmlFor={attributes.id} className={compact ? "font-normal text-muted-foreground text-xs" : undefined}>{label}</FieldLabel>}
+          {E.stq(Number(value) || 0, label, { ...attributes, value, onChange, contextualLabels, compact, step: controls?.step ?? "any", required: controls?.required ?? false })}
           {error.message}
         </Field>
       );
@@ -407,18 +410,26 @@ export const E = {
   ),
   /** A picked value: a Select for short fixed lists; long lists (SKU, customer) keep opening Entity picker.
    *  The trigger shows the matching option's label (so server markup names the choice) unless `displayValue` overrides it.
-   *  `empty` is shown when nothing but a "" placeholder is offered. */
-  pick: (label: string, value: string, options: (string | { value: string; label: string; disabled?: boolean })[], controls?: FieldControls & { forward?: boolean; displayValue?: ReactNode; description?: ReactNode; empty?: PickEmpty }) => {
+   *  `empty` is shown when nothing but a "" placeholder is offered.
+   *  `inline` draws the pick inside a sentence (Recipe's brand): the trigger alone, as link text at the sentence's
+   *  size under any pointer, with no arrow, named by `label` for a screen reader. With nothing picked, its "" option's
+   *  words ("No brand yet") keep the link colour and stay underlined, so they read as something to pick and not as
+   *  muted text. It draws no label, description, note or error. */
+  pick: (label: string, value: string, options: (string | { value: string; label: string; disabled?: boolean })[], controls?: FieldControls & { forward?: boolean; displayValue?: ReactNode; description?: ReactNode; empty?: PickEmpty; inline?: boolean }) => {
     const empty = controls?.empty && !options.some((o) => (typeof o === "string" ? o : o.value) !== "") ? controls.empty : undefined;
     const emptyId = empty && controls?.id ? `${controls.id}-empty` : undefined;
     const error = fieldError(controls);
+    const select = (
+      <Select {...(controls?.onChange ? { value, onValueChange: (next) => controls.onChange?.(next === "__empty_field__" ? "" : next) } : { defaultValue: value })} disabled={controls?.disabled} required={controls?.required} name={controls?.name} form={controls?.form}>
+        <SelectTrigger id={controls?.id} aria-label={controls?.["aria-label"] ?? label} aria-describedby={describedBy(error.describedBy, emptyId)} aria-invalid={error.invalid} className={cn(controls?.forward && "[&_svg:last-child]:hidden", controls?.inline && "inline h-auto! min-h-0! rounded-sm border-0 p-0 align-baseline text-[length:inherit] text-primary whitespace-normal underline-offset-4 hover:underline data-placeholder:text-primary data-placeholder:underline dark:bg-transparent dark:hover:bg-transparent [&_svg]:hidden *:data-[slot=select-value]:inline")}><SelectValue placeholder={options.find((o): o is { value: string; label: string } => typeof o !== "string" && o.value === "")?.label ?? controls?.placeholder}>{controls?.displayValue ?? options.map((o) => typeof o === "string" ? { value: o, label: o } : o).find((o) => o.value === value)?.label}</SelectValue>{controls?.forward ? <DirectionIcon label="Open" /> : null}</SelectTrigger>
+        <SelectContent><SelectGroup>{options.map((o) => typeof o === "string" ? <SelectItem key={o} value={o || "__empty_field__"}>{o}</SelectItem> : <SelectItem key={o.value} value={o.value || "__empty_field__"} disabled={o.disabled}>{o.label}</SelectItem>)}</SelectGroup></SelectContent>
+      </Select>
+    );
+    if (controls?.inline) return select;
     return (
     <Field data-disabled={controls?.disabled} data-invalid={error.invalid} data-required={controls?.required}>
       {!controls?.hideLabel && <FieldLabel htmlFor={controls?.id}>{label}</FieldLabel>}
-      <Select {...(controls?.onChange ? { value, onValueChange: (next) => controls.onChange?.(next === "__empty_field__" ? "" : next) } : { defaultValue: value })} disabled={controls?.disabled} required={controls?.required} name={controls?.name} form={controls?.form}>
-        <SelectTrigger id={controls?.id} aria-label={controls?.["aria-label"] ?? label} aria-describedby={describedBy(error.describedBy, emptyId)} aria-invalid={error.invalid} className={controls?.forward ? "[&_svg:last-child]:hidden" : undefined}><SelectValue placeholder={options.find((o): o is { value: string; label: string } => typeof o !== "string" && o.value === "")?.label ?? controls?.placeholder}>{controls?.displayValue ?? options.map((o) => typeof o === "string" ? { value: o, label: o } : o).find((o) => o.value === value)?.label}</SelectValue>{controls?.forward ? <DirectionIcon label="Open" /> : null}</SelectTrigger>
-        <SelectContent><SelectGroup>{options.map((o) => typeof o === "string" ? <SelectItem key={o} value={o || "__empty_field__"}>{o}</SelectItem> : <SelectItem key={o.value} value={o.value || "__empty_field__"} disabled={o.disabled}>{o.label}</SelectItem>)}</SelectGroup></SelectContent>
-      </Select>
+      {select}
       {controls?.description}
       {empty && emptyNote(empty, emptyId)}
       {error.message}

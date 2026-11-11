@@ -76,7 +76,7 @@ describe("remaining named disabled-action reasons (#1122)", () => {
   it("keeps Create recipe's existing adjacent blocker reactive", () => {
     const render = (blockedReason?: string) => renderToStaticMarkup(createElement(RecipeView, {
       model: { title: "New recipe", notes: "" },
-      controls: { set: () => {}, onSubmit: () => {}, submitLabel: "Create recipe", blockedReason },
+      controls: { setNote: () => {}, onSubmit: () => {}, dirty: true, submitLabel: "Create recipe", blockedReason },
     }));
     expect(render("Add a mash step.")).toContain("Add a mash step.");
     expect(render("Add a mash step.").match(/<button[^>]*>Create recipe<\/button>/)?.[0]).toContain('disabled=""');

@@ -559,15 +559,15 @@ describe("Recipes view", () => {
     expect(body.props.model).toEqual(toRecipesViewProps(recipesList));
   });
 
-  it("maps live list_recipes onto Recipe, Version and Brand columns, without inventing a style", () => {
+  it("maps live list_recipes onto Recipe and Brand columns, without inventing a style or naming a version", () => {
     const model = toRecipesViewProps({
       recipes: [
         { id: "r1", name: "Hazy IPA", brand: null, latest_version: 1 },
         { id: "r2", name: "Stout", brand: "Stout", latest_version: null },
       ],
     });
-    expect(model.rows[0]).toEqual({ key: "r1", name: "Hazy IPA", version: 1, brand: null, href: "/recipes/r1" });
-    expect(model.rows[1]).toEqual({ key: "r2", name: "Stout", version: null, brand: "Stout", href: "/recipes/r2" });
+    expect(model.rows[0]).toEqual({ key: "r1", name: "Hazy IPA", written: true, brand: null, href: "/recipes/r1" });
+    expect(model.rows[1]).toEqual({ key: "r2", name: "Stout", written: false, brand: "Stout", href: "/recipes/r2" });
     const html = htmlOf(createElement(RecipesView, { model, linkRows: true }));
     expect(html).toContain('href="/recipes/r1"');
     expect(html).toContain('href="/recipes/r2"');
@@ -575,17 +575,19 @@ describe("Recipes view", () => {
   });
 
   // #1516 item 8: the shared RecordTable, one line per recipe on the desk.
-  it("draws the recipes through RecordTable, a missing version in the warning style", () => {
+  it("draws the recipes through RecordTable, a recipe not written yet in the warning style", () => {
     const html = htmlOf(createElement(RecipesView, { model: toRecipesViewProps(recipesList) }));
     expect(html).toContain("<table");
-    for (const header of ["Recipe", "Version", "Brand"]) expect(html).toMatch(new RegExp(`<th[^>]*>[\\s\\S]*?${header}[\\s\\S]*?</th>`));
-    expect(html).toContain(">v4<");
-    expect(html).toMatch(/class="text-warning-foreground"[^>]*>No version yet</);
+    for (const header of ["Recipe", "Brand"]) expect(html).toMatch(new RegExp(`<th[^>]*>[\\s\\S]*?${header}[\\s\\S]*?</th>`));
+    // The list names no version: a written recipe says nothing more, and one with no saved sheet says so under its name.
+    expect(html).not.toMatch(/version|>v\d+</i);
+    expect(html).toMatch(/class="text-warning-foreground"[^>]*>Not written yet</);
+    expect(html.match(/Not written yet/g)).toHaveLength(2); // the table row and the phone card, for the one unwritten recipe
     expect(html).toContain("No brand yet");
     expect(html).toMatch(/data-to="Recipe"[^>]*>Farmhouse saison</);
   });
 
-  it("links Water profiles, the catalog a version picks its water from (#1140, #1205)", () => {
+  it("links Water profiles, the catalog a recipe picks its water from (#1140, #1205)", () => {
     const live = htmlOf(createElement(RecipesView, { model: toRecipesViewProps({ recipes: [], waterProfilesHref: "/catalog/water-profiles" }) }));
     expect(live).toMatch(/<a[^>]*href="\/catalog\/water-profiles"[^>]*>[^]*?Water profiles/);
     expect(live).toContain("Manage water profiles");
@@ -593,35 +595,66 @@ describe("Recipes view", () => {
     // The inventory frame leaves the row for the explorer, which walks it to the Water profiles record.
     expect(htmlOf(screen("Recipes").body)).toContain("Water profiles");
     expect(resolveTap(screen("Recipes"), "Water profiles")).toBe("Water profiles");
-    // The renamed create row still opens the Ingredient record, not the global inert list.
-    expect(resolveTap(screen("Recipe"), "Add ingredient")).toBe("Ingredient");
+    // Each column's add action opens the Ingredient record.
+    for (const where of ["brew day", "the cellar"]) expect(resolveTap(screen("Recipe"), `Add ingredient to ${where}`)).toBe("Ingredient");
   });
 
-  it("draws the inventory list through the live adapter, a recipe with no version included", () => {
+  it("draws the inventory list through the live adapter, a recipe not written yet included", () => {
     const { rows } = toRecipesViewProps(recipesList);
     expect(rows.map((r) => r.brand)).toEqual(["Hazy IPA", "Pils", null]);
-    expect(rows[2]).toMatchObject({ name: "Farmhouse saison", version: null });
+    expect(rows[2]).toMatchObject({ name: "Farmhouse saison", written: false });
     expect(htmlOf(screen("Recipes").body)).not.toMatch(/15 bbl · updated/);
   });
 
 
-  it("draws Batch actuals as a heading, the tape, then the summary", () => {
-    const html = htmlOf(createElement(RecipeView, { readOnly: true, model: { title: "Pale v3", tape: [["B-0413 · v4 · Oct 3, 2026", "no gravity readings yet"]], actualsNote: "2 batches: efficiency 68–71% against 72% assumed." } }));
-    expect(html).toMatch(/<h2[^>]*>Batch actuals · predicted in brackets<\/h2><ol[^]*no gravity readings yet[^]*<\/ol>[^]*2 batches: efficiency/);
+  it("folds Batch actuals to its summary line under the heading, over the table", () => {
+    const actuals = { columns: ["OG °P", "FG °P", "ABV", "Attenuation", "Efficiency"], predicted: ["15.2", "3.5", "6.3%", "78%", "72%"], batches: 1, rows: [{ key: "b1", batch: "B-0413", brewed: "Oct 3, 2026", notes: ["no gravity readings yet"], cells: ["", "", "", "", ""].map((measured) => ({ measured, predicted: "" })) }] };
+    const html = htmlOf(createElement(RecipeView, { readOnly: true, model: { title: "Pale", actuals, actualsNote: "2 batches: efficiency 68–71% against 72% assumed." } }));
+    // The heading comes before the fold: many screen readers drop a heading inside <summary>.
+    expect(html).toMatch(/<h2[^>]*>Batch actuals<\/h2><details[^>]*><summary[^>]*>(?:(?!<h2)[^])*2 batches: efficiency(?:(?!<h2)[^])*Show batches(?:(?!<h2)[^])*<\/summary>[^]*<table[^]*Predicted[^]*15\.2[^]*B-0413[^]*Oct 3, 2026[^]*no gravity readings yet[^]*<\/table>[^]*<\/details>/);
+    // Without a summary yet, the line counts this recipe's batches.
+    expect(htmlOf(createElement(RecipeView, { readOnly: true, model: { title: "Pale", actuals } }))).toContain("1 batch brewed.");
+    // Only other recipes brewed this grain bill: the table lists their batches, so the line does not say "0 batches brewed."
+    const notHere = htmlOf(createElement(RecipeView, { readOnly: true, model: { title: "Pale", actuals: { ...actuals, batches: 0 } } }));
+    expect(notHere).toContain("Not brewed yet. Other recipes have brewed this grain bill.");
+    expect(notHere).not.toContain("0 batches brewed");
+    // The long column heads keep their word for a screen reader where a phone shows three letters.
+    expect(html).toMatch(/<span aria-hidden="true"[^>]*>Att\.<\/span><span class="sr-only[^"]*">Attenuation<\/span>/);
+  });
+
+  it("draws a row's tank or recipe quietly in its batch cell, and the footnote as the table's last row", () => {
+    const cells = ["15.1", "", "", "", "71%"].map((measured) => ({ measured, predicted: "" }));
+    const actuals = {
+      columns: ["OG °P", "FG °P", "ABV", "Attenuation", "Efficiency"], predicted: ["15.2", "3.5", "6.3%", "78%", "72%"], batches: 1,
+      rows: [{ key: "b1 FV3", batch: "B-0398", brewed: "Sep 12, 2026", tag: "in FV3", notes: [], cells }, { key: "b2", batch: "B-0391", brewed: "Sep 2, 2026", tag: "as West Coast IPA", notes: [], cells }],
+      footnote: "A batch brewed as another recipe counts toward the mash figures only, so its fermentation figures are left out.",
+    };
+    const html = htmlOf(createElement(RecipeView, { readOnly: true, model: { title: "Pale", actuals } }));
+    expect(html).toMatch(/<td[^>]*><span class="font-medium">B-0398<\/span> <span[^>]*text-muted-foreground[^>]*>Sep 12, 2026<\/span> <span[^>]*text-muted-foreground[^>]*>in FV3<\/span><\/td>/);
+    expect(html).toMatch(/<span[^>]*text-muted-foreground[^>]*>as West Coast IPA<\/span><\/td>/);
+    expect(html).toMatch(/<tr[^>]*><td[^>]*colSpan="6"[^>]*>A batch brewed as another recipe counts toward the mash figures only, so its fermentation figures are left out\.<\/td><\/tr><\/tbody>/);
+    // The folded line counts the batch once, not its tank rows or another recipe's batch.
+    expect(html).toContain("1 batch brewed.");
+    // A table with no such batch has no footnote row.
+    expect(htmlOf(createElement(RecipeView, { readOnly: true, model: { title: "Pale", actuals: { ...actuals, footnote: undefined } } }))).not.toContain("colSpan");
   });
 
   it("the fixture's Batch actuals are computed, and its prediction agrees with their brackets", () => {
-    expect(recipeHazyV4.tape?.[0]).toEqual(["B-0413 · v4 · Oct 3, 2026", "OG 14.8 °P (15.2) · FG 3.5 °P (3.5) · ABV 6.1% (6.3%) · attenuation 77% (78%) · efficiency 68% (72%)"]);
-    expect(recipeHazyV4.predicted).toBe("Predicted: OG 15.2 °P · FG 3.5 °P · ABV 6.3%");
+    expect(recipeHazyV4.actuals?.predicted).toEqual(["15.2", "3.5", "6.3%", "78%", "72%"]);
+    expect(recipeHazyV4.actuals?.rows[0]).toMatchObject({ batch: "B-0413", brewed: "Oct 3, 2026", notes: [] });
+    expect(recipeHazyV4.actuals?.rows[0].cells.map((c) => c.measured)).toEqual(["14.8", "3.5", "6.1%", "77%", "68%"]);
+    expect(recipeHazyV4.figures?.slice(0, 3)).toEqual([["15.2 °P", "OG"], ["3.5 °P", "FG"], ["6.3%", "ABV"]]);
   });
 
-  it("the fixture's IBU is computed from its boil hop, and its dry hop adds nothing", () => {
-    expect(recipeHazyV4.bitterness).toBe("IBU 15");
+  it("the fixture's IBU is computed from its boil and whirlpool hops, and its dry hops add nothing", () => {
+    expect(recipeHazyV4.figures?.at(-1)).toEqual(["74", "IBU"]);
+    expect(recipeHazyV4.figureNotes).toEqual(["Whirlpool hops count at 5%."]);
   });
 
   it("the live Recipe page reads the outcomes and hands them to the page model", () => {
     const page = src("app/(app)/recipes/[id]/page.tsx");
-    expect(page).toMatch(/runCommand\("get_recipe_outcomes", \{ recipeId: id \}, ctx\)/);
+    // Asked for the copy being shown: its grain bill decides which other recipes' batches come back.
+    expect(page).toMatch(/runCommand\("get_recipe_outcomes", \{ recipeId: id, version: snapshot\.version\?\.version \}, ctx\)/);
     expect(page).toMatch(/toRecipePageModel\(snapshot, \{[^}]*outcomes/);
   });
 
@@ -638,19 +671,32 @@ describe("Recipes view", () => {
     expect(body.props.model).toEqual(recipeHazyV4);
   });
 
-  it("renders recipe numbers in one compact responsive grid without React key warnings", () => {
+  it("reads the recipe's numbers as text on the page and draws their fields in the Recipe numbers sheet, without React key warnings", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const html = htmlOf(createElement(RecipeView, { model: recipeHazyV4 }));
+    const sheet = htmlOf(screen("Recipe numbers").body);
     const errors = error.mock.calls.flat().join(" ");
     error.mockRestore();
 
     expect(errors).not.toContain('unique "key" prop');
-    expect(html.match(/grid-cols-2 md:grid-cols-4/g)).toHaveLength(1);
+    // The page holds no field of its own: the change note waits in the save bar for an unsaved change.
+    expect(html.match(/<input\b[^>]*>/g)).toBeNull();
+    expect(html).not.toContain("Change note");
+    // The sheet holds all nine, the batch size first; no field is drawn label-beside-control.
+    expect([...sheet.matchAll(/<label[^>]*>([^<]*)<\/label>/g)].map((m) => m[1])).toEqual([
+      "Batch size bbl", "Brewhouse efficiency %", "Yeast attenuation %", "Pre-boil volume bbl", "Boil time min", "Whirlpool min", "Whirlpool rest min", "Whirlpool temp °F", "Knockout temp °F",
+    ]);
+    expect(sheet).not.toMatch(/data-orientation="horizontal"/);
+    // Each is the compact field: its own input under a small label, without the stepper's buttons.
+    expect(sheet).toMatch(/<label[^>]*text-xs[^>]*>Whirlpool min<\/label>/);
+    expect(sheet).toMatch(/<input[^>]*aria-label="Batch size bbl"[^>]*value="22"/);
+    expect(sheet).not.toMatch(/aria-label="(Decrease|Increase)"/);
   });
 
-  it("the live recipe page mounts RecipeView; its next version is RecipeEditor on ./new", () => {
-    expect(src("app/(app)/recipes/[id]/page.tsx")).toMatch(/<RecipeView\b/);
-    expect(src("app/(app)/recipes/[id]/new/page.tsx")).toMatch(/<RecipeEditor\b/);
+  it("the live recipe page mounts RecipeEditor on the current copy and RecipeView, read only, on an earlier one", () => {
+    const page = src("app/(app)/recipes/[id]/page.tsx");
+    expect(page).toMatch(/<RecipeEditor\b/);
+    expect(page).toMatch(/<RecipeView readOnly\b/);
   });
 });
 

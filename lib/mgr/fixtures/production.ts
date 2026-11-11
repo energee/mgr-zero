@@ -4,16 +4,15 @@ import type { BatchesSnapshot } from "@/lib/mgr/batches-view";
 import type { BrewDayViewModel } from "@/lib/mgr/brew-day-view";
 import { cellarPlanRows, startAtPlan, waterAdditionRows, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import type { ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
-import { outcomeSummary, outcomeTape, type RecipeOutcome, type RecipeViewModel } from "@/lib/mgr/recipe-view";
+import { figureStrip, gristShares, ingredientCells, ingredientPack, outcomeSummary, outcomeTable, recipeHistory, waterFacts, type RecipeOutcome, type RecipeViewModel } from "@/lib/mgr/recipe-view";
 import type { RecipesSnapshot } from "@/lib/mgr/recipes-view";
 import type { RunClosedViewModel } from "@/lib/mgr/run-closed-view";
 import { DEMO_TIME_ZONE } from "@/lib/mgr/fixtures/settings";
 import type { ScheduleBatchViewModel } from "@/lib/mgr/schedule-batch-view";
 import type { VesselDetailViewModel } from "@/lib/mgr/vessel-detail-view";
 import type { CellarMapViewModel } from "@/lib/mgr/cellar-map-view";
-import { ibuText, recipeIbu } from "@/lib/recipe-ibu";
-import { fermentationSummary, ingredientDetail, mashRowSummary, waterRowSummary, type FermentationStage, type MashStep, type WaterDraft } from "@/lib/mgr/recipe-process-view";
-import { plural } from "@/lib/mgr/plural";
+import { recipeIbu } from "@/lib/recipe-ibu";
+import type { FermentationStage, IngredientStage, MashStep, RecipeMaterial, WaterDraft } from "@/lib/mgr/recipe-process-view";
 import { waterProfiles } from "./catalog";
 
 export const cellarMapBrewer: CellarMapViewModel = {
@@ -63,8 +62,8 @@ export const batchesEmpty: BatchesSnapshot = {
 
 export const scheduleBatchHazy: ScheduleBatchViewModel = {
   recipeId: "hazy-v4",
-  recipe: "Hazy IPA v4",
-  recipeOptions: [{ id: "hazy-v4", label: "Hazy IPA v4" }, { id: "pils-v3", label: "Pils v3" }, { id: "stout-v2", label: "Stout v2" }],
+  recipe: "Hazy IPA",
+  recipeOptions: [{ id: "hazy-v4", label: "Hazy IPA" }, { id: "pils-v3", label: "Pils" }, { id: "stout-v2", label: "Stout" }],
   brandId: "hazy",
   brand: "Hazy IPA",
   brandOptions: [{ id: "hazy", label: "Hazy IPA" }, { id: "pils", label: "Pils" }, { id: "stout", label: "Stout" }],
@@ -235,10 +234,10 @@ export const runClosedHazy: RunClosedViewModel = {
   timeZone: DEMO_TIME_ZONE,
 };
 
-/** Brands the Create recipe sheet offers; a recipe is brewed toward one, optionally. */
-export const recipeBrandOptions = [{ id: "hazy", name: "Hazy IPA" }, { id: "pils", name: "Pils" }, { id: "stout", name: "Stout" }];
+/** The brands a recipe can be brewed toward: what the Brand pick in Recipe's sentence offers. */
+const recipeBrandOptions = [{ id: "hazy", name: "Hazy IPA" }, { id: "pils", name: "Pils" }, { id: "stout", name: "Stout" }];
 
-/** list_recipes rows, drawn by the live adapter: two with a current version, one saved without one. */
+/** list_recipes rows, drawn by the live adapter: two written recipes, and one saved by name with no sheet yet. */
 export const recipesList: RecipesSnapshot = {
   recipes: [
     { id: "hazy", name: "Hazy IPA", brand: "Hazy IPA", latest_version: 4 },
@@ -264,41 +263,88 @@ export const FERM_STAGES: FermentationStage[] = [
   { name: "Conditioning", kind: "conditioning", tempF: 34, days: 10 },
 ];
 
-/** The drawn water: Denver source, Hazy target, a suggestion the brewer trimmed by hand so Calcium and Chloride warn; Bicarbonate warns too, since salts only add ions and Denver starts 70 ppm over the target. */
+/** The drawn water for a 22 bbl batch: Denver source, Hazy target, a suggestion the brewer trimmed by hand so Calcium and Chloride warn; Bicarbonate warns too, since salts only add ions and Denver starts 70 ppm over the target. */
 export const WATER_HAZY: WaterDraft = {
-  targetProfileId: "hazy", sourceProfileId: "denver", mashGal: "9.5", spargeGal: "12.0", targetMashPh: "5.35",
-  additions: [{ materialId: "gypsum", qty: 4, unit: "g", stage: "mash" }, { materialId: "cacl", qty: 6, unit: "g", stage: "mash" }, { materialId: "lactic", qty: 3, unit: "mL", stage: "sparge" }],
+  targetProfileId: "hazy", sourceProfileId: "denver", mashGal: "450", spargeGal: "600", targetMashPh: "5.35",
+  additions: [{ materialId: "gypsum", qty: 200, unit: "g", stage: "mash" }, { materialId: "cacl", qty: 300, unit: "g", stage: "mash" }, { materialId: "lactic", qty: 150, unit: "mL", stage: "sparge" }],
 };
 
-/** Two closed batches of v4, as get_recipe_outcomes returns them. The page text is computed from these. */
-const HAZY_V4 = { version: 4, closed: true, predicted: { ogPlato: 15.2, fgPlato: 3.5, abv: 6.3 }, assumedEfficiency: 0.72, assumedAttenuation: 0.78 };
+/** The names of WATER_HAZY's additions, as list_materials would give them to the recipe page. */
+const WATER_HAZY_NAMES: Record<string, string> = { gypsum: "Gypsum", cacl: "Calcium chloride", lactic: "Lactic acid" };
+
+/** Hazy IPA's brewed batches as get_recipe_outcomes returns them, newest first. Two are closed on the current copy (4),
+ *  the second split across two tanks, so it comes once per tank. Two are on the copy before it (3), which assumed more
+ *  efficiency on the same grain bill. Between them sit the batches two other recipes brewed on that grain bill, which
+ *  carry their mash figures only. Batch actuals and As brewed are computed from these. */
+const HAZY_V4 = { version: 4, closed: true, predicted: { ogPlato: 15.2, fgPlato: 3.5, abv: 6.3 }, assumedEfficiency: 0.72, assumedAttenuation: 0.78, sameGrainBill: true };
+const HAZY_V3 = { ...HAZY_V4, version: 3, predicted: { ogPlato: 15.6, fgPlato: 3.6, abv: 6.5 }, assumedEfficiency: 0.74 };
+const B0398 = { ...HAZY_V4, batchId: "b-0398", batchNo: 398, brewedOn: "2026-09-12", ogPlato: 15.1, brewhouseEfficiency: 0.71 };
+/** A batch another recipe brewed on Hazy IPA's grain bill: its own copy's assumptions, its OG and efficiency, no fermentation figures. */
+const brewedAs = (recipeName: string, batchNo: number, brewedOn: string, ogPlato: number, brewhouseEfficiency: number): RecipeOutcome => ({
+  ...HAZY_V4, version: 2, predicted: { ogPlato: 15.4, fgPlato: 2.9, abv: 6.7 }, assumedEfficiency: 0.73, assumedAttenuation: 0.82,
+  batchId: `b-0${batchNo}`, batchNo, brewedOn, recipeName, ogPlato, brewhouseEfficiency, fgPlato: null, abv: null, apparentAttenuation: null,
+});
 const HAZY_OUTCOMES: RecipeOutcome[] = [
   { ...HAZY_V4, batchId: "b-0413", batchNo: 413, brewedOn: "2026-10-03", ogPlato: 14.8, fgPlato: 3.5, abv: 6.1, apparentAttenuation: 0.77, brewhouseEfficiency: 0.68 },
-  { ...HAZY_V4, batchId: "b-0398", batchNo: 398, brewedOn: "2026-09-12", ogPlato: 15.1, fgPlato: 3.4, abv: 6.3, apparentAttenuation: 0.78, brewhouseEfficiency: 0.71 },
+  brewedAs("Session IPA", 407, "2026-09-20", 15.0, 0.7),
+  { ...B0398, vessel: "FV3", fgPlato: 3.4, abv: 6.3, apparentAttenuation: 0.78 },
+  { ...B0398, vessel: "FV5", fgPlato: 3.6, abv: 6.1, apparentAttenuation: 0.77 },
+  brewedAs("West Coast IPA", 391, "2026-09-02", 15.3, 0.74),
+  brewedAs("Session IPA", 388, "2026-08-27", 15.2, 0.72),
+  brewedAs("West Coast IPA", 384, "2026-08-20", 14.7, 0.67),
+  brewedAs("Session IPA", 379, "2026-08-08", 15.0, 0.71),
+  { ...HAZY_V3, batchId: "b-0371", batchNo: 371, brewedOn: "2026-07-18", ogPlato: 15.0, fgPlato: 3.6, abv: 6.1, apparentAttenuation: 0.77, brewhouseEfficiency: 0.7 },
+  brewedAs("West Coast IPA", 364, "2026-07-09", 14.9, 0.69),
+  brewedAs("Session IPA", 360, "2026-07-01", 15.1, 0.7),
+  { ...HAZY_V3, batchId: "b-0356", batchNo: 356, brewedOn: "2026-06-27", ogPlato: 14.9, fgPlato: 3.5, abv: 6.1, apparentAttenuation: 0.77, brewhouseEfficiency: 0.69 },
 ];
 
-/** Hazy IPA v4's hop lines as get_recipe reads them, with the alpha acid frozen on v4. The page text is computed from these. */
-const HAZY_HOP = { name: "Citra", category: "hop", unit: "lb", alphaAcid: 12.5 };
+type HazyMaterial = Pick<RecipeMaterial, "base_uom" | "purchase_uom_factor" | "pack_name"> & { alphaAcid?: number };
+/** A hop sold in 44 lb boxes, and a material with no pack. */
+const boxed = (alphaAcid: number): HazyMaterial => ({ base_uom: "lb", purchase_uom_factor: 44, pack_name: "box", alphaAcid });
+const loose = (base_uom: string, alphaAcid?: number): HazyMaterial => ({ base_uom, purchase_uom_factor: 1, pack_name: null, alphaAcid });
+
+/** Hazy IPA's lines with each material's pack and alpha acid, as get_recipe and list_materials give them. At the
+ *  recipe's 22 bbl the 2-row is 18 bags of 55 lb and the oats 4 packs of 50 lb, sold by no word. Citra and Mosaic come
+ *  in 44 lb boxes: the whirlpool Citra and the dry hop Citra are whole boxes. The 10 minute Citra is part of one box, so
+ *  it reads in pounds and offers no Round. The dry hop Mosaic is a box and a quarter, so it offers Round down and up.
+ *  Magnum and Biofine have no pack, so they read in their unit.
+ *  The yeast is counted in "each" and sold by the pitch. `timing` is minutes, so day 3 is 3 × 1440. */
+const HAZY_LINES: { key: string; title: string; stage: IngredientStage; timing: number | null; perBbl: number; material: HazyMaterial }[] = [
+  { key: "malt", title: "2-row", stage: "mash", timing: null, perBbl: 45, material: { base_uom: "lb", purchase_uom_factor: 55, pack_name: "bag" } },
+  { key: "oats", title: "Flaked oats", stage: "mash", timing: null, perBbl: 9.090909, material: { base_uom: "lb", purchase_uom_factor: 50, pack_name: null } },
+  { key: "bitter", title: "Magnum", stage: "boil", timing: 60, perBbl: 0.1, material: loose("lb", 14) },
+  { key: "boil", title: "Citra", stage: "boil", timing: 10, perBbl: 0.4, material: boxed(12.5) },
+  { key: "wp-citra", title: "Citra", stage: "whirlpool", timing: null, perBbl: 2, material: boxed(12.5) },
+  { key: "yeast", title: "House ale yeast", stage: "fermentation", timing: 0, perBbl: 0.045455, material: { base_uom: "each", purchase_uom_factor: 1, pack_name: "pitch" } },
+  { key: "dh-citra", title: "Citra", stage: "dry_hop", timing: 3 * 1440, perBbl: 4, material: boxed(12.5) },
+  { key: "dh-mosaic", title: "Mosaic", stage: "dry_hop", timing: 3 * 1440, perBbl: 2.5, material: boxed(11.5) },
+  { key: "fining", title: "Biofine", stage: "packaging", timing: null, perBbl: 0.090909, material: loose("L") },
+];
+const HAZY_SHARES = gristShares(HAZY_LINES.map((l) => ({ stage: l.stage, perBbl: l.perBbl, unit: l.material.base_uom })));
+/** The IBU get_recipe would read from the hop lines, with the alpha acid frozen at the save. The page text is computed from it. */
 const HAZY_IBU = recipeIbu({
   ogPlato: HAZY_V4.predicted.ogPlato,
-  lines: [{ ...HAZY_HOP, stage: "boil", perBblQty: 0.4, timingMinutes: 10 }, { ...HAZY_HOP, stage: "dry_hop", perBblQty: 1.2, timingMinutes: null }],
+  lines: HAZY_LINES.flatMap((l) => (l.material.alphaAcid === undefined ? [] : [{ name: l.title, category: "hop", unit: l.material.base_uom, alphaAcid: l.material.alphaAcid, stage: l.stage, perBblQty: l.perBbl, timingMinutes: l.timing }])),
 });
 
+/** Hazy IPA as saved (its fourth copy underneath, which the page never names), with no unsaved change. */
 export const recipeHazyV4: RecipeViewModel = {
-  title: "Hazy IPA v4",
+  title: "Hazy IPA",
+  // The saved date, and that save's change note for the Last change line.
   saved: "Aug 28, 2026",
-  versions: [4, 3, 2, 1].map((number) => ({ number, selected: number === 4, latest: number === 4 })),
+  savedNote: "Whirlpool hard, knock out cold",
   recipeNote: "The flagship. Keep it soft and juicy.",
+  brand: { value: "hazy", options: [{ value: "", label: "No brand yet" }, ...recipeBrandOptions.map((b) => ({ value: b.id, label: b.name }))] },
   priceGroup: "3",
   priceGroupOptions: ["Not decided", "1", "2", "3", "4", "5", "6", "7", "8"],
-  // 2-row comes in 50 lb sacks and Citra in 44 lb boxes; the dry hop is a cellar stage, so it has no pack total.
-  ingredients: [
-    { key: "malt", title: "2-row", detail: ingredientDetail("mash", null, 44, "lb"), qty: "", pack: { perBbl: 44, factor: 50, unit: "lb" } },
-    { key: "boil", title: "Citra", detail: ingredientDetail("boil", 10, 0.4, "lb"), qty: "", pack: { perBbl: 0.4, factor: 44, unit: "lb" } },
-    { key: "dh", title: "Citra", detail: ingredientDetail("dry_hop", null, 1.2, "lb"), qty: "" },
-  ],
-  totalsAtBbl: "22",
-  preBoil: "16.8",
+  // Each line is built as the live page builds it: its cells, its pack and, for a mash line, its share of the grain bill.
+  ingredients: HAZY_LINES.map((l, i) => ({
+    key: l.key, title: l.title, ...ingredientCells(l.stage, l.timing, l.perBbl, l.material.base_uom),
+    pack: ingredientPack(l.perBbl, l.material), share: HAZY_SHARES[i],
+  })),
+  batchBbl: "22",
+  preBoil: "24.5",
   boilMin: "60",
   whirlpoolMin: "20",
   whirlpoolTemp: "180",
@@ -306,15 +352,15 @@ export const recipeHazyV4: RecipeViewModel = {
   knockoutTemp: "65",
   efficiency: "72",
   attenuation: "78",
-  mash: { title: `Mash schedule · ${plural(MASH_STEPS.length, "step")}`, detail: mashRowSummary(MASH_STEPS) },
-  fermentation: { title: `Fermentation schedule · ${plural(FERM_STAGES.length, "stage")}`, detail: fermentationSummary(FERM_STAGES) },
-  // The live draft's Water row: target and addition count (recipe-version-form.tsx); the Water frame names the source.
-  water: { title: "Water", detail: waterRowSummary(waterProfiles.find((p) => p.id === WATER_HAZY.targetProfileId)?.name, WATER_HAZY.additions.length) },
-  notes: "Whirlpool hard, knock out cold.",
-  predicted: "Predicted: OG 15.2 °P · FG 3.5 °P · ABV 6.3%",
-  bitterness: ibuText(HAZY_IBU, { saved: true }),
-  tape: outcomeTape(HAZY_OUTCOMES, "plato"),
-  actualsNote: outcomeSummary(HAZY_OUTCOMES, 4),
+  // The schedules and the water the band, the cellar profile and the rows are drawn from; the Mash schedule, Fermentation schedule and Water frames edit them.
+  mashSchedule: MASH_STEPS,
+  fermentationSchedule: FERM_STAGES,
+  water: waterFacts(WATER_HAZY, waterProfiles, (id) => WATER_HAZY_NAMES[id]),
+  ...(({ figures, notes }) => ({ figures, figureNotes: notes }))(figureStrip({ ...HAZY_V4.predicted, ibu: HAZY_IBU }, "plato", { saved: true })),
+  actuals: outcomeTable(HAZY_OUTCOMES, "plato", HAZY_V4),
+  actualsNote: outcomeSummary(HAZY_OUTCOMES, HAZY_V4),
+  // The inventory's rows open nothing by address; the Recipe record's `to` says where a tap goes.
+  history: recipeHistory(HAZY_OUTCOMES, 4, 4).map((row) => ({ ...row, href: undefined })),
 };
 export const cellarTransferPils = {
   fromId: "fv1-occupancy", toId: "bt1", volume: "3.0", loss: "",

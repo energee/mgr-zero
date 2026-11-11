@@ -1,8 +1,9 @@
 // tests/recipe-ibu.test.ts — the recipe IBU estimate (lib/recipe-ibu.ts): the
-// plan's goldens, every row of its text table, and what never counts.
+// plan's goldens, every row of its text table, what never counts, and the line
+// the recipe page prints under a drawn IBU figure (ibuNote).
 import { describe, expect, it } from "vitest";
 import { sgToPlato } from "@/lib/recipe-gravity";
-import { ibuText, recipeIbu, type IbuLine } from "@/lib/recipe-ibu";
+import { ibuNote, ibuText, recipeIbu, type IbuLine } from "@/lib/recipe-ibu";
 
 const OG = sgToPlato(1.05);
 const boil = (o: Partial<IbuLine> = {}): IbuLine => ({ name: "Citra", category: "hop", stage: "boil", perBblQty: 1, unit: "lb", timingMinutes: 60, alphaAcid: 10, ...o });
@@ -81,8 +82,27 @@ describe("ibuText, the first matching row wins", () => {
 
   it("says how to fix missing alpha acid on a saved version, which a draft does not need", () => {
     const lines = [boil(), boil({ name: "Mosaic", alphaAcid: null })];
-    expect(text(lines, true)).toBe("IBU ≥ 89 · no alpha acid: Mosaic; set alpha acid under Materials, then create the next version");
+    expect(text(lines, true)).toBe("IBU ≥ 89 · no alpha acid: Mosaic; set alpha acid under Materials, then Refresh from Materials on the current recipe");
     expect(text(lines, false)).toBe("IBU ≥ 89 · no alpha acid: Mosaic");
     expect(text([boil({ timingMinutes: null })], true)).toBe("IBU not estimated: no boil time: Citra");
+  });
+});
+
+describe("ibuNote, the line under a drawn IBU figure", () => {
+  const note = (lines: IbuLine[], saved = false) => ibuNote(recipeIbu({ ogPlato: OG, lines }), { saved });
+
+  it("says nothing when the figure says it all", () => {
+    expect(note([boil()])).toBeUndefined();
+  });
+
+  it("says what the figure leaves out, without repeating the number", () => {
+    expect(note([boil(), whirlpool({ name: "Mosaic" })])).toBe("Whirlpool hops count at 5%.");
+    expect(note([boil(), whirlpool({ name: "Mosaic", alphaAcid: null })])).toBe("Not counted in IBU: no alpha acid: Mosaic");
+    expect(note([boil(), boil({ name: "Mosaic", alphaAcid: null })], true)).toBe("Not counted in IBU: no alpha acid: Mosaic; set alpha acid under Materials, then Refresh from Materials on the current recipe");
+  });
+
+  it("keeps ibuText's reason when there is no figure", () => {
+    expect(ibuNote(recipeIbu({ ogPlato: null, lines: [] }), { saved: false })).toBe("IBU not estimated: no predicted OG");
+    expect(note([boil({ alphaAcid: null })])).toBe("IBU not estimated: no alpha acid: Citra");
   });
 });
