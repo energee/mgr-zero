@@ -22,7 +22,10 @@
 // two assumptions, the pre-boil volume, the whirlpool and knock-out
 // temperatures) opens the one Recipe numbers sheet. The boil time and the two
 // whirlpool times are written on the band, which is not tappable; Edit recipe
-// numbers under the band opens the sheet for them. A water fact opens Water; a
+// numbers under the band opens the sheet for them. The line over the brew-day
+// list also says which of the boil time, the whirlpool's time and temperature
+// and the knock-out temperature apply and are not set, each as words that open
+// the same sheet (brewDayFacts). A water fact opens Water; a
 // line's name opens its Ingredient sheet. Link style is for names and values
 // only: every action (Add ingredient, the Edit actions, a Round choice) is a
 // quiet outline button.
@@ -259,8 +262,9 @@ export function RecipeView({
 
   const band = brewDayBand(model.mashSchedule ?? [], model, lines);
   const brewDay = brewDayMoments(lines, model.water, bbl);
-  // The source water is read out on an earlier copy only; the editable page keeps it in its Water sheet.
-  const brewDayLine = brewDayFacts(readOnly ? model.water : model.water && { ...model.water, source: undefined }, model);
+  // The source water is read out on an earlier copy only; the editable page keeps it in its Water sheet. Only the
+  // editable page says which numbers are not set.
+  const brewDayLine = brewDayFacts(readOnly ? model.water : model.water && { ...model.water, source: undefined }, model, lines, !readOnly);
   const grain = lines.filter((row) => row.share !== undefined);
   const stages = model.fermentationSchedule ?? [];
   // An earlier copy has no schedule sheet to open, so it reads its rests and stages out.

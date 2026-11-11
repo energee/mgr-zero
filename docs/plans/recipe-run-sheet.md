@@ -68,6 +68,8 @@ My calls, not yet confirmed by the owner:
 | Which copy is compared | Each batch is matched on the copy it was brewed from. |
 | What pools | OG and efficiency. A batch brewed as another recipe shows no FG, ABV or attenuation here. |
 | Per tank | A batch with more than one tank gets one row per tank, each with its own readings. Efficiency is the batch's. |
+| A boil or whirlpool with no time | It is still drawn on the band when an ingredient goes in there: at the narrowest width, with no minutes. The total names it and does not count it. |
+| A number not set | The editable sheet says so in the line over the brew-day list, as a link to Recipe numbers. It asks for the knock-out temperature, and for the boil time and the whirlpool's time and temperature only when the recipe has that step. |
 
 ## Not in this plan
 

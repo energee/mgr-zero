@@ -6,13 +6,17 @@
 // goes in (brewDayBand), and the cellar's temperature by day with a mark for
 // each dry hop (cellarProfile). A mark names what goes in there. A drawing's x
 // values are percents of its span, and a short step is never drawn too narrow
-// for its labels (spanShares).
+// for its labels (spanShares). The band draws a boil or a whirlpool that has
+// an addition even when the recipe holds no time for it: at the narrowest
+// width, with no minutes.
 // Under them, everything that goes in, in time order, with each moment said
 // once: brew day (brewDayMoments) and the cellar (cellarMoments). Each row
 // reads its amount for the batch, or per bbl while the recipe has no batch
 // size. Also the sentences above the lists: the two assumptions under the
 // figures (assumptions), the brew day's facts (brewDayFacts) and the cellar's
-// length (cellarFacts); and an earlier copy's mash rests and fermentation
+// length (cellarFacts). On the editable sheet the brew day's facts also say
+// which numbers that apply are not set, as words that open Recipe numbers.
+// Last, an earlier copy's mash rests and fermentation
 // stages read out line by line (scheduleReadOut), since it has no sheet to
 // open.
 import { formatDuration, MINUTES_PER_DAY } from "@/lib/time-window";
@@ -40,14 +44,15 @@ export type StepLineModel = {
 };
 
 /** Each stretch's share of the span as a percent, by its length. No stretch is drawn narrower than `floor` percent, so
- *  its labels fit on a phone; the longer ones give up the room. With too many stretches for that, all share equally. */
+ *  its labels fit on a phone; the longer ones give up the room. A stretch with no length is drawn that narrow. With too
+ *  many stretches for that, or when none has a length, all share equally. */
 export function spanShares(lengths: readonly number[], floor: number): number[] {
   const least = Math.min(floor, 100 / lengths.length);
   const held = new Set<number>();
   for (;;) {
     const free = 100 - least * held.size;
     const total = lengths.reduce((sum, length, i) => (held.has(i) ? sum : sum + length), 0);
-    const shares = lengths.map((length, i) => (held.has(i) ? least : free * length / total));
+    const shares = lengths.map((length, i) => (held.has(i) ? least : total > 0 ? free * length / total : free / (lengths.length - held.size)));
     const short = shares.findIndex((share, i) => !held.has(i) && share < least);
     if (short < 0) return shares;
     held.add(short);
@@ -81,23 +86,32 @@ const BAND_FLOOR = 14;
 /** The lowest temperature the band's scale starts from, unless a rest is cooler. The boil sits at 212 on that scale. */
 const BAND_LOW_F = 95, BAND_HIGH_F = 212;
 
-/** The brew day's times and temperatures as the band reads them off the sheet: the rests that last, and each process
- *  number the sheet holds. A number the draft cannot use reads as not set. */
-type BrewDay = { rests: MashStep[]; boilMin?: number; whirlpoolMin: number; restMin: number; whirlpoolTemp?: number; knockout?: number };
-const brewDay = (mash: readonly MashStep[], numbers: Partial<Record<RecipeNumberKey, string>>): BrewDay => ({
-  rests: mash.filter((step) => step.minutes > 0),
-  boilMin: positive(numbers.boilMin), whirlpoolMin: positive(numbers.whirlpoolMin) ?? 0, restMin: positive(numbers.whirlpoolRest) ?? 0,
-  whirlpoolTemp: positive(numbers.whirlpoolTemp), knockout: positive(numbers.knockoutTemp),
-});
+/** The boil and the whirlpool as the sheet holds them, for the band and for the line over the brew-day list. A number
+ *  the draft cannot use reads as not set, and a time not set is 0. The recipe has a `boil` when it holds a boil time or
+ *  an ingredient goes in at the boil. It has a `whirlpool` when it holds one of the whirlpool's three numbers (its
+ *  time, its rest, its temperature) or an ingredient goes in there. */
+type BrewDay = { boil: boolean; boilMin: number; whirlpool: boolean; whirlpoolMin: number; restMin: number; whirlpoolTemp?: number; knockout?: number };
+function brewDay(numbers: Partial<Record<RecipeNumberKey, string>>, lines: readonly Pick<RecipeIngredientView, "stage">[]): BrewDay {
+  const goesIn = (stage: string) => lines.some((line) => line.stage === stage);
+  const boilMin = positive(numbers.boilMin) ?? 0, whirlpoolMin = positive(numbers.whirlpoolMin) ?? 0, restMin = positive(numbers.whirlpoolRest) ?? 0;
+  const whirlpoolTemp = positive(numbers.whirlpoolTemp);
+  return {
+    boil: boilMin > 0 || goesIn("boil"), boilMin,
+    whirlpool: whirlpoolMin + restMin > 0 || whirlpoolTemp !== undefined || goesIn("whirlpool"), whirlpoolMin, restMin, whirlpoolTemp,
+    knockout: positive(numbers.knockoutTemp),
+  };
+}
 
-/** The band in a sentence, for a screen reader: each rest, the boil, the whirlpool and its rest, then the knock-out, and what goes in at each mark. */
-function bandSummary({ rests, boilMin, whirlpoolMin, restMin, whirlpoolTemp, knockout }: BrewDay, marks: StepLineModel["marks"]): string {
+/** The band in a sentence, for a screen reader: each rest, the boil, the whirlpool and its rest, then the knock-out, and
+ *  what goes in at each mark. A boil or a whirlpool with no time is named without one. */
+function bandSummary(rests: readonly MashStep[], { boil, boilMin, whirlpool, whirlpoolMin, restMin, whirlpoolTemp, knockout }: BrewDay, marks: StepLineModel["marks"]): string {
   const held = rests.map((step) => `${degrees(step.tempF)} for ${plural(step.minutes, "minute")}`);
   const at = whirlpoolTemp ? ` at ${degrees(whirlpoolTemp)}` : "";
+  const whirlpoolSaid = whirlpoolMin ? `a ${whirlpoolMin} minute whirlpool${at}${restMin ? ` with a ${restMin} minute rest` : ""}` : restMin ? `a ${restMin} minute whirlpool rest${at}` : `a whirlpool${at}`;
   const said = [
     held.length > 1 ? `mash rests at ${andList(held)}` : held.length ? `a mash rest at ${held[0]}` : "",
-    boilMin ? `a ${boilMin} minute boil` : "",
-    whirlpoolMin ? `a ${whirlpoolMin} minute whirlpool${at}${restMin ? ` with a ${restMin} minute rest` : ""}` : restMin ? `a ${restMin} minute whirlpool rest${at}` : "",
+    boil ? (boilMin ? `a ${boilMin} minute boil` : "a boil") : "",
+    whirlpool ? whirlpoolSaid : "",
   ].filter(Boolean);
   return [
     `The brew day by temperature: ${andList(said)}.`,
@@ -107,22 +121,28 @@ function bandSummary({ rests, boilMin, whirlpoolMin, restMin, whirlpoolTemp, kno
 }
 
 /** The brew day as one temperature line, mash-in to knock-out: each mash rest at its temperature with its minutes,
- *  then the boil and the whirlpool with its rest, when the recipe holds them. The boil draws at a fixed height with no
- *  temperature, because the boiling point depends on altitude; a whirlpool with no temperature draws level with it.
+ *  then the boil and the whirlpool with its rest, when the recipe has them (brewDay). The boil draws at a fixed height
+ *  with no temperature, because the boiling point depends on altitude; a whirlpool with no temperature draws level
+ *  with it. A boil or a whirlpool with no time is drawn at the narrowest width with no minutes, so an addition there
+ *  is always on the band.
  *  A mark shows where each boil and whirlpool addition goes in, and names it. A boil addition's minutes count down to
  *  the end of the boil, and a whirlpool addition's to the end of the whirlpool, before its rest. A whirlpool addition
  *  with no time goes in as the whirlpool starts; a boil addition with no time has no known place, so it has no mark.
- *  Undefined when the recipe holds none of the three. */
+ *  A step with no time has no scale, so everything that goes in during it shares one mark where it starts.
+ *  The band closes with the knock-out temperature and the total time. The total counts the steps that have a time and
+ *  names any that has none ("2 hours plus the whirlpool").
+ *  Undefined when the recipe has no rest, no boil and no whirlpool. */
 export function brewDayBand(mash: readonly MashStep[], numbers: Partial<Record<RecipeNumberKey, string>>, lines: readonly Pick<RecipeIngredientView, "stage" | "timingMinutes" | "title">[]): StepLineModel | undefined {
-  const day = brewDay(mash, numbers);
-  const { rests, boilMin, whirlpoolMin, restMin, whirlpoolTemp, knockout } = day;
+  const day = brewDay(numbers, lines);
+  const { boilMin, whirlpoolMin, restMin, whirlpoolTemp, knockout } = day;
+  const rests = mash.filter((step) => step.minutes > 0);
   const low = Math.min(BAND_LOW_F, ...rests.map((step) => step.tempF));
   const level = (tempF: number | undefined) => (tempF === undefined ? 1 : Math.min(1, Math.max(0, (tempF - low) / (BAND_HIGH_F - low))));
-  const whirlpoolNote = whirlpoolMin && restMin ? `${whirlpoolMin} min, rest ${restMin}` : whirlpoolMin ? `${whirlpoolMin} min` : `rest ${restMin} min`;
+  const whirlpoolNote = whirlpoolMin && restMin ? `${whirlpoolMin} min, rest ${restMin}` : whirlpoolMin ? `${whirlpoolMin} min` : restMin ? `rest ${restMin} min` : undefined;
   const steps = layOut([
     ...rests.map((step) => ({ zone: "Mash", length: step.minutes, level: level(step.tempF), temp: degrees(step.tempF), note: `${step.minutes} min` })),
-    ...(boilMin ? [{ zone: "Boil", length: boilMin, level: 1, temp: undefined, note: `${boilMin} min` }] : []),
-    ...(whirlpoolMin + restMin ? [{ zone: "Whirlpool", length: whirlpoolMin + restMin, level: level(whirlpoolTemp), temp: whirlpoolTemp ? degrees(whirlpoolTemp) : undefined, note: whirlpoolNote }] : []),
+    ...(day.boil ? [{ zone: "Boil", length: boilMin, level: 1, temp: undefined, note: boilMin ? `${boilMin} min` : undefined }] : []),
+    ...(day.whirlpool ? [{ zone: "Whirlpool", length: whirlpoolMin + restMin, level: level(whirlpoolTemp), temp: whirlpoolTemp ? degrees(whirlpoolTemp) : undefined, note: whirlpoolNote }] : []),
   ], BAND_FLOOR);
   if (steps.length === 0) return undefined;
   const zones = ["Mash", "Boil", "Whirlpool"].flatMap((name) => {
@@ -131,15 +151,23 @@ export function brewDayBand(mash: readonly MashStep[], numbers: Partial<Record<R
   });
   const boil = steps.find((step) => step.zone === "Boil"), whirlpool = steps.find((step) => step.zone === "Whirlpool");
   const marks = marksAt(lines.flatMap((line) => {
-    if (line.stage === "boil" && boil && line.timingMinutes !== null) return [{ at: along(boil, 1 - line.timingMinutes / boil.length), name: line.title }];
-    if (line.stage === "whirlpool" && whirlpool) return [{ at: line.timingMinutes === null ? whirlpool.from : along(whirlpool, (whirlpoolMin - line.timingMinutes) / whirlpool.length), name: line.title }];
-    return [];
+    const step = line.stage === "boil" ? boil : line.stage === "whirlpool" ? whirlpool : undefined;
+    // A mash or cellar line has no mark on the band.
+    if (!step) return [];
+    // A step with no time: where it starts.
+    if (!step.length) return [{ at: step.from, name: line.title }];
+    // An addition with no time: as the whirlpool starts, or nowhere in the boil.
+    if (line.timingMinutes === null) return step === whirlpool ? [{ at: step.from, name: line.title }] : [];
+    // Its minutes before the end of the boil, or of the whirlpool before its rest.
+    return [{ at: along(step, step === boil ? 1 - line.timingMinutes / step.length : (whirlpoolMin - line.timingMinutes) / step.length), name: line.title }];
   }));
-  // One step already says its minutes, so it is not totalled again (#1518).
-  const total = steps.length > 1 ? formatDuration(steps.reduce((sum, step) => sum + step.length, 0)) : "";
+  const timed = steps.filter((step) => step.length > 0);
+  const untimed = steps.filter((step) => !step.length).map((step) => `the ${step.zone.toLowerCase()}`);
+  // One step already says its minutes, so it is not totalled again (#1518). A step with no time is named, not counted.
+  const total = timed.length > 1 ? `${formatDuration(timed.reduce((sum, step) => sum + step.length, 0))}${untimed.length ? ` plus ${andList(untimed)}` : ""}` : "";
   const end = [knockout ? `Knock out at ${degrees(knockout)}` : "", total].filter(Boolean).join(", ");
   return {
-    summary: bandSummary(day, marks),
+    summary: bandSummary(rests, day, marks),
     // A temperature is written where it changes.
     steps: steps.map(({ from, to, level, temp, note }, i) => ({ from, to, level, temp: temp && temp !== steps[i - 1]?.temp ? temp : undefined, note })),
     zones, marks,
@@ -269,22 +297,47 @@ export function assumptions(numbers: Partial<Record<"efficiency" | "attenuation"
 /** A piece of a sentence: plain words, or a fact that opens the sheet holding it (the recipe's numbers, or its water). */
 export type Fact = string | { text: string; opens: "numbers" | "water" };
 
+/** Clauses as one sentence's pieces: those with words, joined by commas. Each clause is written as it would start a
+ *  sentence ("Knock out at "), so one after the first starts in lower case, because it now follows a comma. */
+function clauses(...parts: Fact[][]): Fact[] {
+  const lower = (text: string) => text[0].toLowerCase() + text.slice(1);
+  return parts.filter((part) => part.length).flatMap((part, i) => {
+    if (i === 0) return part;
+    const [first, ...rest] = part;
+    return [", ", typeof first === "string" ? lower(first) : { ...first, text: lower(first.text) }, ...rest];
+  });
+}
+
 /** The line over the brew-day list: the target water profile and mash pH, the pre-boil volume, and the whirlpool and
- *  knock-out temperatures, each only when the recipe holds it. Empty when it holds none. A `source` profile is named
- *  beside the target; the page passes one only for an earlier copy, which has no Water sheet to hold it. */
-export function brewDayFacts(water: Pick<RecipeWaterView, "target" | "source" | "mashPh"> | undefined, numbers: Partial<Record<RecipeNumberKey, string>>): Fact[] {
+ *  knock-out temperatures, each only when the recipe holds it. A `source` profile is named beside the target; the page
+ *  passes one only for an earlier copy, which has no Water sheet to hold it.
+ *  On the `editable` sheet a number that applies and is not set says so, as the words that open Recipe numbers to set
+ *  it: the boil time and the whirlpool's time and temperature when the recipe has that step (brewDay), which an
+ *  ingredient at that stage is enough for; and the knock-out temperature, which every recipe has. The two times are
+ *  asked for here because the band, where they read, opens nothing. An earlier copy says nothing about a number it
+ *  does not have. Empty when there is nothing to say. */
+export function brewDayFacts(water: Pick<RecipeWaterView, "target" | "source" | "mashPh"> | undefined, numbers: Partial<Record<RecipeNumberKey, string>>, lines: readonly Pick<RecipeIngredientView, "stage">[], editable: boolean): Fact[] {
   const number = (text: string): Fact => ({ text, opens: "numbers" });
+  const day = brewDay(numbers, lines);
+  const noBoilTime = editable && day.boil && !day.boilMin;
+  const noWhirlpoolTime = editable && day.whirlpool && !(day.whirlpoolMin + day.restMin);
+  const noWhirlpoolTemp = editable && day.whirlpool && !numbers.whirlpoolTemp;
   const sentences: Fact[][] = [];
   const mashPh = water?.mashPh ? `, mash pH ${water.mashPh}` : "";
   if (water?.target) sentences.push([{ text: water.target, opens: "water" }, `${water.source ? ` (source ${water.source})` : ""}${mashPh}`]);
   else if (water?.source) sentences.push([`Source water ${water.source}${mashPh}`]);
   else if (water?.mashPh) sentences.push([`Mash pH ${water.mashPh}`]);
-  if (numbers.preBoil) sentences.push(["Boil from ", number(`${numbers.preBoil} bbl`)]);
-  if (numbers.whirlpoolTemp) sentences.push(["Whirlpool at ", number(degrees(numbers.whirlpoolTemp)), ...(numbers.knockoutTemp ? [", knock out at ", number(degrees(numbers.knockoutTemp))] : [])]);
-  else if (numbers.knockoutTemp) sentences.push(["Knock out at ", number(degrees(numbers.knockoutTemp))]);
+  sentences.push(clauses(numbers.preBoil ? ["Boil from ", number(`${numbers.preBoil} bbl`)] : [], noBoilTime ? [number("Boil time not set")] : []));
+  sentences.push(clauses(
+    numbers.whirlpoolTemp ? ["Whirlpool at ", number(degrees(numbers.whirlpoolTemp))] : [],
+    // One prompt asks for both when neither is set.
+    noWhirlpoolTime ? [number(noWhirlpoolTemp ? "Whirlpool time and temperature not set" : "Whirlpool time not set")] : noWhirlpoolTemp ? [number("Whirlpool temperature not set")] : [],
+    numbers.knockoutTemp ? ["Knock out at ", number(degrees(numbers.knockoutTemp))] : editable ? [number("Knock-out temperature not set")] : [],
+  ));
+  const said = sentences.filter((sentence) => sentence.length);
   const facts: Fact[] = [];
   // Each sentence ends with a full stop and a space before the next; words that meet are one piece.
-  for (const piece of sentences.flatMap((sentence, i) => [...sentence, i < sentences.length - 1 ? ". " : "."])) {
+  for (const piece of said.flatMap((sentence, i) => [...sentence, i < said.length - 1 ? ". " : "."])) {
     const last = facts[facts.length - 1];
     if (typeof piece === "string" && typeof last === "string") facts[facts.length - 1] = last + piece;
     else if (piece !== "") facts.push(piece);

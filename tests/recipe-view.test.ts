@@ -552,6 +552,22 @@ describe("the sheet", () => {
     expect(lists(html)).toEqual([["Mash-in Edit Mash water 450 gal", "Mash-in Edit Gypsum 200 g"], ["Pitch Edit Ale yeast 0.05 lb / bbl", "Day 3 Edit Citra 1.2 lb / bbl", "Packaging Edit Biofine 0.09 lb / bbl"]]);
   });
 
+  it("draws a whirlpool that has additions and no numbers, and asks for the numbers as links on the editable sheet only", () => {
+    const model = { ...blank, mashSchedule: [{ name: "Rest", kind: "infusion", tempF: 154, minutes: 60 }], boilMin: "60", ingredients: [line("c", "Comet", "whirlpool", null, 0.5), line("m", "Mosaic", "whirlpool", null, 0.5)] };
+    const band = (html: string) => [.../<svg role="img"[\s\S]*?<\/svg>/.exec(html)![0].matchAll(/<(?:text|title)[^>]*>([^<]*)</g)].map((m) => m[1]);
+    const html = draw({ model });
+    // The whirlpool has a zone and its mark, no minutes, and a total that does not count it.
+    expect(band(html)).toEqual(["Mash", "Boil", "Whirlpool", "154 °F", "60 min", "60 min", "Comet and Mosaic", "Mash-in", "2 hours plus the whirlpool"]);
+    // Each number not set is a link in the line over the list, which opens Recipe numbers as a set number does.
+    const links = [...html.matchAll(/<button[^>]*data-variant="link"[^>]*>([\s\S]*?)<\/button>/g)].map((m) => text(m[1]));
+    expect(links).toEqual(expect.arrayContaining(["Whirlpool time and temperature not set , edit recipe numbers", "knock-out temperature not set , edit recipe numbers"]));
+    expect(text(html)).toContain("Goes in on brew day Whirlpool time and temperature not set , edit recipe numbers , knock-out temperature not set , edit recipe numbers . Whirlpool Edit Comet");
+    // An earlier copy draws the same band and says nothing about the numbers it does not have.
+    const copy = draw({ readOnly: true, model });
+    expect(band(copy)).toEqual(band(html));
+    expect(copy).not.toMatch(/not set|<button/);
+  });
+
   it("reads a mash line's share of the grain bill beside its amount, and draws the shares as a bar", () => {
     const pils = { ...line("p", "Pilsner malt", "mash", null, 57.5), share: 1265 / 1925 };
     const oats = { ...line("o", "Flaked oats", "mash", null, 30), share: 660 / 1925 };

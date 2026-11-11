@@ -33,6 +33,11 @@ describe("spanShares", () => {
   it("shares the span equally when there are too many stretches for the floor", () => {
     expect(rounded(spanShares([1, 50, 1, 1, 1, 1, 1, 1, 1, 1], 15))).toEqual(Array(10).fill(10));
   });
+  it("holds a stretch with no length at the floor, and shares the span equally when none has a length", () => {
+    expect(spanShares([60, 60, 0], 14)).toEqual([43, 43, 14]);
+    expect(spanShares([0], 14)).toEqual([100]);
+    expect(spanShares([0, 0], 14)).toEqual([50, 50]);
+  });
 });
 
 describe("brewDayBand", () => {
@@ -111,6 +116,49 @@ describe("brewDayBand", () => {
     const steps = brewDayBand(MASH, { boilMin: "60", whirlpoolMin: "20" }, [])!.steps;
     expect(steps.at(-1)).toMatchObject({ level: 1, temp: undefined, note: "20 min" });
     expect(brewDayBand(MASH, { boilMin: "60", whirlpoolRest: "10", whirlpoolTemp: "180" }, [])!.steps.at(-1)!.note).toBe("rest 10 min");
+  });
+
+  it("always shows a whirlpool that has additions: with no time it is drawn at the narrowest width with no minutes, and the total names it", () => {
+    const hops = [line("comet", "whirlpool", null, 0.5), line("mosaic", "whirlpool", null, 0.5), line("late", "whirlpool", 5, 0.5)];
+    const band = brewDayBand([MASH[1]], { boilMin: "60" }, hops)!;
+    expect(band.zones.map((z) => z.name)).toEqual(["Mash", "Boil", "Whirlpool"]);
+    // No minutes are made up: the whirlpool takes the floor, and the mash and the boil share the rest by their minutes.
+    expect(rounded(band.steps.map((s) => s.to - s.from))).toEqual([43, 43, 14]);
+    expect(band.steps.map((s) => [s.temp, s.note])).toEqual([["152 °F", "60 min"], [undefined, "60 min"], [undefined, undefined]]);
+    expect(band.steps[2].level).toBe(1);
+    // A whirlpool with no time has no scale, so everything that goes in there is one mark where it starts.
+    expect(band.marks).toEqual([{ at: band.steps[2].from, title: "comet, mosaic, and late" }]);
+    // The total counts what has a time and names what has none.
+    expect(band.ticks).toEqual([{ at: 0, text: "Mash-in" }, { at: 100, text: "2 hours plus the whirlpool" }]);
+    expect(band.summary).toBe("The brew day by temperature: a mash rest at 152 °F for 60 minutes, a 60 minute boil, and a whirlpool. 1 mark shows where each boil or whirlpool addition goes in: comet, mosaic, and late.");
+    // Its temperature alone shows it too, at that temperature.
+    const warm = brewDayBand([MASH[1]], { boilMin: "60", whirlpoolTemp: "180", knockoutTemp: "65" }, [])!;
+    expect(warm.steps.at(-1)).toMatchObject({ temp: "180 °F", note: undefined });
+    expect(warm.ticks.at(-1)).toEqual({ at: 100, text: "Knock out at 65 °F, 2 hours plus the whirlpool" });
+    expect(warm.summary).toBe("The brew day by temperature: a mash rest at 152 °F for 60 minutes, a 60 minute boil, and a whirlpool at 180 °F. Knock out at 65 °F.");
+    // With no whirlpool addition and none of its numbers, the band ends at the boil.
+    const none = brewDayBand([MASH[1]], { boilMin: "60" }, [line("citra", "boil", 10, 0.4), line("dry", "dry_hop", 3 * 1440, 1.2)])!;
+    expect(none.zones.map((z) => z.name)).toEqual(["Mash", "Boil"]);
+    expect(none.ticks.at(-1)).toEqual({ at: 100, text: "2 hours" });
+  });
+
+  it("shows a boil that has additions and no time the same way", () => {
+    const band = brewDayBand(MASH, { whirlpoolMin: "20" }, [line("magnum", "boil", 60, 0.1), line("moss", "boil", null, 0.01)])!;
+    expect(band.zones.map((z) => z.name)).toEqual(["Mash", "Boil", "Whirlpool"]);
+    const boil = band.steps[3];
+    expect(boil).toMatchObject({ level: 1, temp: undefined, note: undefined });
+    expect(boil.to - boil.from).toBeCloseTo(14, 10);
+    expect(band.marks).toEqual([{ at: boil.from, title: "magnum and moss" }]);
+    expect(band.ticks.at(-1)).toEqual({ at: 100, text: "1 hour 45 minutes plus the boil" });
+    expect(band.summary).toMatch(/and 168 °F for 10 minutes, a boil, and a 20 minute whirlpool\. 1 mark shows/);
+    // Neither has a time: the total is the mash, and names both.
+    expect(brewDayBand(MASH, {}, [line("magnum", "boil", 60, 0.1), line("wp", "whirlpool", null, 0.5)])!.ticks.at(-1)).toEqual({ at: 100, text: "1 hour 25 minutes plus the boil and the whirlpool" });
+    // One step with a time already says its minutes, so nothing is totalled (#1518).
+    expect(brewDayBand([MASH[1]], {}, [line("wp", "whirlpool", null, 0.5)])!.ticks).toEqual([{ at: 0, text: "Mash-in" }]);
+    // Steps with no time and nothing else: they share the band.
+    expect(brewDayBand([], {}, [line("magnum", "boil", 60, 0.1), line("wp", "whirlpool", null, 0.5)])!.steps.map((s) => [s.from, s.to])).toEqual([[0, 50], [50, 100]]);
+    // Nothing on brew day past the mash: no band without a rest.
+    expect(brewDayBand([], {}, [line("dry", "dry_hop", 3 * 1440, 1.2)])).toBeUndefined();
   });
 
   it("reads a number the draft cannot use as not set", () => {
@@ -261,6 +309,9 @@ describe("what goes in on brew day", () => {
 });
 
 describe("the sentences above the lists", () => {
+  /** A line of facts as the words it reads. */
+  const text = (facts: ReturnType<typeof brewDayFacts>) => facts.map((f) => (typeof f === "string" ? f : f.text)).join("");
+
   it("states the two assumptions, and says so when one is not set", () => {
     expect(assumptions({ efficiency: "72", attenuation: "78" })).toEqual(["72% efficiency", "78% attenuation"]);
     expect(assumptions({ efficiency: " ", attenuation: "78" })).toEqual(["no efficiency", "78% attenuation"]);
@@ -269,19 +320,40 @@ describe("the sentences above the lists", () => {
 
   it("gives the brew day's facts in one line, each number opening the sheet that holds it", () => {
     const water = { target: "Hazy target", mashPh: "5.35", additions: [] };
-    expect(brewDayFacts(water, NUMBERS)).toEqual([
+    expect(brewDayFacts(water, NUMBERS, [], false)).toEqual([
       { text: "Hazy target", opens: "water" }, ", mash pH 5.35. Boil from ", { text: "16.8 bbl", opens: "numbers" },
       ". Whirlpool at ", { text: "180 °F", opens: "numbers" }, ", knock out at ", { text: "65 °F", opens: "numbers" }, ".",
     ]);
-    const text = (facts: ReturnType<typeof brewDayFacts>) => facts.map((f) => (typeof f === "string" ? f : f.text)).join("");
-    expect(text(brewDayFacts({ mashPh: "5.3" }, { knockoutTemp: "66" }))).toBe("Mash pH 5.3. Knock out at 66 °F.");
-    expect(text(brewDayFacts({ target: "Burton" }, { whirlpoolTemp: "180" }))).toBe("Burton. Whirlpool at 180 °F.");
-    expect(text(brewDayFacts(undefined, { preBoil: "16.8" }))).toBe("Boil from 16.8 bbl.");
-    expect(brewDayFacts(undefined, {})).toEqual([]);
+    expect(text(brewDayFacts({ mashPh: "5.3" }, { knockoutTemp: "66" }, [], false))).toBe("Mash pH 5.3. Knock out at 66 °F.");
+    expect(text(brewDayFacts({ target: "Burton" }, { whirlpoolTemp: "180" }, [], false))).toBe("Burton. Whirlpool at 180 °F.");
+    expect(text(brewDayFacts(undefined, { preBoil: "16.8" }, [], false))).toBe("Boil from 16.8 bbl.");
+    expect(brewDayFacts(undefined, {}, [], false)).toEqual([]);
     // An earlier copy has no Water sheet to open, so its line names the source profile beside the target.
-    expect(text(brewDayFacts({ ...water, source: "City" }, {}))).toBe("Hazy target (source City), mash pH 5.35.");
-    expect(text(brewDayFacts({ source: "City", mashPh: "5.3" }, {}))).toBe("Source water City, mash pH 5.3.");
-    expect(text(brewDayFacts({ source: "City" }, {}))).toBe("Source water City.");
+    expect(text(brewDayFacts({ ...water, source: "City" }, {}, [], false))).toBe("Hazy target (source City), mash pH 5.35.");
+    expect(text(brewDayFacts({ source: "City", mashPh: "5.3" }, {}, [], false))).toBe("Source water City, mash pH 5.3.");
+    expect(text(brewDayFacts({ source: "City" }, {}, [], false))).toBe("Source water City.");
+  });
+
+  it("says which numbers that apply are not set, on the editable sheet only, as the words that open the sheet", () => {
+    const whirlpool = [line("mosaic", "whirlpool", null, 0.5)], boil = [line("citra", "boil", 10, 0.4)];
+    // A recipe with whirlpool additions and none of its numbers: each prompt opens Recipe numbers.
+    expect(brewDayFacts(undefined, {}, whirlpool, true)).toEqual([
+      { text: "Whirlpool time and temperature not set", opens: "numbers" }, ", ", { text: "knock-out temperature not set", opens: "numbers" }, ".",
+    ]);
+    // Each number is asked for alone once the other is set; a rest is a time.
+    expect(text(brewDayFacts(undefined, { whirlpoolMin: "20", knockoutTemp: "65" }, whirlpool, true))).toBe("Whirlpool temperature not set, knock out at 65 °F.");
+    expect(text(brewDayFacts(undefined, { whirlpoolRest: "10" }, whirlpool, true))).toBe("Whirlpool temperature not set, knock-out temperature not set.");
+    expect(text(brewDayFacts(undefined, { whirlpoolTemp: "180" }, [], true))).toBe("Whirlpool at 180 °F, whirlpool time not set, knock-out temperature not set.");
+    expect(text(brewDayFacts(undefined, NUMBERS, whirlpool, true))).toBe("Boil from 16.8 bbl. Whirlpool at 180 °F, knock out at 65 °F.");
+    // No whirlpool addition and none of its numbers: the whirlpool is not asked about. The knock-out is every recipe's.
+    expect(text(brewDayFacts(undefined, { boilMin: "60" }, boil, true))).toBe("Knock-out temperature not set.");
+    expect(text(brewDayFacts(undefined, {}, [], true))).toBe("Knock-out temperature not set.");
+    // A boil addition asks for the boil time, beside the pre-boil volume when the recipe has one.
+    expect(text(brewDayFacts(undefined, { knockoutTemp: "65" }, boil, true))).toBe("Boil time not set. Knock out at 65 °F.");
+    expect(text(brewDayFacts(undefined, { preBoil: "16.8", knockoutTemp: "65" }, boil, true))).toBe("Boil from 16.8 bbl, boil time not set. Knock out at 65 °F.");
+    // An earlier copy is a read-out: it says nothing about a number it does not have.
+    expect(brewDayFacts(undefined, {}, [...whirlpool, ...boil], false)).toEqual([]);
+    expect(text(brewDayFacts(undefined, { whirlpoolTemp: "180" }, whirlpool, false))).toBe("Whirlpool at 180 °F.");
   });
 
   it("reads an earlier copy's schedules out line by line: each rest and stage by name, then its kind, temperature and length", () => {
