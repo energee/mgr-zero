@@ -102,8 +102,13 @@ The code is `lib/server-timing.ts`.
 | `command` | Same header | The command or query itself, including its RPC |
 | `shell` | Function log line | The staff layout's brewery, identity and membership reads, including brewery and personal gravity units (`app/(app)/layout.tsx`) |
 | `<command name>`, for example `trace_lot` | Function log line | One staff page read through `runPageQuery` or `optionalPageQuery`; the layout reuses its membership reads instead of calling `get_gravity_unit` |
+| `db` | Function log line, one per round trip | One call from the signed-in server client to Supabase's database API (`lib/supabase/server.ts`) |
+| `supabase` | Function log line, one per round trip | One call from that client to any other Supabase API, such as Auth |
+| `db_upstream`, `supabase_upstream` | Same line as its round trip | The time Supabase reports spending behind its gateway. The rest of the round trip is network and gateway time |
 
 A stage that fails is still timed.
+A page read's round trips are logged before the read's own line, so a slow read can be split into its trips.
+The plan that uses these lines is [`docs/plans/hosted-latency.md`](../plans/hosted-latency.md).
 Stages after it are missing because they never ran.
 
 Public `/docs` pages and `/screens/frame/` documents skip session refresh but

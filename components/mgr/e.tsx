@@ -152,7 +152,7 @@ function fieldError(controls?: Pick<FieldControls, "id" | "error" | "aria-invali
  *  unopenable picker still explains itself. */
 const emptyNote = (empty: PickEmpty, id?: string) => (
   <FieldDescription id={id}>
-    {empty.text}{empty.label ? <> <Link href={empty.href ?? "#"} data-to={empty.to} target={empty.target} rel={empty.target ? "noopener" : undefined}>{empty.label}</Link></> : null}
+    {empty.text}{empty.label ? <> <Link href={empty.href ?? "#"} prefetch={rowLinkPrefetch(empty.href ?? "#")} data-to={empty.to} target={empty.target} rel={empty.target ? "noopener" : undefined}>{empty.label}</Link></> : null}
   </FieldDescription>
 );
 
@@ -178,7 +178,7 @@ export const E = {
   back: (to: React.ReactNode, title: React.ReactNode, action?: React.ReactNode, href = "#", screen?: string) => {
     const head = (
       <div className="flex flex-col gap-1">
-        <Link href={href} data-to={screen} className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Icon icon={ArrowLeft01Icon} />{to}</Link>
+        <Link href={href} prefetch={rowLinkPrefetch(href)} data-to={screen} className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Icon icon={ArrowLeft01Icon} />{to}</Link>
         <h1 className="text-lg font-semibold">{title}</h1>
       </div>
     );
@@ -277,7 +277,7 @@ export const E = {
         )}
         {...(kind === "irr" ? { "data-variant": "irreversible" } : {})}
       >
-        {href && !disabled ? <Link href={href}>{t}</Link> : t}
+        {href && !disabled ? <Link href={href} prefetch={rowLinkPrefetch(href)}>{t}</Link> : t}
       </Button>
     );
   },
@@ -481,7 +481,7 @@ export const E = {
     <ItemGroup className="grid grid-cols-2 gap-2 md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]">
       {arr.map(([n, s, g, w, f, href, actions], i) => {
         const content = <TileContent {...{ n, s, g, w, f }} />;
-        const facts = href ? <Link href={href} className="flex min-w-0 max-w-full flex-col gap-0.5">{content}</Link> : content;
+        const facts = href ? <Link href={href} prefetch={rowLinkPrefetch(href)} className="flex min-w-0 max-w-full flex-col gap-0.5">{content}</Link> : content;
         return (
           <Item key={i} variant="outline" size="sm" className="min-w-0 flex-col items-start gap-0.5 wrap-anywhere" asChild>
             {actions ? <div>{facts}{actions}</div> : href ? facts : <button type="button">{content}</button>}
