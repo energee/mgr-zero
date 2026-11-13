@@ -14,6 +14,7 @@ import { asTrigger, CommandForm, CommandFormFooter } from "@/components/mgr/comm
 import { E } from "@/components/mgr/e";
 import { FermentationScheduleView, FermentationStageView } from "@/components/mgr/views/fermentation-schedule";
 import { IngredientView, type IngredientMaterial } from "@/components/mgr/views/ingredient";
+import { RecipeNameView } from "@/components/mgr/views/new-recipe";
 import { RecipeNumbersView, type RecipeNumberField } from "@/components/mgr/views/recipe-numbers";
 import { MashScheduleView, MashStepView } from "@/components/mgr/views/mash-schedule";
 import { WaterAdditionView, WaterView } from "@/components/mgr/views/water";
@@ -110,5 +111,16 @@ export function IngredientSheet({ line, stage = "mash", materials, limits, batch
 export function RecipeNumbersSheet({ values, onChange, trigger, open, onOpenChange }: { values: Record<RecipeNumberField, string>; onChange: (field: RecipeNumberField, value: string) => void; trigger: ReactNode } & Opened) {
   return <CommandForm open={open} onOpenChange={onOpenChange} title="Recipe numbers" trigger={asTrigger(trigger)}>
     <RecipeNumbersView values={values} onChange={onChange} />
+  </CommandForm>;
+}
+
+/** A saved recipe's name and note. Unlike the other sheets it saves on its own (update_recipe), apart from the recipe
+ *  sheet's unsaved changes: `onSave` resolves true once saved, which closes it. Opening it starts from what is saved. */
+export function RecipeNameSheet({ name, note, onSave, busy, error, trigger }: { name: string; note: string; onSave: (values: { name: string; note: string }) => Promise<boolean>; busy: boolean; error?: string | null; trigger: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const [values, setValues] = useState({ name, note });
+  return <CommandForm open={open} onOpenChange={(o) => { setOpen(o); if (o) setValues({ name, note }); }} title="Recipe name" trigger={asTrigger(trigger)}>
+    <RecipeNameView values={values} onChange={setValues} busy={busy} error={error}
+      onSave={() => void onSave(values).then((saved) => { if (saved) setOpen(false); })} />
   </CommandForm>;
 }

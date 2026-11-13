@@ -5950,6 +5950,9 @@ isOneToOne: false
 "update_purchase_order":
 { Args: { "p_brewery": string,"p_expected_on": string,"p_lines": Json,"p_po": string,"p_request_id": string,"p_vendor": string }; Returns: Json
                            },
+"update_recipe":
+{ Args: { "p_brewery": string,"p_name": string,"p_note": string,"p_recipe": string,"p_request_id": string }; Returns: Json
+                           },
 "update_sku":
 { Args: { "p_active": boolean,"p_batch_share"?: number,"p_brewery": string,"p_clear_batch_share"?: boolean,"p_clear_keg_pool"?: boolean,"p_id": string,"p_keg_pool"?: string,"p_request_id": string,"p_upc": string }; Returns: Json
                            },

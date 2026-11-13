@@ -21,7 +21,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { RecipeNumbersView } from "@/components/mgr/views/recipe-numbers";
 import { describe, expect, it } from "vitest";
-import { batchTotalText, draftBlocker, draftIbu, figureStrip, gravityBlockerText, gristKey, gristShares, ingredientCells, ingredientPack, loadedNotice, materialsNowGive, noMashText, packRounding, RECIPE_NUMBERS, recipeHistory, recipePageTitle, toRecipePageModel, versionNumbers, versionToDraft, waterFacts, type RecipeFigures, type RecipeIngredientView, type RecipeOutcome, type RecipePack, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
+import { batchTotalText, draftBlocker, draftIbu, figureStrip, gravityBlockerText, gristKey, gristShares, ingredientCells, ingredientPack, loadedNotice, materialsNowGive, movedBatchesText, noMashText, packRounding, RECIPE_NUMBERS, recipeHistory, recipePageTitle, storedRecipeNote, toRecipePageModel, versionNumbers, versionToDraft, waterFacts, type RecipeFigures, type RecipeIngredientView, type RecipeOutcome, type RecipePack, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
 import { ibuText } from "@/lib/recipe-ibu";
 import type { IngredientLine, MashStep } from "@/lib/mgr/recipe-process-view";
 import { sgToPlato } from "@/lib/recipe-gravity";
@@ -837,5 +837,32 @@ describe("the read page and its brand pick", () => {
     // The error, or the warning that the change could not be kept in this tab, is about the change Discard drops.
     expect(editor).toMatch(/function discard\(\) \{[^}]*setDraft\(start\);[^}]*setError\(null\);\s*\}/);
     expect(editor).toContain("setNote: creating ? undefined : (value) => change({ notes: value }),");
+  });
+});
+
+describe("a saved recipe's name and note (#1818)", () => {
+  it("keeps the source record id the page hides when a note is retyped", () => {
+    const stored = "Imported from Example Brewing recipe 6720f0a1b2c3d4e5f6a7b8c9";
+    expect(storedRecipeNote(stored, "House pale")).toBe("House pale 6720f0a1b2c3d4e5f6a7b8c9");
+    expect(storedRecipeNote("First draft", " House pale ")).toBe("House pale");
+    expect(storedRecipeNote("First draft", "  ")).toBeNull();
+    expect(storedRecipeNote(null, "")).toBeNull();
+  });
+  it("offers Edit name and note beside the brand, and not on a copy read as brewed", () => {
+    const text = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    const draw = (props: Parameters<typeof RecipeView>[0]) => renderToStaticMarkup(createElement(RecipeView, props));
+    const model = { title: "Pale", brand: { value: "", options: [{ value: "", label: "No brand yet" }] } };
+    expect(text(draw({ model }))).toContain("Edit name and note");
+    expect(text(draw({ readOnly: true, model }))).not.toContain("Edit name and note");
+    expect(text(draw({ model: { title: "Pale" } }))).not.toContain("Edit name and note");
+  });
+});
+
+describe("movedBatchesText (#1817)", () => {
+  it("says how many scheduled batches a save moved, and nothing when none did", () => {
+    expect(movedBatchesText(0)).toBeNull();
+    expect(movedBatchesText(1)).toBe("Saved. 1 scheduled batch will brew these changes.");
+    expect(movedBatchesText(3)).toBe("Saved. 3 scheduled batches will brew these changes.");
+    expect(movedBatchesText(undefined)).toBeNull();
   });
 });
