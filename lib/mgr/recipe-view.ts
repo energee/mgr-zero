@@ -510,6 +510,11 @@ export function storedRecipeNote(stored: string | null, typed: string): string |
   return typed.trim() + (stored?.match(IMPORT_ID)?.[0] ?? "") || null;
 }
 
+/** What the page says after a save moved scheduled batches to the new copy (create_recipe_version's moved_batches); null when none moved. */
+export function movedBatchesText(moved: number | undefined): string | null {
+  return moved ? `Saved. ${plural(moved, "scheduled batch", "scheduled batches")} will brew these changes.` : null;
+}
+
 /** The page's model of the selected saved copy; before the first save, the title and note alone.
  *  A copy before the newest is read as brewed: its note, Use this again, and a back link to the current recipe. */
 export function toRecipePageModel(

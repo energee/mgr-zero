@@ -26,7 +26,8 @@
 // with ?from dropped from the address so a reload restores it. Save changes
 // runs create_recipe_version, disabled with draftBlocker's reason until the
 // sheet is complete; the page then refreshes onto the new copy and remounts
-// this editor. Without a recipeId (recipes/new) the shared parent fields sit
+// this editor. That save also moves the recipe's scheduled batches to the new
+// copy, and a toast says how many (movedBatchesText). Without a recipeId (recipes/new) the shared parent fields sit
 // on top, the save bar is always up, and one save runs create_recipe then
 // create_recipe_version, landing on the recipe. A line's name and Add
 // ingredient open the Ingredient sheet, and each schedule's action opens its
@@ -58,7 +59,7 @@ import { nameWithAlias } from "@/lib/mgr/labels";
 import { useCommandContext } from "@/lib/brewery-provider";
 import { gravityBlockers, recipeGravity } from "@/lib/recipe-gravity";
 import { readRecipeDraft, recipeDraftKey, shouldKeepDraft, writeRecipeDraft } from "@/lib/mgr/recipe-draft";
-import { batchSize, draftBlocker, draftIbu, figureStrip, gravityBlockerText, gristShares, ingredientCells, ingredientPack, materialsNowGive, noMashText, RECIPE_NUMBERS, storedRecipeNote, waterFacts, type RecipeDraft, type RecipeFigures, type RecipeNumberKey, type RecipeViewModel } from "@/lib/mgr/recipe-view";
+import { batchSize, draftBlocker, draftIbu, figureStrip, gravityBlockerText, gristShares, ingredientCells, ingredientPack, materialsNowGive, movedBatchesText, noMashText, RECIPE_NUMBERS, storedRecipeNote, waterFacts, type RecipeDraft, type RecipeFigures, type RecipeNumberKey, type RecipeViewModel } from "@/lib/mgr/recipe-view";
 import { EMPTY_WATER, lineReady, materialLookup, optionalNumber as num, removeAt, scheduleDays, upsertAt, type RecipeMaterial, type MashStep, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 import { FermentationScheduleSheet, IngredientSheet, MashScheduleSheet, RecipeNameSheet, RecipeNumbersSheet, WaterSheet } from "./schedule-sheets";
 
@@ -216,8 +217,10 @@ export function RecipeEditor({ recipeId, title, backHref, brandId = null, brands
       if (!id) { action.setError("The recipe was created but its id did not come back; open it from Recipes to finish it."); return; }
     }
     // A save on the recipe's own page stays there: run() refreshes the page, which remounts this editor on the new copy.
-    await action.run("create_recipe_version", build(id), () => {
+    await action.run("create_recipe_version", build(id), (d) => {
       if (key !== null) sessionStorage.removeItem(key);
+      const moved = movedBatchesText((d as { moved_batches?: number } | null)?.moved_batches);
+      if (moved) toast.success(moved);
       if (creating) router.push(`/recipes/${id}`);
     });
   }

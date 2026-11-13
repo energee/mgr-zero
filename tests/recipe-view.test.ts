@@ -21,7 +21,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { RecipeNumbersView } from "@/components/mgr/views/recipe-numbers";
 import { describe, expect, it } from "vitest";
-import { batchTotalText, draftBlocker, draftIbu, figureStrip, gravityBlockerText, gristKey, gristShares, ingredientCells, ingredientPack, loadedNotice, materialsNowGive, noMashText, packRounding, RECIPE_NUMBERS, recipeHistory, recipePageTitle, storedRecipeNote, toRecipePageModel, versionNumbers, versionToDraft, waterFacts, type RecipeFigures, type RecipeIngredientView, type RecipeOutcome, type RecipePack, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
+import { batchTotalText, draftBlocker, draftIbu, figureStrip, gravityBlockerText, gristKey, gristShares, ingredientCells, ingredientPack, loadedNotice, materialsNowGive, movedBatchesText, noMashText, packRounding, RECIPE_NUMBERS, recipeHistory, recipePageTitle, storedRecipeNote, toRecipePageModel, versionNumbers, versionToDraft, waterFacts, type RecipeFigures, type RecipeIngredientView, type RecipeOutcome, type RecipePack, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
 import { ibuText } from "@/lib/recipe-ibu";
 import type { IngredientLine, MashStep } from "@/lib/mgr/recipe-process-view";
 import { sgToPlato } from "@/lib/recipe-gravity";
@@ -855,5 +855,14 @@ describe("a saved recipe's name and note (#1818)", () => {
     expect(text(draw({ model }))).toContain("Edit name and note");
     expect(text(draw({ readOnly: true, model }))).not.toContain("Edit name and note");
     expect(text(draw({ model: { title: "Pale" } }))).not.toContain("Edit name and note");
+  });
+});
+
+describe("movedBatchesText (#1817)", () => {
+  it("says how many scheduled batches a save moved, and nothing when none did", () => {
+    expect(movedBatchesText(0)).toBeNull();
+    expect(movedBatchesText(1)).toBe("Saved. 1 scheduled batch will brew these changes.");
+    expect(movedBatchesText(3)).toBe("Saved. 3 scheduled batches will brew these changes.");
+    expect(movedBatchesText(undefined)).toBeNull();
   });
 });

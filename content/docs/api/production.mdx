@@ -114,7 +114,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, brewer
 
-Add the next version of a recipe: its mash and fermentation schedules, whirlpool/knockout/pre-boil, the batch size it is written for, water and additions, assumptions and ingredients; versions are immutable and snapshot each material's extract potential and alpha acid
+Add the next version of a recipe: its mash and fermentation schedules, whirlpool/knockout/pre-boil, the batch size it is written for, water and additions, assumptions and ingredients; versions are immutable and snapshot each material's extract potential and alpha acid. The recipe's scheduled batches that are not brewed or cancelled move to the new version, and moved_batches in the result counts them
 
 | Field | Type | Required |
 | --- | --- | --- |

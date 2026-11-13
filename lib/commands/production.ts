@@ -91,8 +91,8 @@ defineCommand({
 
 defineCommand({
   name: "create_recipe_version",
-  description: "Add the next version of a recipe: its mash and fermentation schedules, whirlpool/knockout/pre-boil, the batch size it is written for, water and additions, assumptions and ingredients; versions are immutable and snapshot each material's extract potential and alpha acid",
-  compensation: "Cannot be undone; versions are immutable, so add a corrected one with create_recipe_version.",
+  description: "Add the next version of a recipe: its mash and fermentation schedules, whirlpool/knockout/pre-boil, the batch size it is written for, water and additions, assumptions and ingredients; versions are immutable and snapshot each material's extract potential and alpha acid. The recipe's scheduled batches that are not brewed or cancelled move to the new version, and moved_batches in the result counts them",
+  compensation: "Cannot be undone; versions are immutable, so add a corrected one with create_recipe_version, which also moves the scheduled batches to it.",
   input: z.object({
     recipeId: z.string().uuid(),
     mashSchedule: z.array(mashStep).min(1),
