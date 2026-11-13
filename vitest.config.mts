@@ -156,7 +156,9 @@ const pureTests = [
   "tests/keyboard-focus.test.ts",
   "tests/material-count-sheet.test.ts",
   "tests/row-link-prefetch.test.ts",
-  "tests/client-bundle-imports.test.ts"
+  "tests/client-bundle-imports.test.ts",
+  "tests/guide-anchors.test.ts",
+  "tests/api-backlog-empty.test.ts"
 ];
 
 export default defineConfig({
