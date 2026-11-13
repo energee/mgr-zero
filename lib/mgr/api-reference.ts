@@ -164,8 +164,9 @@ export function renderBacklog(): string {
     "This is the backend push, scoped. Each row names the operation a screen asked for and the screens waiting on it, so an area can be built and shipped whole rather than a command at a time. `/docs/api` publishes the same list per area, marked designed, so an integrator sees the roadmap without being told a date.",
     "",
     "Nothing here is a schema decision. An operation appears because a screen named it in its `reads` or `writes`; what it takes and returns is settled when it is built.",
-    "",
-    ...areas,
+    // No areas left means no separator either: a blank line at the end of the
+    // file fails the HTTP API agent's `git diff --check` (#1823).
+    ...(areas.length ? ["", ...areas] : []),
     "",
   ].join("\n");
 }
