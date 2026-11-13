@@ -61,7 +61,7 @@ describe("SCREENS", () => {
   it("draws the recipe as the day at a glance, with each amount for the batch it is written for", () => {
     const recipe = text("Recipe");
     // Under the name, one sentence: the brand, the batch size, the recipe's note and the saved date. That save's change note has the next line.
-    expect(recipe).toMatch(/Brews\s+Hazy IPA\s+at\s+22 bbl\s*, edit recipe numbers\s*\.\s+The flagship\. Keep it soft and juicy\. Saved Aug 28, 2026\.\s+Last change: Whirlpool hard, knock out cold\./);
+    expect(recipe).toMatch(/Brews\s+Hazy IPA\s+at\s+22 bbl\s*, edit recipe numbers\s*\.\s+The flagship\. Keep it soft and juicy\. Saved Aug 28, 2026\.\s+Edit name and note\s+Last change: Whirlpool hard, knock out cold\./);
     expect(recipe).toMatch(/Assumes\s+72% efficiency\s*, edit recipe numbers\s+and\s+78% attenuation\s*, edit recipe numbers\s*\./);
     // The day's two lists are the headings, then what the batches measured and the earlier copies they brewed.
     expect([...body("Recipe").matchAll(/<h2[^>]*>([^<]*)<\/h2>/g)].map((m) => m[1])).toEqual(["Goes in on brew day", "In the cellar", "Batch actuals", "As brewed"]);

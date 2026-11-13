@@ -188,7 +188,11 @@ export type RecipeControls = {
 };
 /** The live editor's sheets. Each takes the action the view drew and returns the sheet that action opens:
  *  addIngredient for Add ingredient (with the stage a new line starts on), sheet for the action named by its key. */
-export type RecipeSlots = { addIngredient?: (stage: IngredientStage, trigger: ReactNode) => ReactNode; sheet?: (key: SheetKey, trigger: ReactNode) => ReactNode };
+export type RecipeSlots = {
+  addIngredient?: (stage: IngredientStage, trigger: ReactNode) => ReactNode; sheet?: (key: SheetKey, trigger: ReactNode) => ReactNode;
+  /** Edit name and note, in the sentence beside the brand: returns the Recipe name sheet that action opens. */
+  rename?: (trigger: ReactNode) => ReactNode;
+};
 
 export function RecipeView({
   model,
@@ -251,6 +255,9 @@ export function RecipeView({
   if (batch) lead.push(brand ? (brewed ? " at " : ", written for ") : "Written for ", fact(batch, "numbers", "batch"), ".");
   else if (!readOnly) lead.push(brand ? ", " : "", fact(brand ? "no batch size yet" : "No batch size yet", "numbers", "batch"), ".");
   const about = [model.recipeNote && sentence(model.recipeNote), model.saved && sentence(`Saved ${model.saved}`)].filter(Boolean).join(" ");
+  // A saved recipe's name and note are edited in their own sheet, opened from the sentence that holds the brand pick.
+  const renameTrigger = <Button type="button" variant="link" className={FACT}>Edit name and note</Button>;
+  const rename = brand ? (slots.rename ? slots.rename(renameTrigger) : renameTrigger) : null;
 
   const figures = model.figures ?? [];
   // The quiet lines under the figures: what a figure leaves out, and the batch-size hint once a line could read a batch amount.
@@ -281,7 +288,7 @@ export function RecipeView({
       {model.asBrewed ? <div className="mb-3">{E.note(model.asBrewed)}</div> : parentForm ? (
         <div className="mb-3 flex flex-wrap items-start gap-x-6 gap-y-3 empty:hidden [&>[data-slot=field]]:w-full @md:[&>[data-slot=field]]:w-52">{parentForm}</div>
       ) : null}
-      {lead.length || about ? <p className={cn(quiet, "max-w-[62ch]")}>{lead}{lead.length && about ? " " : null}{about}</p> : null}
+      {lead.length || about ? <p className={cn(quiet, "max-w-[62ch]")}>{lead}{lead.length && about ? " " : null}{about}{rename ? <> {rename}</> : null}</p> : null}
       {model.savedNote ? <p className={cn(quiet, "max-w-[62ch]")}>Last change: {sentence(model.savedNote)}</p> : null}
       <CommandFormMessage error={controls?.brand?.error} />
 

@@ -77,6 +77,18 @@ defineCommand({
   })),
 });
 
+// A recipe's name and note after creation; a null note clears it. Batches and saved copies point at the recipe by id,
+// so nothing downstream is rewritten.
+defineCommand({
+  name: "update_recipe", description: "Change a recipe's name and note; a null note clears it. Its brand, saved versions and batches are not changed",
+  compensation: "Reverse with update_recipe and the previous name and note.",
+  input: z.object({ recipeId: z.string().uuid(), name: z.string().trim().min(1).describe("The recipe's name"), note: z.string().nullable().describe("The recipe's note; null for none") }),
+  roles: ["admin", "brewer"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_recipe", {
+    p_brewery: ctx.breweryId, p_recipe: i.recipeId, p_name: i.name, p_note: i.note, p_request_id: execution.requestId,
+  })),
+});
+
 defineCommand({
   name: "create_recipe_version",
   description: "Add the next version of a recipe: its mash and fermentation schedules, whirlpool/knockout/pre-boil, the batch size it is written for, water and additions, assumptions and ingredients; versions are immutable and snapshot each material's extract potential and alpha acid",

@@ -1,6 +1,6 @@
 // app/(app)/recipes/[id]/page.tsx — the one recipe page. It opens the current
 // saved copy in the editor (recipe-version-form.tsx), with the recipe's brand
-// and the brands to pick from and, from toRecipePageModel, the saved date,
+// and the brands to pick from, its note as stored (for Edit name and note) and, from toRecipePageModel, the saved date,
 // Schedule batch, the figures the saved copy froze, Batch actuals
 // (get_recipe_outcomes, asked for the copy being shown, whose grain bill decides
 // which other recipes' batches it adds) and As brewed around the sheet. A
@@ -72,7 +72,7 @@ export default async function RecipePage({ params, searchParams }: Props) {
       // A save makes a new current copy, so the editor remounts on it with nothing unsaved.
       key={version?.id ?? "unsaved"}
       recipeId={recipe.id} title={model.title} backHref="/recipes"
-      brandId={recipe.brand_id} brands={brands}
+      brandId={recipe.brand_id} brands={brands} storedNote={recipe.note}
       page={{ saved, savedNote, scheduleHref, recipeNote, actuals, actualsNote, history, figures, figureNotes }}
       // What get_recipe predicted for the saved copy; the editor compares its live preview against these.
       savedFigures={version ? { ogPlato: snapshot.ogPlato, fgPlato: snapshot.fgPlato, abv: snapshot.abv, ibu: snapshot.ibu } : undefined}

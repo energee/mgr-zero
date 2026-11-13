@@ -15,7 +15,10 @@
 // that: the pick in the page's sentence saves on its own (set_recipe_brand),
 // says "Brand saved", and its refresh leaves the unsaved sheet alone. It
 // stays enabled while that save runs, so focus never drops; a pick made
-// meanwhile is ignored, and so is a pick of the brand it already has. An unsaved change is kept in sessionStorage per actor, brewery
+// meanwhile is ignored, and so is a pick of the brand it already has. The name
+// and note are apart too: Edit name and note beside the brand opens the Recipe
+// name sheet, whose Save runs update_recipe and says "Name and note saved"; the
+// note keeps the source record id the page hides (storedRecipeNote). An unsaved change is kept in sessionStorage per actor, brewery
 // and recipe (lib/mgr/recipe-draft.ts), written as each change is made,
 // restored with a notice on return, and cleared on save; /recipes/new keeps
 // none, since there is no recipe to key it by yet. Use this again arrives as
@@ -55,9 +58,9 @@ import { nameWithAlias } from "@/lib/mgr/labels";
 import { useCommandContext } from "@/lib/brewery-provider";
 import { gravityBlockers, recipeGravity } from "@/lib/recipe-gravity";
 import { readRecipeDraft, recipeDraftKey, shouldKeepDraft, writeRecipeDraft } from "@/lib/mgr/recipe-draft";
-import { batchSize, draftBlocker, draftIbu, figureStrip, gravityBlockerText, gristShares, ingredientCells, ingredientPack, materialsNowGive, noMashText, RECIPE_NUMBERS, waterFacts, type RecipeDraft, type RecipeFigures, type RecipeNumberKey, type RecipeViewModel } from "@/lib/mgr/recipe-view";
+import { batchSize, draftBlocker, draftIbu, figureStrip, gravityBlockerText, gristShares, ingredientCells, ingredientPack, materialsNowGive, noMashText, RECIPE_NUMBERS, storedRecipeNote, waterFacts, type RecipeDraft, type RecipeFigures, type RecipeNumberKey, type RecipeViewModel } from "@/lib/mgr/recipe-view";
 import { EMPTY_WATER, lineReady, materialLookup, optionalNumber as num, removeAt, scheduleDays, upsertAt, type RecipeMaterial, type MashStep, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
-import { FermentationScheduleSheet, IngredientSheet, MashScheduleSheet, RecipeNumbersSheet, WaterSheet } from "./schedule-sheets";
+import { FermentationScheduleSheet, IngredientSheet, MashScheduleSheet, RecipeNameSheet, RecipeNumbersSheet, WaterSheet } from "./schedule-sheets";
 
 type Numbers = Record<RecipeNumberKey, string>;
 
@@ -69,12 +72,14 @@ const BLANK_DRAFT: RecipeDraft = { batchBbl: "", numbers: BLANK_NUMBERS, notes: 
 const pctToFraction = (s: string) => Number(s) / 100;
 const NOT_KEPT = "Your changes could not be kept in this tab; they are lost if you leave the page before saving.";
 
-export function RecipeEditor({ recipeId, title, backHref, brandId = null, brands = [], page, savedFigures, initial, baseVersionId = null, loaded, materials, profiles, unit }: {
+export function RecipeEditor({ recipeId, title, backHref, brandId = null, brands = [], storedNote = null, page, savedFigures, initial, baseVersionId = null, loaded, materials, profiles, unit }: {
   recipeId?: string; title: string; backHref: string;
   /** The brand the saved recipe brews, null for none; the pick in the page's sentence starts on it. */
   brandId?: string | null;
   /** The brands to pick from: in the sentence of a saved recipe, and in the Brand field of one being created. */
   brands?: NewRecipeBrand[];
+  /** The saved recipe's note as stored, with the source record id the page hides; the Recipe name sheet keeps that id. */
+  storedNote?: string | null;
   /** What the recipe page draws around the sheet from the saved recipe; the sheet's own fields come from the draft. */
   page?: Pick<RecipeViewModel, "saved" | "savedNote" | "scheduleHref" | "recipeNote" | "actuals" | "actualsNote" | "history" | "figures" | "figureNotes">;
   /** What the saved copy predicts, frozen at its save (get_recipe). The unchanged sheet shows `page`'s figures, drawn
@@ -91,6 +96,7 @@ export function RecipeEditor({ recipeId, title, backHref, brandId = null, brands
   const router = useRouter();
   const action = useCommandAction();
   const brandAction = useCommandAction();
+  const nameAction = useCommandAction();
   const context = useCommandContext();
   const key = recipeId === undefined ? null : recipeDraftKey(context, recipeId);
   const start = initial ?? BLANK_DRAFT;
@@ -161,6 +167,11 @@ export function RecipeEditor({ recipeId, title, backHref, brandId = null, brands
     void brandAction.run("set_recipe_brand", { recipeId, brandId: value || null }, () => toast.success("Brand saved"));
   }
 
+  // The name and note save from their own sheet; true once saved, which closes it.
+  function saveName(values: { name: string; note: string }) {
+    return nameAction.run("update_recipe", { recipeId, name: values.name, note: storedRecipeNote(storedNote, values.note) }, () => toast.success("Name and note saved"));
+  }
+
   // Declared before the preview reads it during render (#440).
   const material = materialLookup(materials);
   const validLines = lines.filter(lineReady);
@@ -192,7 +203,7 @@ export function RecipeEditor({ recipeId, title, backHref, brandId = null, brands
   const creating = recipeId === undefined;
   // A parent that saved before its sheet failed is kept, so a retry writes
   // only the sheet instead of a second recipe; the parent fields lock at
-  // that point, since there is no update_recipe to carry a later edit.
+  // that point, and the name and note are edited on the recipe's own page.
   const [createdId, setCreatedId] = useState(recipeId ?? "");
   async function submit() {
     let id = createdId;
@@ -266,6 +277,7 @@ export function RecipeEditor({ recipeId, title, backHref, brandId = null, brands
         brand: creating ? undefined : { onChange: pickBrand, error: brandAction.error },
       }}
       slots={{
+        rename: (trigger) => <RecipeNameSheet name={title} note={page?.recipeNote ?? ""} onSave={saveName} busy={nameAction.busy} error={nameAction.error} trigger={trigger} />,
         addIngredient: (stage, trigger) => <IngredientSheet stage={stage} {...ingredientSheet} onSave={(f) => change({ lines: [...draft.lines, f] })} trigger={trigger} />,
         sheet: (sheet, trigger) => {
           if (sheet === "numbers") return <RecipeNumbersSheet open={sheetOpen === "numbers"} onOpenChange={toggle("numbers")} values={{ batchBbl, ...numbers }} onChange={(field, value) => change(field === "batchBbl" ? { batchBbl: value } : { numbers: { ...draft.numbers, [field]: value } })} trigger={trigger} />;

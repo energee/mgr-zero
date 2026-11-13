@@ -546,6 +546,25 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_recipe_brand", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "recipeId": "00000000-0000-0000-0000-000000000000", "brandId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
+## update_recipe [#update_recipe]
+
+`command` · admin, brewer
+
+Change a recipe's name and note; a null note clears it. Its brand, saved versions and batches are not changed
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `recipeId` | uuid | yes |
+| `name` | string | yes |
+| `note` | string or null | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "update_recipe", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "recipeId": "00000000-0000-0000-0000-000000000000", "name": "string", "note": "string" } }'
+```
+
 ## upsert_vessel [#upsert_vessel]
 
 `command` · admin
