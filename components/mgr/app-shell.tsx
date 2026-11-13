@@ -14,13 +14,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MgrIcon } from "@/components/mgr-icon";
 import { Icon } from "@/components/mgr/icon";
+import { Button } from "@/components/ui/button";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarHeader, SidebarInset,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem,
   SidebarProvider, SidebarTrigger, useSidebar,
 } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { guideHrefFor } from "@/lib/mgr/guide-anchors";
 import { activeChild, activeTab, isUnder, navGroups, PORTAL_NAV, type NavItem } from "@/lib/mgr/nav";
+import { HelpCircleIcon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 
 export type AppShellProps = {
@@ -40,6 +43,7 @@ export type AppShellProps = {
 export function AppShell({ brand, items, headerRight, composer, active, sidebarOpen, children }: AppShellProps) {
   const pathname = usePathname();
   const current = active ?? activeTab(items, pathname)?.label;
+  const guideHref = guideHrefFor(pathname);
   const brandMark = (
     <span className="flex items-center gap-2 truncate">
       <MgrIcon size={16} className="shrink-0" />
@@ -102,7 +106,15 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
             <ShellSidebarTrigger />
             {composer ?? <span className="md:hidden">{brandMark}</span>}
           </div>
-          {headerRight && <span className="flex shrink-0 items-center gap-1">{headerRight}</span>}
+          <span className="flex shrink-0 items-center gap-1">
+            {/* Opens the guide section for this page (#1741); absent where the map has no entry. */}
+            {guideHref && (
+              <Button variant="ghost" size="icon-sm" className="text-muted-foreground" asChild>
+                <Link href={guideHref} target="_blank" rel="noopener noreferrer" aria-label="Help for this page (opens in a new tab)"><Icon icon={HelpCircleIcon} /></Link>
+              </Button>
+            )}
+            {headerRight}
+          </span>
         </header>
         {/* SidebarInset is already the <main> landmark; only page content scrolls. */}
         <div id="main" tabIndex={-1} data-mgr-page-scroll="" className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-4 outline-none md:px-8 md:py-6 print:overflow-visible">{children}</div>
