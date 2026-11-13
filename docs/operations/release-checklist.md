@@ -206,8 +206,8 @@ implied by local rendering checks or the absence of a scanner finding.
    `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
    `SUPABASE_SECRET_KEY`, `POSTGRES_URL_NON_POOLING`, and `APP_URL`.
    Integration credentials are added only for the approved environment.
-5. Vercel Preview must hold no Production Supabase credentials. Confirm no secret is
-   present in logs, browser bundles, screenshots, or PR text.
+5. Vercel Preview must hold no Production Supabase credentials. Confirm no
+   secret is present in logs, browser bundles, screenshots, or PR text.
 
 ## Database and deploy
 
