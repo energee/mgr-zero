@@ -29,3 +29,22 @@ export function serverTiming(stages: Stages): string {
 export function logServerTiming(stages: Stages) {
   console.info(JSON.stringify({ event: "server_timing", timing: serverTiming(stages) }));
 }
+
+/** `fetch` for the Supabase server client: logs each round trip on its own
+ *  line. A database read (`/rest/`) is `db`; any other Supabase call is
+ *  `supabase`. `<name>_upstream` is the time Supabase itself reports spending
+ *  behind its gateway, so the rest of the trip is network and gateway
+ *  (docs/plans/hosted-latency.md, F2 and F6). A failed trip is logged too. */
+export const timedFetch: typeof fetch = async (input, init) => {
+  const stages: Stages = {};
+  const url = new URL(input instanceof Request ? input.url : input);
+  const name = url.pathname.startsWith("/rest/") ? "db" : "supabase";
+  try {
+    const response = await timeStage(stages, name, () => fetch(input, init));
+    const upstream = response.headers.get("x-envoy-upstream-service-time");
+    if (upstream !== null) stages[`${name}_upstream`] = Number(upstream);
+    return response;
+  } finally {
+    logServerTiming(stages);
+  }
+};

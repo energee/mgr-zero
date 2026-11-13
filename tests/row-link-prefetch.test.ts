@@ -12,6 +12,8 @@ describe("rowLinkPrefetch", () => {
     `/orders/${ID}/ship`,
     `/routes/${ID}`,
     `/portal?reorder=${ID}`,
+    `/orders?order=${ID}`,
+    `/cellar/vessels/${ID}`,
   ])("does not prefetch the record link %s", (href) => {
     expect(rowLinkPrefetch(href)).toBe(false);
   });
@@ -28,7 +30,15 @@ describe("rowLinkPrefetch", () => {
     "components/mgr/views/record-table.tsx",
     "components/mgr/views/portal-orders.tsx",
     "components/mgr/views/lot-trace.tsx",
+    "components/mgr/order-sheet-link.tsx",
   ])("%s passes its row links through the rule", (file) => {
     expect(readFileSync(file, "utf8")).toContain("prefetch={rowLinkPrefetch(");
+  });
+
+  // docs/plans/hosted-latency.md F4: a vessel tile's link had no rule, so
+  // opening Cellar requested every vessel page.
+  it("every link E draws goes through the rule", () => {
+    const links = readFileSync("components/mgr/e.tsx", "utf8").split("\n").filter(line => line.includes("<Link "));
+    expect(links.filter(line => !line.includes("prefetch={rowLinkPrefetch("))).toEqual([]);
   });
 });
