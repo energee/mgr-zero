@@ -196,17 +196,17 @@ implied by local rendering checks or the absence of a scanner finding.
 
 ## Provisioning
 
-1. Create separate Supabase Preview and Production projects. Record their
-   project names, refs, regions, and owners; colocate Vercel functions with the
-   chosen database region.
+1. Production is the only Supabase project; the owner decided on 2026-11-12
+   not to keep a Preview project (#1616). Record its name, ref, region, and
+   owner; colocate Vercel functions with the database region.
 2. Configure Supabase Auth site URLs, exact redirect allowlists, SMTP, and rate
-   limits for each environment.
+   limits for Production.
 3. Create/link the Vercel project and restrict Production to `main`.
 4. Set environment-scoped values from `.env.example`. At minimum:
    `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
    `SUPABASE_SECRET_KEY`, `POSTGRES_URL_NON_POOLING`, and `APP_URL`.
    Integration credentials are added only for the approved environment.
-5. Keep Preview and Production credentials separate. Confirm no secret is
+5. Vercel Preview must hold no Production Supabase credentials. Confirm no secret is
    present in logs, browser bundles, screenshots, or PR text.
 
 ## Database and deploy
@@ -222,7 +222,7 @@ implied by local rendering checks or the absence of a scanner finding.
 
 ## Hosted smoke
 
-Run against Preview first, then Production:
+Run against Production. There is no Preview database (#1616):
 
 - Sign in as a real invited staff user; verify session expiry and sign out.
 - Complete README's login → catalog → inventory path.
@@ -258,7 +258,7 @@ Smoke does not measure latency at pilot volumes; see the [pilot latency protocol
 
 - Required CI checks and production build passed on the deployed SHA.
 - Hosted advisors have no unowned launch blocker.
-- Hosted smoke passed in Preview and Production.
+- Hosted smoke passed in Production.
 - Backup/restore owner, rollback-compatible deployment, integration owners, and
   scheduler owners are recorded.
 - Open deferrals name an owner and trigger; none can affect stock, money,
