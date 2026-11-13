@@ -492,7 +492,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse, brewer
 
-Create or edit a material definition: kind, base and purchase units with the factor between them, the word one purchase unit is sold by, lot tracking, default vendor, extract potential, alpha acid. Units are refused once movements, recipe ingredients, format BOM lines, PO lines, contracts or transfer lines use the material
+Create or edit a material definition: kind, base and purchase units with the factor between them, the word one purchase unit is sold by, lot tracking, default vendor, extract potential, alpha acid. A base unit change is refused once movements, recipe ingredients, format BOM lines, PO lines, contracts, transfer lines or brew pulls use the material; a purchase unit or factor change is refused only once PO lines or contracts do
 
 | Field | Type | Required |
 | --- | --- | --- |

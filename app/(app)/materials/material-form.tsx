@@ -5,8 +5,12 @@
 // read (#430), for hops the alpha acid the recipe IBU reads, and the word one
 // purchase unit is sold by (Sold by: a recipe reads whole packs in it). A saved
 // word can be changed but not cleared: sending none keeps it. Creates or
-// edits; units are refused by the command once anything stores a quantity of the material (#614), and turning lot tracking on is refused while stock
-// without a lot is on hand (#452); the command's message explains a refusal.
+// edits. The command refuses a base unit change once anything stores a
+// quantity of the material (#614). It refuses a purchase unit or factor change
+// only once a purchase order or contract counts the material in purchase
+// units, so a material already in recipes or in stock can still take its pack.
+// Turning lot tracking on is refused while stock without a lot is on hand
+// (#452). The command's message names what blocks a refused change.
 "use client";
 
 import { useState } from "react";
