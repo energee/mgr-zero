@@ -182,6 +182,8 @@ export const INERT: (string | RegExp)[] = [
   // Opens the chat panel over the page in place (#1512).
   "Ask MGR",
   "Guide",
+  // The top bar's "?" opens the guide in a new tab, like Guide (#1741).
+  "Help for this page (opens in a new tab)",
   "Show password",
   "Hide password",
   // A combobox's icon button opens its own list in place.

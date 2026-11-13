@@ -175,6 +175,8 @@ Guest labels are never matched to POS items, so a guest row never shows numeric 
 
 ## Navigate MGR [#navigation]
 
+The top bar has a **?** button. It opens the section of this guide for that page in a new tab. **Guide** under **Me** opens the same section.
+
 Orders and New order reuse data already loaded in this tab. While visible, Orders checks for changes every five seconds; New order checks its customer, location and SKU options every 30 seconds. Checks pause in hidden tabs and resume immediately when you return or reconnect. On Orders, **Last checked** shows the most recent successful check. New order has no **Last checked** timestamp because the order has not been saved. **Updating** keeps existing data and your typed draft visible. A connection pause or failed refresh identifies **last-known data** rather than claiming it is current; failed reads offer **Try again**. Slow or interrupted connections can delay updates beyond the normal interval. Saving changes marks cached data for refresh. Switching brewery or signing out discards that cache. The first visit fetches data on demand with a short loading message, not placeholder rows. Ask MGR loads its conversation and history when you first select **Ask MGR** in the header, rather than when you enter the site.
 
 **Last checked** uses the active brewery's timezone, not your device's timezone. Planned and requested dates remain calendar dates.
