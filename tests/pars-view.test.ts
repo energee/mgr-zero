@@ -36,11 +36,11 @@ describe("Pars view", () => {
   });
 
   it.each([
-    ["no taprooms", { locationId: null, locationName: null, locations: [], warehouses: [], suggestions: [], allocations: [] }],
+    ["no taprooms", { locationId: null, locationName: null, locations: [], sources: [], suggestions: [], allocations: [] }],
     ["no pars", { suggestions: [] }],
     ["no standing allocations", { allocations: [] }],
     ["no shortfalls", { shortfalls: [] }],
-    ["missing warehouse", { warehouses: [] }],
+    ["no source", { sources: [] }],
     ["filtered SKU without shortfall", { skuFilter: "lantern-pils-case", shortfalls: [], allShortfallsHref: "#" }],
   ] satisfies [string, Partial<ReplenishmentViewModel>][])("keeps %s fixture navigation away from live mutation routes", (_name, patch) => {
     const html = renderToStaticMarkup(createElement(ReplenishmentView, {

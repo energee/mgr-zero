@@ -15,7 +15,7 @@ export type ReplenishmentViewProps = {
   model: ReplenishmentViewModel;
   fromLocationId: string;
   qtys: Record<string, string>;
-  onWarehouse?: (id: string) => void;
+  onSource?: (id: string) => void;
   onQuantity?: (skuId: string, qty: string) => void;
   onSubmit?: FormEventHandler<HTMLFormElement>;
   quantityActions?: ReactNode;
@@ -47,7 +47,7 @@ export function ReplenishmentView({
   model,
   fromLocationId,
   qtys,
-  onWarehouse,
+  onSource,
   onQuantity,
   onSubmit,
   quantityActions,
@@ -78,13 +78,13 @@ export function ReplenishmentView({
         if (!model.canEdit || !onSubmit) { event.preventDefault(); return; }
         onSubmit(event);
       }} className="flex flex-col gap-4">
-        <div className="md:w-64">{E.pick("From warehouse", fromLocationId, model.warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name })), {
+        <div className="md:w-64">{E.pick("From", fromLocationId, model.sources.map((source) => ({ value: source.id, label: source.name })), {
           id: sourceId,
-          placeholder: "Select warehouse",
+          placeholder: "Select location",
           disabled: !model.canEdit,
-          onChange: (id) => { if (model.canEdit) onWarehouse?.(id); },
+          onChange: (id) => { if (model.canEdit) onSource?.(id); },
           empty: {
-            text: "No other location has the Warehouse use. An admin sets a location's Uses in Locations.",
+            text: "There is no other location to send from. An admin adds one in Locations.",
             ...(model.locationsHref ? { label: "Open Locations", href: model.locationsHref } : {}),
           },
         })}</div>
