@@ -11,7 +11,7 @@ import { toWorkViewProps } from "../lib/mgr/work-view";
 
 const replenishment = {
   backHref: "/work", locationId: null, locationName: null,
-  locations: [], warehouses: [], suggestions: [], allocations: [], shortfalls: [], canEdit: false,
+  locations: [], sources: [], suggestions: [], allocations: [], shortfalls: [], canEdit: false,
 };
 
 describe("Work task layout (#1259)", () => {

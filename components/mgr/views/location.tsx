@@ -34,7 +34,7 @@ export function LocationFields({ name, uses, controls = {} }: {
         "aria-describedby": hintId,
         description: <FieldDescription id={hintId} className="flex flex-col gap-1">
           <span>Choose one or more. One place can be all three.</span>
-          <span>Warehouse: appears in From warehouse on Replenishment and Portal fulfillment warehouse.</span>
+          <span>Warehouse: can be the Portal fulfillment warehouse.</span>
           <span>Taproom: appears on the tap board, weekly count, variance and Replenishment. Taproom staff see stock only at these locations.</span>
         </FieldDescription>,
       })}

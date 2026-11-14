@@ -21,10 +21,10 @@ export function replenishmentQuantityReason(skuId: string, qty: string): string 
   return submitReason(missing);
 }
 
-/** A replenishment order needs a source warehouse and at least one positive line. */
+/** A replenishment order needs a source location and at least one positive line. */
 export function replenishReason(fromLocationId: string, lines: ReturnType<typeof replenishmentLines>): string | null {
   const missing: string[] = [];
-  if (!fromLocationId) missing.push("a warehouse to send from");
+  if (!fromLocationId) missing.push("a location to send from");
   if (lines.length === 0) missing.push("a transfer quantity above zero");
   return submitReason(missing);
 }

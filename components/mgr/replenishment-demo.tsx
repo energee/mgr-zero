@@ -56,7 +56,7 @@ function ReleaseDemo({ allocation, initialOpen, onRelease }: {
 
 export function ReplenishmentDemo({ children, initialRelease = false }: Props): ReactElement {
   const [model, setModel] = useState(children.props.model);
-  const [fromLocationId, setFromLocationId] = useState(() => children.props.model.warehouses[0]?.id ?? "");
+  const [fromLocationId, setFromLocationId] = useState(() => children.props.model.sources[0]?.id ?? "");
   const [qtys, setQtys] = useState<Record<string, string>>(() => Object.fromEntries(
     children.props.model.suggestions.map(row => [row.skuId, String(row.suggested)]),
   ));
@@ -94,7 +94,7 @@ export function ReplenishmentDemo({ children, initialRelease = false }: Props): 
       onRelease={() => release(allocation)} />,
     fromLocationId,
     qtys,
-    onWarehouse: setFromLocationId,
+    onSource: setFromLocationId,
     onQuantity: (skuId, qty) => setQtys(previous => ({ ...previous, [skuId]: qty })),
     onSubmit: event => event.preventDefault(),
     quantityActions: <>
