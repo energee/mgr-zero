@@ -77,19 +77,17 @@ export function PriceGroupsView({
           {model.tabHrefs
             ? <LinkTabs items={model.tabHrefs} current={channel.name} className="w-full overflow-x-auto overflow-y-hidden [scrollbar-width:none] md:w-fit" />
             : <TabBar names={model.tabs} on={model.tab} cls="w-full overflow-x-auto overflow-y-hidden [scrollbar-width:none] md:w-fit" />}
-          <div className="min-w-0 shrink-0 overflow-x-auto">
-            {E.tbl(
-              ["Group", ...model.headers],
-              channel.rows.map((row) => [
-                renderGroup(row),
-                ...row.cells.map((value, col) => row.formatIds[col] ? renderCell(channel, row, col, value) : renderAddPour(row, model.formats[col]!)),
-              ]),
-              ["l", ...model.formats.map(() => "r" as const)],
-              // Unsorted: the cells are price editors, and the rows are the
-              // price groups in their saved order.
-              { sortable: false },
-            )}
-          </div>
+          {E.tbl(
+            ["Group", ...model.headers],
+            channel.rows.map((row) => [
+              renderGroup(row),
+              ...row.cells.map((value, col) => row.formatIds[col] ? renderCell(channel, row, col, value) : renderAddPour(row, model.formats[col]!)),
+            ]),
+            ["l", ...model.formats.map(() => "r" as const)],
+            // Unsorted: the cells are price editors, and the rows are the
+            // price groups in their saved order.
+            { sortable: false },
+          )}
         </>}
     </>
   );

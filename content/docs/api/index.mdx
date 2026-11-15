@@ -836,7 +836,9 @@ cancelled runs together. These history queries default to 50 rows and accept
 record, not history envelopes. For `list_batches`, `open: true` selects brewed,
 unclosed batches, `open: false` selects unstarted plans, and omitting `open`
 returns both. All three exclude cancelled batches. `readings: true` adds the
-latest reading only for each active batch's open occupancies.
+latest reading only for each active batch's open occupancies. It also adds
+`og_reading` to each active batch: its first gravity reading (`id`,
+`gravity_plato`), or `null` when the batch has none.
 
 ### Fields the server computes [#computed]
 
