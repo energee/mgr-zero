@@ -382,7 +382,9 @@ preview hook.
   and revoking.
 - `content/docs/api/`: the MCP endpoint and its auth.
 - Before hosted release, run the matrix by hand: MCP Inspector, Claude,
-  ChatGPT, Cursor, VS Code, an AI SDK client, the OpenAI Agents SDK.
+  ChatGPT, Cursor, VS Code, an AI SDK client, the OpenAI Agents SDK. The steps,
+  the voice check, and the list of what agents cannot reach are in
+  `docs/plans/agent-compatibility.md`.
 
 ## Closing the gap
 
