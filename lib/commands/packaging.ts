@@ -327,16 +327,57 @@ async function vesselNames(ctx: Ctx, occupancyIds: (string | null)[]) {
   return new Map(occs.map((o) => [o.id as string, names.get(o.vessel_id as string) ?? ""]));
 }
 
-// Planned units per run. Summed here rather than in a view: the number is a
-// convenience for the list, and packaging_run_outputs stays the truth. Runs go
-// 100 ids per read, and each read is paged past the 1000-row cap (#469).
-async function plannedUnitsByRun(ctx: Ctx, runIds: string[]) {
-  if (runIds.length === 0) return new Map<string, number>();
+// What a format is counted in on the packaging list: kegs, cases, or loose units.
+function packageUnit(format: { package_type: string | null; units_per_case: number | null } | null) {
+  if (format?.package_type === "keg") return "keg" as const;
+  return format?.units_per_case ? "case" as const : "each" as const;
+}
+
+type SkuPackage = { id: string; formats: Parameters<typeof packageUnit>[0]; format_volume: { bbl_per_unit: number | string | null } | null };
+
+// Barrels in one actual output. A close freezes the volume on its stock
+// movement. A historical run has no movement, so it counts at the format's
+// volume today, or null when the format has none.
+function outputBbl(frozen: number | string | null, qty: number, perUnit: number | string | null) {
+  if (frozen !== null) return Number(frozen);
+  return perUnit === null ? null : qty * Number(perUnit);
+}
+
+// Per run: planned units, actual output grouped by package unit, and barrels
+// packaged. Summed here rather than in a view: the numbers are a convenience
+// for the list, and packaging_run_outputs stays the truth. Runs go 100 ids
+// per read, and each read is paged past the 1000-row cap (#469).
+// `packaged` sums only frozen volumes, so yield never moves with a format edit.
+// It matches packaging_run_yields, a view staff cannot read directly.
+async function outputsByRun(ctx: Ctx, runIds: string[]) {
   const rows = await inChunks(runIds, chunk => completeRows("Planned units", start => ctx.db.from("packaging_run_outputs")
-    .select("run_id, qty_planned", { count: "exact" }).eq("brewery_id", ctx.breweryId).in("run_id", chunk).order("id").range(start, start + PAGE_SIZE - 1)));
-  const totals = new Map<string, number>();
-  for (const r of rows) totals.set(r.run_id as string, (totals.get(r.run_id as string) ?? 0) + Number(r.qty_planned));
-  return totals;
+    .select("run_id, sku_id, qty_planned, qty_actual, movement:inventory_movements(bbl)", { count: "exact" }).eq("brewery_id", ctx.breweryId).in("run_id", chunk).order("id").range(start, start + PAGE_SIZE - 1)));
+  const actual = rows.filter(r => r.qty_actual !== null);
+  const skus = await inChunks([...new Set(actual.map(r => r.sku_id as string))], async chunk => ((await unwrap(ctx.db.from("skus")
+    .select("id, formats(package_type, units_per_case), format_volume:format_volumes(bbl_per_unit)").eq("brewery_id", ctx.breweryId).in("id", chunk).limit(chunk.length))) ?? []) as unknown as SkuPackage[]);
+  const skuById = new Map(skus.map(sku => [sku.id, sku]));
+
+  const planned = new Map<string, number>();
+  for (const r of rows) planned.set(r.run_id as string, (planned.get(r.run_id as string) ?? 0) + Number(r.qty_planned));
+  const packaged = new Map<string, number>();
+  const outputs = new Map<string, { unit: ReturnType<typeof packageUnit>; qty: number; bbl: number | null }[]>();
+  for (const r of actual) {
+    const sku = skuById.get(r.sku_id as string);
+    const unit = packageUnit(sku?.formats ?? null);
+    const qty = Number(r.qty_actual);
+    const frozen = (r.movement as unknown as { bbl: number | string } | null)?.bbl ?? null;
+    const bbl = outputBbl(frozen, qty, sku?.format_volume?.bbl_per_unit ?? null);
+    packaged.set(r.run_id as string, (packaged.get(r.run_id as string) ?? 0) + Number(frozen ?? 0));
+    const run = outputs.get(r.run_id as string) ?? [];
+    const sameUnit = run.find(output => output.unit === unit);
+    if (!sameUnit) run.push({ unit, qty, bbl });
+    else {
+      sameUnit.qty += qty;
+      sameUnit.bbl = sameUnit.bbl === null || bbl === null ? null : sameUnit.bbl + bbl;
+    }
+    outputs.set(r.run_id as string, run);
+  }
+  return { planned, outputs, packaged };
 }
 
 const RUN_COLUMNS = "id, run_no, brand_id, occupancy_id, planned_on, started_at, closed_at, cancelled_at, bbl_drawn, note";
@@ -344,33 +385,35 @@ const RUN_COLUMNS = "id, run_no, brand_id, occupancy_id, planned_on, started_at,
 /** Resolve display facts only for the runs returned on this page. */
 async function packagingListRows<T extends RunRow>(ctx: Ctx, runs: T[]) {
   if (runs.length === 0) return [];
-  const [brands, vessels, qty] = await Promise.all([
+  const [brands, vessels, outputs] = await Promise.all([
     brandNames(ctx, runs.map(r => r.brand_id)),
     vesselNames(ctx, runs.map(r => r.occupancy_id)),
-    plannedUnitsByRun(ctx, runs.map(r => r.id)),
+    outputsByRun(ctx, runs.map(r => r.id)),
   ]);
   return runs.map(r => ({
     ...r,
     brand_name: brands.get(r.brand_id) ?? null,
     vessel_name: r.occupancy_id ? vessels.get(r.occupancy_id) ?? null : null,
-    qty_planned: qty.get(r.id) ?? 0,
+    qty_planned: outputs.planned.get(r.id) ?? 0,
+    bbl_packaged: r.closed_at ? outputs.packaged.get(r.id) ?? 0 : null,
+    outputs: outputs.outputs.get(r.id) ?? [],
   }));
 }
 
 defineQuery({
   name: "list_packaging_runs",
-  description: "Unfinished packaging runs by planned date, newest first, with brand, source tank and planned units. Use list_packaging_history for closed or cancelled runs.",
+  description: "Unfinished packaging runs by planned date, soonest first, with brand, source tank and planned units. Use list_packaging_history for closed or cancelled runs.",
   input: z.object({}), roles: ["admin", "brewer", "warehouse"],
   handler: async (ctx) => {
     const runs = await completeRows("Packaging runs", start => ctx.db.from("packaging_runs").select(RUN_COLUMNS, { count: "exact" })
       .eq("brewery_id", ctx.breweryId).is("closed_at", null).is("cancelled_at", null)
-      .order("planned_on", { ascending: false }).order("id").range(start, start + PAGE_SIZE - 1)) as RunRow[];
+      .order("planned_on").order("id").range(start, start + PAGE_SIZE - 1)) as RunRow[];
     return packagingListRows(ctx, runs);
   },
 });
 
 defineQuery({
-  name: "list_packaging_history", description: "One page of closed or cancelled packaging runs, newest created first, with brand, source tank and planned units",
+  name: "list_packaging_history", description: "One page of closed or cancelled packaging runs, newest created first, with brand, source tank and planned units. A closed run adds its actual output by package unit (case, keg, or each), its barrels drawn and its barrels packaged",
   input: z.object(historyInput), roles: ["admin", "brewer", "warehouse"],
   handler: async (ctx, i) => {
     const q = ctx.db.from("packaging_runs").select(`${RUN_COLUMNS}, created_at`).eq("brewery_id", ctx.breweryId)

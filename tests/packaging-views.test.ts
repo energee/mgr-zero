@@ -80,7 +80,6 @@ describe("packaging views", () => {
     expect(upcoming).toMatchObject({ runNo: "RUN-0008", brand: "Pils", date: "Sep 5, 2026", source: null, quantity: "0", verb: "Pick source" });
     expect(upcoming.output).toBeUndefined();
     expect(upcoming.yieldPercent).toBeUndefined();
-    expect(upcoming.lossBbl).toBeUndefined();
   });
 
   it("a finished run is a row link with no Open verb, so it never reads as reopen (#996)", () => {
@@ -96,35 +95,61 @@ describe("packaging views", () => {
     expect(markup).not.toMatch(/>Open</);
   });
 
-  it("dates finished runs by the brewery-local close or cancellation day", () => {
-    const base = { planned_on: "2026-09-01", started_at: null, brand_name: "Pils", vessel_name: "FV1", qty_planned: 10 };
+  it("groups finished runs under their planned day, newest day first, with the day's closed runs and barrels", () => {
+    const base = { started_at: null, cancelled_at: null, brand_name: "Pils", vessel_name: "FV1", qty_planned: 10 };
     const model = toPackagingRunsViewProps([
-      { ...base, id: "closed", run_no: 7, closed_at: "2026-09-05T01:30:00Z", cancelled_at: null },
-      { ...base, id: "cancelled", run_no: 8, closed_at: null, cancelled_at: "2026-09-05T01:30:00Z" },
+      { ...base, id: "old", run_no: 5, planned_on: "2026-09-01", closed_at: "2026-09-09T01:30:00Z", outputs: [{ unit: "case", qty: 1, bbl: 0.1 }] },
+      { ...base, id: "a", run_no: 6, planned_on: "2026-09-04", closed_at: "2026-09-09T01:30:00Z", outputs: [{ unit: "case", qty: 90, bbl: 9 }, { unit: "keg", qty: 6, bbl: 3 }] },
+      { ...base, id: "b", run_no: 7, planned_on: "2026-09-04", closed_at: "2026-09-09T01:30:00Z", outputs: [{ unit: "keg", qty: 5, bbl: 2.54 }] },
+      { ...base, id: "c", run_no: 8, planned_on: "2026-09-04", closed_at: null, cancelled_at: "2026-09-05T01:30:00Z" },
     ], "America/Los_Angeles");
-    expect(model.recent.map(row => row.date)).toEqual(["Sep 4, 2026", "Sep 4, 2026"]);
+    expect(model.recent.map(row => [row.key, row.heading])).toEqual([
+      ["a", "Sep 4, 2026 · 2 runs · 14.5 bbl packaged"], ["b", undefined], ["c", undefined],
+      ["old", "Sep 1, 2026 · 1 run · 0.1 bbl packaged"],
+    ]);
   });
 
-  it("keeps shortage precedence over physical work and preserves recorded zero yield and loss", () => {
+  it("states a closed run's output by package unit and its share of barrels in kegs", () => {
+    const run = { id: "r", run_no: 1, planned_on: "2026-09-05", started_at: null, closed_at: "2026-09-06", cancelled_at: null, brand_name: "Pils", vessel_name: null, qty_planned: 20 };
+    const recent = (outputs: NonNullable<Parameters<typeof toPackagingRunsViewProps>[0][number]["outputs"]>) => toPackagingRunsViewProps([{ ...run, outputs }], "UTC").recent[0];
+    expect(recent([{ unit: "keg", qty: 6, bbl: 3 }, { unit: "each", qty: 2, bbl: 0 }, { unit: "case", qty: 1, bbl: 9 }])).toMatchObject({ output: "1 case · 6 kegs · 2 units", kegPercent: 25 });
+    // A recorded zero is stated; with no barrels there is no share to draw.
+    expect(recent([{ unit: "keg", qty: 0, bbl: 0 }])).toMatchObject({ output: "0 kegs", kegPercent: undefined });
+    // A format with no volume leaves the share unknown instead of guessing it.
+    expect(recent([{ unit: "keg", qty: 1, bbl: null }, { unit: "case", qty: 4, bbl: 0.4 }]).kegPercent).toBeUndefined();
+    expect(recent([]).output).toBeUndefined();
+    // A day whose barrels are unknown names its runs only.
+    expect(recent([{ unit: "keg", qty: 1, bbl: null }]).heading).toBe("Sep 5, 2026 · 1 run");
+  });
+
+  it("derives yield from barrels packaged over barrels drawn, and flags one under 90%", () => {
+    const run = { id: "r", run_no: 1, planned_on: "2026-09-05", started_at: null, closed_at: "2026-09-06", cancelled_at: null, brand_name: "Pils", vessel_name: null, qty_planned: 20 };
+    const recent = (facts: { bbl_drawn?: number | null; bbl_packaged?: number | null }) => toPackagingRunsViewProps([{ ...run, ...facts }], "UTC").recent[0];
+    expect(recent({ bbl_drawn: 10, bbl_packaged: 9.64 })).toMatchObject({ yieldPercent: 96, lowYield: false });
+    expect(recent({ bbl_drawn: 10, bbl_packaged: 8.94 })).toMatchObject({ yieldPercent: 89, lowYield: true });
+    expect(recent({ bbl_drawn: 10, bbl_packaged: 0 })).toMatchObject({ yieldPercent: 0, lowYield: true });
+    // A historical run has no barrels drawn, so it has no yield.
+    expect(recent({ bbl_drawn: null, bbl_packaged: 0 }).yieldPercent).toBeUndefined();
+  });
+
+  it("keeps shortage precedence over physical work", () => {
     const base = { id: "r", run_no: 1, planned_on: "2026-09-05", started_at: null, closed_at: null, cancelled_at: null, brand_name: "Pils", vessel_name: "FV1", qty_planned: 10, planned_unit: "kegs" };
     for (const started_at of [null, "2026-09-05"]) {
       const model = toPackagingRunsViewProps([{ ...base, started_at, material_shortfall: "12 ends short" }], "UTC");
       expect(model.upcoming[0]).toMatchObject({ quantity: "10 kegs", shortfall: "12 ends short", verb: "Resolve", tone: "attention" });
     }
-    const model = toPackagingRunsViewProps([{ ...base, closed_at: "2026-09-05", output_summary: "0 kegs", yield_percent: 0, loss_bbl: 0 }], "UTC");
-    expect(model.recent[0]).toMatchObject({ output: "0 kegs", yieldPercent: 0, lossBbl: 0 });
   });
 
-  it("does not present a plan as actual output and renders recorded zeroes instead of blanks", () => {
+  it("Recent shows run, brand and output, adds Yield only when a run has one, and marks a cancelled run", () => {
     const run = { id: "r", run_no: 1, planned_on: "2026-09-05", started_at: null, closed_at: "2026-09-06", cancelled_at: null, brand_name: "Pils", vessel_name: null, qty_planned: 20 };
-    const planned = htmlOf(createElement(PackagingRunsView, { model: toPackagingRunsViewProps([run], "UTC") }));
-    expect(planned).toContain("Planned quantity");
-    expect(planned).not.toMatch(/>Output<|>Yield<|>Loss \(bbl\)</);
-    const model = toPackagingRunsViewProps([{ ...run, output_summary: "0 kegs", yield_percent: 0, loss_bbl: 0 }, { ...run, id: "missing", run_no: 2 }], "UTC");
-    const recorded = htmlOf(createElement(PackagingRunsView, { model })).match(/<table\b[\s\S]*?<\/table>/)![0];
-    const cells = [...recorded.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/g)].map(match => match[1].replace(/<[^>]*>/g, ""));
-    expect(cells.slice(5, 8)).toEqual(["0 kegs", "0%", "0"]);
-    expect(cells.slice(13, 16)).toEqual(["", "", ""]);
+    const table = (runs: Parameters<typeof toPackagingRunsViewProps>[0]) => htmlOf(createElement(PackagingRunsView, { model: toPackagingRunsViewProps(runs, "UTC") })).match(/<table\b[\s\S]*?<\/table>/)![0];
+    const text = (html: string, tag: string) => [...html.matchAll(new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)</${tag}>`, "g"))].map(match => match[1].replace(/<[^>]*>/g, ""));
+    const plain = table([{ ...run, outputs: [{ unit: "case", qty: 4, bbl: 0.4 }] }, { ...run, id: "x", run_no: 2, closed_at: null, cancelled_at: "2026-09-06" }]);
+    expect(text(plain, "th")).toEqual(["Run", "Brand", "Output"]);
+    expect(text(plain, "td")).toEqual(["Sep 5, 2026 · 1 run · 0.4 bbl packaged", "RUN-0001", "Pils", "4 cases", "RUN-0002", "Pils", "Cancelled"]);
+    const drawn = table([{ ...run, bbl_drawn: 10, bbl_packaged: 8 }, { ...run, id: "y", run_no: 2 }]);
+    expect(text(drawn, "th")).toEqual(["Run", "Brand", "Output", "Yield"]);
+    expect(text(drawn, "td")).toEqual(["Sep 5, 2026 · 2 runs", "RUN-0001", "Pils", "", "80%", "RUN-0002", "Pils", "", ""]);
   });
 
   it("explains every missing scheduling requirement without requiring a source tank (#1256)", () => {

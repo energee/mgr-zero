@@ -1,6 +1,7 @@
-// app/(app)/packaging/page.tsx — Work › Packaging: runs by planned date,
-// newest first (list_packaging_runs), each opening its own page to pick a
-// tank, start, or close. Schedule run is schedule-run-form.tsx →
+// app/(app)/packaging/page.tsx — Work › Packaging: unfinished runs soonest
+// first (list_packaging_runs) and a page of finished ones grouped by planned
+// day (list_packaging_history), each opening its own page to pick a tank,
+// start, or close. Schedule run is schedule-run-form.tsx →
 // schedule_packaging_run, fed the brands, open tanks and SKUs read here;
 // Repack is repack-form.tsx → record_repack, a shape change unrelated to any
 // one run — admin/warehouse only (record_repack's own roles), so it is hidden
@@ -15,7 +16,7 @@ import { buildContext } from "@/lib/commands/context";
 import { canRun } from "@/lib/commands/registry";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
-import { toPackagingRunsViewProps } from "@/lib/mgr/packaging-runs-view";
+import { toPackagingRunsViewProps, type PackagingRunSnapshot } from "@/lib/mgr/packaging-runs-view";
 import type { ScheduleRunData } from "@/lib/mgr/schedule-packaging-run-view";
 import { ScheduleRunForm } from "./schedule-run-form";
 import { RepackForm, type RepackParent } from "./repack-form";
@@ -25,11 +26,7 @@ import { historyPage, pageCursor, type HistoryPage, type HistoryRow } from "@/li
 
 export const metadata = { title: navTitle("/packaging") };
 
-type Run = {
-  id: string; run_no: number; brand_id: string; occupancy_id: string | null; planned_on: string;
-  started_at: string | null; closed_at: string | null; cancelled_at: string | null; bbl_drawn: number | null;
-  brand_name: string | null; vessel_name: string | null; qty_planned: number;
-};
+type Run = PackagingRunSnapshot;
 type Brand = { id: string; name: string };
 type Occupancy = ScheduleRunData["occupancies"][number];
 type Location = { id: string; name: string };
