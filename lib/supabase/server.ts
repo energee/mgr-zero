@@ -4,11 +4,13 @@ import { createServerClient as createSSR } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { publicEnv } from "@/lib/env/public";
+import { timedFetch } from "@/lib/server-timing";
 
 export async function createServerClient(headers?: Record<string, string>) {
   const store = await cookies();
   return createSSR<Database>(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
-    ...(headers ? { global: { headers } } : {}),
+    // Each round trip is logged, so hosted page time can be split by trip (lib/server-timing.ts).
+    global: { fetch: timedFetch, ...(headers ? { headers } : {}) },
     cookies: {
       getAll: () => store.getAll(),
       setAll: (all) => all.forEach(({ name, value, options }) => store.set(name, value, options)),
