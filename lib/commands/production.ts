@@ -631,12 +631,24 @@ type BatchRow = {
 
 const BATCH_COLUMNS = "id, batch_no, intended_brand_id, recipe_version_id, planned_on, planned_bbl, brewed_on, closed_at, cancelled_at, completion_adjustment_id, note, brand:brands(name), recipe_version:recipe_versions(recipe:recipes(name))";
 
-/** Only brewed, unfinished batches need occupancy reads. History has no current vessels. */
+/** Each batch's first gravity reading, its OG, by batch id. A batch with no gravity reading has no entry. */
+async function firstGravityReadings(ctx: Ctx, batchIds: string[]) {
+  const rows = await inChunks(batchIds, chunk => completeRows("Batches", start => ctx.db.from("batches")
+    .select("id, fermentation_readings(id, gravity_plato)", { count: "exact" }).eq("brewery_id", ctx.breweryId).in("id", chunk)
+    .not("fermentation_readings.gravity_plato", "is", null)
+    .order("at", { referencedTable: "fermentation_readings" }).order("id", { referencedTable: "fermentation_readings" })
+    .limit(1, { referencedTable: "fermentation_readings" }).order("id").range(start, start + PAGE_SIZE - 1)));
+  return new Map(rows.flatMap(r => r.fermentation_readings.map(first => [r.id, { id: first.id, gravity_plato: num(first.gravity_plato) }] as const)));
+}
+
+/** Only brewed, unfinished batches need occupancy reads. History has no current vessels.
+ *  With readings, each of those batches also carries og_reading, null when it has no gravity reading. */
 async function batchListRows<T extends BatchRow>(ctx: Ctx, batches: T[], readings = false) {
   const activeIds = batches.filter(b => b.brewed_on && !b.closed_at && !b.cancelled_at).map(b => b.id);
-  const vessels = await openVessels(ctx, activeIds, readings);
+  const [vessels, ogs] = await Promise.all([openVessels(ctx, activeIds, readings), readings ? firstGravityReadings(ctx, activeIds) : undefined]);
   return batches.map(({ brand, recipe_version, ...batch }) => ({
     ...batch,
+    ...(ogs && activeIds.includes(batch.id) && { og_reading: ogs.get(batch.id) ?? null }),
     brand_name: brand?.name ?? null,
     recipe_name: recipe_version?.recipe?.name ?? null,
     vessel_name: vessels.get(batch.id)?.map(v => v.vessel_name).join(", ") || null,
@@ -681,9 +693,9 @@ async function openVessels(ctx: Ctx, batchIds: string[], withReadings = false) {
 }
 
 defineQuery({
-  name: "list_batches", description: "Unfinished batches by planned date, newest first, with brand, recipe and current vessels; readings adds the latest reading only for brewed, unclosed batches. Use list_batch_history for completed or cancelled batches.",
+  name: "list_batches", description: "Unfinished batches by planned date, newest first, with brand, recipe and current vessels; readings adds, only for brewed, unclosed batches, each open occupancy's latest reading and the batch's first gravity reading (og_reading, null when it has none). Use list_batch_history for completed or cancelled batches.",
   input: z.object({
-    readings: z.boolean().optional().describe("Add each active occupancy's latest fermentation reading"),
+    readings: z.boolean().optional().describe("Add each active occupancy's latest fermentation reading and each active batch's first gravity reading"),
     open: z.boolean().optional().describe("True keeps brewed, unclosed batches; false keeps unstarted plans; omitted returns both"),
   }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {

@@ -712,10 +712,11 @@ describe("a batch split across tanks", () => {
     const first = (await runCommand("get_brew_day", { batchId: batch.id }, ctx)) as { occupancy: { id: string } };
     await runCommand("record_cellar_transfer", { fromOccupancyId: first.occupancy.id, toVesselId: bt.id, volumeBbl: 5 }, ctx);
 
-    await runCommand("record_fermentation_reading", { occupancyId: first.occupancy.id, at: "2026-10-01T12:00:00Z", tempF: 65 }, ctx);
-    await runCommand("record_fermentation_reading", { occupancyId: first.occupancy.id, at: "2026-10-02T12:00:00Z", tempF: 68 }, ctx);
+    await runCommand("record_fermentation_reading", { occupancyId: first.occupancy.id, at: "2026-10-01T12:00:00Z", tempF: 65, gravityPlato: 15 }, ctx);
+    await runCommand("record_fermentation_reading", { occupancyId: first.occupancy.id, at: "2026-10-02T12:00:00Z", tempF: 68, gravityPlato: 5 }, ctx);
     const plain = (await runCommand("list_batches", {}, ctx)) as { id: string; active_occupancies: object[] }[];
     expect(plain.find((r) => r.id === batch.id)!.active_occupancies[0]).not.toHaveProperty("latest_reading");
+    expect(plain.find((r) => r.id === batch.id)!).not.toHaveProperty("og_reading");
     const brewDay = (await runCommand("get_brew_day", { batchId: batch.id }, ctx)) as { occupancy: object };
     expect(brewDay.occupancy).not.toHaveProperty("latest_reading");
     const listed = (await runCommand("list_batches", { readings: true }, ctx)) as { id: string; vessel_name: string | null; active_occupancies: { id: string; vessel_name: string; latest_reading: { temp_f: number } | null }[] }[];
@@ -724,6 +725,8 @@ describe("a batch split across tanks", () => {
     expect(result.active_occupancies).toHaveLength(2);
     expect(result.active_occupancies[0]).toMatchObject({ id: first.occupancy.id, vessel_name: fv.name, latest_reading: { temp_f: 68 } });
     expect(result.active_occupancies[1]).toMatchObject({ vessel_name: bt.name, latest_reading: null });
+    // The batch's first gravity reading, the OG its tanks' current figures are measured from.
+    expect(result).toMatchObject({ og_reading: { gravity_plato: 15 } });
     const day = (await runCommand("get_brew_day", { batchId: batch.id }, ctx)) as { occupancy: { vessel_name: string; initial_bbl: number } };
     expect(day.occupancy).toMatchObject({ vessel_name: fv.name, initial_bbl: 20 });
   });

@@ -281,7 +281,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, brewer
 
-Unfinished batches by planned date, newest first, with brand, recipe and current vessels; readings adds the latest reading only for brewed, unclosed batches. Use list_batch_history for completed or cancelled batches.
+Unfinished batches by planned date, newest first, with brand, recipe and current vessels; readings adds, only for brewed, unclosed batches, each open occupancy's latest reading and the batch's first gravity reading (og_reading, null when it has none). Use list_batch_history for completed or cancelled batches.
 
 | Field | Type | Required |
 | --- | --- | --- |
