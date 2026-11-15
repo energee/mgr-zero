@@ -201,7 +201,8 @@ export function BrandView({
           )}
         </section>
       </div>
-      {!model.isNew && <FieldDescription>Brands cannot be deleted or archived; to stop selling a format, switch it off under Sells as.</FieldDescription>}
+      {/* Still a note (#1311), in one sentence; quiet text here, because the page already ends in the Save bar. */}
+      {!model.isNew && <FieldDescription role="note">Brands cannot be deleted or archived; to stop selling a format, switch it off under Sells as.</FieldDescription>}
       {/* Save stays in view under both columns: the switches and compliance
           rows above it save on their own, the fields only with this button.
           --bar is the surface the view sits on (the page, or a sheet's
