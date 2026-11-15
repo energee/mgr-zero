@@ -5,7 +5,7 @@
 // cellar-transfer-form.tsx → record_cellar_transfer; Addition is
 // cellar-addition-form.tsx → record_batch_addition.
 import { CellarMapView } from "@/components/mgr/views/cellar-map";
-import { cellarReadings, toCellarMapViewProps } from "@/lib/mgr/cellar-map-view";
+import { cellarReadings, toCellarMapViewProps, type OrderedVessel } from "@/lib/mgr/cellar-map-view";
 import type { VesselReading } from "@/lib/mgr/vessel-detail-view";
 import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -27,7 +27,7 @@ type Occupancy = {
   occupancy_id: string; vessel_id: string; vessel_name: string | null; batch_id: string; batch_no: number | null;
   brand_name: string | null; started_at: string; bbl: number;
 };
-type Vessel = { id: string; name: string; kind: string; capacity_bbl: number };
+type Vessel = OrderedVessel & { capacity_bbl: number };
 type Batch = {
   id: string; batch_no: number | null; brand_name: string | null;
   active_occupancies: { id: string; latest_reading?: VesselReading | null }[];

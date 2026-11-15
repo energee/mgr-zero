@@ -29,7 +29,7 @@ import { PlanActions } from "../components/mgr/views/plan-actions";
 import { toRecipesViewProps } from "../lib/mgr/recipes-view";
 import { resolveTap } from "../lib/mgr/screen-links";
 import { formatVesselReading } from "../lib/mgr/vessel-detail-view";
-import { cellarReadings, toCellarMapViewProps } from "../lib/mgr/cellar-map-view";
+import { cellarReadings, nextTankOccupancy, toCellarMapViewProps } from "../lib/mgr/cellar-map-view";
 import { CellarMapView } from "../components/mgr/views/cellar-map";
 import { CellarTransferView } from "../components/mgr/views/cellar-transfer";
 import { CellarAdditionView } from "../components/mgr/views/cellar-addition";
@@ -55,11 +55,13 @@ const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const src = (file: string) => readFileSync(file, "utf8");
 
 it("cellar derives fills from occupancy and keeps links explicit", () => {
-  const vessels = [{ id: "v1", name: "Actual tank", capacity_bbl: 10 }, { id: "v2", name: "Empty tank", capacity_bbl: 5 }];
+  const vessels = [{ id: "v1", name: "Actual tank", capacity_bbl: 10, kind: "fermenter" as const }, { id: "v2", name: "Empty tank", capacity_bbl: 5, kind: "fermenter" as const }];
   const occupancies = [{ vessel_id: "v1", occupancy_id: "o1", brand_name: null, bbl: 2.5 }];
   const model = toCellarMapViewProps(vessels, occupancies);
-  expect(model.tiles[0]).toMatchObject({ fill: 25, detail: "No brand yet · 2.5 / 10 bbl", reading: "No readings yet", href: undefined });
-  expect(model.tiles[1]).toMatchObject({ fill: 0, reading: "available" });
+  expect(model.tiles[0]).toMatchObject({ fill: 25, detail: "No brand yet", volume: "2.5 / 10 bbl", reading: "No readings yet", href: undefined });
+  // An empty tank says so in one line: no volume, reading or fill bar.
+  expect(model.tiles[1]).toEqual({ name: "Empty tank", group: "Fermenters", detail: "Empty · 5 bbl", href: undefined });
+  expect(htmlOf(createElement(CellarMapView, { model })).match(/aria-label="Fill"/g)).toHaveLength(1);
   const live = toCellarMapViewProps(vessels, occupancies, { o1: "Actual reading" }, { v1: "/cellar/vessels/v1" });
   expect(htmlOf(createElement(CellarMapView, { model: live }))).toContain('href="/cellar/vessels/v1"');
   expect(htmlOf(createElement(CellarMapView, { model }))).not.toContain('href="/cellar');
@@ -67,7 +69,7 @@ it("cellar derives fills from occupancy and keeps links explicit", () => {
 });
 
 it("#1516 puts Complete batch with the cellar actions above the tiles, which fill a wide screen", () => {
-  const model = toCellarMapViewProps([{ id: "v1", name: "FV1", capacity_bbl: 10 }], []);
+  const model = toCellarMapViewProps([{ id: "v1", name: "FV1", capacity_bbl: 10, kind: "fermenter" as const }], []);
   const html = htmlOf(createElement(CellarMapView, { model }));
   expect(html.indexOf(">Complete batch</button>")).toBeLessThan(html.indexOf("FV1"));
   expect(html).toContain("md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]");
@@ -118,7 +120,7 @@ describe("vessels are admin-managed", () => {
   });
 
   it("hides Add vessel and New vessel when their href is null", () => {
-    const model = toCellarMapViewProps([{ id: "v1", name: "Tank", capacity_bbl: 10 }], []);
+    const model = toCellarMapViewProps([{ id: "v1", name: "Tank", capacity_bbl: 10, kind: "fermenter" as const }], []);
     expect(htmlOf(createElement(CellarMapView, { model }))).toContain("Add vessel");
     expect(htmlOf(createElement(CellarMapView, { model: { ...model, addHref: null } }))).not.toContain("Add vessel");
     expect(htmlOf(createElement(BatchesView, { model: toBatchesViewProps(batchesBrewer) }))).toContain("New vessel");
@@ -704,7 +706,7 @@ it("only offers the cellar Reading shortcut when one tank could be meant", () =>
   // The map draws a single Reading button. With more than one tank occupied
   // there is no unambiguous target, and guessing records a fermentation
   // reading against the wrong occupancy; the tile opens the right tank.
-  const vessels = [{ id: "v1", name: "FV1", capacity_bbl: 10 }, { id: "v2", name: "FV2", capacity_bbl: 10 }];
+  const vessels = [{ id: "v1", name: "FV1", capacity_bbl: 10, kind: "fermenter" as const }, { id: "v2", name: "FV2", capacity_bbl: 10, kind: "fermenter" as const }];
   const one = [{ vessel_id: "v1", occupancy_id: "o1", brand_name: null, bbl: 2 }];
   const two = [...one, { vessel_id: "v2", occupancy_id: "o2", brand_name: null, bbl: 3 }];
   const reading = (occupancyId: string) => `/cellar/${occupancyId}/reading`;
@@ -716,18 +718,35 @@ it("only offers the cellar Reading shortcut when one tank could be meant", () =>
 });
 
 it("explains a disabled cellar Reading instead of leaving a dead end (#715)", () => {
-  const vessels = [{ id: "v1", name: "FV1", capacity_bbl: 10 }, { id: "v2", name: "FV2", capacity_bbl: 10 }];
+  const vessels = [{ id: "v1", name: "FV1", capacity_bbl: 10, kind: "fermenter" as const }, { id: "v2", name: "FV2", capacity_bbl: 10, kind: "fermenter" as const }];
   const one = [{ vessel_id: "v1", occupancy_id: "o1", brand_name: null, bbl: 2 }];
   const two = [...one, { vessel_id: "v2", occupancy_id: "o2", brand_name: null, bbl: 3 }];
   const reading = (occupancyId: string) => `/cellar/${occupancyId}/reading`;
   expect(toCellarMapViewProps(vessels, one, {}, {}, reading).actionHint).toBeUndefined();
-  expect(toCellarMapViewProps(vessels, two, {}, {}, reading).actionHint).toBe("Several tanks hold beer. Use Reading on a tank.");
+  // With several tanks the top Reading is not drawn, so there is nothing to explain: each tile's reading line opens Reading.
+  expect(toCellarMapViewProps(vessels, two, {}, {}, reading).actionHint).toBeUndefined();
   // #1115: Transfer and Addition are off for the same reason, so the one note names all three.
   expect(toCellarMapViewProps(vessels, [], {}, {}, reading).actionHint).toBe("No tank holds beer, so there is nothing to read, transfer or add to.");
   const html = htmlOf(createElement(CellarMapView, { model: toCellarMapViewProps(vessels, two, {}, { v1: "/cellar/vessels/v1" }, reading) }));
-  expect(html).toContain("Use Reading on a tank.");
-  // The top Reading stays unbound; each tile carries its own (#1508).
-  expect(html).not.toMatch(/<a[^>]*href="\/cellar\/o\d\/reading"[^>]*>Reading<\/a>\s*<button/);
+  expect(html).not.toMatch(/>Reading</);
+  // Each tile opens Reading on its own tank (#1508): with no reading yet, through an Add reading button.
+  expect(html.match(/<a[^>]*data-slot="button"[^>]*href="\/cellar\/o\d\/reading"[^>]*>Add reading<\/a>/g)).toHaveLength(2);
+  // Once a tank has a reading, that line is the link and the button is gone.
+  const read = htmlOf(createElement(CellarMapView, { model: toCellarMapViewProps(vessels, one, { o1: "4.5 °P · Sep 1" }, {}, reading) }));
+  expect(read).toMatch(/<a href="\/cellar\/o1\/reading"[^>]*>4\.5 °P · Sep 1<\/a>/);
+  expect(read).not.toContain("Add reading");
+});
+
+it("groups cellar tiles by vessel type, in counting order, and the reading round follows", () => {
+  const vessel = (id: string, name: string, kind: "fermenter" | "brite" | "barrel" | "kettle" | "other") => ({ id, name, kind, capacity_bbl: 10 });
+  const vessels = [vessel("b1", "BT1", "brite"), vessel("f1", "FV1", "fermenter"), vessel("f10", "FV10", "fermenter"), vessel("f2", "FV2", "fermenter"), vessel("k", "Kettle", "kettle")];
+  const occupancies = [{ vessel_id: "b1", occupancy_id: "ob", brand_name: "Pils", bbl: 5 }, { vessel_id: "f10", occupancy_id: "o10", brand_name: null, bbl: 5 }, { vessel_id: "f2", occupancy_id: "o2", brand_name: null, bbl: 5 }];
+  const model = toCellarMapViewProps(vessels, occupancies);
+  expect(model.tiles.map(tile => [tile.group, tile.name])).toEqual([["Fermenters", "FV1"], ["Fermenters", "FV2"], ["Fermenters", "FV10"], ["Brite tanks", "BT1"], ["Kettles", "Kettle"]]);
+  const html = htmlOf(createElement(CellarMapView, { model }));
+  expect(html.match(/<h2[^>]*>([^<]+)<\/h2>/g)?.map(h => h.replace(/<[^>]+>/g, ""))).toEqual(["Fermenters", "Brite tanks", "Kettles"]);
+  expect(nextTankOccupancy(vessels, occupancies, "o2")).toBe("o10");
+  expect(nextTankOccupancy(vessels, occupancies, "o10")).toBe("ob");
 });
 
 // #994: an empty search is not an empty recipe book.
@@ -745,9 +764,12 @@ describe("cellar readings (#700)", () => {
       { active_occupancies: [{ id: "o1", latest_reading: reading }, { id: "o2", latest_reading: null }] },
       { active_occupancies: [] },
     ], "plato", "UTC");
-    expect(Object.keys(readings)).toEqual(["o1", "o2"]);
+    // A tank with no reading has no entry, so a linked tile has no reading line and draws Add reading instead.
+    expect(Object.keys(readings)).toEqual(["o1"]);
     expect(readings.o1).toContain("2026");
-    expect(readings.o2).toBe("No readings yet");
+    const vessels = [{ id: "v2", name: "FV2", kind: "fermenter" as const, capacity_bbl: 10 }];
+    const tile = toCellarMapViewProps(vessels, [{ vessel_id: "v2", occupancy_id: "o2", brand_name: null, bbl: 2 }], readings, {}, id => `/cellar/${id}/reading`).tiles[0];
+    expect(tile).toMatchObject({ reading: undefined, readingHref: "/cellar/o2/reading" });
   });
 
 });
@@ -794,7 +816,7 @@ describe("cellar sheets label every field (#1115)", () => {
   });
 
   it("with no beer in any tank, all three actions are off under one note, even without a reading path", () => {
-    const vessels = [{ id: "v1", name: "FV1", capacity_bbl: 10 }];
+    const vessels = [{ id: "v1", name: "FV1", capacity_bbl: 10, kind: "fermenter" as const }];
     const empty = toCellarMapViewProps(vessels, []);
     expect(empty.actionsOff).toBe(true);
     expect(empty.actionHint).toBe("No tank holds beer, so there is nothing to read, transfer or add to.");
@@ -805,9 +827,11 @@ describe("cellar sheets label every field (#1115)", () => {
   });
 
   it("draws Brew day as a link to Batches, not as a peer action button", () => {
-    const model = { ...toCellarMapViewProps([{ id: "v1", name: "FV1", capacity_bbl: 10 }], []), brewHref: "/batches" };
+    const model = { ...toCellarMapViewProps([{ id: "v1", name: "FV1", capacity_bbl: 10, kind: "fermenter" as const }], []), brewHref: "/batches" };
     const html = htmlOf(createElement(CellarMapView, { model }));
     expect(html).toMatch(/<a[^>]*href="\/batches"[^>]*>Start a brew day in Batches<\/a>/);
+    // It sits at the foot, under the tiles, so the actions lead straight into the tanks.
+    expect(html.indexOf("Start a brew day in Batches")).toBeGreaterThan(html.indexOf("FV1"));
     expect(html).not.toMatch(/data-slot="button"[^>]*href="\/batches"/);
   });
 });
