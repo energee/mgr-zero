@@ -4,7 +4,7 @@ import { E } from "@/components/mgr/e";
 /** The fixed slot that leads a Catalog row; left blank when no label is saved. */
 export const COLA_SLOT = "h-12 w-16 shrink-0";
 /** A saved label's thumbnail in that slot; empty until it loads. */
-const COLA_THUMB = `${COLA_SLOT} flex items-center justify-center overflow-hidden rounded-sm border bg-muted/40`;
+const COLA_THUMB = `${COLA_SLOT} flex items-center justify-center overflow-hidden rounded-sm bg-muted/40`;
 
 /** The live adapter resolves TTB's session-bound attachment into image bytes.
  *  Compact draws the Catalog thumbnail. The live ColaImage fetches it when the
