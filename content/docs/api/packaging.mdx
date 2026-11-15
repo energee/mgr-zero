@@ -292,7 +292,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, brewer, warehouse
 
-One page of closed or cancelled packaging runs, newest created first, with brand, source tank and planned units
+One page of closed or cancelled packaging runs, newest created first, with brand, source tank and planned units. A closed run adds its actual output by package unit (case, keg, or each), its barrels drawn and its barrels packaged
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -310,7 +310,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, brewer, warehouse
 
-Unfinished packaging runs by planned date, newest first, with brand, source tank and planned units. Use list_packaging_history for closed or cancelled runs.
+Unfinished packaging runs by planned date, soonest first, with brand, source tank and planned units. Use list_packaging_history for closed or cancelled runs.
 
 Takes no input.
 

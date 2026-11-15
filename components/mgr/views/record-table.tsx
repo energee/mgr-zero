@@ -32,6 +32,10 @@ export type RecordTableRow = {
    *  so every element cell needs its own key (#1137); wrap a keyless helper
    *  like E.act in `<Fragment key>`. */
   cells: ReactNode[];
+  /** A line across the table above this row, starting a group (a day of
+   *  packaging runs). Sorting would scatter the groups, so use it with
+   *  sortable={false}. */
+  heading?: ReactNode;
   /** A secondary line under the name, such as a brand's staff-only alias. */
   note?: ReactNode;
   /** A fixed-size thumbnail before the name, such as a brand's COLA label. */
@@ -112,8 +116,10 @@ export function RecordTable({ headers, align, rows: given, sortable = true }: {
           </TableHeader>
           <TableBody>
             {rows.map((row) => (
-              // A thumbnail has no text baseline, so a row with one centers its cells.
-              <TableRow key={row.key} className={cn("relative", row.media ? "[&>td]:align-middle" : "[&>td]:align-baseline")}>
+              <Fragment key={row.key}>
+              {row.heading && <TableRow className="hover:bg-transparent"><TableCell colSpan={headers.length} className="bg-muted/50 py-1.5 text-xs text-muted-foreground">{row.heading}</TableCell></TableRow>}
+              {/* A thumbnail has no text baseline, so a row with one centers its cells. */}
+              <TableRow className={cn("relative", row.media ? "[&>td]:align-middle" : "[&>td]:align-baseline")}>
                 <TableCell className={cn("whitespace-normal", alignClass(align[0]))}>
                   <div className="flex items-center gap-3">
                     {row.media}
@@ -127,6 +133,7 @@ export function RecordTable({ headers, align, rows: given, sortable = true }: {
                   <TableCell key={index} className={cn(ABOVE_COVER, cellClass(align[index + 1], cell))}>{cell}</TableCell>
                 ))}
               </TableRow>
+              </Fragment>
             ))}
           </TableBody>
         </Table>
@@ -135,6 +142,7 @@ export function RecordTable({ headers, align, rows: given, sortable = true }: {
         {rows.map((row, index) => (
           <Fragment key={row.key}>
             {index > 0 && <ItemSeparator className="my-0" />}
+            {row.heading && <p className="bg-muted/50 px-2 py-1.5 text-xs text-muted-foreground">{row.heading}</p>}
             <Item role="listitem" className="relative px-0">
               {row.media && <ItemMedia className="self-start">{row.media}</ItemMedia>}
               <ItemContent className="min-w-0">

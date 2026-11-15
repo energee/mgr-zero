@@ -542,6 +542,32 @@ describe("closing the run", () => {
     expect(sql(`select bbl from occupancy_volumes where occupancy_id='${occupancyId}'`, true)).toEqual(["10.000"]);
   });
 
+  it("lists a closed run with what it packaged by unit and its frozen barrels, and unfinished runs soonest first", async () => {
+    const catalog = await seedCatalog(b.id, { product: "Listed", sku: "Listed case", bblPerUnit: 0.1, format: "Listed case" });
+    await admin.from("formats").update({ units_per_case: 24 }).eq("id", catalog.formatId).throwOnError();
+    const kegFormatId = await insert("formats", { brewery_id: b.id, name: "Listed half", basis: "packaged", package_type: "keg", keg_size: "half_bbl", bbl_per_unit: 0.5 });
+    const kegSkuId = await insert("skus", { brewery_id: b.id, brand_id: catalog.brandId, format_id: kegFormatId, name: "Listed half" });
+    const { occupancyId } = await brewInto("FV-LISTED", catalog.brandId, 10, "2026-11-10");
+    const run = await runCommand("schedule_packaging_run", { brandId: catalog.brandId, plannedOn: "2026-12-01", occupancyId, outputs: [{ skuId: catalog.skuId, qtyPlanned: 10 }, { skuId: kegSkuId, qtyPlanned: 2 }] }, ctx) as { id: string };
+    await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-12-01T14:00:00Z" }, ctx);
+    await closeWithConfirmedMaterials({ runId: run.id, bblDrawn: 2.5, outputs: [{ skuId: catalog.skuId, qtyActual: 10 }, { skuId: kegSkuId, qtyActual: 2 }], lotCode: "LISTED", packagedOn: fixtureDate, locationId: wh.id, binId: wh.binId }, ctx);
+
+    type Listed = { id: string; bbl_drawn: number | null; bbl_packaged: number | null; outputs: { unit: string; qty: number; bbl: number | null }[] };
+    const history = await runCommand("list_packaging_history", {}, ctx) as { rows: Listed[] };
+    const closed = history.rows.find(row => row.id === run.id)!;
+    expect(closed).toMatchObject({ bbl_drawn: 2.5, bbl_packaged: 2 });
+    expect(closed.outputs).toHaveLength(2);
+    expect(closed.outputs).toEqual(expect.arrayContaining([{ unit: "case", qty: 10, bbl: 1 }, { unit: "keg", qty: 2, bbl: 1 }]));
+
+    const later = await runCommand("schedule_packaging_run", { brandId: catalog.brandId, plannedOn: "2027-03-05", outputs: [{ skuId: catalog.skuId, qtyPlanned: 3 }] }, ctx) as { id: string };
+    const sooner = await runCommand("schedule_packaging_run", { brandId: catalog.brandId, plannedOn: "2027-03-03", outputs: [] }, ctx) as { id: string };
+    const upcoming = await runCommand("list_packaging_runs", {}, ctx) as Listed[];
+    const position = (id: string) => upcoming.findIndex(row => row.id === id);
+    expect(position(sooner.id)).toBeLessThan(position(later.id));
+    // A plan is not output: an unfinished run has packaged nothing yet.
+    expect(upcoming[position(later.id)]).toMatchObject({ bbl_packaged: null, outputs: [] });
+  });
+
   it("keeps closed yield and consumed materials frozen after a format correction", async () => {
     const catalog = await seedCatalog(b.id, { product: "Correction", sku: "Correction case", bblPerUnit: 0.1 });
     const editor = await makeStaffCtx(b.id, "admin");
