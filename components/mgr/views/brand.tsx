@@ -129,8 +129,9 @@ export function BrandView({
             </div>,
           )}
           {/* Four short facts share a row once the column is wide enough, two by
-              two below that. Style gets the most room: its names run long. */}
-          <div className="grid grid-cols-2 items-start gap-x-4 gap-y-3 [&>*]:min-w-0 @min-[36rem]:grid-cols-[3fr_2fr_2.5fr_2.5fr]">
+              two below that. Style gets the most room: its names run long. ABV
+              takes its stepper's own width, which does not shrink. */}
+          <div className="grid grid-cols-2 items-start gap-x-4 gap-y-3 [&>*]:min-w-0 @min-[36rem]:grid-cols-[minmax(0,3fr)_auto_minmax(0,2.5fr)_minmax(0,2.5fr)]">
             <RegistryInput label="Style" value={model.style} onChange={controls.style} suggestions={model.styleOptions} />
             {E.edit("ABV %", model.abv, "number", undefined, { id: abvId, onChange: controls.abv, onBlur: () => touched.touch(0), error: touched.shown(0) ? brandAbvError(model.abv) : undefined, min: BRAND_ABV.min, max: BRAND_ABV.max, step: "any" })}
             <div className="flex flex-col gap-1">
