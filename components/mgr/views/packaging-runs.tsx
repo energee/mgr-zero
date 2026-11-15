@@ -1,9 +1,24 @@
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import type { PackagingRunRowView, PackagingRunsViewModel } from "@/lib/mgr/packaging-runs-view";
+import type { PackagingRunRowView, PackagingRunsViewModel, ReadyTankRowView } from "@/lib/mgr/packaging-runs-view";
 import { RecordTable } from "@/components/mgr/views/record-table";
 import { WorkKindTabs } from "@/components/mgr/views/work-kind-tabs";
 import { HistoryNavigation, type HistoryNavigationProps } from "./history-navigation";
+
+/** Tanks with beer and no run planned: each row opens Schedule run on that tank. */
+function ReadyTable({ rows }: { rows: ReadyTankRowView[] }) {
+  return <RecordTable
+    headers={["Tank", "Brand", "Batch", "Volume", "Next action"]}
+    align={["l", "l", "l", "r", "l"]}
+    rows={rows.map(row => ({
+      key: row.key,
+      href: row.href,
+      to: "Schedule packaging run",
+      cells: [row.tank, row.brand, row.batch, row.volume, <Fragment key="action">{E.act("Schedule", "info", row.href)}</Fragment>],
+      sort: [row.tank, row.brand, row.batch, row.volume, null],
+    }))}
+  />;
+}
 
 function UpcomingTable({ rows }: { rows: PackagingRunRowView[] }) {
   return <RecordTable
@@ -38,19 +53,30 @@ function OutputMix({ row }: { row: PackagingRunRowView }) {
   </span>;
 }
 
+/** Barrels packaged against the plan: the track is the plan and the fill is what was packaged. With no plan to compare, the figure stands alone, muted. */
+function PackagedOfPlanned({ row }: { row: PackagingRunRowView }) {
+  const textClass = row.planPercent === undefined ? "text-muted-foreground" : row.belowPlan ? "font-medium text-warning-foreground" : undefined;
+  return <span className="inline-flex items-center gap-2">
+    {row.planPercent !== undefined && <span aria-hidden className="flex h-2 w-24 shrink-0 overflow-hidden rounded-full bg-muted">
+      <span className={row.belowPlan ? "bg-warning-foreground" : "bg-primary"} style={{ width: `${row.planPercent}%` }} />
+    </span>}
+    <span className={textClass}>{row.packaged}</span>
+  </span>;
+}
+
 const swatch = (className: string) => <span className={`mr-1 inline-block size-2 rounded-sm ${className}`} />;
 
 /** Finished runs under a heading per planned day. The day order is the point, so the columns do not sort. */
 function RecentTable({ rows }: { rows: PackagingRunRowView[] }) {
-  const yieldPercent = rows.some(row => row.yieldPercent !== undefined);
+  const packaged = rows.some(row => row.packaged !== undefined);
   return <>
     {rows.some(row => row.kegPercent !== undefined) && <p className="flex gap-4 text-xs text-muted-foreground">
       <span>{swatch("bg-primary")}Cans and bottles</span><span>{swatch("bg-primary/30")}Kegs</span>
     </p>}
     <RecordTable
       sortable={false}
-      headers={["Run", "Brand", "Output", ...(yieldPercent ? ["Yield"] : [])]}
-      align={["l", "l", "l", ...(yieldPercent ? ["r" as const] : [])]}
+      headers={["Run", "Brand", "Output", ...(packaged ? ["Packaged of planned"] : [])]}
+      align={["l", "l", "l", ...(packaged ? ["l" as const] : [])]}
       rows={rows.map(row => ({
         key: row.key,
         href: row.href,
@@ -60,18 +86,19 @@ function RecentTable({ rows }: { rows: PackagingRunRowView[] }) {
           row.runNo,
           row.brand ?? "No brand",
           row.status === "Cancelled" ? <Fragment key="status">{E.status("Cancelled")}</Fragment> : <OutputMix key="output" row={row} />,
-          ...(yieldPercent ? [row.yieldPercent === undefined ? undefined : <span key="yield" className={row.lowYield ? "font-medium text-warning-foreground" : undefined}>{row.yieldPercent}%</span>] : []),
+          ...(packaged ? [row.packaged === undefined ? undefined : <PackagedOfPlanned key="packaged" row={row} />] : []),
         ],
       }))}
     />
   </>;
 }
 
-export function PackagingRunsView({ model, actions, workHrefs, pagination }: { model: PackagingRunsViewModel; actions?: ReactNode; workHrefs?: Record<string, string>; pagination?: HistoryNavigationProps }) {
+export function PackagingRunsView({ model, ready = [], actions, workHrefs, pagination }: { model: PackagingRunsViewModel; ready?: ReadyTankRowView[]; actions?: ReactNode; workHrefs?: Record<string, string>; pagination?: HistoryNavigationProps }) {
   return <>
     {E.hd("Packaging", actions !== undefined ? actions : E.btn("Schedule run"))}
     <WorkKindTabs chips={model.workChips} current={model.workChips[4]} tabs={model.workTabs} hrefs={workHrefs} />
-    {model.empty && !pagination?.firstHref ? E.blank(model.empty) : <>
+    {model.empty && ready.length === 0 && !pagination?.firstHref ? E.blank(model.empty) : <>
+      {ready.length > 0 && <>{E.ttl("Ready to package")}<ReadyTable rows={ready} /></>}
       {model.upcoming.length > 0 && <>{E.ttl("Upcoming")}<UpcomingTable rows={model.upcoming} /></>}
       {model.recent.length > 0 && <>{E.ttl("Recent")}<RecentTable rows={model.recent} /></>}
     </>}

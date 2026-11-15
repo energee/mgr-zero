@@ -37,7 +37,7 @@ export type SchedulePackagingRunViewModel = {
 
 export type ScheduleRunData = {
   brands: { id: string; name: string; alias?: string | null }[];
-  occupancies: { occupancy_id: string; vessel_name: string | null; brand_name: string | null; batch_no: number | null; bbl: number }[];
+  occupancies: { occupancy_id: string; vessel_name: string | null; brand_id?: string | null; brand_name: string | null; batch_no: number | null; bbl: number }[];
   skus: { id: string; name: string; brand_id: string; formats?: { package_type: string | null } | null; format_volume: { bbl_per_unit: number | null } | null }[];
 };
 
