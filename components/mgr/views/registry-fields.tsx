@@ -15,7 +15,7 @@ export function RegistrySelect({ label, value, options, onChange, disabled, plac
 export function RegistryInput({ label, value, onChange, disabled, required, suggestions, placeholder, id, error }: {
   label: string; value: string; onChange?: (value: string) => void; disabled?: boolean; required?: boolean;
   placeholder?: string; id?: string; error?: string;
-  /** Typed against these as a datalist: an unmatched entry is still accepted. */
+  /** Typed against these as suggestions (SuggestInput): an unmatched entry is still accepted. */
   suggestions?: string[];
 }) {
   return E.edit(label, value, "text", suggestions, { onChange, disabled, required: Boolean(required && onChange), placeholder, id, error });

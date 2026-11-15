@@ -133,7 +133,10 @@ it("keeps named uncontrolled form fields and suggestions", () => {
   const html = renderToStaticMarkup(E.edit("Timezone", "America/Denver", "text", ["America/Denver"], { name: "timezone", required: true }));
   expect(html).toContain('name="timezone"');
   expect(html).toContain('value="America/Denver"');
-  expect(html).toContain("datalist");
+  // The suggestions open from the shadcn combobox, never a native datalist.
+  expect(html).toContain('role="combobox"');
+  expect(html).toContain('data-slot="input-group"');
+  expect(html).not.toContain("datalist");
 });
 
 it("renders the empty option label and keeps the required select value empty", () => {
