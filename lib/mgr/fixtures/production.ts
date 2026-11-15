@@ -41,7 +41,7 @@ export const batchesBrewer: BatchesSnapshot = {
   ],
   active: [
     { key: "b0409", batchNo: "B-0409", brand: "Pils", recipe: "Pils", plannedOn: "Aug 28, 2026", plannedBbl: 15, vessel: "FV1", readings: [{ key: "pils-fv1", vessel: "FV1", reading: "No readings yet" }] },
-    { key: "b0413", batchNo: "B-0413", brand: "Stout", recipe: "Stout", plannedOn: "Aug 31, 2026", plannedBbl: 15, vessel: "FV3, FV4", readings: [{ key: "stout-fv3", vessel: "FV3", reading: "0.0 °P · pH 4.2 · Sep 2, 2026, 5:00 PM" }, { key: "stout-fv4", vessel: "FV4", reading: "5.2 °P · 68 °F · Sep 3, 2026, 8:10 AM" }] },
+    { key: "b0413", batchNo: "B-0413", brand: "Stout", recipe: "Stout", plannedOn: "Aug 31, 2026", plannedBbl: 15, vessel: "FV3, FV4", readings: [{ key: "stout-fv3", vessel: "FV3", reading: "0.0 °P · pH 4.2 · Sep 2, 2026, 5:00 PM" }, { key: "stout-fv4", vessel: "FV4", reading: "5.2 °P · 68 °F · Sep 3, 2026, 8:10 AM", abv: "5.4%", attenuation: "67%" }] },
     { key: "b0414", batchNo: "B-0414", brand: "Porter", recipe: "Robust porter", plannedOn: "Sep 1, 2026", plannedBbl: 10, vessel: null, readings: [] },
   ],
   completed: [

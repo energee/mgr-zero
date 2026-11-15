@@ -116,8 +116,10 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
             {headerRight}
           </span>
         </header>
-        {/* SidebarInset is already the <main> landmark; only page content scrolls. */}
-        <div id="main" tabIndex={-1} data-mgr-page-scroll="" className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-4 outline-none md:px-8 md:py-6 print:overflow-visible">{children}</div>
+        {/* SidebarInset is already the <main> landmark; only page content scrolls.
+            --page-bleed repeats the desk gutter (md:px-8) so page tables and
+            list rows can run edge to edge (app/globals.css). */}
+        <div id="main" tabIndex={-1} data-mgr-page-scroll="" className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-4 outline-none md:px-8 md:py-6 md:[--page-bleed:2rem] print:overflow-visible">{children}</div>
         <PhoneNavigation items={items} active={current} className="md:hidden" />
       </SidebarInset>
     </SidebarProvider>

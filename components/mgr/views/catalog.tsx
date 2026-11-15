@@ -10,7 +10,7 @@
 // #formats anchor that Brand's Manage formats opens; inventory and live draw both.
 // Live, a row the viewer may not open is plain (no tap, no Open); the
 // inventory, which passes no links, keeps every row an inert tap.
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { Tick02Icon } from "@hugeicons/core-free-icons";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { E } from "@/components/mgr/e";
@@ -44,7 +44,7 @@ const colaCell = (brand: CatalogBrandView, findCola: Record<string, ReactNode> |
  *  beside its approval date and TTB's record; it sits above the row's link so
  *  the pointer reaches it. */
 const labelMedia = (image: NonNullable<CatalogBrandView["image"]>, thumb: ReactNode, preview: ReactNode): ReactNode => preview ? (
-  <HoverCard openDelay={150} closeDelay={100}>
+  <HoverCard key="media" openDelay={150} closeDelay={100}>
     <HoverCardTrigger asChild><span className="relative z-10 block cursor-zoom-in">{thumb}</span></HoverCardTrigger>
     <HoverCardContent align="start">
       {preview}
@@ -54,7 +54,7 @@ const labelMedia = (image: NonNullable<CatalogBrandView["image"]>, thumb: ReactN
       </p>
     </HoverCardContent>
   </HoverCard>
-) : thumb;
+) : <Fragment key="media">{thumb}</Fragment>;
 
 export function CatalogView({
   model,
@@ -106,7 +106,8 @@ export function CatalogView({
             key: brand.key,
             cells: [brand.name, brand.style, brand.abv, brand.skus, colaCell(brand, findCola)],
             // Every row leads with the same slot, so names line up; a brand without a label leaves it blank.
-            media: brand.image ? labelMedia(brand.image, images?.[brand.key] ?? <ColaLabelImageView label={`${brand.name} · COLA ${brand.image.ttbId}`} compact />, previews?.[brand.key]) : <div className={COLA_SLOT} aria-hidden />,
+            // Keyed, because the rows cross to the client RecordTable in an array prop (#1137).
+            media: brand.image ? labelMedia(brand.image, images?.[brand.key] ?? <ColaLabelImageView label={`${brand.name} · COLA ${brand.image.ttbId}`} compact />, previews?.[brand.key]) : <div key="media" className={COLA_SLOT} aria-hidden />,
             // A style or ABV that is not set sorts last, not as the words.
             sort: [brand.name, brand.style === NOT_SET ? null : brand.style, brand.abv === NOT_SET ? null : brand.abv, brand.skus, brand.cola],
             note: brand.alias,

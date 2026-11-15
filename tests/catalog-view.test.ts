@@ -445,7 +445,10 @@ describe("Brand view", () => {
     expect(html).toContain('aria-label="Sells as Half"');
     expect(html).toMatch(/Four Pack · 6 per Case/);
     expect(html).toMatch(/>Glass</);
-    expect(html).toMatch(/>Edit on price group</);
+    // Pours sit in the Sells as list, tagged instead of switched; no section of their own.
+    expect(html).not.toMatch(/>Pours</);
+    expect(html).toMatch(/>Glass<[\s\S]*?>Pour<[\s\S]*>Compliance</);
+    expect(html).toMatch(/>Edit pours</);
     expect(html.match(/>Edit SKU</g)).toHaveLength(3);
     expect(html).toMatch(/3 active packages/);
     expect(html).toMatch(/Compliance/);
@@ -460,7 +463,7 @@ describe("Brand view", () => {
     expect(html).not.toMatch(/→/);
   });
 
-  it("footer null hides Save brand; linkRows links Edit on price group", () => {
+  it("footer null hides Save brand; linkRows links Edit pours", () => {
     const html = htmlOf(createElement(BrandView, {
       model: toBrandViewProps(brandHazy),
       footer: null,

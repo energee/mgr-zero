@@ -10,12 +10,16 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { RecordSheet } from "@/components/mgr/record-sheet";
 import { sheetHref } from "@/lib/mgr/order-sheet";
+import { rowLinkPrefetch } from "@/lib/mgr/row-link-prefetch";
 
-/** scroll={false}: opening the sheet leaves the list where it was scrolled. */
+/** scroll={false}: opening the sheet leaves the list where it was scrolled.
+ *  The href names a record, so it is not prefetched: a list of rows would
+ *  otherwise request its own page once per row (lib/mgr/row-link-prefetch.ts). */
 export function SheetLink({ param, id, className, children }: { param: string; id: string; className?: string; children: React.ReactNode }) {
   const pathname = usePathname();
   const search = useSearchParams();
-  return <Link href={sheetHref(pathname, search.toString(), param, id)} scroll={false} className={className}>{children}</Link>;
+  const href = sheetHref(pathname, search.toString(), param, id);
+  return <Link href={href} prefetch={rowLinkPrefetch(href)} scroll={false} className={className}>{children}</Link>;
 }
 
 /** Closing replaces the address, so the list's filters stay and Back does not reopen a closed sheet. */

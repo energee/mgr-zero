@@ -27,31 +27,44 @@ function UpcomingTable({ rows }: { rows: PackagingRunRowView[] }) {
   />;
 }
 
+/** How a closed run's barrels split between cans or bottles (solid) and kegs (light). */
+function OutputMix({ row }: { row: PackagingRunRowView }) {
+  if (row.kegPercent === undefined) return row.output;
+  return <span className="inline-flex items-center gap-2">
+    <span role="img" aria-label={`${100 - row.kegPercent}% cans and bottles, ${row.kegPercent}% kegs by volume`} className="flex h-2 w-20 shrink-0 overflow-hidden rounded-full bg-primary/30">
+      <span className="bg-primary" style={{ width: `${100 - row.kegPercent}%` }} />
+    </span>
+    {row.output}
+  </span>;
+}
+
+const swatch = (className: string) => <span className={`mr-1 inline-block size-2 rounded-sm ${className}`} />;
+
+/** Finished runs under a heading per planned day. The day order is the point, so the columns do not sort. */
 function RecentTable({ rows }: { rows: PackagingRunRowView[] }) {
-  const lot = rows.some(row => row.lot !== undefined);
-  const output = rows.some(row => row.output !== undefined);
   const yieldPercent = rows.some(row => row.yieldPercent !== undefined);
-  const loss = rows.some(row => row.lossBbl !== undefined);
-  return <RecordTable
-    headers={["Run", "Brand", "Status", "Closed or cancelled", "Planned quantity", ...(lot ? ["Lot"] : []), ...(output ? ["Output"] : []), ...(yieldPercent ? ["Yield"] : []), ...(loss ? ["Loss (bbl)"] : [])]}
-    align={["l", "l", "l", "l", "r", ...(lot ? ["l" as const] : []), ...(output ? ["r" as const] : []), ...(yieldPercent ? ["r" as const] : []), ...(loss ? ["r" as const] : [])]}
-    rows={rows.map(row => ({
-      key: row.key,
-      href: row.href,
-      to: "Run closed",
-      cells: [
-        row.runNo,
-        row.brand ?? "No brand",
-        row.status,
-        row.date,
-        row.quantity,
-        ...(lot ? [row.lot] : []),
-        ...(output ? [row.output] : []),
-        ...(yieldPercent ? [row.yieldPercent === undefined ? undefined : `${row.yieldPercent}%`] : []),
-        ...(loss ? [row.lossBbl === undefined ? undefined : <span key="loss" className={row.lossBbl ? "text-warning-foreground" : undefined}>{row.lossBbl}</span>] : []),
-      ],
-    }))}
-  />;
+  return <>
+    {rows.some(row => row.kegPercent !== undefined) && <p className="flex gap-4 text-xs text-muted-foreground">
+      <span>{swatch("bg-primary")}Cans and bottles</span><span>{swatch("bg-primary/30")}Kegs</span>
+    </p>}
+    <RecordTable
+      sortable={false}
+      headers={["Run", "Brand", "Output", ...(yieldPercent ? ["Yield"] : [])]}
+      align={["l", "l", "l", ...(yieldPercent ? ["r" as const] : [])]}
+      rows={rows.map(row => ({
+        key: row.key,
+        href: row.href,
+        to: "Run closed",
+        heading: row.heading,
+        cells: [
+          row.runNo,
+          row.brand ?? "No brand",
+          row.status === "Cancelled" ? <Fragment key="status">{E.status("Cancelled")}</Fragment> : <OutputMix key="output" row={row} />,
+          ...(yieldPercent ? [row.yieldPercent === undefined ? undefined : <span key="yield" className={row.lowYield ? "font-medium text-warning-foreground" : undefined}>{row.yieldPercent}%</span>] : []),
+        ],
+      }))}
+    />
+  </>;
 }
 
 export function PackagingRunsView({ model, actions, workHrefs, pagination }: { model: PackagingRunsViewModel; actions?: ReactNode; workHrefs?: Record<string, string>; pagination?: HistoryNavigationProps }) {

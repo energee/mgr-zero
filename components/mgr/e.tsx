@@ -153,7 +153,7 @@ function fieldError(controls?: Pick<FieldControls, "id" | "error" | "aria-invali
  *  unopenable picker still explains itself. */
 const emptyNote = (empty: PickEmpty, id?: string) => (
   <FieldDescription id={id}>
-    {empty.text}{empty.label ? <> <Link href={empty.href ?? "#"} data-to={empty.to} target={empty.target} rel={empty.target ? "noopener" : undefined}>{empty.label}</Link></> : null}
+    {empty.text}{empty.label ? <> <Link href={empty.href ?? "#"} prefetch={rowLinkPrefetch(empty.href ?? "#")} data-to={empty.to} target={empty.target} rel={empty.target ? "noopener" : undefined}>{empty.label}</Link></> : null}
   </FieldDescription>
 );
 
@@ -179,7 +179,7 @@ export const E = {
   back: (to: React.ReactNode, title: React.ReactNode, action?: React.ReactNode, href = "#", screen?: string) => {
     const head = (
       <div className="flex flex-col gap-1">
-        <Link href={href} data-to={screen} className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Icon icon={ArrowLeft01Icon} />{to}</Link>
+        <Link href={href} prefetch={rowLinkPrefetch(href)} data-to={screen} className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Icon icon={ArrowLeft01Icon} />{to}</Link>
         <h1 className="text-lg font-semibold">{title}</h1>
       </div>
     );
@@ -278,7 +278,7 @@ export const E = {
         )}
         {...(kind === "irr" ? { "data-variant": "irreversible" } : {})}
       >
-        {href && !disabled ? <Link href={href}>{t}</Link> : t}
+        {href && !disabled ? <Link href={href} prefetch={rowLinkPrefetch(href)}>{t}</Link> : t}
       </Button>
     );
   },
@@ -420,7 +420,7 @@ export const E = {
     const error = fieldError(controls);
     const select = (
       <Select {...(controls?.onChange ? { value, onValueChange: (next) => controls.onChange?.(next === "__empty_field__" ? "" : next) } : { defaultValue: value })} disabled={controls?.disabled} required={controls?.required} name={controls?.name} form={controls?.form}>
-        <SelectTrigger id={controls?.id} aria-label={controls?.["aria-label"] ?? label} aria-describedby={describedBy(error.describedBy, emptyId)} aria-invalid={error.invalid} className={cn(controls?.forward && "[&_svg:last-child]:hidden", controls?.inline && "inline h-auto! min-h-0! rounded-sm border-0 p-0 align-baseline text-[length:inherit] text-primary whitespace-normal underline-offset-4 hover:underline data-placeholder:text-primary data-placeholder:underline dark:bg-transparent dark:hover:bg-transparent [&_svg]:hidden *:data-[slot=select-value]:inline")}><SelectValue placeholder={options.find((o): o is { value: string; label: string } => typeof o !== "string" && o.value === "")?.label ?? controls?.placeholder}>{controls?.displayValue ?? options.map((o) => typeof o === "string" ? { value: o, label: o } : o).find((o) => o.value === value)?.label}</SelectValue>{controls?.forward ? <DirectionIcon label="Open" /> : null}</SelectTrigger>
+        <SelectTrigger id={controls?.id} aria-label={controls?.["aria-label"] ?? label} aria-describedby={describedBy(error.describedBy, emptyId)} aria-invalid={error.invalid} className={cn(controls?.forward && "[&_svg:last-child]:hidden", controls?.inline && "inline h-auto! min-h-0! rounded-sm border-0 p-0 align-baseline text-[length:inherit] text-primary whitespace-normal underline-offset-4 hover:underline data-placeholder:text-primary data-placeholder:underline bg-transparent! [&_svg]:hidden *:data-[slot=select-value]:inline")}><SelectValue placeholder={options.find((o): o is { value: string; label: string } => typeof o !== "string" && o.value === "")?.label ?? controls?.placeholder}>{controls?.displayValue ?? options.map((o) => typeof o === "string" ? { value: o, label: o } : o).find((o) => o.value === value)?.label}</SelectValue>{controls?.forward ? <DirectionIcon label="Open" /> : null}</SelectTrigger>
         <SelectContent><SelectGroup>{options.map((o) => typeof o === "string" ? <SelectItem key={o} value={o || "__empty_field__"}>{o}</SelectItem> : <SelectItem key={o.value} value={o.value || "__empty_field__"} disabled={o.disabled}>{o.label}</SelectItem>)}</SelectGroup></SelectContent>
       </Select>
     );
@@ -481,7 +481,7 @@ export const E = {
     <ItemGroup className="grid grid-cols-2 gap-2 md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]">
       {arr.map(([n, s, g, w, f, href, actions, quiet], i) => {
         const content = <TileContent {...{ n, s, g, w, f }} />;
-        const facts = href ? <Link href={href} className="flex min-w-0 max-w-full flex-col gap-0.5">{content}</Link> : content;
+        const facts = href ? <Link href={href} prefetch={rowLinkPrefetch(href)} className="flex min-w-0 max-w-full flex-col gap-0.5">{content}</Link> : content;
         return (
           <Item key={i} variant="outline" size="sm" className={cn("min-w-0 flex-col items-start gap-0.5 wrap-anywhere", quiet && "border-dashed text-muted-foreground")} asChild>
             {actions ? <div>{facts}{actions}</div> : href ? facts : <button type="button">{content}</button>}
