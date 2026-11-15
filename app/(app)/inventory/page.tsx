@@ -16,7 +16,7 @@ import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand, requirePagePermission } from "@/lib/mgr/page-query";
 import { canRun } from "@/lib/commands/registry";
 import type { InventoryValue } from "@/lib/commands/inventory";
-import { assembleFinishedGoods, toFinishedGoodsViewProps, skuLabel } from "@/lib/mgr/finished-goods-view";
+import { assembleFinishedGoods, movementBbl, toFinishedGoodsViewProps, skuLabel } from "@/lib/mgr/finished-goods-view";
 import "@/lib/commands/all";
 import { MovementForm } from "./movement-form";
 import { formatDateTime } from "@/lib/date-format";
@@ -86,7 +86,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         rows: movements.map(m => ({
           key: m.id,
           title: `${Number(m.qty) > 0 ? "+" : ""}${m.qty} ${skuLabel(skuById.get(m.sku_id) ?? { name: "—" })}`,
-          detail: `${sentenceCase(m.type)} · ${locationName(m.location_id)} · ${bins.find(b => b.id === m.bin_id)?.name ?? "—"}${m.lots?.code ? ` · ${m.lots.code}` : ""} · ${m.bbl} bbl${m.dest_state ? ` · ${m.dest_state}` : ""}${m.sale_channel_id ? ` · ${channels.find(c => c.id === m.sale_channel_id)?.name ?? "—"}` : ""}${m.note ? ` · ${m.note}` : ""}`,
+          detail: `${sentenceCase(m.type)} · ${locationName(m.location_id)} · ${bins.find(b => b.id === m.bin_id)?.name ?? "—"}${m.lots?.code ? ` · ${m.lots.code}` : ""} · ${movementBbl(m.bbl)}${m.dest_state ? ` · ${m.dest_state}` : ""}${m.sale_channel_id ? ` · ${channels.find(c => c.id === m.sale_channel_id)?.name ?? "—"}` : ""}${m.note ? ` · ${m.note}` : ""}`,
           trailing: `${formatDateTime(m.created_at, brewery.timeZone)}${m.ref_label ? ` · ${m.ref_label}` : ""}`,
           outbound: Number(m.qty) < 0,
         })),

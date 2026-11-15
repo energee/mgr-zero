@@ -9,8 +9,8 @@ import { FinishedGoodsView } from "../components/mgr/views/finished-goods";
 import { RecordMovementView } from "../components/mgr/views/record-movement";
 import { SKU_HAZY, SKU_PILS, SKU_STOUT } from "../lib/mgr/fixtures/demo";
 import { ReverseMovementView } from "../components/mgr/views/reverse-movement";
-import { finishedGoodsList, recordMovementFestival, reverseMovementAdjustment } from "../lib/mgr/fixtures/inventory";
-import { assembleFinishedGoods, skuLabel, toFinishedGoodsViewProps } from "../lib/mgr/finished-goods-view";
+import { finishedGoodsList, finishedGoodsMovements, recordMovementFestival, reverseMovementAdjustment } from "../lib/mgr/fixtures/inventory";
+import { assembleFinishedGoods, movementBbl, skuLabel, toFinishedGoodsViewProps } from "../lib/mgr/finished-goods-view";
 import { movementReceiptLine } from "../lib/mgr/movement-recorded-view";
 import { toRecordMovementViewProps } from "../lib/mgr/record-movement-view";
 import { MOVEMENT_KIND_LABELS } from "../lib/movement-form";
@@ -21,6 +21,12 @@ const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", nu
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 
 describe("Finished goods view", () => {
+  it("states a movement's barrels to the nearest tenth, not the stored eight decimals", () => {
+    expect(movementBbl("0.09677419")).toBe("0.1 bbl");
+    expect(movementBbl("-0.50000000")).toBe("-0.5 bbl");
+    expect(movementBbl("2.00000000")).toBe("2 bbl");
+    expect(finishedGoodsMovements.rows.map((row) => row.detail).join(" ")).not.toMatch(/\d\.\d{2,} bbl/);
+  });
   it("renders authorized inventory value and counts uncosted units without valuing them (#810)", () => {
     const snapshot = assembleFinishedGoods([{ id: "s1", name: "Costed keg" }], [{ sku_id: "s1", qty: 4 }], [{ sku_id: "s1", qty: 4 }], { value_cents: 2000.4, uncosted_qty: 1.5 });
     const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(snapshot), movements: { rows: [] } }));
