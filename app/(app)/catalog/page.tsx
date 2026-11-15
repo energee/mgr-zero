@@ -69,7 +69,9 @@ export default async function CatalogPage({ searchParams }: { searchParams?: Pro
     <CatalogView
       model={model}
       colaAction={canWrite ? <ColaReview brands={brands} /> : null}
+      findCola={canWrite ? Object.fromEntries(brands.flatMap(brand => brand.colas.length ? [] : [[brand.id, <ColaReview key={brand.id} brands={[brand]} single />]])) : null}
       images={Object.fromEntries(model.brands.flatMap(brand => brand.image ? [[brand.key, <ColaImage key={`${brand.key}:${brand.image.url}`} ttbId={brand.image.ttbId} url={brand.image.url} label={`${brand.name} · COLA ${brand.image.ttbId}`} compact />]] : []))}
+      previews={Object.fromEntries(model.brands.flatMap(brand => brand.image ? [[brand.key, <ColaImage key={`${brand.key}:${brand.image.url}`} ttbId={brand.image.ttbId} url={brand.image.url} label={`${brand.name} · COLA ${brand.image.ttbId}`} />]] : []))}
       controls={controls}
       createAction={canWrite ? E.btn("New brand", "p", "/catalog/brands/new") : null}
       links={{

@@ -3,6 +3,7 @@
 // toCatalogScopes builds the Sort and Category picks above the table.
 import type { ListScope } from "@/components/mgr/list-controls";
 import type { Approval } from "@/lib/commands/compliance";
+import { colaUrl } from "./brand-approval-view";
 import { approvalDate } from "./brand-view";
 import type { EmptyState } from "./empty-state";
 import type { BrandSort } from "./enums";
@@ -22,9 +23,14 @@ export type CatalogBrandView = {
   abv: string;
   /** Saved packaged SKUs, active or not; eligible formats and pours are not SKUs. */
   skus: string;
-  /** Recorded COLA approvals: "None on file", one's TTB ID and approval date, or "2 on file". */
+  /** Recorded COLA approvals: "None on file", "Approved", or "On file" when none carries an approval date. */
   cola: string;
-  image?: { url: string; ttbId: string };
+  /** TTB's public page for the COLA the cell speaks for; absent with none on file. */
+  colaHref?: string;
+  /** That COLA's date: "approved Oct 2, 2026" or "approval date unknown". */
+  colaNote?: string;
+  /** The newest approved label: its image, its date as in colaNote, and TTB's page for it. */
+  image?: { url: string; ttbId: string; note: string; href?: string };
   href: string;
 };
 
@@ -62,20 +68,29 @@ export type CatalogSnapshot = {
 /** A brand's missing style or ABV; Catalog sorts it as empty (last). */
 export const NOT_SET = "Not set";
 
-/** Shows only saved COLAs: "None on file", one COLA's TTB ID and date, or a count when
- *  there are several (the brand page lists each). */
-function colaFact(colas: CatalogBrandRow["colas"]): string {
-  if (colas.length === 0) return COLA_NOT_ON_FILE;
-  if (colas.length > 1) return `${colas.length} on file`;
-  const { ttb_id, approved_on } = colas[0]!;
-  return `TTB ID ${ttb_id} · ${approvalDate(approved_on)}`;
+/** The COLA cell's word for a brand with a dated approval; Catalog draws it as a green check. */
+export const COLA_APPROVED = "Approved";
+
+/** The dated COLAs, newest approval first. */
+function approvedColas(colas: CatalogBrandRow["colas"]): CatalogBrandRow["colas"] {
+  return colas.filter(cola => cola.approved_on)
+    .sort((a, b) => b.approved_on!.localeCompare(a.approved_on!) || b.ttb_id.localeCompare(a.ttb_id));
+}
+
+/** Shows only saved COLAs. The cell says whether one is approved and links
+ *  TTB's page for the newest approval; the brand page lists each with its ID
+ *  and date. A COLA saved without a date is on file, not claimed approved. */
+function colaFact(colas: CatalogBrandRow["colas"]): Pick<CatalogBrandView, "cola" | "colaHref" | "colaNote"> {
+  if (colas.length === 0) return { cola: COLA_NOT_ON_FILE };
+  const approved = approvedColas(colas)[0];
+  const shown = approved ?? colas[0]!;
+  return { cola: approved ? COLA_APPROVED : "On file", colaHref: colaUrl(shown.ttb_id) ?? undefined, colaNote: approvalDate(shown.approved_on) };
 }
 
 /** A label without an approval date is not an approved catalog image. */
 function latestColaImage(colas: CatalogBrandRow["colas"]): CatalogBrandView["image"] {
-  const latest = colas.filter(cola => cola.approved_on && cola.image_url)
-    .sort((a, b) => b.approved_on!.localeCompare(a.approved_on!) || b.ttb_id.localeCompare(a.ttb_id))[0];
-  return latest ? { url: latest.image_url!, ttbId: latest.ttb_id } : undefined;
+  const latest = approvedColas(colas).find(cola => cola.image_url);
+  return latest ? { url: latest.image_url!, ttbId: latest.ttb_id, note: approvalDate(latest.approved_on), href: colaUrl(latest.ttb_id) ?? undefined } : undefined;
 }
 
 export function toCatalogViewProps({
@@ -97,7 +112,7 @@ export function toCatalogViewProps({
       style: b.styles?.name ?? NOT_SET,
       abv: b.abv == null || b.abv === "" ? NOT_SET : `${Number(b.abv)}%`,
       skus: String(b.skus.length),
-      cola: colaFact(b.colas),
+      ...colaFact(b.colas),
       image: latestColaImage(b.colas),
       href: `/catalog/brands/${b.id}`,
     })),

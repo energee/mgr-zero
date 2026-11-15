@@ -1,17 +1,23 @@
 // Catalog draws one row per brand in the shared RecordTable, its alias under
 // the name. Live, the name opens the brand in a sheet over the list (?brand=,
 // lib/mgr/order-sheet.ts) for a role that may open it; the page passes the
-// open sheet. The COLA column reads its recorded approvals; the latest approved label
-// leads the row as a thumbnail. What a brand sells (packages
+// open sheet. The COLA column is a green check that opens TTB's page for an
+// approval on file; a brand with none offers Find COLA instead, which reviews
+// that one brand (components/mgr/views/cola-review.tsx). The latest approved
+// label leads the row as a thumbnail, and opens larger on hover. What a brand sells (packages
 // and pours) lives under its Sells as.
 // Price groups and Water profiles rows follow, then Formats under the
 // #formats anchor that Brand's Manage formats opens; inventory and live draw both.
 // Live, a row the viewer may not open is plain (no tap, no Open); the
 // inventory, which passes no links, keeps every row an inert tap.
 import type { ReactNode } from "react";
+import { Tick02Icon } from "@hugeicons/core-free-icons";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { E } from "@/components/mgr/e";
+import { Icon } from "@/components/mgr/icon";
 import { BRAND_SHEET_PARAM } from "@/lib/mgr/order-sheet";
-import { NOT_SET, type CatalogViewModel } from "@/lib/mgr/catalog-view";
+import { COLA_APPROVED, NOT_SET, type CatalogBrandView, type CatalogViewModel } from "@/lib/mgr/catalog-view";
+import { sentenceCase } from "@/lib/mgr/labels";
 import { WATER_PROFILES_CAPTION } from "@/lib/mgr/water-profiles-view";
 import { FormatsView, type FormatsViewModel } from "@/components/mgr/views/formats";
 import { RecordTable } from "@/components/mgr/views/record-table";
@@ -21,11 +27,42 @@ import { COLA_SLOT, ColaLabelImageView } from "@/components/mgr/views/cola-label
 const navRow = (title: string, subtitle: ReactNode, href: string | null | undefined) =>
   href === null ? E.row(title, subtitle) : E.nav(title, subtitle, "", undefined, href);
 
+const TTB_LINK = { target: "_blank", rel: "noopener noreferrer" };
+
+/** The COLA cell stays quiet about the usual case. An approved COLA is a
+ *  green check that opens TTB's record, with its date as the label; one saved
+ *  without a date reads On file. A brand with none offers Find COLA, which
+ *  rests as plain text until its row is reached (app/globals.css). A role with
+ *  no action keeps the words, so its cell is never blank. */
+const colaCell = (brand: CatalogBrandView, findCola: Record<string, ReactNode> | null | undefined): ReactNode => !brand.colaHref
+  ? <span key="cola" data-quiet-action>{findCola === undefined ? E.act("Find COLA") : findCola?.[brand.key] ?? brand.cola}</span>
+  : brand.cola === COLA_APPROVED
+    ? <a key="cola" href={brand.colaHref} {...TTB_LINK} title={sentenceCase(brand.colaNote ?? "")} aria-label={`COLA ${brand.colaNote}; open on TTB`} className="inline-flex size-7 items-center justify-center rounded-full text-success-foreground hover:bg-success"><Icon icon={Tick02Icon} /></a>
+    : <a key="cola" href={brand.colaHref} {...TTB_LINK} title={sentenceCase(brand.colaNote ?? "")} className="text-muted-foreground underline underline-offset-4">{brand.cola}</a>;
+
+/** A saved label's thumbnail. With the full image it opens larger on hover,
+ *  beside its approval date and TTB's record; it sits above the row's link so
+ *  the pointer reaches it. */
+const labelMedia = (image: NonNullable<CatalogBrandView["image"]>, thumb: ReactNode, preview: ReactNode): ReactNode => preview ? (
+  <HoverCard openDelay={150} closeDelay={100}>
+    <HoverCardTrigger asChild><span className="relative z-10 block cursor-zoom-in">{thumb}</span></HoverCardTrigger>
+    <HoverCardContent align="start">
+      {preview}
+      <p className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        {sentenceCase(image.note)}
+        {image.href && <a href={image.href} {...TTB_LINK} className="underline underline-offset-4">Open on TTB</a>}
+      </p>
+    </HoverCardContent>
+  </HoverCard>
+) : thumb;
+
 export function CatalogView({
   model,
   createAction,
   colaAction,
+  findCola,
   images,
+  previews,
   links,
   formats,
   formatAction,
@@ -37,7 +74,11 @@ export function CatalogView({
   controls?: ReactNode;
   createAction?: ReactNode;
   colaAction?: ReactNode;
+  /** Live: each None on file row's working Find COLA, keyed by brand; null for a role that cannot record one. The inventory draws the verb. */
+  findCola?: Record<string, ReactNode> | null;
   images?: Record<string, ReactNode>;
+  /** Each saved label at full size, keyed by brand, for the thumbnail's hover card; without it the thumbnail stands alone. */
+  previews?: Record<string, ReactNode>;
   /** Live: which rows are links, each only for a role its page lets in; the rest draw plain. Inventory leaves them all inert taps. */
   links?: { brands: boolean; priceGroups: boolean; waterProfiles: boolean };
   formats?: FormatsViewModel;
@@ -63,9 +104,9 @@ export function CatalogView({
           align={["l", "l", "r", "r", "l"]}
           rows={model.brands.map((brand) => ({
             key: brand.key,
-            cells: [brand.name, brand.style, brand.abv, brand.skus, brand.cola],
+            cells: [brand.name, brand.style, brand.abv, brand.skus, colaCell(brand, findCola)],
             // Every row leads with the same slot, so names line up; a brand without a label leaves it blank.
-            media: brand.image ? images?.[brand.key] ?? <ColaLabelImageView label={`${brand.name} · COLA ${brand.image.ttbId}`} compact /> : <div className={COLA_SLOT} aria-hidden />,
+            media: brand.image ? labelMedia(brand.image, images?.[brand.key] ?? <ColaLabelImageView label={`${brand.name} · COLA ${brand.image.ttbId}`} compact />, previews?.[brand.key]) : <div className={COLA_SLOT} aria-hidden />,
             // A style or ABV that is not set sorts last, not as the words.
             sort: [brand.name, brand.style === NOT_SET ? null : brand.style, brand.abv === NOT_SET ? null : brand.abv, brand.skus, brand.cola],
             note: brand.alias,

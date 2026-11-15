@@ -73,20 +73,57 @@ describe("Catalog view", () => {
   });
 
   // #965: only recorded COLA approvals (list_brands already left formulas out) decide the cell.
-  it("says None on file, one COLA's TTB ID and date, or how many are on file", () => {
+  it("says None on file, Approved, or On file, and links TTB's page for the newest approved COLA", () => {
     const brand = { abv: null, styles: null, skus: [] };
     const model = toCatalogViewProps({ priceGroups: [], brands: [
       { ...brand, id: "none", name: "None", colas: [] },
       { ...brand, id: "one", name: "One", colas: [{ ttb_id: "00123456789012", approved_on: "2026-10-02" }] },
       { ...brand, id: "undated", name: "Undated", colas: [{ ttb_id: "26001001000123", approved_on: null }] },
-      { ...brand, id: "two", name: "Two", colas: [{ ttb_id: "26001001000124", approved_on: null }, { ttb_id: "26001001000125", approved_on: "2026-01-15" }] },
+      { ...brand, id: "two", name: "Two", colas: [{ ttb_id: "26001001000124", approved_on: null }, { ttb_id: "26001001000125", approved_on: "2026-01-15" }, { ttb_id: "25001001000126", approved_on: "2025-03-01" }] },
     ] });
-    expect(model.brands.map(({ cola }) => cola)).toEqual([
-      "None on file",
-      "TTB ID 00123456789012 · approved Oct 2, 2026",
-      "TTB ID 26001001000123 · approval date unknown",
-      "2 on file",
+    const ttb = (id: string) => `https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicFormDisplay&ttbid=${id}`;
+    expect(model.brands.map(({ cola, colaHref, colaNote }) => [cola, colaHref, colaNote])).toEqual([
+      ["None on file", undefined, undefined],
+      ["Approved", ttb("00123456789012"), "approved Oct 2, 2026"],
+      // Without an approval date the cell does not claim approval.
+      ["On file", ttb("26001001000123"), "approval date unknown"],
+      ["Approved", ttb("26001001000125"), "approved Jan 15, 2026"],
     ]);
+  });
+
+  it("links an on-file COLA out to TTB, and offers Find COLA on a row with none", () => {
+    const ttbPage = (id: string) => `https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicFormDisplay&ttbid=${id}`;
+    const brand = { abv: null, styles: null, skus: [] };
+    const model = toCatalogViewProps({ priceGroups: [], brands: [
+      { ...brand, id: "none", name: "None", colas: [] },
+      { ...brand, id: "one", name: "One", colas: [{ ttb_id: "00123456789012", approved_on: "2026-10-02" }] },
+    ] });
+    const inventory = htmlOf(createElement(CatalogView, { model }));
+    // Approved is a quiet check that opens TTB's record; the date is its label, not more text in the row.
+    const approved = inventory.match(/<a [^>]*aria-label="COLA approved Oct 2, 2026; open on TTB"[^>]*>/)![0];
+    expect(approved).toMatch(/href="https:\/\/ttbonline\.gov[^"]*ttbid=00123456789012"/);
+    expect(approved).toContain('target="_blank"');
+    expect(approved).toContain('title="Approved Oct 2, 2026"');
+    expect(inventory).not.toContain('data-slot="badge"');
+    expect(inventory).not.toContain(">Approved<");
+    expect(inventory).not.toContain("TTB ID 00123456789012");
+    // A row with none shows only the action; the words are kept for a role that has no action.
+    expect(inventory.match(/>Find COLA</g)).toHaveLength(2); // the table cell and the phone card
+    expect(inventory).not.toContain("None on file");
+    // Live: the page supplies each row's working action, or null for a role that cannot record one.
+    const live = htmlOf(createElement(CatalogView, { model, findCola: { none: createElement("button", { key: "find" }, "Find it") } }));
+    expect(live).toContain(">Find it<");
+    expect(live).not.toContain(">Find COLA<");
+    // A saved label opens larger from its thumbnail when the page supplies the full image.
+    const labelled = toCatalogViewProps({ priceGroups: [], brands: [
+      { ...brand, id: "img", name: "Img", colas: [{ ttb_id: "00123456789012", approved_on: "2026-10-02", image_url: "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=a.jpg&filetype=l" }] },
+    ] });
+    expect(labelled.brands[0]!.image).toMatchObject({ ttbId: "00123456789012", note: "approved Oct 2, 2026", href: ttbPage("00123456789012") });
+    expect(htmlOf(createElement(CatalogView, { model: labelled }))).not.toContain('data-slot="hover-card-trigger"');
+    expect(htmlOf(createElement(CatalogView, { model: labelled, previews: { img: createElement("img", { key: "p", alt: "full label" }) } }))).toContain('data-slot="hover-card-trigger"');
+    const denied = htmlOf(createElement(CatalogView, { model, findCola: null }));
+    expect(denied).not.toContain(">Find COLA<");
+    expect(denied).toContain("None on file");
   });
 
   it("keeps a brand's staff-only alias apart from its name (brand-alias.md)", () => {
@@ -275,6 +312,7 @@ describe("Catalog view", () => {
     const html = htmlOf(createElement(CatalogView, {
       model: toCatalogViewProps(catalogBrands),
       createAction: null,
+      findCola: null,
       links: { brands: false, priceGroups: false, waterProfiles: false },
     }));
     expect(html).toContain(brandOf(SKU_HAZY));
@@ -482,14 +520,42 @@ describe("Brand view", () => {
     expect(html).not.toMatch(/>Sells as<|>Compliance</);
   });
 
-  it("lays the form beside Sells as and Compliance, with Save brand inside the form", () => {
+  it("lays the form beside Sells as and Compliance, with Save brand pinned under both", () => {
     const html = htmlOf(createElement(BrandView, { model: toBrandViewProps(brandHazy) }));
-    const form = html.slice(html.indexOf('aria-label="Brand details"'), html.indexOf('aria-label="Sells as and compliance"'));
-    expect(form).toMatch(/Selling/);
-    expect(form).toMatch(/>Save brand</);
+    const sells = html.indexOf('aria-label="Sells as and compliance"');
+    const form = html.slice(html.indexOf('aria-label="Brand details"'), sells);
     expect(form).not.toMatch(/>Sells as</);
     expect(html).toMatch(/id="compliance"/);
-    expect(html).toMatch(/ABV %/);
+    // Style, ABV, Category and Price group share one row; no heading splits them.
+    const facts = form.slice(form.indexOf(">Style<"), form.indexOf(">Price group<"));
+    expect(facts).toMatch(/ABV %/);
+    expect(facts).toMatch(/>Category</);
+    expect(facts).not.toMatch(/<h2/);
+    expect(form).not.toMatch(/>Selling</);
+    // Save stays in view under both columns; the no-delete note ends the page above it.
+    expect(form).not.toMatch(/>Save brand</);
+    const footer = html.indexOf("data-brand-footer");
+    expect(footer).toBeGreaterThan(sells);
+    expect(html.slice(footer)).toMatch(/>Save brand</);
+    expect(html.slice(sells, footer)).toMatch(/Brands cannot be deleted or archived/);
+  });
+
+  it("keeps guidance quiet: no alert boxes on a saved brand", () => {
+    const html = htmlOf(createElement(BrandView, { model: toBrandViewProps(brandHazy) }));
+    expect(html).not.toContain('data-slot="alert"');
+    expect(html).toMatch(/Switch on a packaged format to create a SKU for this brand/);
+  });
+
+  it("draws each Sells as format on one line, and Description as a multi-line box", () => {
+    const html = htmlOf(createElement(BrandView, { model: toBrandViewProps(brandHazy) }));
+    const half = html.slice(html.indexOf(">Half"), html.indexOf('aria-label="Sells as Half"'));
+    expect(half).not.toContain('data-slot="item-description"');
+    expect(html).toMatch(/<textarea[^>]*aria-label="Description"/);
+  });
+
+  it("tucks the COLA label behind a thumbnail that opens", () => {
+    const html = htmlOf(createElement(BrandView, { model: toBrandViewProps(brandHazy), images: { cola: createElement("img", { alt: "label" }) } }));
+    expect(html).toMatch(/<details[^>]*><summary[^>]*><img alt="label"/);
   });
 
   it("the Brand inventory record is BrandView", () => {

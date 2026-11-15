@@ -231,6 +231,17 @@
   color: var(--foreground);
 }
 
+/* A row action marked quiet (Catalog's Find COLA) rests as plain text and
+   takes its tint when its table row is hovered or focused, so a column of
+   them does not compete with the rows. Touch has no hover and the phone list
+   has no table row, so there the action keeps its tint. */
+@media (hover: hover) {
+  tr:not(:hover, :focus-within) [data-quiet-action] [data-row-action] {
+    background-color: transparent;
+    color: var(--muted-foreground);
+  }
+}
+
 /* Pointer size, not viewport, chooses target height (plan §5): every control
    is ≥48px under a coarse pointer, and the primary action is ≥56px. Applied
    to the shadcn data-slot hooks so components/ui stays untouched. */
