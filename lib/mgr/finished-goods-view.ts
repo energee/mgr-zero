@@ -51,7 +51,8 @@ export type FinishedGoodsSnapshot = {
 };
 
 /** A movement row's barrels, rounded to the nearest tenth ("0.1 bbl"). The ledger
- *  stores eight decimals; SKU detail and the lot trace state the finer figure. */
+ *  stores eight decimals, too long to read in a list. SKU detail and the lot
+ *  trace show two decimals (bblFixed). */
 export const movementBbl = (bbl: string | number) => bblExact(Number(bbl), 1);
 
 type StockRow = { sku_id: string; qty: string | number };
