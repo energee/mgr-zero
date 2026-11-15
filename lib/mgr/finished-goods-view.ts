@@ -3,6 +3,7 @@ import type { EmptyState } from "./empty-state";
 import { money } from "./money";
 import type { InventoryValue } from "@/lib/commands/inventory";
 import { plural } from "./plural";
+import { bblExact } from "@/lib/volume";
 /** One SKU in the register. Counts are display text in package units; `atp`
  *  (shown as Available) uses a true minus sign when negative, and `short` says so. */
 export type FinishedGoodsRowView = {
@@ -48,6 +49,10 @@ export type FinishedGoodsSnapshot = {
   value?: { cents: number; uncostedUnits: number };
   backHref?: string;
 };
+
+/** A movement row's barrels, rounded to the nearest tenth ("0.1 bbl"). The ledger
+ *  stores eight decimals; SKU detail and the lot trace state the finer figure. */
+export const movementBbl = (bbl: string | number) => bblExact(Number(bbl), 1);
 
 type StockRow = { sku_id: string; qty: string | number };
 

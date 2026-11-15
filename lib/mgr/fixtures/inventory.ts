@@ -2,7 +2,7 @@
 // snapshots for Finished goods, Record movement and Reverse movement.
 // Identities from demo.ts. Views own no sample data.
 import { SKU_HAZY, SKU_PILS, SKU_STOUT, LOC_WAREHOUSE, LOC_TAPROOM } from "./demo";
-import type { FinishedGoodsMovements, FinishedGoodsSnapshot } from "@/lib/mgr/finished-goods-view";
+import { movementBbl, type FinishedGoodsMovements, type FinishedGoodsSnapshot } from "@/lib/mgr/finished-goods-view";
 import type { RecordMovementSnapshot } from "@/lib/mgr/record-movement-view";
 import type { ReverseMovementSnapshot } from "@/lib/mgr/reverse-movement-view";
 import { formatDateTime } from "@/lib/date-format";
@@ -55,14 +55,14 @@ export const finishedGoodsMovements: FinishedGoodsMovements = {
     {
       key: "festival-removal",
       title: `-${recordMovementFestival.qty} ${SKU_HAZY.name}`,
-      detail: `Festival removal · ${recordMovementFestival.location} · ${recordMovementFestival.bin} · ${recordMovementFestival.bbl} bbl · PA · ${recordMovementFestival.channel} · Community festival`,
+      detail: `Festival removal · ${recordMovementFestival.location} · ${recordMovementFestival.bin} · ${movementBbl(recordMovementFestival.bbl)} · PA · ${recordMovementFestival.channel} · Community festival`,
       trailing: formatDateTime("2026-09-10T14:00:00Z", DEMO_TIME_ZONE),
       outbound: true,
     },
     {
       key: "standalone-adjustment",
       title: `+${reverseMovementAdjustment.qty} ${SKU_HAZY.name}`,
-      detail: `Adjustment · ${reverseMovementAdjustment.location} · ${reverseMovementAdjustment.bin} · ${Number(reverseMovementAdjustment.bbl).toFixed(8)} bbl · ${reverseMovementAdjustment.note}`,
+      detail: `Adjustment · ${reverseMovementAdjustment.location} · ${reverseMovementAdjustment.bin} · ${movementBbl(reverseMovementAdjustment.bbl)} · ${reverseMovementAdjustment.note}`,
       trailing: formatDateTime("2026-09-10T13:00:00Z", DEMO_TIME_ZONE),
       outbound: false,
     },
