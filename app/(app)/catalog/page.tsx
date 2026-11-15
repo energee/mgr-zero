@@ -7,8 +7,8 @@
 // it in (canRun on the reads or write that page requires), never to No access.
 // ?q=, ?sort= and ?category= narrow and order the brands in list_brands
 // (docs/plans/list-filters.md), newest first when no sort is given;
-// ListControls draws them as a GET form and
-// labeled Sort and Category picks whose options are links (toCatalogScopes).
+// ListControls draws them as a GET form and labeled Sort and Category picks
+// whose options are links (toCatalogScopes).
 import { z } from "zod";
 import { CatalogView } from "@/components/mgr/views/catalog";
 import { toCatalogScopes, toCatalogViewProps, type CatalogBrandRow } from "@/lib/mgr/catalog-view";
