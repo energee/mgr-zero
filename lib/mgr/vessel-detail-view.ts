@@ -11,9 +11,10 @@ export const VESSEL_TYPES = ["Fermenter", "Brite", "Barrel", "Kettle", "Other"];
 export function formatVesselReading(reading: VesselReading, unit: GravityUnit): string {
   return [reading.gravity_plato == null ? undefined : formatGravity(reading.gravity_plato, unit), reading.temp_f == null ? undefined : `${reading.temp_f} °F`, reading.ph == null ? undefined : `pH ${reading.ph}`, reading.note].filter(Boolean).join(" · ");
 }
-// One tank's newest reading with its time, as Cellar and Batches list it.
+// One tank's newest reading with its time, as Cellar and Batches list it. The
+// note is left out: a list line stays short, and Vessel detail shows the note.
 export function formatLatestReading(reading: VesselReading | undefined | null, unit: GravityUnit, timeZone: string): string {
-  return reading ? `${formatVesselReading(reading, unit)} · ${formatDateTime(reading.at, timeZone)}` : "No readings yet";
+  return reading ? `${formatVesselReading({ ...reading, note: null }, unit)} · ${formatDateTime(reading.at, timeZone)}` : "No readings yet";
 }
 export type VesselDetailViewModel = {
   backHref?: string;

@@ -1,4 +1,4 @@
-import { formatVesselReading } from "@/lib/mgr/vessel-detail-view";
+import { formatLatestReading, formatVesselReading } from "@/lib/mgr/vessel-detail-view";
 import { expect, it } from "vitest";
 import { batchesFromQuery } from "@/lib/mgr/batches-view";
 
@@ -19,4 +19,12 @@ it("keeps split occupancies and absent readings explicit with exact recording li
 
 it("preserves an absent temperature instead of printing a synthetic value", () => {
   expect(formatVesselReading({ id: "r", at: "2026-09-27", temp_f: null, gravity_plato: 5, ph: null, note: null }, "plato")).toBe("5.0 °P");
+});
+
+it("leaves the note out of a list's latest reading and keeps it on Vessel detail", () => {
+  const reading = { id: "r", at: "2026-09-27T12:00:00Z", temp_f: 69, gravity_plato: 5, ph: 4.14, note: "Lolev fermentation" };
+  const latest = formatLatestReading(reading, "plato", "UTC");
+  expect(latest).toMatch(/^5\.0 °P · 69 °F · pH 4\.14 · /);
+  expect(latest).not.toContain("Lolev fermentation");
+  expect(formatVesselReading(reading, "plato")).toBe("5.0 °P · 69 °F · pH 4.14 · Lolev fermentation");
 });
