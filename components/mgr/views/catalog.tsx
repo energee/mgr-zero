@@ -30,14 +30,14 @@ const navRow = (title: string, subtitle: ReactNode, href: string | null | undefi
 const TTB_LINK = { target: "_blank", rel: "noopener noreferrer" };
 
 /** The COLA cell stays quiet about the usual case. An approved COLA is a
- *  green check that opens TTB's record, with its date as the label; one saved
+ *  check in a solid green disc that opens TTB's record, with its date as the label; one saved
  *  without a date reads On file. A brand with none offers Find COLA, which
  *  rests as plain text until its row is reached (app/globals.css). A role with
  *  no action keeps the words, so its cell is never blank. */
 const colaCell = (brand: CatalogBrandView, findCola: Record<string, ReactNode> | null | undefined): ReactNode => !brand.colaHref
   ? <span key="cola" data-quiet-action>{findCola === undefined ? E.act("Find COLA") : findCola?.[brand.key] ?? brand.cola}</span>
   : brand.cola === COLA_APPROVED
-    ? <a key="cola" href={brand.colaHref} {...TTB_LINK} title={sentenceCase(brand.colaNote ?? "")} aria-label={`COLA ${brand.colaNote}; open on TTB`} className="inline-flex size-7 items-center justify-center rounded-full text-success-foreground hover:bg-success"><Icon icon={Tick02Icon} /></a>
+    ? <a key="cola" href={brand.colaHref} {...TTB_LINK} title={sentenceCase(brand.colaNote ?? "")} aria-label={`COLA ${brand.colaNote}; open on TTB`} className="inline-flex size-6 items-center justify-center rounded-full bg-success-foreground text-success hover:opacity-80"><Icon icon={Tick02Icon} className="[&_*]:stroke-2" /></a>
     : <a key="cola" href={brand.colaHref} {...TTB_LINK} title={sentenceCase(brand.colaNote ?? "")} className="text-muted-foreground underline underline-offset-4">{brand.cola}</a>;
 
 /** A saved label's thumbnail. With the full image it opens larger on hover,
