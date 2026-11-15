@@ -101,7 +101,8 @@
   --destructive-foreground: #FFFFFF;
   --border: #E3E3DC;
   /* Interactive boundaries stay distinct from decorative dividers. The input
-     alias also supplies stock shadcn borders and the unchecked Switch track. */
+     alias supplies field and outline-button fills, toggle borders, and the
+     unchecked Switch track; fields themselves draw no border at rest. */
   --control-border: #818278;
   --input: var(--control-border);
   --ring: #6453B3;
@@ -229,6 +230,28 @@
 
 [cmdk-item][data-selected="true"] .text-muted-foreground {
   color: var(--foreground);
+}
+
+/* Fields and outline buttons are filled, not outlined. Applied to the
+   data-slot hooks so components/ui stays untouched; unlayered, so it beats
+   the stock border and background utilities. An outline button is matched by
+   its own class, because a trigger rendered asChild (the date picker) swaps
+   the button's data-slot. */
+:is([data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"], [data-slot="input-group"], .group\/button[data-variant="outline"]) {
+  /* The border keeps its width and only loses its colour at rest, so focus
+     (ring) and invalid (destructive) still draw it and nothing shifts. */
+  &:not(:focus-visible, :has(:focus-visible), [aria-invalid="true"], :has([aria-invalid="true"])) {
+    border-color: transparent;
+  }
+  /* In the light theme the border was the only edge: stock fields are
+     transparent and an outline button matches the page. The dark theme and
+     disabled controls already carry a fill. */
+  &:not(.dark *, :disabled, :has(:disabled)) {
+    background-color: color-mix(in srgb, var(--input) 12%, transparent);
+  }
+}
+.group\/button[data-variant="outline"]:is(:hover, [aria-expanded="true"]):not(.dark *, :disabled) {
+  background-color: color-mix(in srgb, var(--input) 22%, transparent);
 }
 
 /* Page tables run edge to edge on the desk: the row rules and the header band

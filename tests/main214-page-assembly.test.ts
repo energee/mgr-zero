@@ -80,7 +80,7 @@ beforeEach(() => { state.roles = ["admin"]; state.calls = []; });
 it("assembles shared Catalog with the brand link and the shared format list", async () => {
   const page = await CatalogPage();
   expect(page.type).toBe(CatalogView);
-  expect(state.brandInput).toEqual({ q: "", sort: "name", category: "" });
+  expect(state.brandInput).toEqual({ q: "", sort: "newest", category: "" });
   const html = render(page);
   // Packages and pours are one tap further, on the brand's SKU list.
   // A brand opens in a sheet over Catalog (?brand=); a format opens its page.
@@ -274,10 +274,10 @@ it("says no contracts match when a vendor search finds none", async () => {
   expect(html).not.toContain("No contracts yet");
 });
 
-// docs/plans/list-filters.md: the URL's search, sort and category reach list_brands; a bad sort falls back.
+// docs/plans/list-filters.md: the URL's search, sort and category reach list_brands; a bad or missing sort falls back to newest.
 it("passes Catalog's URL filters to list_brands", async () => {
   const page = await CatalogPage({ searchParams: Promise.resolve({ q: " hazy ", sort: "bogus", category: "Core" }) });
-  expect(state.brandInput).toEqual({ q: "hazy", sort: "name", category: "Core" });
+  expect(state.brandInput).toEqual({ q: "hazy", sort: "newest", category: "Core" });
   const html = render(page);
   expect(html).toContain('value="hazy"');
   // Sort and Category are ScopePick selects (#965): each option carries the
@@ -285,6 +285,9 @@ it("passes Catalog's URL filters to list_brands", async () => {
   const scopes = page.props.controls.props.scopes as { label: string; options: { value: string; href?: string }[] }[];
   const href = (label: string, value: string) => scopes.find((s) => s.label === label)?.options.find((o) => o.value === value)?.href;
   expect(href("Sort", "abv")).toBe("/catalog?q=hazy&sort=abv&category=Core");
+  // Newest is the default, so only the other sorts appear in a link.
+  expect(href("Sort", "name")).toBe("/catalog?q=hazy&sort=name&category=Core");
+  expect(href("Sort", "newest")).toBe("/catalog?q=hazy&category=Core");
   expect(href("Category", "")).toBe("/catalog?q=hazy");
 });
 it("routes list: an assigned route not yet departed is a row link; Resume and Assign stay verbs (#1026)", async () => {

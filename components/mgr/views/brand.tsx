@@ -158,12 +158,14 @@ export function BrandView({
               ))}
               {sellsMessages}
               {model.sells.contents.map((line) => <div key={line.key}>{E.row(line.label, line.prices)}</div>)}
-              {E.ttl("Pours")}
-              {model.sells.pours.map((pour) => <div key={pour.key}>{E.row(pour.name, `${pour.size} · ${pour.prices}`)}</div>)}
-              {model.sells.pours.length === 0 && E.info(model.sells.unpriced
-                ? "Choose a price group and save the brand before adding pours or setting prices."
-                : "No pours on this price group. Add a pour on Price groups; pours are servings, not SKUs.")}
-              {!model.sells.unpriced && linkRows !== false && E.nav("Edit on price group", "", "", undefined, linkRows ? model.sells.priceGroupHref : undefined)}
+              {/* Pours are the group's servings, not SKUs: listed with what the beer sells as, tagged instead of switched. */}
+              {model.sells.pours.map((pour) => <div key={pour.key}>{E.row(pour.name, `${pour.size} · ${pour.prices}`, "Pour")}</div>)}
+              {model.sells.unpriced
+                ? E.info("Choose a price group and save the brand before adding pours or setting prices.")
+                : <FieldDescription>
+                  {model.sells.pours.length ? "Pours are servings from the tap, shared by every brand on this price group." : "No pours on this price group yet. Pours are servings from the tap, not SKUs."}
+                  {linkRows !== false && <> {E.link("Edit pours", "Price groups", linkRows ? model.sells.priceGroupHref : undefined)}</>}
+                </FieldDescription>}
               {E.ttl("Compliance", "compliance")}
               {model.compliance.map((row) => (
                 <div key={row.key}>

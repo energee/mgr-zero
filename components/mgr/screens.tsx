@@ -1637,7 +1637,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Brand",
-    to: { Edit: "Brand approval", "COLA TTB ID 25318001000034": "Brand approval", "OH registration": "State registration", "Add approval": "Brand approval", "Add registration": "State registration", Use: "Brand", "Suggested group 2": "Brand", "Edit SKU": "SKU", "Four Pack · 6 per Case": "Format", Glass: "Price group", "Edit on price group": "Price group", "Manage formats": "Catalog" },
+    to: { Edit: "Brand approval", "COLA TTB ID 25318001000034": "Brand approval", "OH registration": "State registration", "Add approval": "Brand approval", "Add registration": "State registration", Use: "Brand", "Suggested group 2": "Brand", "Edit SKU": "SKU", "Four Pack · 6 per Case": "Format", Glass: "Price group", "Manage formats": "Catalog" },
     job: "Sellable brand facts and compliance, including selected COLA label images",
     reads: "list_brands [incl. the staff-only alias, SKUs and pours] · list_catalog_categories · list_formats [packaged, with contents] · list_channel_prices · list_sale_channels · list_keg_pools · get_compliance_registry [this brand’s approvals and registrations] · get_brand_recipe_cost [recipe cost per barrel and any uncosted ingredient] · get_cola_image",
     writes: "upsert_brand · save_catalog_category · delete_catalog_category · update_sku · create_sku · upsert_brand_approval · upsert_state_registration",
