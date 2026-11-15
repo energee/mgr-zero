@@ -11,6 +11,7 @@
 import { DatePicker } from "@/components/mgr/date-picker";
 import { DirectionIcon, Icon, type IconSvgElement } from "@/components/mgr/icon";
 import { StepQuantity } from "@/components/mgr/qty";
+import { SuggestInput } from "@/components/mgr/suggest-input";
 import { SearchPick, type SearchPickOption } from "@/components/mgr/search-pick";
 import { SortTable } from "@/components/mgr/sort-table";
 import { SubmitButton, type SubmitButtonProps } from "@/components/mgr/submit-button";
@@ -368,16 +369,14 @@ export const E = {
         </Field>
       );
     }
-    // The options are the datalist's identity, so the id derives from them: two
-    // fields sharing a label (a card names its own material, so both lot fields
-    // are just "Lot") never collide, and two offering the same options correctly
-    // share one list. A caller cannot forget to disambiguate.
-    const listId = suggestions?.length ? `list-${suggestions.join("-").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}` : undefined;
+    const field = { type, "aria-label": label, ...attributes };
     return (
       <Field data-disabled={attributes.disabled} data-invalid={attributes["aria-invalid"]}>
         {!hideLabel && <FieldLabel htmlFor={attributes.id}>{label}</FieldLabel>}
-        <Input type={type} aria-label={label} {...attributes} {...(onChange ? { value, onChange: (event) => onChange(event.target.value) } : { defaultValue: value })} list={listId} />
-        {listId ? <datalist id={listId}>{suggestions!.map((o) => <option key={o} value={o} />)}</datalist> : null}
+        {/* Suggestions open from the shadcn combobox; typing anything else is still accepted. */}
+        {suggestions?.length
+          ? <SuggestInput suggestions={suggestions} value={value} onChange={onChange} {...field} />
+          : <Input {...field} {...(onChange ? { value, onChange: (event) => onChange(event.target.value) } : { defaultValue: value })} />}
         {error.message}
       </Field>
     );

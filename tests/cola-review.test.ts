@@ -44,7 +44,8 @@ describe("COLA bulk review", () => {
       { ttb_id: "old", approved_on: "2025-01-01", image_url: "https://example.test/old.jpg" },
       { ttb_id: "new", approved_on: "2026-01-01", image_url: "https://example.test/new.jpg" },
     ] }] });
-    expect(model.brands[0]?.image).toEqual({ url: "https://example.test/new.jpg", ttbId: "new" });
+    // The label also carries its approval date, for the thumbnail's hover card.
+    expect(model.brands[0]?.image).toEqual({ url: "https://example.test/new.jpg", ttbId: "new", note: "approved Jan 1, 2026" });
     const pendingOnly = toCatalogViewProps({ priceGroups: [], brands: [{ ...brand, abv: null, styles: null, skus: [], colas: [{ ttb_id: "pending", approved_on: null, image_url: "https://example.test/pending.jpg" }] }] });
     expect(pendingOnly.brands[0]?.image).toBeUndefined();
   });
