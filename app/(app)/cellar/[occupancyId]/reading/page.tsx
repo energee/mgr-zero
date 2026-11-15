@@ -13,7 +13,7 @@ import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { notFound } from "next/navigation";
 import { readingIdentity } from "@/components/mgr/views/fermentation-reading";
 import { nextReadingHref, readingReturnHref } from "@/lib/mgr/fermentation-reading-view";
-import { nextTankOccupancy } from "@/lib/mgr/cellar-map-view";
+import { nextTankOccupancy, type OrderedVessel } from "@/lib/mgr/cellar-map-view";
 import { ReadingForm } from "./reading-form";
 import { navTitle } from "@/lib/mgr/nav";
 import VesselPage from "@/app/(app)/cellar/vessels/[id]/page";
@@ -42,7 +42,7 @@ export default async function OccupancyReadingPage({ params, searchParams }: { p
     runCommand("list_fermentation_readings", { occupancyId }, ctx),
     runCommand("get_gravity_unit", {}, ctx),
     runCommand("list_vessels", {}, ctx),
-  ]) as [Reading[], { effective: GravityUnit }, { id: string }[]];
+  ]) as [Reading[], { effective: GravityUnit }, OrderedVessel[]];
   const next = nextTankOccupancy(vessels, occupancies, occupancyId);
 
   return (

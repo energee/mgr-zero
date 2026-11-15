@@ -382,7 +382,8 @@ describe("SCREENS", () => {
     for (const [name, count] of [["Cellar map", 6], ["Tap board", 11]] as const) {
       const screen = SCREENS.find((s) => s.name === name)!;
       const html = renderToStaticMarkup(createElement("div", null, screen.body));
-      expect.soft(html.match(/<button/g)?.length ?? 0, `${name}: actionable tiles`).toBeGreaterThanOrEqual(count);
+      // A tile acts through a button or a link: a Cellar tile's reading line is its link to Reading.
+      expect.soft(html.match(/<(button|a)\b/g)?.length ?? 0, `${name}: actionable tiles`).toBeGreaterThanOrEqual(count);
     }
   });
 
@@ -461,7 +462,7 @@ describe("SCREENS", () => {
   it("keeps row actions to verbs", () => {
     const verbs = new Set([
       "Correct receipt", "Add brew turn", "Correct turn 1", "Correct turn 2",
-      "Add", "Add stop", "Add to route", "Adjust", "Assign", "Cancel plan", "Reschedule", "Change", "Check", "Check in", "Choose lot", "Choose who gets it", "Close", "Confirm", "Confirm all", "Connect", "Count", "Create",
+      "Add", "Add reading", "Add stop", "Add to route", "Adjust", "Assign", "Cancel plan", "Reschedule", "Change", "Check", "Check in", "Choose lot", "Choose who gets it", "Close", "Confirm", "Confirm all", "Connect", "Count", "Create",
       "Deliver", "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Edit SKU", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Mark sent", "Open", "Open format",
       "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Reading", "Receive", "Record movement", "Record opening count", "Record return", "Release", "Reload", "Remove", "Reorder", "Re-push",
       "Resolve", "Resume", "Retry", "Return", "Return and credit", "Review", "Review history", "Review sales", "Select", "Send", "Send PO", "Set vendor", "Shortfall", "Skip", "Start", "Swap", "Switch", "Tap",

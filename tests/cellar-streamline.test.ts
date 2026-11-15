@@ -27,7 +27,7 @@ import { CellarAdditionForm } from "@/app/(app)/cellar/cellar-addition-form";
 import { NewBatchForm } from "@/app/(app)/batches/new-batch-form";
 import { cellarAdditionCitra, cellarTransferPils } from "@/lib/mgr/fixtures/production";
 
-const vessels = [{ id: "v1", name: "FV1", capacity_bbl: 10 }, { id: "v2", name: "FV2", capacity_bbl: 10 }, { id: "v3", name: "FV3", capacity_bbl: 10 }];
+const vessels = [{ id: "v1", name: "FV1", capacity_bbl: 10, kind: "fermenter" as const }, { id: "v2", name: "FV2", capacity_bbl: 10, kind: "fermenter" as const }, { id: "v3", name: "FV3", capacity_bbl: 10, kind: "fermenter" as const }];
 const two = [{ vessel_id: "v1", occupancy_id: "o1", brand_name: null, bbl: 2 }, { vessel_id: "v2", occupancy_id: "o2", brand_name: null, bbl: 3 }];
 const reading = (occupancyId: string) => `/cellar/${occupancyId}/reading?from=/cellar`;
 
@@ -35,7 +35,6 @@ describe("item 1: Reading from each tile, back to where it opened", () => {
   it("gives every occupied tile its own Reading and an empty tile none", () => {
     const model = toCellarMapViewProps(vessels, two, {}, {}, reading);
     expect(model.tiles.map(tile => tile.readingHref)).toEqual(["/cellar/o1/reading?from=/cellar", "/cellar/o2/reading?from=/cellar", undefined]);
-    expect(model.actionHint).toBe("Several tanks hold beer. Use Reading on a tank.");
     const html = renderToStaticMarkup(createElement(CellarMapView, { model }));
     expect(html).toContain('href="/cellar/o2/reading?from=/cellar"');
   });

@@ -476,14 +476,15 @@ export const E = {
    *  region, so a screen reader hears the change politely. E.info and E.note
    *  default to static notes; only explicit errors use their alert role. */
   polite: (t: React.ReactNode) => (t ? <p className="text-sm text-muted-foreground">{t}</p> : null),
-  /** Status tiles. `actions` sit under a tile's facts; with an `href` too, the facts stay the link. */
-  tiles: (arr: [React.ReactNode, React.ReactNode, React.ReactNode?, (0 | 1)?, number?, string?, React.ReactNode?][]) => (
+  /** Status tiles. `actions` sit under a tile's facts; with an `href` too, the facts stay the link.
+   *  `quiet` draws a tile with nothing in it (an empty tank) muted, so the full ones stand out. */
+  tiles: (arr: [React.ReactNode, React.ReactNode, React.ReactNode?, (0 | 1)?, number?, string?, React.ReactNode?, boolean?][]) => (
     <ItemGroup className="grid grid-cols-2 gap-2 md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]">
-      {arr.map(([n, s, g, w, f, href, actions], i) => {
+      {arr.map(([n, s, g, w, f, href, actions, quiet], i) => {
         const content = <TileContent {...{ n, s, g, w, f }} />;
         const facts = href ? <Link href={href} className="flex min-w-0 max-w-full flex-col gap-0.5">{content}</Link> : content;
         return (
-          <Item key={i} variant="outline" size="sm" className="min-w-0 flex-col items-start gap-0.5 wrap-anywhere" asChild>
+          <Item key={i} variant="outline" size="sm" className={cn("min-w-0 flex-col items-start gap-0.5 wrap-anywhere", quiet && "border-dashed text-muted-foreground")} asChild>
             {actions ? <div>{facts}{actions}</div> : href ? facts : <button type="button">{content}</button>}
           </Item>
         );
