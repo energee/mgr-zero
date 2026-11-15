@@ -6,6 +6,10 @@ description: "Recipes, batches, brew days, vessels and fermentation."
 A recipe is versioned: a batch references the version it was brewed to, so a
 later recipe change never rewrites the history of beer already made.
 
+A batch that is neither brewed nor cancelled moves to each new version saved
+with `create_recipe_version`. Its `moved_batches` count in that result says how
+many moved. Brewed and cancelled batches keep the version they had.
+
 `get_recipe` defaults to the latest version. Pass a positive integer `version`
 to read an older saved version, including its own ingredients, water additions
 and predicted gravity. `versions` lists all available version numbers, newest
