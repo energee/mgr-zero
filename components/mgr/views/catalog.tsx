@@ -65,7 +65,8 @@ export function CatalogView({
             key: brand.key,
             cells: [brand.name, brand.style, brand.abv, brand.skus, brand.cola],
             // Every row leads with the same slot, so names line up; a brand without a label leaves it blank.
-            media: brand.image ? images?.[brand.key] ?? <ColaLabelImageView label={`${brand.name} · COLA ${brand.image.ttbId}`} compact /> : <div className={COLA_SLOT} aria-hidden />,
+            // Keyed, because the rows cross to the client RecordTable in an array prop (#1137).
+            media: brand.image ? images?.[brand.key] ?? <ColaLabelImageView key="media" label={`${brand.name} · COLA ${brand.image.ttbId}`} compact /> : <div key="media" className={COLA_SLOT} aria-hidden />,
             // A style or ABV that is not set sorts last, not as the words.
             sort: [brand.name, brand.style === NOT_SET ? null : brand.style, brand.abv === NOT_SET ? null : brand.abv, brand.skus, brand.cola],
             note: brand.alias,

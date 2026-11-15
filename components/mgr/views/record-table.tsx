@@ -34,7 +34,8 @@ export type RecordTableRow = {
   cells: ReactNode[];
   /** A secondary line under the name, such as a brand's staff-only alias. */
   note?: ReactNode;
-  /** A fixed-size thumbnail before the name, such as a brand's COLA label. */
+  /** A fixed-size thumbnail before the name, such as a brand's COLA label.
+   *  An element here needs a key for the same reason a cell does (#1137). */
   media?: ReactNode;
   /** Where the name links on a live page; the inventory leaves it out (an
    *  inert tap). null: the live viewer may not open it, so the name is plain text. */
