@@ -38,19 +38,30 @@ function OutputMix({ row }: { row: PackagingRunRowView }) {
   </span>;
 }
 
+/** Barrels packaged against the plan: the track is the plan and the fill is what was packaged. */
+function PackagedOfPlanned({ row }: { row: PackagingRunRowView }) {
+  if (row.planPercent === undefined) return <span className="text-muted-foreground">{row.packaged}</span>;
+  return <span className="inline-flex items-center gap-2">
+    <span aria-hidden className="flex h-2 w-24 shrink-0 overflow-hidden rounded-full bg-muted">
+      <span className={row.belowPlan ? "bg-warning-foreground" : "bg-primary"} style={{ width: `${row.planPercent}%` }} />
+    </span>
+    <span className={row.belowPlan ? "font-medium text-warning-foreground" : undefined}>{row.packaged}</span>
+  </span>;
+}
+
 const swatch = (className: string) => <span className={`mr-1 inline-block size-2 rounded-sm ${className}`} />;
 
 /** Finished runs under a heading per planned day. The day order is the point, so the columns do not sort. */
 function RecentTable({ rows }: { rows: PackagingRunRowView[] }) {
-  const yieldPercent = rows.some(row => row.yieldPercent !== undefined);
+  const packaged = rows.some(row => row.packaged !== undefined);
   return <>
     {rows.some(row => row.kegPercent !== undefined) && <p className="flex gap-4 text-xs text-muted-foreground">
       <span>{swatch("bg-primary")}Cans and bottles</span><span>{swatch("bg-primary/30")}Kegs</span>
     </p>}
     <RecordTable
       sortable={false}
-      headers={["Run", "Brand", "Output", ...(yieldPercent ? ["Yield"] : [])]}
-      align={["l", "l", "l", ...(yieldPercent ? ["r" as const] : [])]}
+      headers={["Run", "Brand", "Output", ...(packaged ? ["Packaged of planned"] : [])]}
+      align={["l", "l", "l", ...(packaged ? ["l" as const] : [])]}
       rows={rows.map(row => ({
         key: row.key,
         href: row.href,
@@ -60,7 +71,7 @@ function RecentTable({ rows }: { rows: PackagingRunRowView[] }) {
           row.runNo,
           row.brand ?? "No brand",
           row.status === "Cancelled" ? <Fragment key="status">{E.status("Cancelled")}</Fragment> : <OutputMix key="output" row={row} />,
-          ...(yieldPercent ? [row.yieldPercent === undefined ? undefined : <span key="yield" className={row.lowYield ? "font-medium text-warning-foreground" : undefined}>{row.yieldPercent}%</span>] : []),
+          ...(packaged ? [row.packaged === undefined ? undefined : <PackagedOfPlanned key="packaged" row={row} />] : []),
         ],
       }))}
     />

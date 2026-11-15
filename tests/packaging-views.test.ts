@@ -79,7 +79,7 @@ describe("packaging views", () => {
     }], DEMO_TIME_ZONE).upcoming;
     expect(upcoming).toMatchObject({ runNo: "RUN-0008", brand: "Pils", date: "Sep 5, 2026", source: null, quantity: "0", verb: "Pick source" });
     expect(upcoming.output).toBeUndefined();
-    expect(upcoming.yieldPercent).toBeUndefined();
+    expect(upcoming.packaged).toBeUndefined();
   });
 
   it("a finished run is a row link with no Open verb, so it never reads as reopen (#996)", () => {
@@ -122,14 +122,20 @@ describe("packaging views", () => {
     expect(recent([{ unit: "keg", qty: 1, bbl: null }]).heading).toBe("Sep 5, 2026 · 1 run");
   });
 
-  it("derives yield from barrels packaged over barrels drawn, and flags one under 90%", () => {
+  it("states barrels packaged against barrels planned, and flags a run under 90% of plan", () => {
     const run = { id: "r", run_no: 1, planned_on: "2026-09-05", started_at: null, closed_at: "2026-09-06", cancelled_at: null, brand_name: "Pils", vessel_name: null, qty_planned: 20 };
-    const recent = (facts: { bbl_drawn?: number | null; bbl_packaged?: number | null }) => toPackagingRunsViewProps([{ ...run, ...facts }], "UTC").recent[0];
-    expect(recent({ bbl_drawn: 10, bbl_packaged: 9.64 })).toMatchObject({ yieldPercent: 96, lowYield: false });
-    expect(recent({ bbl_drawn: 10, bbl_packaged: 8.94 })).toMatchObject({ yieldPercent: 89, lowYield: true });
-    expect(recent({ bbl_drawn: 10, bbl_packaged: 0 })).toMatchObject({ yieldPercent: 0, lowYield: true });
-    // A historical run has no barrels drawn, so it has no yield.
-    expect(recent({ bbl_drawn: null, bbl_packaged: 0 }).yieldPercent).toBeUndefined();
+    const recent = (bbl: number | null, bbl_planned?: number | null) => toPackagingRunsViewProps([{ ...run, bbl_planned, outputs: [{ unit: "case", qty: 4, bbl }] }], "UTC").recent[0];
+    expect(recent(9.64, 10)).toMatchObject({ packaged: "9.6 of 10 bbl", planPercent: 96, belowPlan: false });
+    expect(recent(8.94, 10)).toMatchObject({ packaged: "8.9 of 10 bbl", planPercent: 89, belowPlan: true });
+    // Over plan: the real numbers, and a bar that stops at full.
+    expect(recent(8.1, 7.8)).toMatchObject({ packaged: "8.1 of 7.8 bbl", planPercent: 100, belowPlan: false });
+    // Nothing planned, or a planned format with no volume: the packaged barrels alone.
+    for (const planned of [0, null, undefined]) {
+      expect(recent(6, planned).packaged).toBe("6 bbl");
+      expect(recent(6, planned).planPercent).toBeUndefined();
+    }
+    // A packaged format with no volume has no barrels to state.
+    expect(recent(null, 10).packaged).toBeUndefined();
   });
 
   it("keeps shortage precedence over physical work", () => {
@@ -140,16 +146,15 @@ describe("packaging views", () => {
     }
   });
 
-  it("Recent shows run, brand and output, adds Yield only when a run has one, and marks a cancelled run", () => {
+  it("Recent shows run, brand, output and barrels packaged of planned, and marks a cancelled run", () => {
     const run = { id: "r", run_no: 1, planned_on: "2026-09-05", started_at: null, closed_at: "2026-09-06", cancelled_at: null, brand_name: "Pils", vessel_name: null, qty_planned: 20 };
     const table = (runs: Parameters<typeof toPackagingRunsViewProps>[0]) => htmlOf(createElement(PackagingRunsView, { model: toPackagingRunsViewProps(runs, "UTC") })).match(/<table\b[\s\S]*?<\/table>/)![0];
     const text = (html: string, tag: string) => [...html.matchAll(new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)</${tag}>`, "g"))].map(match => match[1].replace(/<[^>]*>/g, ""));
-    const plain = table([{ ...run, outputs: [{ unit: "case", qty: 4, bbl: 0.4 }] }, { ...run, id: "x", run_no: 2, closed_at: null, cancelled_at: "2026-09-06" }]);
-    expect(text(plain, "th")).toEqual(["Run", "Brand", "Output"]);
-    expect(text(plain, "td")).toEqual(["Sep 5, 2026 · 1 run · 0.4 bbl packaged", "RUN-0001", "Pils", "4 cases", "RUN-0002", "Pils", "Cancelled"]);
-    const drawn = table([{ ...run, bbl_drawn: 10, bbl_packaged: 8 }, { ...run, id: "y", run_no: 2 }]);
-    expect(text(drawn, "th")).toEqual(["Run", "Brand", "Output", "Yield"]);
-    expect(text(drawn, "td")).toEqual(["Sep 5, 2026 · 2 runs", "RUN-0001", "Pils", "", "80%", "RUN-0002", "Pils", "", ""]);
+    const listed = table([{ ...run, bbl_planned: 0.5, outputs: [{ unit: "case", qty: 4, bbl: 0.4 }] }, { ...run, id: "x", run_no: 2, closed_at: null, cancelled_at: "2026-09-06" }]);
+    expect(text(listed, "th")).toEqual(["Run", "Brand", "Output", "Packaged of planned"]);
+    expect(text(listed, "td")).toEqual(["Sep 5, 2026 · 1 run · 0.4 bbl packaged", "RUN-0001", "Pils", "4 cases", "0.4 of 0.5 bbl", "RUN-0002", "Pils", "Cancelled", ""]);
+    // With no barrels on any run, the column is left out.
+    expect(text(table([{ ...run, outputs: [{ unit: "keg", qty: 1, bbl: null }] }]), "th")).toEqual(["Run", "Brand", "Output"]);
   });
 
   it("explains every missing scheduling requirement without requiring a source tank (#1256)", () => {

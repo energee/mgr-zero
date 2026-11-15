@@ -16,10 +16,8 @@ export type PackagingRunSnapshot = {
   qty_planned: number;
   planned_unit?: string;
   material_shortfall?: string;
-  /** Barrels drawn from the tank at close; null on a historical run. */
-  bbl_drawn?: number | null;
-  /** Barrels the close moved into stock, frozen at close (packaging_run_yields). */
-  bbl_packaged?: number | null;
+  /** The plan in barrels: planned units at each format's volume; null when a planned format has none. */
+  bbl_planned?: number | null;
   /** What a closed run actually packaged, one entry per package unit. */
   outputs?: PackagedOutput[];
 };
@@ -43,8 +41,11 @@ export type PackagingRunRowView = {
   output?: string;
   /** Share of the packaged barrels that went into kegs, 0 to 100. */
   kegPercent?: number;
-  yieldPercent?: number;
-  lowYield?: boolean;
+  /** Barrels packaged, against the plan when there is one: "9.3 of 9.6 bbl" or "6 bbl". */
+  packaged?: string;
+  /** Packaged as a percent of plan, capped at 100 for the bar; unset with no plan to compare. */
+  planPercent?: number;
+  belowPlan?: boolean;
   verb?: string;
   tone?: "info" | "attention";
   href?: string;
@@ -61,8 +62,9 @@ export type PackagingRunsViewModel = {
 
 const UNIT_WORDS = { case: ["case", "cases"], keg: ["keg", "kegs"], each: ["unit", "units"] } as const;
 const UNIT_ORDER = Object.keys(UNIT_WORDS);
-/** A yield under this percent is drawn as a warning. */
-const LOW_YIELD_PERCENT = 90;
+/** A run that packaged under this percent of its plan is drawn as a warning. */
+const BELOW_PLAN_PERCENT = 90;
+const tenths = (bbl: number) => bbl.toLocaleString("en-US", { maximumFractionDigits: 1 });
 
 /** Barrels across outputs, or undefined when any format has no volume. */
 function packagedBbl(outputs: PackagedOutput[]) {
@@ -82,9 +84,17 @@ function kegPercent(outputs: PackagedOutput[]) {
   return Math.round(packagedBbl(outputs.filter(output => output.unit === "keg"))! / total * 100);
 }
 
-/** Packaged over drawn; a run with no barrels drawn (historical) has no yield. */
-function yieldPercent(run: PackagingRunSnapshot) {
-  return run.bbl_drawn && run.bbl_packaged != null ? Math.round(run.bbl_packaged / run.bbl_drawn * 100) : undefined;
+/** Barrels packaged against barrels planned. With nothing planned, or a volume unknown, the packaged barrels stand alone. */
+function againstPlan(run: PackagingRunSnapshot): Pick<PackagingRunRowView, "packaged" | "planPercent" | "belowPlan"> {
+  const packaged = packagedBbl(run.outputs ?? []);
+  if (packaged === undefined || !run.outputs?.length) return {};
+  if (!run.bbl_planned) return { packaged: `${tenths(packaged)} bbl` };
+  const percent = Math.round(packaged / run.bbl_planned * 100);
+  return {
+    packaged: `${tenths(packaged)} of ${tenths(run.bbl_planned)} bbl`,
+    planPercent: Math.min(percent, 100),
+    belowPlan: percent < BELOW_PLAN_PERCENT,
+  };
 }
 
 /** "Sep 4, 2026 · 2 runs · 14.5 bbl packaged" for one planned day's finished runs. */
@@ -110,17 +120,13 @@ function row(run: PackagingRunSnapshot, today: string, href?: string): Packaging
   };
   // Finished runs open their record without suggesting they can be reopened.
   if (run.cancelled_at) return { ...common, status: "Cancelled" };
-  if (run.closed_at) {
-    const percent = yieldPercent(run);
-    return {
-      ...common,
-      status: "Closed",
-      output: outputWords(run.outputs ?? []),
-      kegPercent: kegPercent(run.outputs ?? []),
-      yieldPercent: percent,
-      lowYield: percent !== undefined && percent < LOW_YIELD_PERCENT,
-    };
-  }
+  if (run.closed_at) return {
+    ...common,
+    status: "Closed",
+    output: outputWords(run.outputs ?? []),
+    kegPercent: kegPercent(run.outputs ?? []),
+    ...againstPlan(run),
+  };
   const verb = run.material_shortfall ? "Resolve" : run.started_at ? "Close" : run.vessel_name ? "Start" : "Pick source";
   return {
     ...common,

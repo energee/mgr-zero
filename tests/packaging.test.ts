@@ -542,7 +542,7 @@ describe("closing the run", () => {
     expect(sql(`select bbl from occupancy_volumes where occupancy_id='${occupancyId}'`, true)).toEqual(["10.000"]);
   });
 
-  it("lists a closed run with what it packaged by unit and its frozen barrels, and unfinished runs soonest first", async () => {
+  it("lists a closed run with what it packaged by unit and its planned barrels, and unfinished runs soonest first", async () => {
     const catalog = await seedCatalog(b.id, { product: "Listed", sku: "Listed case", bblPerUnit: 0.1, format: "Listed case" });
     await admin.from("formats").update({ units_per_case: 24 }).eq("id", catalog.formatId).throwOnError();
     const kegFormatId = await insert("formats", { brewery_id: b.id, name: "Listed half", basis: "packaged", package_type: "keg", keg_size: "half_bbl", bbl_per_unit: 0.5 });
@@ -552,10 +552,10 @@ describe("closing the run", () => {
     await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-12-01T14:00:00Z" }, ctx);
     await closeWithConfirmedMaterials({ runId: run.id, bblDrawn: 2.5, outputs: [{ skuId: catalog.skuId, qtyActual: 10 }, { skuId: kegSkuId, qtyActual: 2 }], lotCode: "LISTED", packagedOn: fixtureDate, locationId: wh.id, binId: wh.binId }, ctx);
 
-    type Listed = { id: string; bbl_drawn: number | null; bbl_packaged: number | null; outputs: { unit: string; qty: number; bbl: number | null }[] };
+    type Listed = { id: string; bbl_planned: number | null; outputs: { unit: string; qty: number; bbl: number | null }[] };
     const history = await runCommand("list_packaging_history", {}, ctx) as { rows: Listed[] };
     const closed = history.rows.find(row => row.id === run.id)!;
-    expect(closed).toMatchObject({ bbl_drawn: 2.5, bbl_packaged: 2 });
+    expect(closed.bbl_planned).toBe(2);
     expect(closed.outputs).toHaveLength(2);
     expect(closed.outputs).toEqual(expect.arrayContaining([{ unit: "case", qty: 10, bbl: 1 }, { unit: "keg", qty: 2, bbl: 1 }]));
 
@@ -565,7 +565,15 @@ describe("closing the run", () => {
     const position = (id: string) => upcoming.findIndex(row => row.id === id);
     expect(position(sooner.id)).toBeLessThan(position(later.id));
     // A plan is not output: an unfinished run has packaged nothing yet.
-    expect(upcoming[position(later.id)]).toMatchObject({ bbl_packaged: null, outputs: [] });
+    expect(upcoming[position(later.id)].outputs).toEqual([]);
+    expect(upcoming[position(later.id)].bbl_planned).toBeCloseTo(0.3);
+    expect(upcoming[position(sooner.id)].bbl_planned).toBe(0);
+    // A planned format with no volume leaves the plan's barrels unknown, not zero.
+    const noVolumeFormatId = await insert("formats", { brewery_id: b.id, name: "Listed no volume", basis: "packaged", package_type: "can" });
+    const noVolumeSkuId = await insert("skus", { brewery_id: b.id, brand_id: catalog.brandId, format_id: noVolumeFormatId, name: "Listed no volume" });
+    const unknown = await runCommand("schedule_packaging_run", { brandId: catalog.brandId, plannedOn: "2027-03-07", outputs: [{ skuId: catalog.skuId, qtyPlanned: 3 }, { skuId: noVolumeSkuId, qtyPlanned: 1 }] }, ctx) as { id: string };
+    const relisted = await runCommand("list_packaging_runs", {}, ctx) as Listed[];
+    expect(relisted.find(row => row.id === unknown.id)!.bbl_planned).toBeNull();
   });
 
   it("keeps closed yield and consumed materials frozen after a format correction", async () => {

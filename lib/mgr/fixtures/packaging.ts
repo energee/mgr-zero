@@ -6,9 +6,9 @@ export const packagingRuns: PackagingRunSnapshot[] = [
   { id: "run31", run_no: 31, planned_on: "2026-09-05", started_at: null, closed_at: null, cancelled_at: null, brand_name: "Hazy cans", vessel_name: "FV3", qty_planned: 118, planned_unit: "cases", material_shortfall: "480 ends short" },
   { id: "run32", run_no: 32, planned_on: "2026-09-09", started_at: null, closed_at: null, cancelled_at: null, brand_name: "Pils ½ bbl", vessel_name: "FV1", qty_planned: 40, planned_unit: "kegs" },
   { id: "run33", run_no: 33, planned_on: "2026-09-11", started_at: null, closed_at: null, cancelled_at: null, brand_name: "Stout cans", vessel_name: null, qty_planned: 0 },
-  { id: "run30", run_no: 30, planned_on: "2026-09-02", started_at: "2026-09-02", closed_at: "2026-09-02", cancelled_at: null, brand_name: "Pils cans", vessel_name: "FV1", qty_planned: 96, bbl_drawn: 9.6, bbl_packaged: 9.3, outputs: [{ unit: "case", qty: 96, bbl: 9.3 }] },
-  { id: "run29", run_no: 29, planned_on: "2026-09-02", started_at: "2026-09-02", closed_at: "2026-09-02", cancelled_at: null, brand_name: "Hazy IPA", vessel_name: "FV3", qty_planned: 98, bbl_drawn: 20, bbl_packaged: 19, outputs: [{ unit: "case", qty: 62, bbl: 6 }, { unit: "keg", qty: 26, bbl: 13 }] },
-  { id: "run28", run_no: 28, planned_on: "2026-08-27", started_at: "2026-08-27", closed_at: "2026-08-27", cancelled_at: null, brand_name: "Helles cans", vessel_name: "FV2", qty_planned: 110, bbl_drawn: 12.2, bbl_packaged: 10.6, outputs: [{ unit: "case", qty: 110, bbl: 10.6 }] },
+  { id: "run30", run_no: 30, planned_on: "2026-09-02", started_at: "2026-09-02", closed_at: "2026-09-02", cancelled_at: null, brand_name: "Pils cans", vessel_name: "FV1", qty_planned: 96, bbl_planned: 9.6, outputs: [{ unit: "case", qty: 96, bbl: 9.3 }] },
+  { id: "run29", run_no: 29, planned_on: "2026-09-02", started_at: "2026-09-02", closed_at: "2026-09-02", cancelled_at: null, brand_name: "Hazy IPA", vessel_name: "FV3", qty_planned: 98, bbl_planned: 20, outputs: [{ unit: "case", qty: 62, bbl: 6 }, { unit: "keg", qty: 26, bbl: 13 }] },
+  { id: "run28", run_no: 28, planned_on: "2026-08-27", started_at: "2026-08-27", closed_at: "2026-08-27", cancelled_at: null, brand_name: "Helles cans", vessel_name: "FV2", qty_planned: 110, bbl_planned: 12.2, outputs: [{ unit: "case", qty: 110, bbl: 10.6 }] },
 ];
 
 export const schedulePackagingRun: SchedulePackagingRunViewModel = {
