@@ -1,9 +1,24 @@
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import type { PackagingRunRowView, PackagingRunsViewModel } from "@/lib/mgr/packaging-runs-view";
+import type { PackagingRunRowView, PackagingRunsViewModel, ReadyTankRowView } from "@/lib/mgr/packaging-runs-view";
 import { RecordTable } from "@/components/mgr/views/record-table";
 import { WorkKindTabs } from "@/components/mgr/views/work-kind-tabs";
 import { HistoryNavigation, type HistoryNavigationProps } from "./history-navigation";
+
+/** Tanks with beer and no run planned: each row opens Schedule run on that tank. */
+function ReadyTable({ rows }: { rows: ReadyTankRowView[] }) {
+  return <RecordTable
+    headers={["Tank", "Brand", "Batch", "Volume", "Next action"]}
+    align={["l", "l", "l", "r", "l"]}
+    rows={rows.map(row => ({
+      key: row.key,
+      href: row.href,
+      to: "Schedule packaging run",
+      cells: [row.tank, row.brand, row.batch, row.volume, <Fragment key="action">{E.act("Schedule", "info", row.href)}</Fragment>],
+      sort: [row.tank, row.brand, row.batch, row.volume, null],
+    }))}
+  />;
+}
 
 function UpcomingTable({ rows }: { rows: PackagingRunRowView[] }) {
   return <RecordTable
@@ -38,14 +53,14 @@ function OutputMix({ row }: { row: PackagingRunRowView }) {
   </span>;
 }
 
-/** Barrels packaged against the plan: the track is the plan and the fill is what was packaged. */
+/** Barrels packaged against the plan: the track is the plan and the fill is what was packaged. With no plan to compare, the figure stands alone, muted. */
 function PackagedOfPlanned({ row }: { row: PackagingRunRowView }) {
-  if (row.planPercent === undefined) return <span className="text-muted-foreground">{row.packaged}</span>;
+  const textClass = row.planPercent === undefined ? "text-muted-foreground" : row.belowPlan ? "font-medium text-warning-foreground" : undefined;
   return <span className="inline-flex items-center gap-2">
-    <span aria-hidden className="flex h-2 w-24 shrink-0 overflow-hidden rounded-full bg-muted">
+    {row.planPercent !== undefined && <span aria-hidden className="flex h-2 w-24 shrink-0 overflow-hidden rounded-full bg-muted">
       <span className={row.belowPlan ? "bg-warning-foreground" : "bg-primary"} style={{ width: `${row.planPercent}%` }} />
-    </span>
-    <span className={row.belowPlan ? "font-medium text-warning-foreground" : undefined}>{row.packaged}</span>
+    </span>}
+    <span className={textClass}>{row.packaged}</span>
   </span>;
 }
 
@@ -78,11 +93,12 @@ function RecentTable({ rows }: { rows: PackagingRunRowView[] }) {
   </>;
 }
 
-export function PackagingRunsView({ model, actions, workHrefs, pagination }: { model: PackagingRunsViewModel; actions?: ReactNode; workHrefs?: Record<string, string>; pagination?: HistoryNavigationProps }) {
+export function PackagingRunsView({ model, ready = [], actions, workHrefs, pagination }: { model: PackagingRunsViewModel; ready?: ReadyTankRowView[]; actions?: ReactNode; workHrefs?: Record<string, string>; pagination?: HistoryNavigationProps }) {
   return <>
     {E.hd("Packaging", actions !== undefined ? actions : E.btn("Schedule run"))}
     <WorkKindTabs chips={model.workChips} current={model.workChips[4]} tabs={model.workTabs} hrefs={workHrefs} />
-    {model.empty && !pagination?.firstHref ? E.blank(model.empty) : <>
+    {model.empty && ready.length === 0 && !pagination?.firstHref ? E.blank(model.empty) : <>
+      {ready.length > 0 && <>{E.ttl("Ready to package")}<ReadyTable rows={ready} /></>}
       {model.upcoming.length > 0 && <>{E.ttl("Upcoming")}<UpcomingTable rows={model.upcoming} /></>}
       {model.recent.length > 0 && <>{E.ttl("Recent")}<RecentTable rows={model.recent} /></>}
     </>}

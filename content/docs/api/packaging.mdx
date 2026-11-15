@@ -277,9 +277,11 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, brewer, warehouse
 
-Tanks with beer in them right now: the vessel, the batch, the brand it intends and how many barrels are left
+Tanks with beer in them right now: the vessel, the batch, the brand it intends and how many barrels are left. readyToPackage keeps only brite tanks that no unfinished packaging run draws from
 
-Takes no input.
+| Field | Type | Required |
+| --- | --- | --- |
+| `readyToPackage` | boolean | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -292,7 +294,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, brewer, warehouse
 
-One page of closed or cancelled packaging runs, newest created first, with brand, source tank, planned units and the plan in barrels. A closed run adds its actual output by package unit (case, keg, or each) with its barrels
+One page of closed or cancelled packaging runs, newest created first, with brand, source tank and the plan by package unit (case, keg, or each) with its barrels. A closed run adds its actual output by the same units
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -310,7 +312,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, brewer, warehouse
 
-Unfinished packaging runs by planned date, soonest first, with brand, source tank, planned units and the plan in barrels. Use list_packaging_history for closed or cancelled runs.
+Unfinished packaging runs by planned date, soonest first, with brand, source tank, the plan by package unit (case, keg, or each) with its barrels, and the materials the plan is short of. Use list_packaging_history for closed or cancelled runs.
 
 Takes no input.
 

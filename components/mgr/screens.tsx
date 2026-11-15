@@ -229,7 +229,7 @@ import {
   correctReceiptPo, draftPoCanSource, editPoCanSource, newPoDraft, newPoIncomplete, purchaseOrdersWarehouse, receiptPoPartial, receivePoSent, vendorDetail, vendorEdit, vendorsList,
 } from "@/lib/mgr/fixtures/purchasing";
 import { kegBalanceRidgeline, kegFleet, kegHistoryLedger, kegReportOwned } from "@/lib/mgr/fixtures/kegs";
-import { packagingRuns, repackCase, schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
+import { packagingReady, packagingRuns, repackCase, schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
 import { planningDemo } from "@/lib/mgr/fixtures/planning";
 import { monthlyComplianceAmended, monthlyComplianceAugust, monthlyComplianceSeptember, monthlyComplianceUnbalanced } from "@/lib/mgr/fixtures/monthly-compliance";
 import { confirmDeliveryStop1, driverRouteA, returnRouteA, routeAPlan, routesDriver } from "@/lib/mgr/fixtures/delivery";
@@ -293,7 +293,7 @@ import { toPutBackViewProps } from "@/lib/mgr/put-back-view";
 import { toQuestionInvoiceViewProps } from "@/lib/mgr/question-invoice-view";
 import { toRecipesViewProps } from "@/lib/mgr/recipes-view";
 import { toRecordMovementViewProps } from "@/lib/mgr/record-movement-view";
-import { toPackagingRunsViewProps } from "@/lib/mgr/packaging-runs-view";
+import { toPackagingRunsViewProps, toReadyToPackage } from "@/lib/mgr/packaging-runs-view";
 import { toPlanningViewProps } from "@/lib/mgr/planning-view";
 import { beforeBooksState, toMonthlyComplianceViewProps } from "@/lib/mgr/monthly-compliance-view";
 import { toReverseMovementViewProps } from "@/lib/mgr/reverse-movement-view";
@@ -2024,13 +2024,13 @@ export const SCREENS: Screen[] = [
     slice: 5,
     tab: "Work",
     name: "Packaging runs",
-    to: { Resolve: "Close packaging run", Start: "Packaging plan", "Pick source": "Packaging plan" },
+    to: { Resolve: "Close packaging run", Start: "Packaging plan", "Pick source": "Packaging plan", Schedule: "Schedule packaging run" },
     job: "See what is planned, what is due and what closed, and schedule the next run",
     reads: "list_packaging_runs · list_packaging_history · list_brands · list_occupancies · list_skus · list_locations · list_bins",
     writes: "none [scheduling and closing happen on their own surfaces]",
-    states: [["short", "a planned run whose materials fall short says so beneath its run number and its next action is Resolve, not Start"], ["overdue", "an unstarted active plan before brewery-local today is marked Overdue; finished runs never are"], ["due today", "the same run also appears in Today for the brewer"], ["closed", "finished runs stay under Recent, grouped by planned day; a run that packaged under 90% of its plan is drawn as a warning"], ["cancelled", "a cancelled run says Cancelled where its output would be"], ["empty", "no runs planned: the empty state points at Schedule run"]],
-    spec: "Reuse the responsive RecordTable register shared with Batches: sortable columns on desktop and labeled records on phones. Keep Upcoming and Recent separate. Upcoming shows run, brand, planned date, source, planned quantity and next action. Recent does not sort: it is grouped under a heading per planned day, newest first, naming the day, its closed runs and their barrels packaged. Each row shows run, brand and actual output in package units, with a bar splitting its barrels between cans or bottles and kegs when every format has a volume. The last column sets barrels packaged against barrels planned, as a bar filled toward the plan and both figures; with nothing planned it states the packaged barrels alone. Schedule run and Repack keep their existing forms. A run number opens its record; finished runs have no next action.",
-    body: <PackagingRunsView model={toPackagingRunsViewProps(packagingRuns, DEMO_TIME_ZONE)} pagination={{ moreHref: "#" }} />,
+    states: [["ready", "beer in a brite tank with no run planned from it is listed first under Ready to package; Schedule opens the run sheet on that tank and its brand"], ["short", "a planned run whose materials fall short of stock on hand and on order says so beneath its run number and its next action is Resolve, not Start"], ["overdue", "an unstarted active plan before brewery-local today is marked Overdue; finished runs never are"], ["due today", "the same run also appears in Today for the brewer"], ["closed", "finished runs stay under Recent, grouped by planned day; a run that packaged under 90% of its plan is drawn as a warning"], ["cancelled", "a cancelled run says Cancelled where its output would be"], ["empty", "no runs planned: the empty state points at Schedule run"]],
+    spec: "Reuse the responsive RecordTable register shared with Batches: sortable columns on desktop and labeled records on phones. Ready to package comes first, then Upcoming, then Recent. Ready to package shows tank, brand, batch, volume and Schedule. Upcoming shows run, brand, planned date, source, planned quantity by package unit and next action. Recent does not sort: it is grouped under a heading per planned day, newest first, naming the day, its closed runs and their barrels packaged. Each row shows run, brand and actual output in package units, with a bar splitting its barrels between cans or bottles and kegs when every format has a volume. The last column sets barrels packaged against barrels planned, as a bar filled toward the plan and both figures; with nothing planned it states the packaged barrels alone. Schedule run and Repack keep their existing forms. A run number opens its record; finished runs have no next action.",
+    body: <PackagingRunsView model={toPackagingRunsViewProps(packagingRuns, DEMO_TIME_ZONE)} ready={toReadyToPackage(packagingReady)} pagination={{ moreHref: "#" }} />,
   },
   {
     step: 8,

@@ -542,7 +542,7 @@ describe("closing the run", () => {
     expect(sql(`select bbl from occupancy_volumes where occupancy_id='${occupancyId}'`, true)).toEqual(["10.000"]);
   });
 
-  it("lists a closed run with what it packaged by unit and its planned barrels, and unfinished runs soonest first", async () => {
+  it("lists runs with their plan and output by unit, an unfinished run's material shortages, and unfinished runs soonest first", async () => {
     const catalog = await seedCatalog(b.id, { product: "Listed", sku: "Listed case", bblPerUnit: 0.1, format: "Listed case" });
     await admin.from("formats").update({ units_per_case: 24 }).eq("id", catalog.formatId).throwOnError();
     const kegFormatId = await insert("formats", { brewery_id: b.id, name: "Listed half", basis: "packaged", package_type: "keg", keg_size: "half_bbl", bbl_per_unit: 0.5 });
@@ -552,13 +552,20 @@ describe("closing the run", () => {
     await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-12-01T14:00:00Z" }, ctx);
     await closeWithConfirmedMaterials({ runId: run.id, bblDrawn: 2.5, outputs: [{ skuId: catalog.skuId, qtyActual: 10 }, { skuId: kegSkuId, qtyActual: 2 }], lotCode: "LISTED", packagedOn: fixtureDate, locationId: wh.id, binId: wh.binId }, ctx);
 
-    type Listed = { id: string; bbl_planned: number | null; outputs: { unit: string; qty: number; bbl: number | null }[] };
+    type ByUnit = { unit: string; qty: number; bbl: number | null }[];
+    type Listed = { id: string; planned: ByUnit; outputs: ByUnit; shortages?: { name: string; short: number; unit: string }[] };
     const history = await runCommand("list_packaging_history", {}, ctx) as { rows: Listed[] };
     const closed = history.rows.find(row => row.id === run.id)!;
-    expect(closed.bbl_planned).toBe(2);
+    expect(closed.planned).toHaveLength(2);
+    expect(closed.planned).toEqual(expect.arrayContaining([{ unit: "case", qty: 10, bbl: 1 }, { unit: "keg", qty: 2, bbl: 1 }]));
+    // Shortages are for work still to do, so history carries none.
+    expect(closed.shortages).toBeUndefined();
     expect(closed.outputs).toHaveLength(2);
     expect(closed.outputs).toEqual(expect.arrayContaining([{ unit: "case", qty: 10, bbl: 1 }, { unit: "keg", qty: 2, bbl: 1 }]));
 
+    // The case format now needs one lid per case, and none is in stock or on order.
+    const lid = await material("Listed lid");
+    await runCommand("replace_format_bom", { formatId: catalog.formatId, lines: [{ materialId: lid, qtyPerUnit: 1 }] }, await makeStaffCtx(b.id, "admin"));
     const later = await runCommand("schedule_packaging_run", { brandId: catalog.brandId, plannedOn: "2027-03-05", outputs: [{ skuId: catalog.skuId, qtyPlanned: 3 }] }, ctx) as { id: string };
     const sooner = await runCommand("schedule_packaging_run", { brandId: catalog.brandId, plannedOn: "2027-03-03", outputs: [] }, ctx) as { id: string };
     const upcoming = await runCommand("list_packaging_runs", {}, ctx) as Listed[];
@@ -566,14 +573,35 @@ describe("closing the run", () => {
     expect(position(sooner.id)).toBeLessThan(position(later.id));
     // A plan is not output: an unfinished run has packaged nothing yet.
     expect(upcoming[position(later.id)].outputs).toEqual([]);
-    expect(upcoming[position(later.id)].bbl_planned).toBeCloseTo(0.3);
-    expect(upcoming[position(sooner.id)].bbl_planned).toBe(0);
+    expect(upcoming[position(later.id)].planned).toEqual([{ unit: "case", qty: 3, bbl: expect.closeTo(0.3) }]);
+    expect(upcoming[position(later.id)].shortages).toEqual([{ name: "Listed lid", short: 3, unit: "each" }]);
+    expect(upcoming[position(sooner.id)]).toMatchObject({ planned: [], shortages: [] });
     // A planned format with no volume leaves the plan's barrels unknown, not zero.
     const noVolumeFormatId = await insert("formats", { brewery_id: b.id, name: "Listed no volume", basis: "packaged", package_type: "can" });
     const noVolumeSkuId = await insert("skus", { brewery_id: b.id, brand_id: catalog.brandId, format_id: noVolumeFormatId, name: "Listed no volume" });
     const unknown = await runCommand("schedule_packaging_run", { brandId: catalog.brandId, plannedOn: "2027-03-07", outputs: [{ skuId: catalog.skuId, qtyPlanned: 3 }, { skuId: noVolumeSkuId, qtyPlanned: 1 }] }, ctx) as { id: string };
     const relisted = await runCommand("list_packaging_runs", {}, ctx) as Listed[];
-    expect(relisted.find(row => row.id === unknown.id)!.bbl_planned).toBeNull();
+    expect(relisted.find(row => row.id === unknown.id)!.planned).toEqual(expect.arrayContaining([{ unit: "each", qty: 1, bbl: null }]));
+  });
+
+  it("list_occupancies can name only the brite tanks no unfinished run draws from", async () => {
+    const catalog = await seedCatalog(b.id, { product: "Ready", sku: "Ready case", format: "Ready case" });
+    const brite = await runCommand("upsert_vessel", { name: "BT-READY", kind: "brite", capacityBbl: 60 }, owner) as { id: string };
+    const batch = await runCommand("schedule_batch", { plannedOn: "2026-11-10", plannedBbl: 8, intendedBrandId: catalog.brandId }, ctx) as { id: string };
+    const day = await runCommand("record_brew_day", { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: brite.id, initialBbl: 8, brewedOn: "2026-11-10" }, ctx) as { occupancy: { id: string } };
+    const fermenter = await brewInto("FV-NOT-READY", catalog.brandId, 8, "2026-11-10");
+
+    type Tank = { occupancy_id: string; vessel_name: string; brand_id: string | null };
+    const ready = async () => (await runCommand("list_occupancies", { readyToPackage: true }, ctx)) as Tank[];
+    expect((await ready()).find(tank => tank.occupancy_id === day.occupancy.id)).toMatchObject({ vessel_name: "BT-READY", brand_id: catalog.brandId });
+    // Beer still in a fermenter is not ready, though the full list has it.
+    expect((await ready()).some(tank => tank.occupancy_id === fermenter.occupancyId)).toBe(false);
+    expect(((await runCommand("list_occupancies", {}, ctx)) as Tank[]).some(tank => tank.occupancy_id === fermenter.occupancyId)).toBe(true);
+    // Once a run is planned from the tank, it is no longer waiting.
+    const run = await runCommand("schedule_packaging_run", { brandId: catalog.brandId, plannedOn: "2026-12-01", occupancyId: day.occupancy.id, outputs: [] }, ctx) as { id: string };
+    expect((await ready()).some(tank => tank.occupancy_id === day.occupancy.id)).toBe(false);
+    await runCommand("cancel_packaging_run", { runId: run.id }, ctx);
+    expect((await ready()).some(tank => tank.occupancy_id === day.occupancy.id)).toBe(true);
   });
 
   it("keeps closed yield and consumed materials frozen after a format correction", async () => {
