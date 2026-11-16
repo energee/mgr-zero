@@ -266,7 +266,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, brewer
 
-One page of completed or cancelled batches, newest created first, with brand and embedded recipe
+One page of completed or cancelled batches, newest created first, with brand and embedded recipe; each completed batch also carries its first and last gravity readings (og_reading and fg_reading, each null when it has no gravity reading)
 
 | Field | Type | Required |
 | --- | --- | --- |

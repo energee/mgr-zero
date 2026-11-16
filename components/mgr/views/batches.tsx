@@ -29,14 +29,15 @@ function Occupancies({ readings }: { readings: BatchOccupancyView[] }) {
 /** One lifecycle group. A batch with readings lists its open occupancies in
  *  the vessel cell; any other batch shows the vessel names it has. A group
  *  where no batch has either draws no vessel column at all. A group with
- *  brewed batches adds ABV and Attenuation, each tank's figure so far. The row itself
+ *  brewed batches adds ABV and Attenuation: each tank's figure so far, or a
+ *  completed batch's final one. The row itself
  *  is the link that opens the batch; an overdue plan's date is badged, the date last so
  *  it never breaks (as on Invoices). */
 function GroupTable({ rows }: { rows: BatchesRowView[] }) {
-  const brewed = rows.some(row => row.readings);
-  const vesselHead = brewed ? "Vessel and latest reading" : rows.some(row => row.vessel) ? "Vessel" : null;
-  /** One figure of a batch's tanks, in tank order; a tank without it is left out. */
-  const figure = (row: BatchesRowView, key: "abv" | "attenuation") => row.readings?.flatMap(occupancy => occupancy[key] ?? []).join(", ") ?? "";
+  const brewed = rows.some(row => row.readings || row.abv !== undefined);
+  const vesselHead = rows.some(row => row.readings) ? "Vessel and latest reading" : rows.some(row => row.vessel) ? "Vessel" : null;
+  /** A completed batch's final figure, or one figure of a batch's tanks, in tank order; a tank without it is left out. */
+  const figure = (row: BatchesRowView, key: "abv" | "attenuation") => row[key] ?? row.readings?.flatMap(occupancy => occupancy[key] ?? []).join(", ") ?? "";
   return <RecordTable
     headers={["Batch", "Brand", "Recipe", "Planned on", "Planned barrels", ...(brewed ? ["ABV", "Attenuation"] : []), ...(vesselHead ? [vesselHead] : [])]}
     align={["l", "l", "l", "l", "r", ...(brewed ? ["r" as const, "r" as const] : []), ...(vesselHead ? ["l" as const] : [])]}
