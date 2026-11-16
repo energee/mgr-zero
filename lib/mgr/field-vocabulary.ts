@@ -164,6 +164,7 @@ export const FIELD_VOCABULARY: Record<string, { meaning: string; unit?: string; 
   batchId: { meaning: "A batch of beer, planned or brewed.", entity: "batch" },
   vesselId: { meaning: "A tank or other vessel that holds beer.", entity: "vessel" },
   toVesselId: { meaning: "The vessel the beer moves into.", entity: "vessel" },
+  toBatchId: { meaning: "The planned batch this beer starts.", entity: "batch" },
   occupancyId: { meaning: "One stay of a batch in a vessel.", entity: "occupancy" },
   fromOccupancyId: { meaning: "The occupancy the beer moves out of.", entity: "occupancy" },
   capacityBbl: { meaning: "How much the vessel holds.", unit: "bbl" },

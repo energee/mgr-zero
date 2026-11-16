@@ -733,6 +733,15 @@ describe("SCREENS", () => {
     expect(SCREENS.find((x) => x.name === "Repack")!.writes).not.toMatch(/SCHEMA-GATE/);
   });
 
+  it("draws Cellar transfer starting a planned batch in an empty tank", () => {
+    const transfer = SCREENS.find((x) => x.name === "Cellar transfer")!;
+    const html = renderToStaticMarkup(createElement("div", null, transfer.body));
+    expect(html).toContain("Start a planned batch");
+    expect(html).toContain("Dry-Hopped Pils · B-0420");
+    expect(html).toContain("Transfer preview: BT2 0 + 3 = 3 / 10 bbl");
+    expect(transfer.states?.map(([name]) => name)).toContain("planned batch");
+  });
+
   it("gives every Work create form the shared E.pin footer (#1226)", () => {
     // One placement: primary on the right on the desk, full width on a phone.
     // The live pages mount these same views, so the record is the proof.

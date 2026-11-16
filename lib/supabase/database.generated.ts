@@ -5616,7 +5616,7 @@ isOneToOne: false
 { Args: { "p_actuals"?: Json,"p_batch": string,"p_brewed_on": string,"p_brewery": string,"p_confirm_empty"?: boolean,"p_initial_bbl": number,"p_process"?: Json,"p_request_id": string,"p_vessel": string }; Returns: Json
                            },
 "record_cellar_transfer":
-{ Args: { "p_brewery": string,"p_from_occupancy": string,"p_loss_bbl": number,"p_request_id": string,"p_to_vessel": string,"p_volume_bbl": number }; Returns: Json
+{ Args: { "p_brewery": string,"p_from_occupancy": string,"p_loss_bbl": number,"p_request_id": string,"p_to_batch"?: string,"p_to_vessel": string,"p_volume_bbl": number }; Returns: Json
                            },
 "record_chat_callback_receipt":
 { Args: { "p_callback_id": string,"p_callback_kind": string,"p_external_installation_id": string,"p_external_user_id": string,"p_payload_hash": string,"p_provider": string }; Returns: Json

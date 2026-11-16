@@ -1,6 +1,6 @@
 # Batch split: part of a batch becomes another batch
 
-Status: plan, awaiting approval. Branch `feat/batch-split`, PR to `main`.
+Status: approved 2026-11-16 and built. Branch `feat/batch-split`, PR to `main`.
 
 ## Why
 
@@ -44,7 +44,7 @@ Not in scope, by decision:
 
 - No new table, no parent/child column: the `transfers` row is the link.
 - No batch created inside the transfer; `schedule_batch` already does that.
-- No changing a batch's brand in place.
+- No changing the brand of an existing batch.
 - No backdating. A transfer is dated now, like every transfer today.
 
 ## Limits to know before approving
@@ -160,3 +160,18 @@ $$;
 The timestamp `20261116120000` is later than main's newest migration
 (`20261113051000_recipe_save_moves_batches.sql`); no open PR adds a migration
 today. Re-check both when the migration is written.
+
+## What changed while building
+
+- Tasks 1 to 3 were built together by one agent: they share one test file.
+- Task 6 found no failing read. It found that a batch started by a transfer read wrongly on two pages, so two display
+  fixes were added, with no new migration:
+  - The batch page says **Started from** with the source batch and the barrels transferred in, where a brewed batch
+    says **Knockout**. `get_brew_day` returns `startedFrom` for it.
+  - A recipe's Batch actuals leaves such a batch out. Its first reading is beer already fermenting, and it has no knockout.
+- The transfer preview names the batch it starts.
+- `toBatchId` was added to the field vocabulary, so an agent's proposal card names the batch.
+- `tests/rpc-allowlist.test.ts` and `tests/rls-taproom.test.ts` pin the procedure's signature and were updated for the
+  seventh parameter.
+- Known and left as is: on a split batch's page the pre-filled brew-day actuals are still built, though **Add brew turn**
+  is hidden for it and the database refuses the turn.

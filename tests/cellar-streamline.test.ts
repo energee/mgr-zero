@@ -77,7 +77,7 @@ describe("item 2: cellar forms open on their tank", () => {
   it("Transfer and Addition start on the occupancy they were opened for", () => {
     const { occupancies } = cellarTransferPils;
     const chosen = occupancies[1].occupancy_id;
-    const transfer = renderToStaticMarkup(createElement(CellarTransferForm, { occupancies, vessels: cellarTransferPils.vessels, fromId: chosen }));
+    const transfer = renderToStaticMarkup(createElement(CellarTransferForm, { occupancies, vessels: cellarTransferPils.vessels, plannedBatches: [], fromId: chosen }));
     expect(transfer).toContain(`Remainder in ${occupancies[1].vessel_name}`);
     const addition = renderToStaticMarkup(createElement(CellarAdditionForm, { occupancies, materials: cellarAdditionCitra.materials, lotsByMaterial: cellarAdditionCitra.lotsByMaterial, occupancyId: chosen }));
     expect(addition).not.toContain("a tank");

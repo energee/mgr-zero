@@ -314,17 +314,44 @@ defineQuery({
 // batch points at can add a batch, so the mash lines read are those copies' and
 // the shown copy's: the key's columns for another recipe's copy, the whole line
 // for a copy whose batches are returned. A batch brewed as another recipe is
-// read with its first gravity reading alone, and brew records are read for
-// closed batches alone. Ceiling: finding those copies reads one column of every
+// read with its first gravity reading alone. A batch started from a transfer
+// (transferStarts) is left out: it was not brewed on its own, so its first
+// reading is beer already fermenting and it has no knockout. Ceiling: finding those copies reads one column of every
 // brewed batch in the brewery on each call, a page per 500 batches. If it
 // measures slow, store the key on recipe_versions when a copy is saved and
 // filter by it in the query.
 const OUTCOME_BATCH = "id, batch_no, planned_bbl, brewed_on, closed_at, recipe_version_id, recipe_version:recipe_versions!inner(recipe_id, version, brewhouse_efficiency, yeast_attenuation, recipe:recipes!inner(name))";
 /** A batch brewed as another recipe, with the gravity readings it is measured from: the read keeps only its first. */
 const POOLED_BATCH = `${OUTCOME_BATCH}, fermentation_readings(batch_id, occupancy_id, gravity_plato)` as const;
+
+/** The batches among these that started from a transfer (record_cellar_transfer with toBatchId), by batch id: no tank
+ *  of theirs was opened with a knockout, and beer came in from another batch. Each maps to the earliest such transfer's
+ *  source batch and time, and the barrels all of them brought in. Pass only batches with no brew record: a brewed batch
+ *  that later took a blend has one. */
+async function transferStarts(ctx: Ctx, batchIds: string[]) {
+  const tanks = await inChunks(batchIds, chunk => completeRows("Tank stays", start => ctx.db.from("vessel_occupancies")
+    .select("id, batch_id, initial_bbl", { count: "exact" }).eq("brewery_id", ctx.breweryId).in("batch_id", chunk).order("id").range(start, start + PAGE_SIZE - 1)));
+  // A batch brewed before brew records existed has none either, but its tank opened with its knockout.
+  const knockedOut = new Set(tanks.filter((tank) => num(tank.initial_bbl) > 0).map((tank) => tank.batch_id));
+  const batchOf = new Map(tanks.filter((tank) => !knockedOut.has(tank.batch_id)).map((tank) => [tank.id, tank.batch_id]));
+  const moves = await inChunks([...batchOf.keys()], chunk => completeRows("Transfers", start => ctx.db.from("transfers")
+    .select("id, to_occupancy_id, bbl, at, source:vessel_occupancies!transfers_from_occupancy_id_brewery_id_fkey(batch_id)", { count: "exact" })
+    .eq("brewery_id", ctx.breweryId).in("to_occupancy_id", chunk).order("at").order("id").range(start, start + PAGE_SIZE - 1)));
+  const starts = new Map<string, { batchId: string; at: string; bbl: number }>();
+  for (const move of moves) {
+    const batchId = batchOf.get(move.to_occupancy_id)!;
+    // A move between two tanks of the same batch brings nothing in.
+    if (move.source.batch_id === batchId) continue;
+    const first = starts.get(batchId);
+    const earliest = first && Date.parse(first.at) <= Date.parse(move.at) ? first : { batchId: move.source.batch_id, at: move.at };
+    // Barrels are stored to three decimals; the sum is rounded back to them.
+    starts.set(batchId, { ...earliest, bbl: Number(((first?.bbl ?? 0) + num(move.bbl)).toFixed(3)) });
+  }
+  return starts;
+}
 defineQuery({
   name: "get_recipe_outcomes",
-  description: "Each brewed batch of a recipe, newest first: OG, FG, ABV, apparent attenuation and brewhouse efficiency from its gravity readings and knockout, beside what its own version predicted and assumed. A batch split across tanks that held beer at the same time comes once per tank, with that tank's vessel name and figures and the batch's efficiency. Also each brewed batch of another recipe whose own version has the same mash lines as the requested version (latest by default), with its recipeName, OG and efficiency and no FG, ABV or attenuation; sameGrainBill marks every batch on that grain bill. A figure is null when an input is missing, and efficiency is null until the batch closes. Computed on read, never stored",
+  description: "Each brewed batch of a recipe, newest first: OG, FG, ABV, apparent attenuation and brewhouse efficiency from its gravity readings and knockout, beside what its own version predicted and assumed. A batch split across tanks that held beer at the same time comes once per tank, with that tank's vessel name and figures and the batch's efficiency. Also each brewed batch of another recipe whose own version has the same mash lines as the requested version (latest by default), with its recipeName, OG and efficiency and no FG, ABV or attenuation; sameGrainBill marks every batch on that grain bill. A batch started from a transfer (record_cellar_transfer with toBatchId) is not listed: it has no brew record and its first reading is beer already fermenting. A figure is null when an input is missing, and efficiency is null until the batch closes. Computed on read, never stored",
   input: z.object({ recipeId: z.string().uuid(), version: z.number().int().positive().optional().describe("The version whose grain bill other recipes' batches are matched on; the latest by default") }), roles: ["admin", "brewer"],
   handler: async (ctx, i): Promise<{ batches: RecipeOutcome[] }> => {
     const [recipe, versions] = await Promise.all([
@@ -394,8 +421,16 @@ defineQuery({
     ]);
     const bills = Map.groupBy([...ownLines, ...pooledLines], (line) => line.recipe_version_id);
     for (const b of others) readingsOf.set(b.id, b.fermentation_readings);
+    // Every batch's brew records: a closed batch's give its knockout, and a batch with none may have started from a transfer.
+    const brewedBatches = [...own, ...others];
+    const records = await inChunks(brewedBatches.map((b) => b.id), chunk => completeRows("Brew records", start => ctx.db.from("brew_records")
+      .select("id, batch_id, initial_bbl, corrects_id", { count: "exact" }).eq("brewery_id", ctx.breweryId).in("batch_id", chunk)
+      .order("id").range(start, start + PAGE_SIZE - 1)));
+    const recorded = new Set(records.map((r) => r.batch_id));
+    const fromTransfer = await transferStarts(ctx, brewedBatches.filter((b) => !recorded.has(b.id)).map((b) => b.id));
     // ISO dates sort as text.
-    const batches = [...own, ...others].sort((a, b) => b.brewed_on!.localeCompare(a.brewed_on!) || (b.batch_no ?? 0) - (a.batch_no ?? 0));
+    const batches = brewedBatches.filter((b) => !fromTransfer.has(b.id))
+      .sort((a, b) => b.brewed_on!.localeCompare(a.brewed_on!) || (b.batch_no ?? 0) - (a.batch_no ?? 0));
 
     const vesselOf = new Map(stays.map((stay) => [stay.id, { id: stay.vessel_id, name: stay.vessels.name }]));
     type Stay = (typeof stays)[number];
@@ -407,10 +442,6 @@ defineQuery({
       .filter(([, held]) => held.some((a, n) => held.slice(n + 1).some((b) => beganBeforeEnd(a, b) && beganBeforeEnd(b, a))))
       .map(([batchId]) => batchId));
 
-    // Only a closed batch gets a knockout, so only the closed batches' brew records are read.
-    const records = await inChunks(batches.filter((b) => b.closed_at !== null).map((b) => b.id), chunk => completeRows("Brew records", start => ctx.db.from("brew_records")
-      .select("id, batch_id, initial_bbl, corrects_id", { count: "exact" }).eq("brewery_id", ctx.breweryId).in("batch_id", chunk)
-      .order("id").range(start, start + PAGE_SIZE - 1)));
     const knockouts = new Map<string, number>();
     for (const r of currentBrewRecords(records)) knockouts.set(r.batch_id, (knockouts.get(r.batch_id) ?? 0) + num(r.initial_bbl));
 
@@ -420,7 +451,8 @@ defineQuery({
         const ingredients = gravityLines(bills.get(b.recipe_version_id!) ?? []);
         const assumptions = { brewhouseEfficiency: num(copy.brewhouse_efficiency), yeastAttenuation: num(copy.yeast_attenuation) };
         const potential = potentialPointsPerBbl(ingredients);
-        const knockoutBbl = knockouts.get(b.id) ?? null;
+        // Only a closed batch gets a knockout.
+        const knockoutBbl = b.closed_at === null ? null : knockouts.get(b.id) ?? null;
         /** The figures of one run of gravity readings in time order: the first is the OG, the last the FG. */
         const measure = (gravity: number[]) => {
           const ogPlato = gravity[0] ?? null;
@@ -723,17 +755,31 @@ defineQuery({
   },
 });
 
+/** Where a batch with no brew record got its beer: the batch it started from by transfer (number and brand), the
+ *  barrels transferred in from other batches, and when the first arrived. Null for a batch that was brewed. */
+async function startedFrom(ctx: Ctx, batchId: string) {
+  const records = await unwrap(ctx.db.from("brew_records").select("id").eq("brewery_id", ctx.breweryId).eq("batch_id", batchId).limit(1));
+  if (records?.length) return null;
+  const start = (await transferStarts(ctx, [batchId])).get(batchId);
+  if (!start) return null;
+  // single() fails the read when the row is missing, so the source batch is there.
+  const source = (await unwrap(ctx.db.from("batches").select("id, batch_no, intended_brand_id").eq("brewery_id", ctx.breweryId).eq("id", start.batchId).single()))!;
+  const brands = await brandNames(ctx, [source.intended_brand_id]);
+  return { batch_id: source.id, batch_no: source.batch_no, brand_name: source.intended_brand_id ? brands.get(source.intended_brand_id) ?? null : null, bbl: start.bbl, at: start.at };
+}
+
 defineQuery({
-  name: "get_brew_day", description: "One batch, with its intended brand's name, and the occupancy it is currently sitting in (the oldest open one when split across tanks): the vessel's name and the volume that went in; closed_at is set once the batch is completed; then writeOffBbl is the barrels its completion wrote off as loss (null when none) and packagedBbl the barrels its closed packaging runs packaged (both null before completion)",
+  name: "get_brew_day", description: "One batch, with its intended brand's name, and the occupancy it is currently sitting in (the oldest open one when split across tanks): the vessel's name and initial_bbl, the knockout volume that opened it, which is 0 for an occupancy opened by a transfer, where the beer arrives as the transfer; startedFrom is null for a brewed batch, and for a batch with no brew record that started from a transfer (record_cellar_transfer with toBatchId) it names the source batch of the first transfer in (batch_id, batch_no, brand_name), the bbl transferred in from other batches, and at, when the first arrived; closed_at is set once the batch is completed; then writeOffBbl is the barrels its completion wrote off as loss (null when none) and packagedBbl the barrels its closed packaging runs packaged (both null before completion)",
   input: z.object({ batchId: z.string().uuid() }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {
     const batch = await unwrap(ctx.db.from("batches")
       .select("id, batch_no, intended_brand_id, recipe_version_id, planned_on, planned_bbl, brewed_on, closed_at, cancelled_at, completion_adjustment_id, note")
       .eq("brewery_id", ctx.breweryId).eq("id", i.batchId).maybeSingle());
     if (!batch) throw new CommandError("batch not found", 404, "not_found");
-    const [vessels, brands, writeOff, balance] = await Promise.all([
+    const [vessels, brands, from, writeOff, balance] = await Promise.all([
       openVessels(ctx, [i.batchId]),
       brandNames(ctx, [batch.intended_brand_id]),
+      startedFrom(ctx, i.batchId),
       // complete_batch records its write-off as one negative loss adjustment, named by completion_adjustment_id.
       batch.completion_adjustment_id ? unwrap(ctx.db.from("volume_adjustments").select("bbl")
         .eq("brewery_id", ctx.breweryId).eq("id", batch.completion_adjustment_id).single()) : null,
@@ -741,7 +787,7 @@ defineQuery({
       batch.closed_at ? unwrap(ctx.db.rpc("get_batch_volume_balance", { p_brewery: ctx.breweryId, p_batch: i.batchId })) : null,
     ]);
     const brand_name = batch.intended_brand_id ? brands.get(batch.intended_brand_id) ?? null : null;
-    return { batch: { ...batch, brand_name }, occupancy: vessels.get(i.batchId)?.[0] ?? null, writeOffBbl: writeOff ? -Number(writeOff.bbl) : null,
+    return { batch: { ...batch, brand_name }, occupancy: vessels.get(i.batchId)?.[0] ?? null, startedFrom: from, writeOffBbl: writeOff ? -Number(writeOff.bbl) : null,
       packagedBbl: balance ? Number((balance as { packagedBbl: number }).packagedBbl) : null };
   },
 });
@@ -775,18 +821,20 @@ defineCommand({
 // close the source only once the view says it is empty.
 defineCommand({
   name: "record_cellar_transfer",
-  description: "Move beer out of one occupancy into a vessel: opens an occupancy if the vessel is empty, blends into the open one if it is not, and closes the source when it empties",
+  description: "Move beer out of one occupancy into a vessel: opens an occupancy if the vessel is empty, blends into the open one if it is not, and closes the source when it empties. With toBatchId the vessel must be empty and the occupancy it opens starts that planned batch, brewed today, instead of continuing the source's batch",
   compensation: "Cannot be undone; a cellar transfer has no correction.",
   input: z.object({
     fromOccupancyId: z.string().uuid(),
     toVesselId: z.string().uuid(),
     volumeBbl: z.number().positive(),
     lossBbl: z.number().nonnegative().optional(),
+    toBatchId: z.string().uuid().optional().describe("A planned, unbrewed batch to start in the empty destination vessel from this beer"),
   }),
   roles: ["admin", "brewer"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_cellar_transfer", {
     p_brewery: ctx.breweryId, p_from_occupancy: i.fromOccupancyId, p_to_vessel: i.toVesselId,
     p_volume_bbl: i.volumeBbl, p_loss_bbl: i.lossBbl ?? 0, p_request_id: execution.requestId,
+    p_to_batch: i.toBatchId,
   })),
 });
 
