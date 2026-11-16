@@ -779,7 +779,8 @@ defineQuery({
     const [vessels, brands, from, writeOff, balance] = await Promise.all([
       openVessels(ctx, [i.batchId]),
       brandNames(ctx, [batch.intended_brand_id]),
-      startedFrom(ctx, i.batchId),
+      // An unbrewed plan has no tank, so nothing was transferred in.
+      batch.brewed_on ? startedFrom(ctx, i.batchId) : null,
       // complete_batch records its write-off as one negative loss adjustment, named by completion_adjustment_id.
       batch.completion_adjustment_id ? unwrap(ctx.db.from("volume_adjustments").select("bbl")
         .eq("brewery_id", ctx.breweryId).eq("id", batch.completion_adjustment_id).single()) : null,
