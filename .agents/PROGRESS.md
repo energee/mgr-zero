@@ -7,6 +7,7 @@ descriptions, and `scripts/pr-directives.ts` moves finished `TODO.md` items
 here.
 
 ## Done
+- 2026-11-16 — Hosted latency plan filed and tasks 1, 3, 4 shipped (#1829, `docs/plans/hosted-latency.md`): Supabase round trips are logged and sheet and tile links no longer prefetch; Catalog suggestion fields use a shadcn combobox, the brand sheet is a third shorter and the COLA column shows a check or Find COLA (#1844); Packaging lists ready-to-package tanks, packaged of planned, plan by unit and material shortages (#1847). Watchdogs #1700 (`order-email`) and #1846 (Dreaming failing) are open.
 - 2026-11-14 — Replenishment can take stock from any other location (#1831). Watchdog #1700 (`order-email`) is still open.
 - 2026-11-13 — Recipe name and note editable via `update_recipe` (#1818) and a recipe save moves its scheduled batches to the new copy (#1826, #1817); a `?` in the top bar opens the guide section for the page (#1824, #1741); no Preview Supabase project, by owner decision (#1825, #1616); an empty API backlog no longer ends in a blank line (#1827, #1823). Watchdog #1700 (`order-email`) is still open.
 - 2026-11-11 — Recipe is one editable run sheet (#1819; plans `docs/plans/recipe-brewsheet.md`, `recipe-run-sheet.md`, `recipe-srm.md`): the day at a glance with a time band, packs, and Batch actuals by grain bill and by tank (`get_recipe_outcomes` filters every read on the brewery). The SRM plan is filed, not built. Watchdogs #1700 (`order-email`) and #1820 (no dream for 3+ days) are open.
