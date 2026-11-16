@@ -112,7 +112,7 @@ export function PriceGroupsView({
             <TableBody className="max-md:block">
               {channel.rows.map((row) => (
                 <TableRow key={row.id} className="max-md:block max-md:py-2">
-                  <TableCell className="max-md:block max-md:border-0 max-md:px-0! max-md:py-1">
+                  <TableCell className="text-left max-md:block max-md:border-0 max-md:px-0! max-md:py-1">
                     {renderGroup(row)}
                     <p className="text-muted-foreground max-md:inline max-md:pl-2">{row.note}</p>
                   </TableCell>
