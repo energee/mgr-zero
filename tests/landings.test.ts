@@ -3,7 +3,7 @@
 // read (zeros allowed); list_work unions Today's rows with the open purchase
 // orders and routes the caller's role may open, each tagged with a Work chip.
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { asUser, channelId, ins, insertFixture, makeBrewery, makeCustomerUser, makeStaffCtx, priceSku, seedCatalog, seedCustomer, seedLocation, sql } from "./helpers";
+import { admin, asUser, channelId, ins, insertFixture, makeBrewery, makeCustomerUser, makeStaffCtx, priceSku, seedCatalog, seedCustomer, seedLocation, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import { defaultWorkKinds, type WorkRow } from "@/lib/commands/landings";
 import "@/lib/commands/all";
@@ -207,6 +207,11 @@ describe("list_work", () => {
     expect(await kinds(sales)).not.toContain(`POs:/purchase-orders/${po.id}`);
     expect(await kinds(warehouse)).toContain(`POs:/purchase-orders/${po.id}`);
     expect((await kinds(brewer)).some((k) => k.startsWith("routes:"))).toBe(false);
+    // A PO row offers what the Purchase orders list offers: purchaseOrderNext's verb and tone.
+    const poRow = async () => (await runCommand("list_work", {}, adminCtx) as WorkRow[]).find((r) => r.id === po.id);
+    expect(await poRow()).toMatchObject({ verb: "Mark sent", tone: "info" });
+    expect((await admin.from("purchase_orders").update({ status: "partially_received", sent_via: "external", ordered_on: "2026-09-01" }).eq("id", po.id)).error).toBeNull();
+    expect(await poRow()).toMatchObject({ verb: "Receive", tone: "attention" });
     const all = await runCommand("list_work", {}, adminCtx) as WorkRow[];
     for (const r of all) expect(["orders", "transfers", "batches", "runs", "POs", "routes"]).toContain(r.kind);
     // #759: a route row counts its stops without list_work reading them; a returned route is not in motion.
