@@ -6,7 +6,7 @@ import { sentenceCase } from "./labels";
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { shipToLine } from "./ship-to-view";
-import { shownState, stagedOnOpenOrder, type DeliveryOutcome, type OrderStatus } from "./order-status";
+import { orderAllows, shownState, type DeliveryOutcome, type OrderStatus } from "./order-status";
 import { formatDate, formatDateTime } from "@/lib/date-format";
 import { stagedQty } from "./put-back-view";
 import type { OrderCogs } from "@/lib/commands/orders";
@@ -279,9 +279,9 @@ export function toOrderViewProps({ order, lines, events, atp, locations, deliver
     costLine: costLineFor(order, cogs),
     restockNote: restockNoteFor(order, lines),
     repickNote: order.repick_since && order.status === "confirmed" ? "Changed after pick: count the added or raised lines; the rest is already staged." : undefined,
-    putBackHref: stagedOnOpenOrder(order.status, order.needs_restock) ? (backHref ? `/orders/${order.id}/restock` : "#") : undefined,
-    editHref: order.status === "draft" ? (backHref ? `/orders/${order.id}/edit` : "#") : undefined,
-    confirmHref: order.status === "submitted" ? (backHref ? `/orders/${order.id}/confirm` : "#") : undefined,
+    putBackHref: order.needs_restock ? (backHref ? `/orders/${order.id}/restock` : "#") : undefined,
+    editHref: orderAllows("update_draft_order", order.status) ? (backHref ? `/orders/${order.id}/edit` : "#") : undefined,
+    confirmHref: orderAllows("confirm_order", order.status) ? (backHref ? `/orders/${order.id}/confirm` : "#") : undefined,
     canReorderRefused: order.kind === "wholesale" && order.status === "shipped" && lines.some(line => Number(line.qty_refused ?? 0) > 0)
       && !events.some((e) => e.event === "reorder_created"),
     columns: lineColumns(order.status, lines),

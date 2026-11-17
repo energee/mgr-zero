@@ -7,6 +7,7 @@ import { getOrderPageData, getOrderShipSources } from "../../order-data";
 import { ShipForm, type ShippingSnapshot } from "../ship-form";
 import "@/lib/commands/all";
 import { navTitle } from "@/lib/mgr/nav";
+import { stepRedirect, type OrderStatus } from "@/lib/mgr/order-status";
 
 const getCompletePageData = cache(async function getCompletePageData(id: string) {
   const brewery = await getActiveBrewery();
@@ -25,8 +26,10 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function CompleteTransferPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { ctx, snapshot, available } = await getCompletePageData(id);
-  const { order, lines } = snapshot as { order: ShippingSnapshot["order"] & { status: string }; lines: ShippingSnapshot["lines"] };
+  const { order, lines } = snapshot as { order: ShippingSnapshot["order"] & { status: OrderStatus; needs_restock: boolean }; lines: ShippingSnapshot["lines"] };
   const locations = await runPageQuery("list_locations", {}, ctx) as ShippingSnapshot["locations"];
-  if (order.kind !== "taproom_transfer" || order.status !== "picked") redirect(`/orders/${order.id}`);
+  if (order.kind !== "taproom_transfer") redirect(`/orders/${order.id}`);
+  const away = stepRedirect("ship_order", order);
+  if (away) redirect(away);
   return <ShipForm snapshot={{ order, lines, locations, backHref: `/orders/${order.id}` }} available={available} />;
 }

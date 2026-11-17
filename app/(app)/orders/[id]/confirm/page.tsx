@@ -13,6 +13,7 @@ import { getOrderPageData } from "../../order-data";
 import "@/lib/commands/all";
 import { ConfirmOrderForm } from "./confirm-buttons";
 import { navTitle } from "@/lib/mgr/nav";
+import { stepRedirect, type OrderStatus } from "@/lib/mgr/order-status";
 
 const getConfirmPageData = cache(async function getConfirmPageData(id: string) {
   const brewery = await getActiveBrewery();
@@ -27,7 +28,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return { title: navTitle("/orders") };
 }
 
-type Order = { id: string; order_no: number | null; status: string; requested_ship_date: string | null; from_location_id: string; customers: { name: string } | null };
+type Order = { id: string; order_no: number | null; status: OrderStatus; requested_ship_date: string | null; from_location_id: string; customers: { name: string } | null };
 type Line = { id: string; sku_id: string; qty_ordered: number; skus: { name: string } | null };
 
 export default async function ConfirmOrderPage({ params }: { params: Promise<{ id: string }> }) {
@@ -35,6 +36,7 @@ export default async function ConfirmOrderPage({ params }: { params: Promise<{ i
   const { ctx, snapshot } = await getConfirmPageData(id);
   const { order, lines, atp, sourceOnHand } = snapshot as { order: Order; lines: Line[]; atp: { sku_id: string; qty: number }[]; sourceOnHand: { sku_id: string; qty: number }[] };
   const locations = await runCommand("list_locations", {}, ctx) as { id: string; name: string }[];
-  if (order.status !== "submitted") redirect(`/orders/${order.id}`);
+  const away = stepRedirect("confirm_order", order);
+  if (away) redirect(away);
   return <ConfirmOrderForm key={lines.map((l) => `${l.id}:${l.qty_ordered}`).join()} snapshot={{ order, lines, atp, sourceOnHand, locations, backHref: "/orders" }} />;
 }

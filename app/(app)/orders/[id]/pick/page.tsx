@@ -8,6 +8,7 @@ import type { PickSnapshot } from "@/lib/mgr/pick-view";
 import { PickForm } from "../pick-form";
 import "@/lib/commands/all";
 import { navTitle } from "@/lib/mgr/nav";
+import { stepRedirect, type OrderStatus } from "@/lib/mgr/order-status";
 
 const getPickPageData = cache(async function getPickPageData(id: string) {
   const brewery = await getActiveBrewery();
@@ -25,9 +26,10 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function PickPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { ctx, snapshot } = await getPickPageData(id);
-  const { order, lines, sourceOnHand, events = [] } = snapshot as { order: PickSnapshot["order"] & { status: string }; lines: PickSnapshot["lines"]; sourceOnHand: PickSnapshot["sourceOnHand"]; events?: { id: string; created_at: string; event: string; payload: { line_id?: string } }[] };
+  const { order, lines, sourceOnHand, events = [] } = snapshot as { order: PickSnapshot["order"] & { status: OrderStatus }; lines: PickSnapshot["lines"]; sourceOnHand: PickSnapshot["sourceOnHand"]; events?: { id: string; created_at: string; event: string; payload: { line_id?: string } }[] };
   const locations = await runPageQuery("list_locations", {}, ctx) as PickSnapshot["locations"];
-  if (order.status !== "confirmed" && order.status !== "picked") redirect(`/orders/${order.id}`);
+  const away = stepRedirect("record_pick", order);
+  if (away) redirect(away);
   // Recovery-panel retries skip the original form callback. Existing events still identify the resolved line.
   const latestShort = new Map<string, string>();
   for (const event of events) {

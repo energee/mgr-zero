@@ -1159,7 +1159,7 @@ export const SCREENS: Screen[] = [
     reads: "get_order [restock flag and staged qtys]",
     writes: "confirm_restock [one RPC: clears needs_restock + order_events row]",
     states: [["permission", "warehouse or admin required", 1], ["pending", "Today Put back is the standing row"], ["done", "flag cleared · row leaves Today"], ["cancelled order", "the flag survives cancel · this is the only way back"], ["stale", "someone re-picked · the flag is already clear", 1]],
-    spec: "Today’s Put back row opens this. Staged 3 Pils cases after ORD-0229 was adjusted down. The verb writes: it clears the restock flag and appends the order event, because a cancelled order can never be re-picked or shipped and would otherwise leave its row standing on Today forever. Inventory already sits in Warehouse as staged, so nothing moves in the ledger.",
+    spec: "Today’s Put back row opens this, as does Put back on the Orders list and on the order page. Staged 3 Pils cases after ORD-0229 was adjusted down. The verb writes: it clears the restock flag and appends the order event, because a cancelled order can never be re-picked or shipped and would otherwise leave its row standing on Today forever. Inventory already sits in Warehouse as staged, so nothing moves in the ledger.",
     body: <PutBackView model={toPutBackViewProps(orderPickedRestockPutBack)} />,
   },
   {
