@@ -18,12 +18,12 @@ import { waterProfiles } from "./catalog";
 export const cellarMapBrewer: CellarMapViewModel = {
   readingHref: null,
   tiles: [
-    { name: "FV1", group: "Fermenters", detail: "Pils", volume: "12.8 / 15 bbl", reading: "1.9 °P · read 4 h", fill: 85, readingHref: "" },
-    { name: "FV2", group: "Fermenters", detail: "Hazy", volume: "9.0 / 15 bbl", reading: "7.5 °P · read 8 h", fill: 60, readingHref: "" },
+    { name: "FV1", group: "Fermenters", detail: "Pils", volume: "12.8 / 15 bbl", reading: "1.9 °P · 68 °F", readAgo: "4h ago", abv: "5.1% ABV", state: "Finished", fill: 85, readingHref: "" },
+    { name: "FV2", group: "Fermenters", detail: "Hazy", volume: "9.0 / 15 bbl", reading: "7.5 °P · 67 °F", readAgo: "8h ago", abv: "3.4% ABV", state: "Fermenting", fill: 60, readingHref: "" },
     { name: "FV3", group: "Fermenters", detail: "Stout", volume: "13.5 / 15 bbl", reading: "5.2 °P · overdue 31 h", warning: true, fill: 90, readingHref: "" },
     { name: "BT1", group: "Brite tanks", detail: "Pils", volume: "7.0 / 10 bbl", fill: 70, readingHref: "" },
     { name: "BT2", group: "Brite tanks", detail: "Empty · 10 bbl" },
-    { name: "FB1", group: "Barrels", detail: "Saison", volume: "0.4 / 1 bbl", reading: "aging · read 1 d", fill: 40, readingHref: "" },
+    { name: "FB1", group: "Barrels", detail: "Saison", volume: "0.4 / 1 bbl", reading: "64 °F", readAgo: "1d ago", fill: 40, readingHref: "" },
   ],
   detail: { title: "FV3 · fermenter · 15 bbl", description: "occupancy, readings and vessel facts" },
 };
@@ -41,7 +41,7 @@ export const batchesBrewer: BatchesSnapshot = {
   ],
   active: [
     { key: "b0409", batchNo: "B-0409", brand: "Pils", recipe: "Pils", plannedOn: "Aug 28, 2026", plannedBbl: 15, vessel: "FV1", readings: [{ key: "pils-fv1", vessel: "FV1", reading: "No readings yet" }] },
-    { key: "b0413", batchNo: "B-0413", brand: "Stout", recipe: "Stout", plannedOn: "Aug 31, 2026", plannedBbl: 15, vessel: "FV3, FV4", readings: [{ key: "stout-fv3", vessel: "FV3", reading: "0.0 °P · pH 4.2 · Sep 2, 2026, 5:00 PM" }, { key: "stout-fv4", vessel: "FV4", reading: "5.2 °P · 68 °F · Sep 3, 2026, 8:10 AM", abv: "5.4%", attenuation: "67%" }] },
+    { key: "b0413", batchNo: "B-0413", brand: "Stout", recipe: "Stout", plannedOn: "Aug 31, 2026", plannedBbl: 15, vessel: "FV3, FV4", readings: [{ key: "stout-fv3", vessel: "FV3", reading: "0.0 °P · pH 4.2 · 2d ago" }, { key: "stout-fv4", vessel: "FV4", reading: "5.2 °P · 68 °F · 1d ago", abv: "5.4%", attenuation: "67%", state: "Fermenting" }] },
     { key: "b0414", batchNo: "B-0414", brand: "Porter", recipe: "Robust porter", plannedOn: "Sep 1, 2026", plannedBbl: 10, vessel: null, readings: [] },
   ],
   completed: [

@@ -695,18 +695,27 @@ async function batchListRows<T extends BatchRow>(ctx: Ctx, batches: T[], reading
 // all of them, oldest first, so the brew-day tank (created first) leads. Ids go
 // 100 per read so the URL stays bounded (#469); a batch's rows all land in one
 // chunk, so the per-chunk order is the per-batch order. withReadings embeds each
-// occupancy's newest fermentation reading; the Batches list and Cellar map ask for it.
-type OpenVessel = { id: string; vessel_id: string; initial_bbl: number; started_at: string; vessel_name: string; latest_reading?: VesselReading | null };
-type OpenRow = { id: string; batch_id: string; vessel_id: string; initial_bbl: number; started_at: string; fermentation_readings?: VesselReading[] };
+// occupancy's newest fermentation reading and its last two gravity readings
+// (recent_gravity, newest first), so the Batches list and Cellar map can figure
+// ABV past a temperature-only check and tell a steady gravity from a falling one.
+type RecentGravity = { id: string; at: string; gravity_plato: number };
+type OpenVessel = { id: string; vessel_id: string; initial_bbl: number; started_at: string; vessel_name: string; latest_reading?: VesselReading | null; recent_gravity?: RecentGravity[] };
+type OpenRow = { id: string; batch_id: string; vessel_id: string; initial_bbl: number; started_at: string; latest?: VesselReading[]; recent_gravity?: RecentGravity[] };
 async function openVessels(ctx: Ctx, batchIds: string[], withReadings = false) {
   const rows = await inChunks(batchIds, async (chunk): Promise<OpenRow[]> => {
     const columns = "id, batch_id, vessel_id, initial_bbl, started_at";
-    const open = ctx.db.from("vessel_occupancies").select(withReadings ? `${columns}, fermentation_readings(id,at,temp_f,gravity_plato,ph,note)` : columns)
+    const open = ctx.db.from("vessel_occupancies").select(withReadings ? `${columns}, latest:fermentation_readings(id,at,temp_f,gravity_plato,ph,note), recent_gravity:fermentation_readings(id,at,gravity_plato)` : columns)
       .in("batch_id", chunk).is("ended_at", null).order("created_at").order("id");
     return (await unwrap(withReadings ? open
-      .order("at", { referencedTable: "fermentation_readings", ascending: false })
-      .order("id", { referencedTable: "fermentation_readings", ascending: false })
-      .limit(1, { referencedTable: "fermentation_readings" }) : open) ?? []) as unknown as OpenRow[];
+      // Both embeds read fermentation_readings, so each is aliased and ordered by its alias:
+      // ordered by the table name, PostgREST left the newest-first order off one of them.
+      .order("at", { referencedTable: "latest", ascending: false })
+      .order("id", { referencedTable: "latest", ascending: false })
+      .limit(1, { referencedTable: "latest" })
+      .not("recent_gravity.gravity_plato", "is", null)
+      .order("at", { referencedTable: "recent_gravity", ascending: false })
+      .order("id", { referencedTable: "recent_gravity", ascending: false })
+      .limit(2, { referencedTable: "recent_gravity" }) : open) ?? []) as unknown as OpenRow[];
   });
   const byBatch = new Map<string, OpenVessel[]>();
   if (rows.length === 0) return byBatch;
@@ -718,7 +727,8 @@ async function openVessels(ctx: Ctx, batchIds: string[], withReadings = false) {
     list.push({
       id: r.id as string, vessel_id: r.vessel_id as string, initial_bbl: num(r.initial_bbl),
       started_at: r.started_at as string, vessel_name: names.get(r.vessel_id as string) ?? "",
-      ...(r.fermentation_readings && { latest_reading: r.fermentation_readings[0] ?? null }),
+      ...(r.latest && { latest_reading: r.latest[0] ?? null }),
+      ...(r.recent_gravity && { recent_gravity: r.recent_gravity.map(g => ({ ...g, gravity_plato: num(g.gravity_plato) })) }),
     });
     byBatch.set(r.batch_id as string, list);
   }
@@ -726,9 +736,9 @@ async function openVessels(ctx: Ctx, batchIds: string[], withReadings = false) {
 }
 
 defineQuery({
-  name: "list_batches", description: "Unfinished batches by planned date, newest first, with brand, recipe and current vessels; readings adds, only for brewed, unclosed batches, each open occupancy's latest reading and the batch's first gravity reading (og_reading, null when it has none). Use list_batch_history for completed or cancelled batches.",
+  name: "list_batches", description: "Unfinished batches by planned date, newest first, with brand, recipe and current vessels; readings adds, only for brewed, unclosed batches, each open occupancy's latest reading, its last two gravity readings (recent_gravity, newest first), and the batch's first gravity reading (og_reading, null when it has none). Use list_batch_history for completed or cancelled batches.",
   input: z.object({
-    readings: z.boolean().optional().describe("Add each active occupancy's latest fermentation reading and each active batch's first gravity reading"),
+    readings: z.boolean().optional().describe("Add each active occupancy's latest fermentation reading and last two gravity readings, and each active batch's first gravity reading"),
     open: z.boolean().optional().describe("True keeps brewed, unclosed batches; false keeps unstarted plans; omitted returns both"),
   }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {
