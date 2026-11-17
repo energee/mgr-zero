@@ -50,6 +50,7 @@ export const TAPS: [string | RegExp, string][] = [
   [/^B-\d+/, "Brew day"],
   [/^RUN-\d+/, "Close packaging run"],
   ["Reading", "Fermentation reading"],
+  ["Add reading", "Fermentation reading"],
   ["Outbox", "Offline outbox"],
   ["Start", "Brew prep"],
   ["Transfer", "Cellar transfer"],
@@ -117,7 +118,8 @@ export const TAPS: [string | RegExp, string][] = [
   ["Add contract", "Contract"],
   [/^Fictional (Hop|Malt) Supply · /, "Contract"],
   ["New recipe", "Recipe"],
-  [/^(Hazy IPA|Pils|Stout) v\d+$/, "Recipe"],
+  // Recipe reads its batch size and process numbers as text; each one in a sentence, and the action under the band, opens their one sheet.
+  [/(^E|, e)dit recipe numbers$/, "Recipe numbers"],
   [/^(January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/, "Monthly compliance"],
   ["Save filed snapshot", "Compliance months"],
   // The months list is titled Compliance on the glass; its children crumb to that (#259).
@@ -181,6 +183,8 @@ export const INERT: (string | RegExp)[] = [
   // Opens the chat panel over the page in place (#1512).
   "Ask MGR",
   "Guide",
+  // The top bar's "?" opens the guide in a new tab, like Guide (#1741).
+  "Help for this page (opens in a new tab)",
   "Show password",
   "Hide password",
   // A combobox's icon button opens its own list in place.
@@ -194,8 +198,6 @@ export const INERT: (string | RegExp)[] = [
   "Record 7 sales + 1 refund as expected",
   "Main ship-to",
   "Dock ship-to",
-  // The Recipe frame's note is a read-out row; the parent form above it edits the note.
-  "Recipe note",
   // The QuickBooks sync row's title is a read-out; its Sync button acts in place.
   "Last successful sync",
   "1 \u00b7 Add locations",
@@ -232,7 +234,6 @@ export const INERT: (string | RegExp)[] = [
   "Change",
   "Citra \u00b7 44 lb boxes",
   "Complete batch",
-  "New recipe version",
   "Current state",
   "Online payments",
   "Decrease",

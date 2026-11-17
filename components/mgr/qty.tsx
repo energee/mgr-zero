@@ -28,8 +28,9 @@ function useNumberNotation(input: RefObject<HTMLInputElement | null>, value: str
   return { error, errorId, changed };
 }
 
-/** The same stepper for controlled forms and uncontrolled inventory fields. */
-export function StepQuantity({ label, value, defaultValue, onChange, contextualLabels, ...attributes }: Omit<FieldControls, "hideLabel" | "error"> & { label: string; value?: string; defaultValue?: string }) {
+/** The same stepper for controlled forms and uncontrolled inventory fields. `compact` draws the input without its
+ *  −/+ buttons, for a dense sheet of short numbers (Recipe numbers); the same input, bounds and notation error. */
+export function StepQuantity({ label, value, defaultValue, onChange, contextualLabels, compact, ...attributes }: Omit<FieldControls, "hideLabel" | "error"> & { label: string; value?: string; defaultValue?: string }) {
   const input = useRef<HTMLInputElement>(null);
   const notation = useNumberNotation(input, onChange ? value : undefined, value ?? defaultValue);
   const notationError = attributes["aria-invalid"] ? undefined : notation.error;
@@ -40,18 +41,19 @@ export function StepQuantity({ label, value, defaultValue, onChange, contextualL
     if (onChange) onChange(next);
     else field.value = next;
   };
-  return <div className="flex flex-col gap-2"><ButtonGroup>
+  // Grows with its digits (field-sizing) so a long quantity is not cut off (#493).
+  // eslint-disable-next-line no-restricted-syntax -- Shared E numeric primitive; native spinners are hidden.
+  const control = <Input ref={input} type="number" inputMode="decimal" step="any" aria-label={label} {...attributes}
+    aria-invalid={Boolean(notation.error) || attributes["aria-invalid"]}
+    aria-describedby={[attributes["aria-describedby"], notationError ? notation.errorId : undefined].filter(Boolean).join(" ") || undefined}
+    value={onChange ? value : undefined} defaultValue={onChange ? undefined : value ?? defaultValue}
+    onChange={event => { notation.changed(event.target.value); onChange?.(event.target.value); }}
+    className={cn("field-sizing-content [appearance:textfield] text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none", compact ? "w-full min-w-16 tabular-nums" : "w-auto min-w-14")} />;
+  return <div className="flex flex-col gap-2">{compact ? control : <ButtonGroup>
     <Button type="button" variant="outline" size="icon" data-preview-action aria-label={contextualLabels ? `Decrease ${label}` : "Decrease"} disabled={Boolean(notation.error) || attributes.disabled || attributes.readOnly || Boolean(onChange && attributes.min !== undefined && Number(value) <= Number(attributes.min))} onClick={() => step(-1)}>−</Button>
-    {/* Grows with its digits (field-sizing) so a long quantity is not cut off (#493). */}
-    {/* eslint-disable-next-line no-restricted-syntax -- Shared E numeric primitive; native spinners are hidden. */}
-    <Input ref={input} type="number" inputMode="decimal" step="any" aria-label={label} {...attributes}
-      aria-invalid={Boolean(notation.error) || attributes["aria-invalid"]}
-      aria-describedby={[attributes["aria-describedby"], notationError ? notation.errorId : undefined].filter(Boolean).join(" ") || undefined}
-      value={onChange ? value : undefined} defaultValue={onChange ? undefined : value ?? defaultValue}
-      onChange={event => { notation.changed(event.target.value); onChange?.(event.target.value); }}
-      className="w-auto min-w-14 field-sizing-content [appearance:textfield] text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
+    {control}
     <Button type="button" variant="outline" size="icon" data-preview-action aria-label={contextualLabels ? `Increase ${label}` : "Increase"} disabled={Boolean(notation.error) || attributes.disabled || attributes.readOnly || Boolean(onChange && attributes.max !== undefined && Number(value) >= Number(attributes.max))} onClick={() => step(1)}>+</Button>
-  </ButtonGroup>{notationError && <FieldError id={notation.errorId}>{notationError}</FieldError>}</div>;
+  </ButtonGroup>}{notationError && <FieldError id={notation.errorId}>{notationError}</FieldError>}</div>;
 }
 
 /** A typed quantity under its visible label: the OS keyboard is the keypad, so
@@ -154,15 +156,13 @@ export function TabBar({
   const value = String(on);
   return (
     <Tabs value={hrefs || onChange ? value : undefined} defaultValue={hrefs || onChange ? undefined : value} onValueChange={onChange && ((v) => onChange(names[Number(v)]))} className={panel === undefined ? "min-w-0" : "min-w-0 flex-1 gap-3"}>
-      {/* Only the selected tab is filled (bg-muted). Each trigger overlaps
-          the list's 1px border (-my-px, and -ml-px/-mr-px on the ends), so
-          the selected tab's own border falls on the same pixels as the list
-          border. The base trigger's shadow-sm is forced off so it cannot blur
-          that shared edge. */}
-      <TabsList className={cn("rounded-xl border border-foreground/40 bg-transparent p-0", cls)} aria-label={label}>
+      {/* The stock segmented control, with no borders: a muted track, and the
+          selected tab lifted on it. The dark theme's stock selected tab draws
+          a border, so that one is cleared. */}
+      <TabsList className={cls} aria-label={label}>
         {names.map((n, i) => {
           const text = labels?.[n] ?? n;
-          return <TabsTrigger key={n} value={String(i)} data-to={to?.[n]} className="-my-px h-[calc(100%+2px)] rounded-none px-3 first:-ml-px first:rounded-l-xl last:-mr-px last:rounded-r-xl data-active:border-foreground/40 data-active:bg-muted data-active:shadow-none! dark:data-active:border-foreground/40 dark:data-active:bg-muted" asChild={Boolean(hrefs?.[n])}>{hrefs?.[n] ? <Link href={hrefs[n]}>{text}</Link> : text}</TabsTrigger>;
+          return <TabsTrigger key={n} value={String(i)} data-to={to?.[n]} className="px-3 dark:data-active:border-transparent" asChild={Boolean(hrefs?.[n])}>{hrefs?.[n] ? <Link href={hrefs[n]}>{text}</Link> : text}</TabsTrigger>;
         })}
       </TabsList>
       {panel === undefined ? null : names.map((n, i) => hrefs?.[n] ? null : <TabsContent key={n} value={String(i)} tabIndex={-1} className="flex flex-col gap-3">{panel}</TabsContent>)}

@@ -7,6 +7,7 @@
 // the recorded plan sheet list what happens after knockout (cellarPlanRows).
 import { BREW_DAY_STAGES, fermentationStageDetail, ingredientDetail, isBrewDayStage, perBblDisplay } from "./recipe-process-view";
 import { brewDayLines, brewSourceKey, fitsStock, observedProcess, plannedIngredientQty, soleSource, type BrewDayVessel, type BrewMaterialSource, type BrewPlan, type BrewPlanIngredient, type BrewPull, type BrewWaterAddition } from "./brew-day-view";
+import { sentenceCase } from "./labels";
 import { materialSourceKey, type SourceIds } from "./material-source";
 import { fromPacks, splitPacks, withPacks } from "./pack-qty";
 import { fromTicks, isNumber, numberNotationError, toTicks } from "./quantity-input";
@@ -151,7 +152,8 @@ export function waterAdditionRows(plan: BrewPlan, sources: BrewMaterialSource[])
 
 /** A later line's detail: "Dry hop · day 4 · 1.2 lb / bbl · 17.5 lb for 14.6 bbl". The total is left off unless `bbl` is above zero. */
 function laterLineDetail(row: BrewPlanIngredient, bbl: number): string {
-  const detail = ingredientDetail(row.stage, row.timing_minutes ?? null, perBblDisplay(row.per_bbl_qty), row.unit);
+  // The cellar plan has no step headings, so the line names its own stage.
+  const detail = `${sentenceCase(row.stage)} · ${ingredientDetail(row.stage, row.timing_minutes ?? null, perBblDisplay(row.per_bbl_qty), row.unit)}`;
   return bbl > 0 ? `${detail} · ${perBblDisplay(plannedIngredientQty(row, bbl))} ${row.unit} for ${bblExact(bbl, 8)}` : detail;
 }
 

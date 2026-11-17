@@ -7,7 +7,8 @@ import { isUuid } from "@/lib/uuid";
 // planned water additions as rows; vessel and date sit in Knockout. Both tabs
 // list what happens after knockout, totalled for the planned barrels.
 // A recorded batch (history, Correct turn, Add brew turn; once completed, its
-// completion day, packaged volume and write-off) and a cancelled one keep BrewDayView; the
+// completion day, packaged volume and write-off) and a cancelled one keep BrewDayView; a
+// batch started from a transfer names the batch it came from there; the
 // timeline does not model corrections or turns. Every state is titled with the
 // batch number and brand (batchLabel), as the vessel page names the batch.
 // get_brew_day is the read; only open vessels not already occupied make
@@ -43,6 +44,7 @@ type Batch = {
   planned_on: string; planned_bbl: number; brewed_on: string | null; closed_at: string | null; cancelled_at: string | null; note: string | null;
 };
 type Occupancy = { id: string; vessel_id: string; initial_bbl: number; started_at: string; vessel_name: string };
+type StartedFrom = { batch_id: string; batch_no: number | null; brand_name: string | null; bbl: number };
 type Vessel = { id: string; name: string; kind: string; capacity_bbl: number };
 type Plan = { batch: { planned_vessel_id: string | null }; plan: BrewPlan; sources: BrewMaterialSource[]; pulls: BrewPull[] };
 
@@ -51,13 +53,13 @@ const getBatchPageData = cache(async function getBatchPageData(id: string) {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   // Confirm the batch exists before its dependent RPCs can fail independently.
-  const { batch, occupancy, writeOffBbl, packagedBbl } = await orNotFound(runCommand("get_brew_day", { batchId: id }, ctx)) as { batch: Batch; occupancy: Occupancy | null; writeOffBbl: number | null; packagedBbl: number | null };
-  return { brewery, ctx, batch, occupancy, writeOffBbl, packagedBbl };
+  const { batch, occupancy, startedFrom, writeOffBbl, packagedBbl } = await orNotFound(runCommand("get_brew_day", { batchId: id }, ctx)) as { batch: Batch; occupancy: Occupancy | null; startedFrom: StartedFrom | null; writeOffBbl: number | null; packagedBbl: number | null };
+  return { brewery, ctx, batch, occupancy, startedFrom, writeOffBbl, packagedBbl };
 });
 
 export default async function BatchPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   const [{ id }, { tab }] = await Promise.all([params, searchParams]);
-  const { brewery, ctx, batch, occupancy, writeOffBbl, packagedBbl } = await getBatchPageData(id);
+  const { brewery, ctx, batch, occupancy, startedFrom, writeOffBbl, packagedBbl } = await getBatchPageData(id);
   const [vessels, today, plan, history] = (await Promise.all([
     runCommand("list_vessels", {}, ctx),
     breweryToday(ctx),
@@ -82,7 +84,8 @@ export default async function BatchPage({ params, searchParams }: { params: Prom
     }} />;
   }
   const confirmedBbl = currentBrewRecords(history.records).reduce((sum, record) => sum + record.initial_bbl, 0);
-  const initialBbl = history.records.length ? String(confirmedBbl) : occupancy ? String(Number(occupancy.initial_bbl)) : recorded ? "" : String(plannedBbl);
+  // A batch started from a transfer has no knockout: its volume is the barrels transferred in.
+  const initialBbl = history.records.length ? String(confirmedBbl) : startedFrom ? String(startedFrom.bbl) : occupancy ? String(Number(occupancy.initial_bbl)) : recorded ? "" : String(plannedBbl);
   const brewedOn = batch.brewed_on ?? (recorded ? "" : today);
   const model = {
     plan: plan.plan, sources: plan.sources, records: history.records, actuals: brewPlanActuals(plan.plan, plannedBbl, plan.sources), process: {}, confirmEmpty: false,
@@ -91,6 +94,7 @@ export default async function BatchPage({ params, searchParams }: { params: Prom
     planned: recorded && brewedAsPlanned({ bbl: plannedBbl, on: batch.planned_on }, { bbl: initialBbl, on: brewedOn }) ? undefined : planned, note: batch.note ?? undefined,
     today, plannedBbl, recorded, cancelled: !!batch.cancelled_at, vesselId: occupancy?.vessel_id ?? "", vesselName: occupancy?.vessel_name, vessels,
     initialBbl, brewedOn,
+    startedFrom: startedFrom ? { label: batchLabel(startedFrom.batch_no, startedFrom.brand_name), href: `/batches/${startedFrom.batch_id}`, bbl: startedFrom.bbl } : undefined,
     // get_brew_day reads packagedBbl whenever closed_at is set.
     completion: batch.closed_at ? { on: formatDate(batch.closed_at, brewery.timeZone), writeOffBbl, packagedBbl: packagedBbl! } : undefined,
   };

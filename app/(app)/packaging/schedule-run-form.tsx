@@ -4,7 +4,9 @@
 // (picked later, on the run's own page); outputs are a planned count per
 // package of the chosen brand. The model comes from the page's reads through
 // toSchedulePackagingRunView; the shared requirement query supplies current shortages.
-// The planned date starts on the brewery's today (#1508).
+// The planned date starts on the brewery's today (#1508). `sourceOccupancyId`
+// (Ready to package's Schedule link) opens the sheet on that tank and its brand;
+// an id that is no longer an occupied tank leaves the sheet closed and blank.
 "use client";
 
 import { useCommandQuery } from "@/components/mgr/query-provider";
@@ -17,8 +19,9 @@ import { SchedulePackagingRunView } from "@/components/mgr/views/schedule-packag
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { plannedPackageQty, scheduleRunReason, toSchedulePackagingRunView, type ScheduleRunData, type ScheduleRunDraft } from "@/lib/mgr/schedule-packaging-run-view";
 
-export function ScheduleRunForm({ catalogHref, today, ...data }: ScheduleRunData & { catalogHref: string | null; today: string }) {
-  const empty: ScheduleRunDraft = { brandId: "", occupancyId: "", plannedOn: today, qty: {} };
+export function ScheduleRunForm({ catalogHref, today, sourceOccupancyId, ...data }: ScheduleRunData & { catalogHref: string | null; today: string; sourceOccupancyId?: string }) {
+  const source = data.occupancies.find((occupancy) => occupancy.occupancy_id === sourceOccupancyId);
+  const empty: ScheduleRunDraft = { brandId: source?.brand_id ?? "", occupancyId: source?.occupancy_id ?? "", plannedOn: today, qty: {} };
   const [draft, setDraft] = useState(empty);
   const change = (patch: Partial<ScheduleRunDraft>) => setDraft((prev) => ({ ...prev, ...patch }));
   const model = toSchedulePackagingRunView(data, draft, today);
@@ -28,6 +31,7 @@ export function ScheduleRunForm({ catalogHref, today, ...data }: ScheduleRunData
   const form = useCommandForm("schedule_packaging_run", {
     build: () => ({ brandId: draft.brandId, plannedOn: draft.plannedOn, occupancyId: draft.occupancyId || undefined, outputs }),
     reset: () => setDraft(empty),
+    defaultOpen: source !== undefined,
   });
   const materials = useCommandQuery<{ planned: PackagingRequirement[] }>("get_packaging_material_plan", { outputs }, form.open && outputs.length > 0);
   return (

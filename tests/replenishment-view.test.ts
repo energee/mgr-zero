@@ -9,7 +9,7 @@ function view() {
       locationId: "taproom",
       locationName: "Lantern taproom",
       locations: [{ value: "taproom", label: "Lantern taproom" }],
-      warehouses: [{ id: "warehouse", name: "Lantern warehouse" }],
+      sources: [{ id: "warehouse", name: "Lantern warehouse" }],
       suggestions: [
         { skuId: "ten", sku: "Beer 10 · keg", par: 12, onHand: 2, suggested: 10 },
         { skuId: "two", sku: "Beer 2 · keg", par: 8, onHand: 6, suggested: 2 },
@@ -90,16 +90,16 @@ it("keeps global shortfalls visible with no taproom and does not create a transf
   const out = render({ model: { ...props.model, locationId: null, locationName: null, locations: [], suggestions: [], allocations: [] } });
   expect(out).toContain("No taprooms yet: add one under Locations");
   expect(out).not.toContain("<form");
-  expect(out).not.toContain("From warehouse");
+  expect(out).not.toContain('aria-label="From"');
   expect(out).toContain("Shortfalls across all locations");
   expect(out).toContain("Orchard Lantern");
 });
 
 it("shows missing-source guidance without inventing a Locations destination", () => {
   const { props, render } = view();
-  const model = { ...props.model, warehouses: [] };
+  const model = { ...props.model, sources: [] };
   const out = render({ model, fromLocationId: "" });
-  expect(out).toContain("No other location has the Warehouse use.");
+  expect(out).toContain("There is no other location to send from.");
   expect(out).not.toContain("Open Locations");
   const linked = render({ model: { ...model, locationsHref: "/locations" }, fromLocationId: "" });
   expect(linked).toContain('href="/locations"');

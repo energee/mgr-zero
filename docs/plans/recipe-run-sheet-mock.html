@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recipe run sheet mock (made-up data)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --background: #FAFAF7; --foreground: #1E1F1A; --muted-foreground: #6C6D64;
+    --border: #E3E3DC; --control-border: #818278; --primary: #6453B3; --wash: #F1F1EC;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --background: #050a16; --foreground: #dddddd; --muted-foreground: #bebebe;
+      --border: #2a4478; --control-border: #798fac; --primary: #60a4ec; --wash: #0e1c38;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--background); color: var(--foreground);
+    font: 400 15px/1.45 "Instrument Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  .sheet { max-width: 1040px; margin: 0 auto; padding: 28px 32px 80px; }
+  h1, h2, .figure b { font-family: "Familjen Grotesk", "Instrument Sans", sans-serif; }
+  h1 { font-size: 34px; line-height: 1.05; letter-spacing: -0.02em; margin: 0; font-weight: 700; }
+  .quiet { color: var(--muted-foreground); }
+  .num { font-variant-numeric: tabular-nums; }
+  a { color: var(--primary); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 3px; }
+
+  /* Head: the name, what it brews, and the beer itself. */
+  .head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+  .head p { margin: 6px 0 0; }
+  .button { font: 500 14px "Instrument Sans", sans-serif; color: var(--foreground); background: transparent;
+    border: 1px solid var(--control-border); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+  .beer { display: grid; grid-template-columns: minmax(0, 1.3fr) repeat(3, auto); gap: 8px 40px; align-items: end;
+    margin: 28px 0 8px; }
+  .figure b { display: block; font-size: 30px; line-height: 1; font-weight: 600; letter-spacing: -0.01em; }
+  .figure span { color: var(--muted-foreground); font-size: 13px; }
+  .gravity b small { font-size: 16px; font-weight: 500; color: var(--muted-foreground); margin: 0 8px; }
+  .drop { height: 8px; margin-top: 10px; border-radius: 4px; background: var(--wash); overflow: hidden; }
+  .drop i { display: block; height: 100%; width: 77%; background: var(--foreground); border-radius: 4px 0 0 4px; }
+  .swatch { display: inline-block; width: 13px; height: 13px; border-radius: 50%; background: #E0AE3C;
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / .18); vertical-align: -1px; margin-right: 6px; }
+
+  /* A step: its name and plain facts in the gutter, its content beside it. Rules, not boxes. */
+  .step { display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 4px 32px; padding: 22px 0;
+    border-top: 1px solid var(--border); }
+  .step h2 { font-size: 19px; line-height: 1.2; margin: 0; font-weight: 600; }
+  .step .facts { margin: 4px 0 0; font-size: 14px; color: var(--muted-foreground); }
+  .step .facts span { display: block; }
+  .step .act { margin-top: 10px; font-size: 14px; }
+  .side { margin-top: 30px; font: 600 13px "Instrument Sans", sans-serif; color: var(--muted-foreground); }
+
+  .rows { display: grid; column-gap: 28px; row-gap: 0; }
+  .rows > div { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; padding: 7px 0;
+    border-top: 1px solid var(--border); align-items: baseline; }
+  .rows > div:first-child { border-top: 0; }
+  .rows .r { text-align: right; }
+  .grain { grid-template-columns: minmax(0, 1fr) auto auto 3.2em; }
+  .hops { grid-template-columns: 4.6em minmax(0, 1fr) auto auto; }
+  .total { font-weight: 600; }
+
+  .bar { display: flex; gap: 2px; height: 12px; margin: 2px 0 12px; }
+  .bar i { display: block; border-radius: 2px; }
+  svg { display: block; width: 100%; overflow: visible; margin-bottom: 8px; }
+  svg text { font: 500 12px "Instrument Sans", sans-serif; fill: var(--muted-foreground); }
+  svg .line { stroke: var(--foreground); stroke-width: 2; stroke-linecap: round; }
+  svg .axis { stroke: var(--control-border); stroke-width: 1; }
+  svg .soft { stroke: var(--control-border); stroke-width: 2; stroke-dasharray: 2 5; stroke-linecap: round; }
+  svg .mark { fill: var(--primary); }
+  svg .temp { fill: var(--foreground); font-weight: 600; }
+  .legend { margin: 6px 0 12px; font-size: 13px; color: var(--muted-foreground); }
+
+  @media (max-width: 700px) {
+    .sheet { padding: 18px 16px 72px; }
+    h1 { font-size: 28px; }
+    .beer { grid-template-columns: repeat(3, auto); justify-content: space-between; gap: 18px 16px; }
+    .gravity { grid-column: 1 / -1; }
+    .figure b { font-size: 26px; }
+    .step { grid-template-columns: 1fr; padding: 18px 0; }
+    .step .act { margin: 6px 0 10px; }
+    .grain { grid-template-columns: minmax(0, 1fr) auto 3em; column-gap: 14px; }
+    .grain .bags { grid-column: 1; grid-row: 2; text-align: left; color: var(--muted-foreground); font-size: 13px; }
+    svg .minor { display: none; }
+    .grain > div { row-gap: 0; }
+    .hops { grid-template-columns: 4.2em minmax(0, 1fr) auto; column-gap: 14px; }
+    .hops .per { display: none; }
+  }
+
+  .sheet { max-width: 1080px; }
+  .head p { max-width: 62ch; }
+  .beer.slim { grid-template-columns: repeat(5, auto); justify-content: start; gap: 8px 44px; margin: 24px 0 6px; }
+  .beer.slim .figure b { font-size: 26px; }
+  .assumes { margin: 6px 0 0; font-size: 14px; color: var(--muted-foreground); }
+  .glance { margin: 22px 0 6px; }
+  .zone { fill: var(--wash); }
+  svg .zname { font-weight: 600; fill: var(--foreground); font-size: 13px; }
+  .cols { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 8px 56px; margin-top: 26px; }
+  .cols h2 { font-size: 19px; margin: 0 0 2px; font-weight: 600; }
+  .cols .facts { margin: 0 0 12px; font-size: 14px; color: var(--muted-foreground); }
+  .list { grid-template-columns: 6.4em minmax(0, 1fr) auto auto; }
+  .list .share { color: var(--muted-foreground); }
+  .list > div.cont { border-top-color: transparent; padding-top: 2px; }
+  .list > div.cont + div.cont, .list > div + div.cont { border-top-color: transparent; }
+  .more { margin-top: 34px; border-top: 1px solid var(--border); }
+  .more details, .more .fold { border-bottom: 1px solid var(--border); padding: 12px 0; }
+  .more summary { cursor: pointer; list-style: none; display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; }
+  .more summary::-webkit-details-marker { display: none; }
+  .more b { font: 600 15px "Familjen Grotesk", sans-serif; }
+  .more .open { margin-left: auto; color: var(--primary); font-size: 14px; }
+  .actuals { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+  .actuals th { text-align: right; font-weight: 500; font-size: 13px; color: var(--muted-foreground); padding: 4px 0 4px 16px; }
+  .actuals td { text-align: right; padding: 5px 0 5px 16px; border-top: 1px solid var(--border); }
+  .actuals th:first-child, .actuals td:first-child { text-align: left; padding-left: 0; }
+  @media (max-width: 700px) {
+    .cols { grid-template-columns: 1fr; gap: 28px; }
+    .list { grid-template-columns: 5.4em minmax(0, 1fr) auto auto; column-gap: 10px; }
+    .list .weight { display: none; }
+    .beer.slim { grid-template-columns: repeat(3, auto); justify-content: space-between; gap: 14px; }
+    .actuals .wide { display: none; }
+  }
+</style></head><body>
+<main class="sheet">
+  <div class="head">
+    <div>
+      <h1>Hazy IPA</h1>
+      <p class="quiet">Brews <a href="#">Hazy IPA</a> at <a href="#">22 bbl</a>. The flagship: keep it soft and juicy. Saved Aug 28, 2026.</p>
+    </div>
+    <button class="button" type="button">Schedule batch</button>
+  </div>
+
+  <section class="beer slim" aria-label="What this recipe predicts">
+    <div class="figure"><b class="num">15.2 °P</b><span>original gravity</span></div>
+    <div class="figure"><b class="num">3.5 °P</b><span>final gravity</span></div>
+    <div class="figure"><b class="num">6.3%</b><span>alcohol by volume</span></div>
+    <div class="figure"><b class="num">32</b><span>IBU</span></div>
+    <div class="figure"><b class="num">4.6</b><span><i class="swatch"></i>SRM</span></div>
+  </section>
+  <p class="assumes">Assumes <a href="#">72% efficiency</a> and <a href="#">78% attenuation</a>.</p>
+
+  <section class="glance">
+    <svg id="day" height="158" role="img" aria-label="The brew day by temperature: mash rests of 15, 60 and 10 minutes, a 60 minute boil, a 20 minute whirlpool and a 10 minute rest, with a mark where each hop goes in"></svg>
+  </section>
+
+  <div class="cols">
+    <section>
+      <h2>Goes in on brew day</h2>
+      <p class="facts"><a href="#">Hazy water profile</a>, mash pH 5.35. Boil from 16.8 bbl. Whirlpool at 180 °F, knock out at 65 °F.</p>
+      <div class="bar" id="grist" role="img" aria-label="Share of the grain bill by weight"></div>
+      <div class="rows list" id="in"></div>
+      <p class="act"><a href="#">Add an ingredient</a></p>
+    </section>
+    <section>
+      <h2>In the cellar</h2>
+      <p class="facts">18 days from pitch to package.</p>
+      <svg id="ferm" height="100" role="img" aria-label="Fermentation temperature by day: 68 °F for 4 days, 72 °F for 2, then 34 °F for 12, with the dry hop on day 3"></svg>
+      <div class="rows list" id="cellar"></div>
+      <p class="act"><a href="#">Edit the schedule</a></p>
+    </section>
+  </div>
+
+  <section class="more">
+    <details>
+      <summary><b>Batch actuals</b><span class="quiet">This grain bill, 38 batches across 6 recipes: efficiency 67 to 74% against 72% assumed. This recipe, 4 batches: attenuation 77 to 78% against 78%.</span><span class="open">Show batches</span></summary>
+      <table class="actuals num">
+        <thead><tr><th>Batch</th><th>OG °P</th><th>FG °P</th><th>ABV</th><th class="wide">Attenuation</th><th>Efficiency</th></tr></thead>
+        <tbody>
+          <tr class="quiet"><td>Predicted</td><td>15.2</td><td>3.5</td><td>6.3%</td><td class="wide">78%</td><td>72%</td></tr>
+          <tr><td>B-0413, Oct 3</td><td>14.8</td><td>3.5</td><td>6.1%</td><td class="wide">77%</td><td>68%</td></tr>
+          <tr><td>B-0407, Sep 20 <span class="quiet">as Session IPA</span></td><td>15.0</td><td></td><td></td><td class="wide"></td><td>70%</td></tr>
+          <tr><td>B-0398, Sep 12 <span class="quiet">in FV3</span></td><td>15.1</td><td>3.4</td><td>6.3%</td><td class="wide">78%</td><td>71%</td></tr>
+          <tr><td>B-0398, Sep 12 <span class="quiet">in FV5</span></td><td>15.1</td><td>3.6</td><td>6.1%</td><td class="wide">77%</td><td>71%</td></tr>
+          <tr><td>B-0391, Sep 2 <span class="quiet">as West Coast IPA</span></td><td>15.3</td><td></td><td></td><td class="wide"></td><td>74%</td></tr>
+          <tr><td>B-0371, Jul 18</td><td>15.0</td><td>3.6</td><td>6.1%</td><td class="wide">77%</td><td>70%</td></tr>
+          <tr><td>B-0356, Jun 27</td><td>14.9</td><td>3.5</td><td>6.1%</td><td class="wide">77%</td><td>69%</td></tr>
+          <tr class="quiet"><td colspan="6" style="text-align:left">A batch brewed as another recipe counts toward the mash figures only, so its fermentation figures are left out. 31 more batches of this grain bill.</td></tr>
+        </tbody>
+      </table>
+    </details>
+    <div class="fold"><summary><b>As brewed before</b><span class="quiet">B-0356 to B-0371, Jun 27 to Jul 18, 2026.</span><a class="open" href="#">Open that recipe</a></summary></div>
+  </section>
+</main>
+<script>
+  const BBL = 22;
+  const grain = [
+    { name: "Pilsner malt", bags: 23, bag: 55, tint: "#D2A944" }, { name: "Flaked oats", bags: 6, bag: 50, tint: "#E4CC84" },
+    { name: "White wheat", bags: 5, bag: 50, tint: "#C29532" }, { name: "Chit malt", bags: 2, bag: 55, tint: "#EBDCAA" },
+  ];
+  const lb = (n) => `${n.toLocaleString("en-US")} lb`;
+  const total = grain.reduce((sum, g) => sum + g.bags * g.bag, 0);
+  const pct = (n) => `${n.toFixed(2)}%`;
+  // A stepped temperature line. x is a percent of the span and y is in pixels, so text keeps its size at any width.
+  // A narrow step that is not the first labels its temperature from its right end, clear of the next riser.
+  function steps(segments, { low, high, top, bottom }) {
+    const span = segments.reduce((sum, s) => sum + s.length, 0), y = (t) => bottom - (t - low) / (high - low) * (bottom - top);
+    let at = 0, out = "";
+    segments.forEach((s, i) => {
+      const x1 = at / span * 100, x2 = (at + s.length) / span * 100, narrow = i > 0 && x2 - x1 < 12;
+      out += `<line class="line" x1="${pct(x1)}" x2="${pct(x2)}" y1="${y(s.temp)}" y2="${y(s.temp)}"/>`;
+      if (i > 0) out += `<line class="line" x1="${pct(x1)}" x2="${pct(x1)}" y1="${y(segments[i - 1].temp)}" y2="${y(s.temp)}"/>`;
+      if (i === 0 || segments[i - 1].temp !== s.temp) out += `<text class="temp" x="${pct(narrow ? x2 : x1)}" dx="${narrow ? -6 : i ? 6 : 2}" text-anchor="${narrow ? "end" : "start"}" y="${y(s.temp) - 7}">${s.temp} °F</text>`;
+      if (s.note) out += `<text x="${pct((x1 + x2) / 2)}" y="${y(s.temp) + 16}" text-anchor="middle">${s.note}</text>`;
+      at += s.length;
+    });
+    return { out, span };
+  }
+
+  (function day() {
+    const hot = [{ temp: 104, length: 15, note: "15" }, { temp: 152, length: 60, note: "60 min" }, { temp: 168, length: 10, note: "10" }, { temp: 212, length: 60, note: "60 min" }, { temp: 180, length: 30, note: "20, rest 10" }];
+    const h = steps(hot, { low: 95, high: 215, top: 50, bottom: 108 }), floor = 134;
+    let out = "";
+    [["Mash", 0, 85, "start"], ["Boil", 85, 145, "start"], ["Whirlpool", 145, 175, "end"]].forEach(([name, from, to, anchor], i) => {
+      if (i !== 1) out += `<rect class="zone" x="${pct(from / h.span * 100)}" width="${pct((to - from) / h.span * 100)}" y="0" height="${floor}" rx="3"/>`;
+      out += `<text class="zname" x="${pct((anchor === "end" ? to : from) / h.span * 100)}" dx="${anchor === "end" ? -8 : 8}" text-anchor="${anchor}" y="18">${name}</text>`;
+    });
+    out += h.out + `<line class="axis" x1="0" x2="100%" y1="${floor}" y2="${floor}"/>`;
+    [85, 135, 150, 156].forEach((at) => { out += `<circle class="mark" cx="${pct(at / h.span * 100)}" cy="${floor}" r="5"/>`; });
+    out += `<text x="0" y="${floor + 20}">Mash-in</text><text x="100%" y="${floor + 20}" text-anchor="end">Knock out at 65 °F, 2 h 55 min</text>`;
+    document.getElementById("day").innerHTML = out;
+  })();
+
+  (function ferm() {
+    const f = steps([{ temp: 68, length: 4 }, { temp: 72, length: 2 }, { temp: 34, length: 12 }], { low: 30, high: 76, top: 22, bottom: 72 });
+    let out = f.out + `<line class="axis" x1="0" x2="100%" y1="80" y2="80"/><circle class="mark" cx="${pct(3 / f.span * 100)}" cy="80" r="5"/>`;
+    [[0, "Pitch", "start"], [4, "Day 4", "middle"], [6, "6", "middle"], [18, "Day 18", "end"]].forEach(([d, t, anchor]) => { out += `<text x="${pct(d / f.span * 100)}" y="98" text-anchor="${anchor}">${t}</text>`; });
+    document.getElementById("ferm").innerHTML = out;
+  })();
+
+  document.getElementById("grist").innerHTML = grain.map((g) => `<i style="flex:${g.bags * g.bag};background:${g.tint}" title="${g.name}"></i>`).join("");
+  // One row per thing that goes in. The "when" is said once, on the first row of its moment.
+  function rows(groups) {
+    return groups.map(([when, items]) => items.map(([name, amount, weight = "", share = ""], i) =>
+      `<div class="${i ? "cont" : ""}"><span class="num quiet">${i ? "" : when}</span><a href="#">${name}</a><span class="r num quiet"><span class="weight">${weight}${weight && share ? ", " : ""}</span><span class="share">${share}</span></span><span class="r num">${amount}</span></div>`).join("")).join("");
+  }
+  document.getElementById("in").innerHTML = rows([
+    ["Mash-in", [["Mash water", "600 gal"], ["Gypsum", "350 g"], ["Calcium chloride", "400 g"],
+      ...grain.map((g) => [g.name, `${g.bags} bags`, lb(g.bags * g.bag), `${Math.round(g.bags * g.bag / total * 100)}%`])]],
+    ["Sparge", [["Sparge water", "450 gal"], ["Lactic acid", "60 mL"]]],
+    ["Boil, 60 min", [["Hop extract", "1 bottle"]]],
+    ["Boil, 10 min", [["Citra", "8.8 lb"]]],
+    ["Whirlpool", [["Citra", "11 lb"], ["Mosaic", "11 lb"]]],
+  ]);
+  document.getElementById("cellar").innerHTML = rows([
+    ["Pitch", [["London Tropics", "1 pitch"]]],
+    ["Day 3", [["Citra", "26.4 lb"], ["Mosaic", "22 lb"]]],
+    ["Packaging", [["Biofine", "2 L"]]],
+  ]);
+</script></body></html>

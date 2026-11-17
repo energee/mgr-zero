@@ -1,5 +1,6 @@
 import { breweryDate, formatDate } from "@/lib/date-format";
-import { runNo } from "@/lib/mgr/doc-no";
+import { bblExact } from "@/lib/volume";
+import { batNo, runNo } from "@/lib/mgr/doc-no";
 import type { EmptyState } from "@/lib/mgr/empty-state";
 import { WORK_CHIPS, WORK_TABS } from "@/lib/mgr/work-view";
 
@@ -13,13 +14,16 @@ export type PackagingRunSnapshot = {
   brand_name: string | null;
   vessel_name: string | null;
   qty_planned: number;
-  planned_unit?: string;
-  material_shortfall?: string;
-  lot_code?: string;
-  output_summary?: string;
-  yield_percent?: number;
-  loss_bbl?: number;
+  /** The plan, one entry per package unit, counted at each format's volume. */
+  planned?: PackagedOutput[];
+  /** Materials an unfinished run's plan needs beyond stock on hand and on order. */
+  shortages?: { name: string; short: number; unit: string }[];
+  /** What a closed run actually packaged, one entry per package unit. */
+  outputs?: PackagedOutput[];
 };
+
+/** A count in one package unit. `bbl` is that count at the format's volume (for a closed run's output, the volume frozen at close); null when a format has none. */
+export type PackagedOutput = { unit: "case" | "keg" | "each"; qty: number; bbl: number | null };
 
 export type PackagingRunRowView = {
   key: string;
@@ -31,10 +35,17 @@ export type PackagingRunRowView = {
   status?: "Closed" | "Cancelled";
   overdue?: boolean;
   shortfall?: string;
-  lot?: string;
+  /** Set on the first Recent row of each planned day: the day, its closed runs and their barrels. */
+  heading?: string;
+  /** Actual output in words, such as "93 cases · 19 kegs". */
   output?: string;
-  yieldPercent?: number;
-  lossBbl?: number;
+  /** Share of the packaged barrels that went into kegs, 0 to 100. */
+  kegPercent?: number;
+  /** Barrels packaged, against the plan when there is one: "9.3 of 9.6 bbl" or "6 bbl". */
+  packaged?: string;
+  /** Packaged as a percent of plan, capped at 100 for the bar; unset with no plan to compare. */
+  planPercent?: number;
+  belowPlan?: boolean;
   verb?: string;
   tone?: "info" | "attention";
   href?: string;
@@ -49,48 +60,128 @@ export type PackagingRunsViewModel = {
   workTabs: Record<string, string>;
 };
 
-function row(run: PackagingRunSnapshot, timeZone: string, today: string, href?: string): PackagingRunRowView {
+const UNIT_WORDS = { case: ["case", "cases"], keg: ["keg", "kegs"], each: ["unit", "units"] } as const;
+const UNIT_ORDER = Object.keys(UNIT_WORDS);
+/** A run that packaged under this percent of its plan is drawn as a warning. */
+const BELOW_PLAN_PERCENT = 90;
+const tenths = (bbl: number) => bbl.toLocaleString("en-US", { maximumFractionDigits: 1 });
+
+/** Barrels across outputs, or undefined when any format has no volume. */
+function packagedBbl(outputs: PackagedOutput[]) {
+  return outputs.every(output => output.bbl !== null) ? outputs.reduce((sum, output) => sum + output.bbl!, 0) : undefined;
+}
+
+/** "1 case · 6 kegs": cases, then kegs, then loose units; a recorded zero is still stated. */
+function outputWords(outputs: PackagedOutput[]) {
+  if (outputs.length === 0) return undefined;
+  return [...outputs].sort((a, b) => UNIT_ORDER.indexOf(a.unit) - UNIT_ORDER.indexOf(b.unit))
+    .map(output => `${output.qty} ${UNIT_WORDS[output.unit][output.qty === 1 ? 0 : 1]}`).join(" · ");
+}
+
+function kegPercent(outputs: PackagedOutput[]) {
+  const total = packagedBbl(outputs);
+  if (!total) return undefined;
+  return Math.round(packagedBbl(outputs.filter(output => output.unit === "keg"))! / total * 100);
+}
+
+/** Barrels packaged against barrels planned. With nothing planned, or a volume unknown, the packaged barrels stand alone. */
+function againstPlan(run: PackagingRunSnapshot): Pick<PackagingRunRowView, "packaged" | "planPercent" | "belowPlan"> {
+  const packaged = packagedBbl(run.outputs ?? []);
+  if (packaged === undefined || !run.outputs?.length) return {};
+  const planned = packagedBbl(run.planned ?? []);
+  if (!planned) return { packaged: `${tenths(packaged)} bbl` };
+  const percent = Math.round(packaged / planned * 100);
+  return {
+    packaged: `${tenths(packaged)} of ${tenths(planned)} bbl`,
+    planPercent: Math.min(percent, 100),
+    belowPlan: percent < BELOW_PLAN_PERCENT,
+  };
+}
+
+/** "Sep 4, 2026 · 2 runs · 14.5 bbl packaged" for one planned day's finished runs. */
+function dayHeading(day: PackagingRunSnapshot[]) {
+  const closed = day.filter(run => run.closed_at && !run.cancelled_at);
+  const bbl = packagedBbl(closed.flatMap(run => run.outputs ?? []));
+  return [
+    formatDate(day[0].planned_on),
+    closed.length > 0 && `${closed.length} ${closed.length === 1 ? "run" : "runs"}`,
+    !!bbl && `${bblExact(bbl, 1)} packaged`,
+  ].filter(Boolean).join(" · ");
+}
+
+/** "1,480 Can ends short", then how many more materials are short. */
+function shortfallWords(shortages: NonNullable<PackagingRunSnapshot["shortages"]>) {
+  if (shortages.length === 0) return undefined;
+  const [first, ...more] = shortages;
+  const words = `${first.short.toLocaleString("en-US")} ${first.name} short`;
+  return more.length === 0 ? words : `${words}, and ${more.length} more ${more.length === 1 ? "material" : "materials"}`;
+}
+
+function row(run: PackagingRunSnapshot, today: string, href?: string): PackagingRunRowView {
+  const shortfall = shortfallWords(run.shortages ?? []);
   const common = {
     key: run.id,
     runNo: runNo(run.run_no),
     brand: run.brand_name,
+    date: formatDate(run.planned_on),
     source: run.vessel_name,
-    quantity: [run.qty_planned, run.planned_unit].filter(value => value !== undefined).join(" "),
+    // Without a plan by unit, the bare count stands: no unit is guessed.
+    quantity: outputWords(run.planned ?? []) ?? String(run.qty_planned),
     href,
   };
   // Finished runs open their record without suggesting they can be reopened.
-  if (run.cancelled_at) return { ...common, status: "Cancelled", date: formatDate(run.cancelled_at, timeZone) };
+  if (run.cancelled_at) return { ...common, status: "Cancelled" };
   if (run.closed_at) return {
     ...common,
     status: "Closed",
-    date: formatDate(run.closed_at, timeZone),
-    lot: run.lot_code,
-    output: run.output_summary,
-    yieldPercent: run.yield_percent,
-    lossBbl: run.loss_bbl,
+    output: outputWords(run.outputs ?? []),
+    kegPercent: kegPercent(run.outputs ?? []),
+    ...againstPlan(run),
   };
-  const verb = run.material_shortfall ? "Resolve" : run.started_at ? "Close" : run.vessel_name ? "Start" : "Pick source";
+  const verb = shortfall ? "Resolve" : run.started_at ? "Close" : run.vessel_name ? "Start" : "Pick source";
   return {
     ...common,
-    date: formatDate(run.planned_on),
     overdue: !run.started_at && run.planned_on < today,
-    shortfall: run.material_shortfall,
+    shortfall,
     verb,
-    tone: run.material_shortfall || run.started_at ? "attention" : "info",
+    tone: shortfall || run.started_at ? "attention" : "info",
   };
 }
 
-/** `timeZone` is breweries.timezone: a closed run is dated by the brewery's day, not closed_at's UTC prefix (#442). */
 /** A closed or cancelled run is history; everything else is still upcoming. */
 const finished = (run: PackagingRunSnapshot) => !!(run.closed_at || run.cancelled_at);
 
+/** `timeZone` is breweries.timezone: an unstarted run is overdue once the brewery's own day passes its planned date.
+ *  Recent is grouped by planned day, newest first. A page of history is in created order, so it is re-sorted here.
+ *  ponytail: the planned day stands in for the lot's packaged-on date, which matches it on every run so far;
+ *  read the lot date in the list queries if runs start closing on a later day than planned. */
 export function toPackagingRunsViewProps(runs: PackagingRunSnapshot[], timeZone: string, hrefFor?: (id: string) => string, at: Date = new Date()): PackagingRunsViewModel {
   const today = breweryDate(timeZone, at);
+  const done = runs.filter(finished).sort((a, b) => b.planned_on.localeCompare(a.planned_on));
   return {
-    upcoming: runs.filter((run) => !finished(run)).map((run) => row(run, timeZone, today, hrefFor?.(run.id))),
-    recent: runs.filter(finished).map((run) => row(run, timeZone, today, hrefFor?.(run.id))),
+    upcoming: runs.filter((run) => !finished(run)).map((run) => row(run, today, hrefFor?.(run.id))),
+    recent: done.map((run, index) => ({
+      ...row(run, today, hrefFor?.(run.id)),
+      heading: run.planned_on === done[index - 1]?.planned_on ? undefined : dayHeading(done.filter(other => other.planned_on === run.planned_on)),
+    })),
     empty: runs.length === 0 ? { title: "No runs planned" } : undefined,
     workChips: WORK_CHIPS,
     workTabs: WORK_TABS,
   };
+}
+
+/** A tank from list_occupancies({ readyToPackage: true }): beer in a brite tank with no run planned from it. */
+export type ReadyTank = { occupancy_id: string; vessel_name: string | null; brand_name: string | null; batch_no: number | null; bbl: number };
+export type ReadyTankRowView = { key: string; tank: string; brand: string; batch: string; volume: string; href?: string };
+
+/** Ready to package rows. `hrefFor` opens Schedule run on that tank; the inventory leaves it out. */
+export function toReadyToPackage(tanks: ReadyTank[], hrefFor?: (occupancyId: string) => string): ReadyTankRowView[] {
+  return tanks.map(tank => ({
+    key: tank.occupancy_id,
+    tank: tank.vessel_name ?? "Unnamed tank",
+    brand: tank.brand_name ?? "No brand",
+    batch: batNo(tank.batch_no),
+    volume: bblExact(tank.bbl, 1),
+    href: hrefFor?.(tank.occupancy_id),
+  }));
 }

@@ -3,22 +3,23 @@ import { useId, useState } from "react";
 import { E } from "@/components/mgr/e";
 import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 import { CellarTransferView, CellarTransferFooter } from "@/components/mgr/views/cellar-transfer";
-import { onlyOccupancy, transferPreview, transferReason, type TransferOccupancy, type TransferVessel } from "@/lib/mgr/cellar-transfer-view";
+import { onlyOccupancy, transferPreview, transferReason, type CellarTransferViewModel, type TransferOccupancy, type TransferVessel } from "@/lib/mgr/cellar-transfer-view";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
 /** `disabled` is the map's actionsOff: no tank holds beer, and the map's note says why (#1115).
  *  `fromId` scopes the sheet to its tank; otherwise it starts on the only open tank.
+ *  `plannedBatches` are the unstarted plans an empty destination tank may start (toBatchId).
  *  `addVesselHref` links to New vessel when the source is the only vessel. */
-export function CellarTransferForm({ occupancies, vessels, addVesselHref, disabled, fromId = onlyOccupancy(occupancies) }: { occupancies: TransferOccupancy[]; vessels: TransferVessel[]; addVesselHref?: string | null; disabled?: boolean; fromId?: string }) {
+export function CellarTransferForm({ occupancies, vessels, plannedBatches, addVesselHref, disabled, fromId = onlyOccupancy(occupancies) }: { occupancies: TransferOccupancy[]; vessels: TransferVessel[]; plannedBatches: CellarTransferViewModel["plannedBatches"]; addVesselHref?: string | null; disabled?: boolean; fromId?: string }) {
   const formId = useId();
-  const empty = { fromId, toId: "", volume: "", loss: "" };
+  const empty = { fromId, toId: "", volume: "", loss: "", toBatchId: "" };
   const [fields, setFields] = useState(empty);
-  const model = { ...fields, occupancies, vessels, addVesselHref };
+  const model = { ...fields, occupancies, vessels, plannedBatches, addVesselHref };
   const source = occupancies.find(o => o.occupancy_id === fields.fromId);
   const preview = transferPreview(source?.bbl, fields.volume, fields.loss);
   const reason = transferReason(model);
   const form = useCommandForm("record_cellar_transfer", {
-    build: () => ({ fromOccupancyId: fields.fromId, toVesselId: fields.toId, volumeBbl: preview.moving, lossBbl: fields.loss ? preview.loss : undefined }),
+    build: () => ({ fromOccupancyId: fields.fromId, toVesselId: fields.toId, volumeBbl: preview.moving, lossBbl: fields.loss ? preview.loss : undefined, toBatchId: fields.toBatchId || undefined }),
     reset: () => setFields(empty),
   });
   return <CommandForm open={form.open} onOpenChange={form.setOpen} title="Cellar transfer" trigger={E.btn("Transfer", disabled ? "g disabled" : "g")} footer={E.pin(<CellarTransferFooter formId={formId} submitting={form.submitting} reason={reason} />)}>

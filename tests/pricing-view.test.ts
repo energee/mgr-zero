@@ -87,9 +87,44 @@ describe("Price groups view", () => {
     expect(html).toContain('value="150.00"');
     expect(html).toContain('aria-label="2 · case · 24×16oz on Wholesale"');
     expect(html).toMatch(/placeholder="—"/);
-    expect(html).not.toMatch(/not priced/);
     // Emptying a field clears it; no cell carries its own Clear button (#1516).
     expect(html).not.toContain("Clear");
+  });
+
+  it("folds the formats no group prices on the showing channel, and none when nothing is priced", () => {
+    expect(toPriceGroupsViewProps(pricingGrid).channel?.folded).toEqual([false, false, false, true, true]);
+    expect(toPriceGroupsViewProps({ ...pricingGrid, channelId: taproom!.id }).channel?.folded).toEqual([true, true, true, false, false]);
+    // A channel with no prices yet keeps every column: there is nothing to tell apart.
+    expect(toPriceGroupsViewProps({ ...pricingGrid, cells: [] }).channel?.folded).toEqual([false, false, false, false, false]);
+  });
+
+  it("offers one switch that shows the folded formats, and none when no column folds", () => {
+    const html = htmlOf(createElement(PriceGroupsView, { model: toPriceGroupsViewProps(pricingGrid) }));
+    expect(html.match(/role="switch"/g)).toHaveLength(1);
+    expect(html).toContain("Show 2 formats not priced on Wholesale");
+    // Folded cells stay in the table, so the switch needs no reload to show them.
+    expect(html).toContain('aria-label="1 · pint on Wholesale"');
+    const all = htmlOf(createElement(PriceGroupsView, { model: toPriceGroupsViewProps({ ...pricingGrid, cells: [] }) }));
+    expect(all).not.toMatch(/role="switch"/);
+  });
+
+  it("says each group's cost ceiling under its name", () => {
+    expect(toPriceGroupsViewProps(pricingGrid).channel?.rows.map((r) => r.note)).toEqual(["No cost ceiling", "Up to $65.00/bbl cost", "No cost ceiling"]);
+    const html = htmlOf(createElement(PriceGroupsView, { model: toPriceGroupsViewProps(pricingGrid), renderGroup: (row) => `G:${row.name}` }));
+    expect(html).toContain("Up to $65.00/bbl cost");
+  });
+
+  it("names each price cell's format beside it for the phone, where the header row is hidden", () => {
+    const html = htmlOf(createElement(PriceGroupsView, { model: toPriceGroupsViewProps(pricingGrid) }));
+    expect(html.match(/<span class="[^"]*md:hidden[^"]*">sixtel<\/span>/g)).toHaveLength(3);
+  });
+
+  it("keeps Saved on the field's line and an error under it", () => {
+    const saved = htmlOf(createElement(PriceCellInput, { label: "x", value: "7.00", status: "Saved" }));
+    expect(saved.indexOf("Saved")).toBeLessThan(saved.indexOf('data-slot="input-group"'));
+    const bad = htmlOf(createElement(PriceCellInput, { label: "x", value: "abc", error: "Enter a price." }));
+    expect(bad.indexOf("Enter a price.")).toBeGreaterThan(bad.indexOf('data-slot="input-group"'));
+    expect(saved).toContain("data-quiet-field");
   });
 
   it("offers to add a missing pour where a group has none of that column's name", () => {

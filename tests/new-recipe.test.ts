@@ -1,7 +1,6 @@
 // tests/new-recipe.test.ts — a recipe is created on the Recipe surface, not
-// on a page of its own: the parent fields (name, optional brand and note) are one shared component, mounted by the inventory Recipe record
-// in RecipeView's parentForm slot and by the live version form when it has
-// no recipe yet. /recipes/new is that editor; one save writes create_recipe
+// on a page of its own: the parent fields (name, optional brand and note) are one shared component, drawn in RecipeView's
+// parentForm slot by the live editor when it has no recipe yet. The inventory Recipe record draws the saved recipe. /recipes/new is that editor; one save writes create_recipe
 // then create_recipe_version and lands on the recipe.
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
@@ -17,6 +16,7 @@ import { WaterAdditionView, WaterView } from "../components/mgr/views/water";
 import { BrewDayView } from "../components/mgr/views/brew-day";
 import { EMPTY_WATER, INGREDIENT_STAGES } from "../lib/mgr/recipe-process-view";
 import { RecipeView } from "../components/mgr/views/recipe";
+import { RecipeNumbersView } from "../components/mgr/views/recipe-numbers";
 import { recipeHazyV4 } from "../lib/mgr/fixtures/production";
 import { SCREEN_ROUTES } from "../lib/mgr/screen-routes";
 import { isInertOn, resolveTap } from "../lib/mgr/screen-links";
@@ -34,46 +34,68 @@ describe("Recipe creation", () => {
     expect(html).not.toMatch(/<form\b|<button[^>]*type="submit"/);
   });
 
-  it("the inventory Recipe record mounts the parent fields in RecipeView's parentForm slot", () => {
-    const body = screen("Recipe").body as { type: unknown; props: { parentForm: { type: unknown } } };
+  it("the creating state draws the parent fields in RecipeView's parentForm slot, above the same sheet, and has no screen of its own", () => {
+    // The inventory record draws the saved recipe: its brand is a pick in its sentence, so it mounts no parent fields.
+    const body = screen("Recipe").body as { type: unknown; props: { parentForm?: unknown } };
     expect(body.type).toBe(RecipeView);
-    expect(body.props.parentForm.type).toBe(NewRecipeFieldsView);
+    expect(body.props.parentForm).toBeUndefined();
+    const creating = renderToStaticMarkup(createElement(RecipeView, {
+      model: { title: "New recipe", notes: "" }, parentForm: createElement(NewRecipeFieldsView, { brands: [{ id: "b1", name: "Hazy IPA" }] }),
+      controls: { setNote: () => {}, onSubmit: () => {}, dirty: true, submitLabel: "Create recipe" },
+    }));
+    const at = (words: string) => creating.indexOf(words);
+    expect(at(">Name<")).toBeGreaterThan(at("</h1>"));
+    expect(at("Brand · optional")).toBeGreaterThan(at(">Name<"));
+    expect(at("Note · optional")).toBeGreaterThan(at("Brand · optional"));
+    expect(at("Assumes ")).toBeGreaterThan(at("Note · optional"));
+    // The brand is picked in the fields, so the sentence under them holds no second pick.
+    expect(creating.match(/role="combobox"/g)).toHaveLength(1);
     expect(screen("New recipe")).toBeUndefined();
     expect(SCREEN_ROUTES.find((r) => r.name === "New recipe")).toBeUndefined();
     expect(resolveTap(screen("Recipes"), "New recipe")).toBe("Recipe");
   });
 
   it("bounds the process numbers as create_recipe_version does, so the browser refuses them first (#447)", () => {
-    const live = renderToStaticMarkup(createElement(RecipeView, { model: { title: "New recipe", notes: "" }, controls: { set: () => {}, onSubmit: () => {} } }));
-    const input = (label: string) => new RegExp(`<input[^>]*aria-label="${label}"[^>]*>`).exec(live)?.[0] ?? "";
+    const sheet = renderToStaticMarkup(createElement(RecipeNumbersView, { values: {}, onChange: () => {} }));
+    const input = (label: string) => new RegExp(`<input[^>]*aria-label="${label}"[^>]*>`).exec(sheet)?.[0] ?? "";
     expect(input("Boil time min")).toMatch(/min="1"[^>]*step="1"|step="1"[^>]*min="1"/);
     expect(input("Whirlpool min")).toMatch(/min="0"/);
     expect(input("Whirlpool min")).toMatch(/step="1"/);
     expect(input("Whirlpool rest min")).toMatch(/step="1"/);
     expect(input("Pre-boil volume bbl")).toMatch(/min="0.01"/);
+    // The batch size takes what a saved copy can store: above zero, at most 9,999,999.999.
+    expect(input("Batch size bbl")).toMatch(/min="0\.001"/);
+    expect(input("Batch size bbl")).toMatch(/max="9999999\.999"/);
   });
 
   it("RecipeView is the one editor: controlled when given controls, static for the fixture", () => {
     const fixture = renderToStaticMarkup(createElement(RecipeView, { model: recipeHazyV4 }));
     expect(fixture).not.toMatch(/<form\b/);
-    expect(fixture).toMatch(/New recipe version/);
-    const set = vi.fn();
-    const live = renderToStaticMarkup(createElement(RecipeView, { model: { title: "New recipe", preBoil: "16.8", notes: "" }, controls: { set, onSubmit: () => {}, submitLabel: "Create recipe" } }));
+    // The fixture is the saved recipe with no unsaved change: no save bar, and no verb that names a version.
+    expect(fixture).not.toMatch(/New recipe version|Save changes/);
+    const live = renderToStaticMarkup(createElement(RecipeView, { model: { title: "New recipe", preBoil: "16.8", notes: "" }, controls: { onSubmit: () => {}, dirty: true, submitLabel: "Create recipe" } }));
     expect(live).toMatch(/<form\b/);
-    expect(live).toMatch(/value="16.8"/);
-    expect(live).toMatch(/grid-cols-2 md:grid-cols-4/);
+    // A recipe being created is asked for no change note; the numbers read as text that opens their sheet.
+    expect(live).not.toMatch(/Change note|<input/);
+    // A saved recipe with an unsaved change is asked for one, in the save bar.
+    const changed = renderToStaticMarkup(createElement(RecipeView, { model: { title: "Hazy", saved: "Aug 28, 2026", notes: "Less crystal" }, controls: { setNote: () => {}, onSubmit: () => {}, onDiscard: () => {}, dirty: true } }));
+    expect(changed).toMatch(/<input[^>]*aria-label="Change note · optional"[^>]*value="Less crystal"/);
+    expect(live).toMatch(/Boil from <button[^>]*>16\.8 bbl<span class="sr-only">, edit recipe numbers<\/span><\/button>\./);
     expect(live).toMatch(/<button[^>]*type="submit"[^>]*>Create recipe</);
-    // A cut version is read out as text, its schedules as rows under their headings.
-    const cut = renderToStaticMarkup(createElement(RecipeView, { readOnly: true, model: { title: "Hazy v1", preBoil: "16.8", mash: { title: "Mash schedule · 1 step", detail: "60 min", rows: [{ title: "Sacch", detail: "152 °F · 60 min" }] } } }));
-    expect(cut).toMatch(/Sacch/);
-    expect(cut).not.toMatch(/<form\b|Add ingredient|Open/);
+    // The Recipe numbers sheet holds the fields, each under its own label.
+    const sheet = renderToStaticMarkup(createElement(RecipeNumbersView, { values: { preBoil: "16.8" }, onChange: () => {} }));
+    expect(sheet).toMatch(/<label[^>]*>Pre-boil volume bbl<\/label>/);
+    expect(sheet).toMatch(/<input[^>]*aria-label="Pre-boil volume bbl"[^>]*value="16.8"/);
+    // A saved copy read only is text and drawings, with nothing that edits it.
+    const cut = renderToStaticMarkup(createElement(RecipeView, { readOnly: true, model: { title: "Hazy", preBoil: "16.8", mashSchedule: [{ name: "Sacch", kind: "infusion", tempF: 152, minutes: 60 }] } }));
+    expect(cut).toContain("152 °F");
+    expect(cut).toContain("Boil from 16.8 bbl.");
+    expect(cut).not.toMatch(/<form\b|<button|Add ingredient|Edit schedule|Open/);
     // No scale chips: they previewed a batch size nothing supplies.
     expect(fixture).not.toMatch(/15 bbl|30 bbl/);
-    // No version yet: no number is invented.
-    const none = renderToStaticMarkup(createElement(RecipeView, { readOnly: true, model: { title: "Hazy", empty: { title: "No version yet" }, createHref: "/recipes/x/new" } }));
-    expect(none).toMatch(/No version yet/);
-    expect(none).not.toMatch(/Pre-boil volume/);
-    expect(none).toMatch(/href="\/recipes\/x\/new"/);
+    // Not written yet: no number is invented, and nothing says "version".
+    const none = renderToStaticMarkup(createElement(RecipeView, { readOnly: true, model: { title: "Hazy" } }));
+    expect(none).not.toMatch(/No version yet|Pre-boil volume|Assumes/);
   });
 
   describe("the ingredient sheet fields (plan task 13)", () => {
@@ -103,6 +125,21 @@ describe("Recipe creation", () => {
       expect(html.match(/step="any"/g)).toHaveLength(2);
     });
 
+    it("takes a count of packs beside the per-barrel amount, when the recipe has a batch size and the material a pack size", () => {
+      const pils = { id: "pils", name: "Pilsner malt", unit: "lb", category: "malt", packSize: 55, packName: "bag" as const };
+      const sheet = (batchBbl: number | undefined, material: Omit<typeof pils, "packName"> & { packName?: "bag" } = pils) => renderToStaticMarkup(createElement(IngredientView, { fields: { materialId: "pils", stage: "mash", perBblQty: "57.5", timing: "" }, materials: [material], batchBbl }));
+      const html = sheet(22);
+      expect(html).toMatch(/<label[^>]*>Bags \(55 lb\) for 22 bbl<\/label>/);
+      expect(html).toMatch(/<input[^>]*aria-label="Bags \(55 lb\) for 22 bbl"[^>]*value="23"/);
+      // The per-barrel field stays, after the count.
+      expect(html).toMatch(/<input[^>]*aria-label="Quantity per bbl \(lb\)"[^>]*value="57.5"/);
+      expect(html.indexOf("for 22 bbl")).toBeLessThan(html.indexOf("Quantity per bbl"));
+      // No pack word: the count is of packs.
+      expect(sheet(22, { ...pils, packSize: 50, packName: null as never })).toContain("Packs (50 lb) for 22 bbl");
+      // No batch size, or a material with no pack size: per barrel only.
+      for (const without of [sheet(undefined), sheet(0), sheet(22, { ...pils, packSize: 1, packName: undefined })]) expect(without).not.toMatch(/bbl<\/label>[^]*bbl<\/label>|Bags \(|Packs \(/);
+    });
+
     it("the material trigger acts in place on the Ingredient record", () => {
       expect(isInertOn(screen("Ingredient"), "Material")).toBe(true);
       expect(isInertOn(screen("Cycle count"), "Material")).toBe(false);
@@ -110,31 +147,31 @@ describe("Recipe creation", () => {
   });
 
   describe("the read-out and the draft blocker (plan task 8)", () => {
-    const versioned = { title: "Hazy v1", createHref: "/recipes/x/new", preBoil: "16.8", efficiency: "72.5", notes: "", ingredients: [{ key: "m", title: "2-row", detail: "Mash · 40.9 lb / bbl", qty: "" }] };
-    const empty = { title: "Hazy", createHref: "/recipes/x/new", empty: { title: "No version yet" } };
+    const versioned = { title: "Hazy", preBoil: "16.8", efficiency: "72.5", notes: "", ingredients: [{ key: "m", title: "2-row", amount: "40.9 lb", timing: "", timingMinutes: null, stage: "mash" as const }] };
     const draw = (props: Parameters<typeof RecipeView>[0]) => renderToStaticMarkup(createElement(RecipeView, props));
-    const draft = (blockedReason?: string) => draw({ model: { title: "Hazy v2", notes: "" }, controls: { set: () => {}, onSubmit: () => {}, blockedReason } });
+    const draft = (blockedReason?: string) => draw({ model: { title: "Hazy", notes: "" }, controls: { setNote: () => {}, onSubmit: () => {}, dirty: true, blockedReason } });
 
-    it("a cut version reads its numbers as text, with no input", () => {
-      const cut = draw({ readOnly: true, model: versioned });
-      expect(cut).toMatch(/<dt[^>]*>Pre-boil volume bbl<\/dt>/);
-      expect(cut).toMatch(/<dd[^>]*>16.8<\/dd>/);
-      expect(cut).not.toMatch(/<input/);
-      // Only the numbers the version holds are read out.
-      expect(cut).not.toMatch(/Boil time min/);
+    it("a saved copy read only shows its numbers as text, with no input", () => {
+      const cut = draw({ readOnly: true, model: versioned }).replace(/<[^>]+>/g, "");
+      expect(cut).toContain("Assumes 72.5% efficiency and no attenuation.");
+      expect(cut).toContain("Boil from 16.8 bbl.");
+      expect(draw({ readOnly: true, model: versioned })).not.toMatch(/<input|<button/);
+      // Only the numbers the copy holds are read out.
+      expect(cut).not.toMatch(/Boil time|Whirlpool|Knock out/);
     });
 
-    it("the one New recipe version sits in the title row, empty or versioned, read-only or not", () => {
-      for (const model of [versioned, empty]) {
-        for (const readOnly of [true, false]) {
-          const html = draw({ model, readOnly, parentForm: createElement("p", null, "PARENT") });
-          expect(html.match(/New recipe version/g)).toHaveLength(1);
-          const verb = html.indexOf("New recipe version");
-          expect(verb).toBeGreaterThan(html.indexOf("</h1>"));
-          expect(verb).toBeLessThan(html.indexOf("PARENT"));
-          expect(html).toMatch(/href="\/recipes\/x\/new"/);
-        }
+    it("the title row holds Schedule batch once the recipe is saved, read-only or not, and never a version verb", () => {
+      for (const readOnly of [true, false]) {
+        const html = draw({ model: { ...versioned, saved: "Aug 28, 2026", scheduleHref: "/batches?recipe=x" }, readOnly, parentForm: createElement("p", null, "PARENT") });
+        expect(html.match(/Schedule batch/g)).toHaveLength(1);
+        const verb = html.indexOf("Schedule batch");
+        expect(verb).toBeGreaterThan(html.indexOf("</h1>"));
+        expect(verb).toBeLessThan(html.indexOf("PARENT"));
+        expect(html).toMatch(/href="\/batches\?recipe=x"/);
+        expect(html).not.toContain("New recipe version");
       }
+      // Not saved yet: nothing to schedule, so the title row has no verb.
+      expect(draw({ model: versioned, readOnly: true })).not.toContain("Schedule batch");
     });
 
     it("a live page draws no Default price group; the inventory keeps its picker", () => {
@@ -150,41 +187,55 @@ describe("Recipe creation", () => {
       expect(draft()).not.toMatch(/<button[^>]*type="submit"[^>]*disabled/);
     });
 
-    it("draws no tape list or Batch actuals heading without a tape", () => {
+    it("draws no table or Batch actuals heading without brewed batches", () => {
       const html = draw({ readOnly: true, model: versioned });
-      expect(html).not.toMatch(/<ol\b/);
+      expect(html).not.toMatch(/<table\b/);
       expect(html).not.toContain("Batch actuals");
-      expect(draw({ model: recipeHazyV4 })).toMatch(/<ol\b/);
+      expect(draw({ model: recipeHazyV4 })).toMatch(/<table\b/);
     });
 
-    it("shows the recipe note, the saved date and a version note under headings", () => {
-      const html = draw({ readOnly: true, model: { ...versioned, recipeNote: "House IPA", saved: "Aug 28, 2026", notes: "Knock out cold." } });
-      expect(html).toMatch(/Recipe note[^]*House IPA/);
-      expect(html).toMatch(/<dt[^>]*>Saved<\/dt><dd[^>]*>Aug 28, 2026<\/dd>/);
-      expect(html).toMatch(/<dt[^>]*>Version note<\/dt><dd[^>]*>Knock out cold\.<\/dd>/);
-      expect(html).toMatch(/<h2[^>]*>Ingredients<\/h2>/);
-      expect(html).toMatch(/<h2[^>]*>Process<\/h2>/);
-      expect(draw({ readOnly: true, model: versioned })).not.toMatch(/Recipe note|Version note/);
-      expect(draft()).toMatch(/aria-label="Version note"|>Version note</);
+    it("shows the recipe note and the saved date in one sentence and the change note on the next line, over the day's two lists", () => {
+      const html = draw({ readOnly: true, model: { ...versioned, recipeNote: "House IPA", saved: "Aug 28, 2026", savedNote: "Knock out cold" } });
+      // The recipe's own note, then the saved date; that save's change note has its own line.
+      expect(html).toContain("House IPA. Saved Aug 28, 2026.</p>");
+      expect(html).toContain(">Last change: Knock out cold.</p>");
+      expect([...html.matchAll(/<h2[^>]*>([^<]*)<\/h2>/g)].map((m) => m[1])).toEqual(["Goes in on brew day"]);
+      expect(draw({ readOnly: true, model: versioned })).not.toMatch(/Saved|Change note/);
+      expect(draft()).toMatch(/aria-label="Change note · optional"|>Change note · optional</);
     });
   });
 
   it("/recipes/new and /recipes/[id] draw the editor through RecipeView, never a detail override", () => {
     expect(src("app/(app)/recipes/new/page.tsx")).toMatch(/<RecipeEditor\b/);
     const detail = src("app/(app)/recipes/[id]/page.tsx");
-    expect(detail).toMatch(/<RecipeView\b/);
-    // Version history may use search params; the removed alternate detail drawing must stay gone.
+    // The recipe's own page is the editor; an earlier copy is the same view read only.
+    expect(detail).toMatch(/<RecipeEditor\b/);
+    expect(detail).toMatch(/<RecipeView readOnly\b/);
+    // As brewed and Use this again use search params; the removed alternate detail drawing must stay gone.
     expect(detail).not.toMatch(/detail=/);
-    const next = src("app/(app)/recipes/[id]/new/page.tsx");
-    expect(next).toMatch(/<RecipeEditor\b/);
-    // The next version starts as a copy of the current one, and a draft left in this tab comes back.
-    expect(next).toMatch(/initial=\{versionToDraft\(snapshot\)/);
+    // The editor starts as the current saved copy, and a change left in this tab comes back.
+    expect(detail).toMatch(/const initial = versionToDraft\(snapshot\)/);
     const form = src("app/(app)/recipes/[id]/recipe-version-form.tsx");
     expect(form).toMatch(/\breadRecipeDraft\b[^]*\bwriteRecipeDraft\b|\bwriteRecipeDraft\b[^]*\breadRecipeDraft\b/);
     expect(form).toMatch(/import \{[^}]*\breadRecipeDraft\b[^}]*\} from "@\/lib\/mgr\/recipe-draft"/);
     expect(form).toMatch(/import \{[^}]*\bwriteRecipeDraft\b[^}]*\} from "@\/lib\/mgr\/recipe-draft"/);
     expect(form).toMatch(/<RecipeView\b/);
     expect(form).toMatch(/<NewRecipeFieldsView\b/);
+    // The save bar is up only while the sheet differs from what is saved (always while creating), and Discard puts it back.
+    expect(form).toMatch(/const dirty = creating \|\| shouldKeepDraft\(start, draft\)/);
+    expect(form).toMatch(/onDiscard: creating \? undefined : discard/);
+    // An unchanged saved sheet offers Refresh from Materials when its live preview differs from what the copy froze,
+    // and never guesses when it cannot see a line's material.
+    expect(form).toMatch(/materialsNowGive\(savedFigures, lines\.every\(\(l\) => material\.get\(l\.materialId\)\) \? live : null, unit\)/);
+    expect(form).toMatch(/refresh: refreshText \? \{ text: refreshText, onRefresh: \(\) => void submit\(\) \} : undefined/);
+    // The batch size is part of the sheet: sent with every save (blank sends none), and checked before it.
+    expect(form).toMatch(/process: \{ batchBbl: num\(batchBbl\),/);
+    expect(form).toMatch(/draftBlocker\(\{[^}]*\bbatchBbl\b/);
+    // The Ingredient sheet gets the batch size and each material's pack, so a line can be typed in packs.
+    expect(form).toMatch(/batchBbl: batchSize\(batchBbl\)/);
+    expect(form).toMatch(/packSize: Number\(m\.purchase_uom_factor\), packName: m\.pack_name/);
+    // Nothing the editor says to the brewer names a version.
+    expect(form).not.toMatch(/["`][^"`\n]*\bversions?\b[^"`\n]*["`]/i);
     expect(form).not.toMatch(/<CommandForm\b|grid-cols-2|<Label\b|id="rv-/);
     expect(src("components/mgr/views/recipe.tsx")).not.toMatch(/detail\?:/);
     // "Add ingredient" is the add action: it opens the ingredient editor itself, not a list with a second header.
@@ -222,10 +273,10 @@ describe("recipe form copy (#1139)", () => {
     expect(fields).not.toMatch(/intent only|identity is required|New batches start/);
   });
 
-  it("the add-ingredient row reads like every other create action", () => {
-    const draft = html(createElement(RecipeView, { model: { title: "Hazy v2", notes: "" } }));
-    expect(draft).toContain("Add ingredient");
-    expect(draft).toContain("Material, stage and timing");
+  it("each column's add-ingredient action reads like every other create action", () => {
+    const draft = html(createElement(RecipeView, { model: { title: "Hazy", notes: "" } })).replace(/<[^>]+>/g, "");
+    expect(draft).toContain("Add ingredient to brew day");
+    expect(draft).toContain("Add ingredient to the cellar");
     expect(draft).not.toMatch(/\+ add ingredient|material · stage · timing/);
   });
 

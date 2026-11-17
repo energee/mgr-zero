@@ -24,7 +24,7 @@ export const replenishmentDemo: ReplenishmentViewModel = {
   locationId: "lantern-taproom",
   locationName: "Lantern taproom",
   locations: [{ value: "lantern-taproom", label: "Lantern taproom" }],
-  warehouses: [
+  sources: [
     { id: "lantern-warehouse", name: "Lantern warehouse" },
     { id: "meadow-warehouse", name: "Meadow warehouse" },
   ],

@@ -90,7 +90,7 @@ export const STAFF_NAV: readonly NavItem[] = [
       { label: "Menu", href: "/menu", roles: ["warehouse"], group: "Menu", about: "Choose what Square sells, where and for how much" },
       { label: "Customers", href: "/customers", roles: ["sales"], group: "Sales", about: "Manage accounts, ship-tos and portal users" },
       { label: "Price groups", href: "/pricing", roles: ["sales"], group: "Sales", about: "Set prices by group for each sale channel" },
-      { label: "Recipes", href: "/recipes", roles: ["brewer"], group: "Production", about: "Write recipes and their versions" },
+      { label: "Recipes", href: "/recipes", roles: ["brewer"], group: "Production", about: "Write and change recipes" },
       { label: "Vendors", href: "/vendors", roles: ["brewer", "warehouse"], group: "Production", about: "Manage vendors, their terms and contracts" },
       { label: "Compliance", href: "/compliance", roles: ["sales"], group: "Sales", about: "Review and file compliance reports" },
       { label: "Planning", href: "/planning", roles: ["brewer", "warehouse"], group: "Production", about: "See what planned work is short of" },

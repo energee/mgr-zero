@@ -32,7 +32,12 @@ export async function login(_previous: LoginState, form: FormData): Promise<Logi
     email,
     password: String(form.get("password")),
   });
-  if (error) return failure;
+  // supabase-js reports an unreachable Auth as status 0, and Auth without its database
+  // answers 5xx; neither says anything about the credentials.
+  if (error) {
+    const unreachable = error.status === 0 || (error.status ?? 0) >= 500;
+    return unreachable ? { email, error: "MGR cannot reach its database. Try again in a few minutes." } : failure;
+  }
   const auth = createRequestAuthContext(() => Promise.resolve(db));
   const identity = await auth.getIdentity();
   if (!identity) return failure;

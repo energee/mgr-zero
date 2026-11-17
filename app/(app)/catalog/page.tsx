@@ -6,8 +6,9 @@
 // A brand, Price groups and Water profiles link only for a role whose page lets
 // it in (canRun on the reads or write that page requires), never to No access.
 // ?q=, ?sort= and ?category= narrow and order the brands in list_brands
-// (docs/plans/list-filters.md); ListControls draws them as a GET form and
-// labeled Sort and Category picks whose options are links (toCatalogScopes).
+// (docs/plans/list-filters.md), newest first when no sort is given;
+// ListControls draws them as a GET form and labeled Sort and Category picks
+// whose options are links (toCatalogScopes).
 import { z } from "zod";
 import { CatalogView } from "@/components/mgr/views/catalog";
 import { toCatalogScopes, toCatalogViewProps, type CatalogBrandRow } from "@/lib/mgr/catalog-view";
@@ -42,7 +43,7 @@ const PRICING_READS = ["list_sale_channels", "list_price_groups", "list_formats"
 
 const catalogParams = z.object({
   q: searchQuery,
-  sort: z.enum(BRAND_SORTS).catch("name"),
+  sort: z.enum(BRAND_SORTS).catch("newest"),
   category: z.string().trim().catch(""),
 });
 
@@ -69,7 +70,9 @@ export default async function CatalogPage({ searchParams }: { searchParams?: Pro
     <CatalogView
       model={model}
       colaAction={canWrite ? <ColaReview brands={brands} /> : null}
+      findCola={canWrite ? Object.fromEntries(brands.flatMap(brand => brand.colas.length ? [] : [[brand.id, <ColaReview key={brand.id} brands={[brand]} single />]])) : null}
       images={Object.fromEntries(model.brands.flatMap(brand => brand.image ? [[brand.key, <ColaImage key={`${brand.key}:${brand.image.url}`} ttbId={brand.image.ttbId} url={brand.image.url} label={`${brand.name} · COLA ${brand.image.ttbId}`} compact />]] : []))}
+      previews={Object.fromEntries(model.brands.flatMap(brand => brand.image ? [[brand.key, <ColaImage key={`${brand.key}:${brand.image.url}`} ttbId={brand.image.ttbId} url={brand.image.url} label={`${brand.name} · COLA ${brand.image.ttbId}`} />]] : []))}
       controls={controls}
       createAction={canWrite ? E.btn("New brand", "p", "/catalog/brands/new") : null}
       links={{

@@ -205,6 +205,15 @@ describe("password sign-in failure (#1398)", () => {
     expect(redirect).not.toHaveBeenCalled();
     expect(auth.signInWithPassword).toHaveBeenCalledWith({ email: "qa+buyer@example.com", password: "never-put-password-in-url" });
   });
+
+  // Status 0 is supabase-js's network failure; 500 is Auth answering without its database.
+  it.each([0, 500, 503])("says the database is unavailable instead of blaming the credentials (status %s)", async (status) => {
+    auth.signInWithPassword.mockResolvedValue({ error: { status, message: "Private provider detail" } });
+    const form = new FormData();
+    form.set("email", "qa+buyer@example.com");
+    form.set("password", "correct-password");
+    await expect(login({}, form)).resolves.toEqual({ email: "qa+buyer@example.com", error: "MGR cannot reach its database. Try again in a few minutes." });
+  });
 });
 
 describe("staff sign-in return target (#1399)", () => {

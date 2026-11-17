@@ -19,7 +19,7 @@ describe("Brand selling setup", () => {
     const html = brandHtml([]);
     expect(html).toContain("Manage formats");
     expect(html).not.toContain('role="switch"');
-    expect(html).not.toContain("Edit on price group");
+    expect(html).not.toContain("Edit pours");
   });
 
   it("offers eligible off switches without claiming an existing SKU", () => {
@@ -41,7 +41,7 @@ describe("Brand selling setup", () => {
       model: toBrandViewProps(brandHazy), formatAction: null, linkRows: false, sellsDisabled: true,
     }));
     expect(html).not.toContain("Manage formats");
-    expect(html).not.toContain("Edit on price group");
+    expect(html).not.toContain("Edit pours");
     const switches = html.match(/<button[^>]*role="switch"[^>]*>/g)!;
     expect(switches).toHaveLength(4);
     for (const control of switches) expect(control).toContain("disabled");

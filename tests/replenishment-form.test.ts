@@ -9,7 +9,7 @@ const props: ReplenishmentViewProps = {
     locationId: "taproom",
     locationName: "Lantern taproom",
     locations: [{ value: "taproom", label: "Lantern taproom" }],
-    warehouses: [{ id: "warehouse", name: "Lantern warehouse" }],
+    sources: [{ id: "warehouse", name: "Lantern warehouse" }],
     suggestions: [{ skuId: "a", sku: "Lantern pale · keg", par: 8, onHand: 3, suggested: 5 }],
     allocations: [{ id: "standing", skuId: "a", sku: "Lantern pale · keg", qty: 2 }],
     shortfalls: [],
@@ -21,7 +21,7 @@ const props: ReplenishmentViewProps = {
 
 it("keeps source and transfer controls disabled and omits mutation actions for Warehouse", () => {
   const out = renderToStaticMarkup(createElement(ReplenishmentView, props));
-  const source = [...out.matchAll(/<button\b[^>]*>/g)].map((match) => match[0]).find((tag) => tag.includes('aria-label="From warehouse"'));
+  const source = [...out.matchAll(/<button\b[^>]*>/g)].map((match) => match[0]).find((tag) => tag.includes('aria-label="From"'));
   expect(source).toBeDefined();
   expect(source).toMatch(/\sdisabled(?:=|\s|>)/);
   const quantities = out.match(/<input\b[^>]*type="number"[^>]*>/g) ?? [];

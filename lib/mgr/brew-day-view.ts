@@ -1,5 +1,6 @@
 import { BREW_DAY_STAGES, isBrewDayStage, type FermentationStage, type IngredientStage } from "./recipe-process-view";
 import { materialSourceKey, restoreSources } from "./material-source";
+import { batchQty } from "./pack-qty";
 import { fromTicks, toTicks } from "./quantity-input";
 // lib/mgr/brew-day-view.ts — view-model for Brew day.
 export type BrewDayLotView = { key: string; title: string; detail: string };
@@ -14,7 +15,7 @@ export type BrewMaterialSource = { material_id: string; material_name: string; u
 export type BrewPull = BrewMaterialSource & { id: string; recipe_ingredient_id: string | null };
 export type BrewActualDraft = { key: string; source: string; recipeIngredientId?: string; stage: IngredientStage; qty: string };
 /** purchaseUomFactor is the material's pack size; plan snapshots frozen before it existed lack it, read as 1.
- *  timing_minutes is the recipe line's timing (ingredientDetail reads it); null when the line has none. */
+ *  timing_minutes is the recipe line's timing (brew-prep-view.ts prints it through ingredientDetail); null when the line has none. */
 export type BrewPlanIngredient = { id: string; material_id: string; materialName: string; unit: string; stage: IngredientStage; per_bbl_qty: number; purchaseUomFactor?: number; timing_minutes?: number | null };
 /** version is the pinned recipe_versions row (to_jsonb); a snapshot frozen before a process column existed lacks it. */
 export type BrewPlan = { recipe?: string; version?: { version?: number; mash_schedule?: { name: string; temp_f?: number; tempF?: number; minutes: number }[];
@@ -56,6 +57,9 @@ export type BrewDayViewModel = {
   /** A completed batch: the day it completed, the loss its completion wrote off (null when none), and the barrels its
    *  closed packaging runs packaged (get_brew_day's packagedBbl). */
   completion?: { on: string; writeOffBbl: number | null; packagedBbl: number };
+  /** A batch with no brew record that started from a transfer (get_brew_day's startedFrom): the source batch's label,
+   *  where it opens, and the barrels transferred in. `brewedOn` is then the day it started. */
+  startedFrom?: { label: string; href?: string; bbl: number };
   sheet?: { title: string; detail: string };
   tapeHead?: [string, string][];
 };
@@ -69,7 +73,7 @@ export const brewDayLines = (plan: BrewPlan) =>
   (plan.ingredients ?? []).filter((row): row is BrewPlanIngredient & { stage: (typeof BREW_DAY_STAGES)[number] } => isBrewDayStage(row.stage));
 
 /** A line's planned amount for `volume` bbl, exact to the tick. */
-export const plannedIngredientQty = (row: BrewPlanIngredient, volume: number) => fromTicks(toTicks(row.per_bbl_qty * volume));
+export const plannedIngredientQty = (row: BrewPlanIngredient, volume: number) => batchQty(row.per_bbl_qty, volume);
 
 /** The one source holding this material; undefined when none or several do, so the brewer chooses. */
 export function soleSource(sources: BrewMaterialSource[], materialId: string): BrewMaterialSource | undefined {

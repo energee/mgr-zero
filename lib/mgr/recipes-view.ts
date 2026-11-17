@@ -1,15 +1,17 @@
 // lib/mgr/recipes-view.ts — view-model for the Recipes list. Each row is a
-// recipe's name, its current version number (null: no version yet) and its
-// brand (null: none yet), one RecordTable column each. `backHref`,
-// `createHref` and `waterProfilesHref` are the live destinations of the More
-// back, New recipe and the Water profiles row (where a version's source and
-// target come from); fixtures leave them unset so the inventory frame stays inert.
+// recipe's name and its brand (null: none yet), one RecordTable column each,
+// and whether its sheet has been written: a recipe saved by name alone is not
+// written yet. The list never names a version. `backHref`, `createHref` and
+// `waterProfilesHref` are the live destinations of the More back, New recipe
+// and the Water profiles row (where a recipe's source and target water come
+// from); fixtures leave them unset so the inventory frame stays inert.
 // Inventory and live both pass list_recipes rows, so the frame draws live copy.
 import type { EmptyState } from "./empty-state";
 export type RecipesRowView = {
   key: string;
   name: string;
-  version: number | null;
+  /** False until the recipe's sheet has been saved once (list_recipes' latest_version is null). */
+  written: boolean;
   brand: string | null;
   href: string;
 };
@@ -41,6 +43,6 @@ export function toRecipesViewProps(s: RecipesSnapshot): RecipesViewModel {
     createHref,
     waterProfilesHref,
     empty: recipes.length > 0 ? undefined : s.filtered ? NO_MATCH : NO_RECIPES,
-    rows: recipes.map((r) => ({ key: r.id, name: r.name, version: r.latest_version, brand: r.brand ?? null, href: `/recipes/${r.id}` })),
+    rows: recipes.map((r) => ({ key: r.id, name: r.name, written: r.latest_version !== null, brand: r.brand ?? null, href: `/recipes/${r.id}` })),
   };
 }

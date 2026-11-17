@@ -28,14 +28,19 @@ function Occupancies({ readings }: { readings: BatchOccupancyView[] }) {
 
 /** One lifecycle group. A batch with readings lists its open occupancies in
  *  the vessel cell; any other batch shows the vessel names it has. A group
- *  where no batch has either draws no vessel column at all. The row itself
+ *  where no batch has either draws no vessel column at all. A group with
+ *  brewed batches adds ABV and Attenuation: each tank's figure so far, or a
+ *  completed batch's final one. The row itself
  *  is the link that opens the batch; an overdue plan's date is badged, the date last so
  *  it never breaks (as on Invoices). */
 function GroupTable({ rows }: { rows: BatchesRowView[] }) {
+  const brewed = rows.some(row => row.readings || row.abv !== undefined);
   const vesselHead = rows.some(row => row.readings) ? "Vessel and latest reading" : rows.some(row => row.vessel) ? "Vessel" : null;
+  /** A completed batch's final figure, or one figure of a batch's tanks, in tank order; a tank without it is left out. */
+  const figure = (row: BatchesRowView, key: "abv" | "attenuation") => row[key] ?? row.readings?.flatMap(occupancy => occupancy[key] ?? []).join(", ") ?? "";
   return <RecordTable
-    headers={["Batch", "Brand", "Recipe", "Planned on", "Planned barrels", ...(vesselHead ? [vesselHead] : [])]}
-    align={["l", "l", "l", "l", "r", ...(vesselHead ? ["l" as const] : [])]}
+    headers={["Batch", "Brand", "Recipe", "Planned on", "Planned barrels", ...(brewed ? ["ABV", "Attenuation"] : []), ...(vesselHead ? [vesselHead] : [])]}
+    align={["l", "l", "l", "l", "r", ...(brewed ? ["r" as const, "r" as const] : []), ...(vesselHead ? ["l" as const] : [])]}
     rows={rows.map(row => ({
       key: row.key,
       href: row.href,
@@ -46,6 +51,7 @@ function GroupTable({ rows }: { rows: BatchesRowView[] }) {
         orMissing(row.recipe, "No recipe"),
         row.overdue ? <Fragment key="planned">{E.status("Overdue", "w")} {row.plannedOn}</Fragment> : row.plannedOn,
         row.plannedBbl,
+        ...(brewed ? [figure(row, "abv"), figure(row, "attenuation")] : []),
         ...(vesselHead ? [row.readings ? <Occupancies key="vessel" readings={row.readings} /> : row.vessel] : []),
       ],
       // A missing brand or recipe sorts last rather than by its muted words;
@@ -56,6 +62,8 @@ function GroupTable({ rows }: { rows: BatchesRowView[] }) {
         row.recipe,
         row.plannedOn,
         row.plannedBbl,
+        // Percents sort as numbers; a batch with no figure yet sorts last.
+        ...(brewed ? [parseFloat(figure(row, "abv")) || null, parseFloat(figure(row, "attenuation")) || null] : []),
         ...(vesselHead ? [row.readings ? row.readings.map(occupancy => occupancy.vessel).join(", ") || null : row.vessel] : []),
       ],
     }))}

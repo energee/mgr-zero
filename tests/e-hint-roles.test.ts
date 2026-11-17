@@ -30,7 +30,7 @@ const command = (over: Partial<Record<string, unknown>>) =>
   ({ requestId: null, result: null, failure: null, busy: false, ...over }) as unknown as ExactCommand;
 const noop = () => {};
 /** The inner HTML of the one role="status" region, or null when there is none. */
-const statusRegion = (html: string) => html.match(/<div role="status">([\s\S]*?)<\/div>/)?.[1] ?? null;
+const statusRegion = (html: string) => html.match(/<div role="status"[^>]*>([\s\S]*?)<\/div>/)?.[1] ?? null;
 
 describe("hint roles", () => {
   it.each(["note", "info"] as const)("E.%s defaults to a non-live note and opts errors into alerts", kind => {
@@ -132,15 +132,18 @@ describe("hint roles", () => {
     expect(cards(renderToStaticMarkup(createElement(ChatLinkConsentView, { intent: null })), "alert")).toContain("This link is missing, expired");
   });
 
-  it("RecipeView renders Predicted inside a polite status region, not an alert", () => {
+  it("RecipeView renders its predicted figures inside a polite status region, not an alert", () => {
     const html = renderToStaticMarkup(createElement(RecipeView, { model: recipeHazyV4 }));
-    expect(statusRegion(html)).toContain("Predicted: OG 15.2 °P");
-    expect(statusRegion(html)).toContain("IBU 15");
-    expect(html).not.toMatch(/role="alert"[^>]*>(?:(?!<\/div>)[\s\S])*Predicted:/);
+    // The figures are nested blocks in the first status region (the quiet lines under them are the second),
+    // so it is read up to the next region instead of through statusRegion.
+    const status = html.split('role="status"')[1];
+    expect(status).toMatch(/>15\.2 °P<\/div><div[^>]*>OG</);
+    expect(status).toMatch(/>74<\/div><div[^>]*>IBU</);
+    expect(html).not.toMatch(/role="alert"[^>]*>(?:(?!<\/div>)[\s\S])*15\.2/);
   });
 
   it("RecipeView keeps the status region mounted before anything is predicted", () => {
-    const html = renderToStaticMarkup(createElement(RecipeView, { model: { title: "New recipe", notes: "" }, controls: { set: noop, onSubmit: noop } }));
+    const html = renderToStaticMarkup(createElement(RecipeView, { model: { title: "New recipe", notes: "" }, controls: { setNote: noop, onSubmit: noop, dirty: true } }));
     expect(statusRegion(html)).toBe("");
   });
 

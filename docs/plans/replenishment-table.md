@@ -42,7 +42,7 @@ back link. Three sections with explicit scopes, in this order:
 
 Keep the Location picker near the top, before any repeated records.
 Keep Set taproom par and Set standing allocation alongside this section.
-Keep From warehouse above the editable table and Create replenishment order
+Keep From above the editable table and Create replenishment order
 below it, with the existing error and missing-input messages.
 
 | Column | Meaning | Interaction |
@@ -133,8 +133,8 @@ Do not edit generated docs inventory pages by hand.
   Do not duplicate a fixed input ID or share row-local state by position.
 - Use explicit numeric sort values for cells containing components or detail
   controls. Hidden reservation text must not change the SKU's sort value.
-- Preserve first-taproom and first-eligible-warehouse defaults. A destination
-  with Warehouse use still cannot be its own source.
+- Preserve first-taproom and first-source defaults. From lists every other
+  location, whatever its uses; a destination cannot be its own source.
 - Admin and Sales keep mutation access. Warehouse remains read-only.
 - Do not filter out zero suggestions. They remain visible and editable.
 - Preserve suggestions after par changes, allocation warnings, release

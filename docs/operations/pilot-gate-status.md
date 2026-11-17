@@ -30,7 +30,9 @@ Production Supabase is `uogrvqmrbmolvtftotsf`.
 The 2026-09-18 record also named a Preview project, `ugzhwxzictzvrzlacjmv`.
 That project no longer exists ([#1616](https://github.com/energee/mgr-zero/issues/1616)).
 On 2026-10-30, `supabase projects list` showed only Production.
-Whether to recreate a Preview project is an open owner decision.
+Owner decision 2026-11-12: there is no Preview project, and none will be recreated.
+Vercel Preview deployments must not hold Production Supabase credentials.
+That check is open until the Vercel CLI can read the project ([#1617](https://github.com/energee/mgr-zero/issues/1617)).
 
 ## Pilot blockers
 

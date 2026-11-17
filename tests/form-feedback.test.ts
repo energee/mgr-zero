@@ -158,8 +158,8 @@ describe("per-form reasons", () => {
     expect(replenishmentQuantityReason("", "1")).toBe("Still needed: a SKU.");
   });
 
-  it("a replenishment order needs a source warehouse and a positive line", () => {
-    expect(replenishReason("", [])).toBe("Still needed: a warehouse to send from and a transfer quantity above zero.");
+  it("a replenishment order needs a source location and a positive line", () => {
+    expect(replenishReason("", [])).toBe("Still needed: a location to send from and a transfer quantity above zero.");
     expect(replenishReason("w", [{ skuId: "s", qty: 1 }])).toBeNull();
   });
 
@@ -472,12 +472,12 @@ describe("live forms withhold their submit with the reason", () => {
     withheld(html(createElement(VesselForm, { model })), "Still needed: a name and a valid capacity.");
   });
 
-  it("Create replenishment order, with no warehouse and no lines", () => {
+  it("Create replenishment order, with no source and no lines", () => {
     withheld(html(createElement(ReplenishForm, {
-      model: { locationId: "t", locationName: "Taproom", locations: [{ value: "t", label: "Taproom" }], warehouses: [], suggestions: [], allocations: [], shortfalls: [], canEdit: true },
+      model: { locationId: "t", locationName: "Taproom", locations: [{ value: "t", label: "Taproom" }], sources: [], suggestions: [], allocations: [], shortfalls: [], canEdit: true },
       skus: [],
       workHrefs: {},
-    })), "Still needed: a warehouse to send from and a transfer quantity above zero.");
+    })), "Still needed: a location to send from and a transfer quantity above zero.");
   });
 });
 

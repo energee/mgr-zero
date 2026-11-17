@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
+import { E } from "@/components/mgr/e";
 import { ColaReviewView } from "@/components/mgr/views/cola-review";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import type { ColaSearch } from "@/lib/commands/compliance";
@@ -10,7 +11,9 @@ import type { ColaDetails, ColaRecord } from "@/lib/ttb/colas";
 import { colaApprovalInput, defaultColaImage, matchingBrandColas, missingColaIds, soleColaId, type ColaReviewBrand } from "@/lib/mgr/cola-review";
 import { ColaImage } from "./cola-image";
 
-export function ColaReview({ brands }: { brands: ColaReviewBrand[] }) {
+/** The review of the brands Catalog shows. `single` is one row's Find COLA:
+ *  it reviews that brand alone, so opening it searches TTB at once. */
+export function ColaReview({ brands, single = false }: { brands: ColaReviewBrand[]; single?: boolean }) {
   const missing = missingColaIds(brands);
   const everyId = brands.map(brand => brand.id);
   const initial = missing.length ? missing : everyId;
@@ -38,6 +41,7 @@ export function ColaReview({ brands }: { brands: ColaReviewBrand[] }) {
     setIndex(0);
     setSaved(0);
     clearChoice();
+    if (next && single) void controls.start();
   }
 
   function clearChoice() {
@@ -95,8 +99,9 @@ export function ColaReview({ brands }: { brands: ColaReviewBrand[] }) {
     close: () => changeOpen(false),
   };
 
-  return <CommandForm title="Bulk process COLAs" open={open} onOpenChange={changeOpen} trigger={<Button variant="outline" disabled={!brands.length}>Bulk process COLAs</Button>}>
-    <ColaReviewView brands={brands} selected={selected} missing={missing} queue={queue} index={index} saved={saved} candidates={candidates} ttbId={ttbId} details={details} imageUrl={imageUrl} showAll={showAll} busy={action.busy} controls={controls}
+  return <CommandForm title={single ? `Find COLA · ${brands[0]?.name}` : "Bulk process COLAs"} open={open} onOpenChange={changeOpen}
+    trigger={single ? E.act("Find COLA") : <Button variant="outline" disabled={!brands.length}>Bulk process COLAs</Button>}>
+    <ColaReviewView single={single} brands={brands} selected={selected} missing={missing} queue={queue} index={index} saved={saved} candidates={candidates} ttbId={ttbId} details={details} imageUrl={imageUrl} showAll={showAll} busy={action.busy} controls={controls}
       messages={<CommandFormMessage error={action.error} />}
       images={details && Object.fromEntries(details.images.map(image => [image.url, <ColaImage key={`${ttbId}:${image.url}`} ttbId={ttbId} url={image.url} label={image.label} />]))} />
   </CommandForm>;

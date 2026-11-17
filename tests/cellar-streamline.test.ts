@@ -27,7 +27,7 @@ import { CellarAdditionForm } from "@/app/(app)/cellar/cellar-addition-form";
 import { NewBatchForm } from "@/app/(app)/batches/new-batch-form";
 import { cellarAdditionCitra, cellarTransferPils } from "@/lib/mgr/fixtures/production";
 
-const vessels = [{ id: "v1", name: "FV1", capacity_bbl: 10 }, { id: "v2", name: "FV2", capacity_bbl: 10 }, { id: "v3", name: "FV3", capacity_bbl: 10 }];
+const vessels = [{ id: "v1", name: "FV1", capacity_bbl: 10, kind: "fermenter" as const }, { id: "v2", name: "FV2", capacity_bbl: 10, kind: "fermenter" as const }, { id: "v3", name: "FV3", capacity_bbl: 10, kind: "fermenter" as const }];
 const two = [{ vessel_id: "v1", occupancy_id: "o1", brand_name: null, bbl: 2 }, { vessel_id: "v2", occupancy_id: "o2", brand_name: null, bbl: 3 }];
 const reading = (occupancyId: string) => `/cellar/${occupancyId}/reading?from=/cellar`;
 
@@ -35,7 +35,6 @@ describe("item 1: Reading from each tile, back to where it opened", () => {
   it("gives every occupied tile its own Reading and an empty tile none", () => {
     const model = toCellarMapViewProps(vessels, two, {}, {}, reading);
     expect(model.tiles.map(tile => tile.readingHref)).toEqual(["/cellar/o1/reading?from=/cellar", "/cellar/o2/reading?from=/cellar", undefined]);
-    expect(model.actionHint).toBe("Several tanks hold beer. Use Reading on a tank.");
     const html = renderToStaticMarkup(createElement(CellarMapView, { model }));
     expect(html).toContain('href="/cellar/o2/reading?from=/cellar"');
   });
@@ -78,7 +77,7 @@ describe("item 2: cellar forms open on their tank", () => {
   it("Transfer and Addition start on the occupancy they were opened for", () => {
     const { occupancies } = cellarTransferPils;
     const chosen = occupancies[1].occupancy_id;
-    const transfer = renderToStaticMarkup(createElement(CellarTransferForm, { occupancies, vessels: cellarTransferPils.vessels, fromId: chosen }));
+    const transfer = renderToStaticMarkup(createElement(CellarTransferForm, { occupancies, vessels: cellarTransferPils.vessels, plannedBatches: [], fromId: chosen }));
     expect(transfer).toContain(`Remainder in ${occupancies[1].vessel_name}`);
     const addition = renderToStaticMarkup(createElement(CellarAdditionForm, { occupancies, materials: cellarAdditionCitra.materials, lotsByMaterial: cellarAdditionCitra.lotsByMaterial, occupancyId: chosen }));
     expect(addition).not.toContain("a tank");

@@ -133,6 +133,7 @@ const pureTests = [
   "tests/screen-view-composition.test.ts",
   "tests/production-view.test.ts",
   "tests/recipe-outcomes-view.test.ts",
+  "tests/recipe-day-view.test.ts",
   "tests/inventory-view.test.ts",
   "tests/inventory-detail-view.test.ts",
   "tests/order-view.test.ts",
@@ -155,7 +156,9 @@ const pureTests = [
   "tests/keyboard-focus.test.ts",
   "tests/material-count-sheet.test.ts",
   "tests/row-link-prefetch.test.ts",
-  "tests/client-bundle-imports.test.ts"
+  "tests/client-bundle-imports.test.ts",
+  "tests/guide-anchors.test.ts",
+  "tests/api-backlog-empty.test.ts"
 ];
 
 export default defineConfig({

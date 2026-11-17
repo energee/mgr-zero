@@ -180,6 +180,8 @@ export const materialCitra: MaterialViewModel = {
   baseUnits: "44",
   purchaseUnit: "each",
   purchaseUnitOptions: ["lb", "kg", "oz", "g", "each", "l", "gal", "ml"],
+  soldBy: "box",
+  soldBySaved: true,
   unit: "lb",
   unitOptions: ["lb", "kg", "oz", "g", "each", "l", "gal", "ml"],
   defaultVendorId: "hop-supply",

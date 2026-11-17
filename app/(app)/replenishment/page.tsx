@@ -18,10 +18,10 @@ export default async function ReplenishmentPage({ searchParams }: { searchParams
   const { location, sku } = await searchParams;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  // list_locations filters by use in Postgres, so ask it for the two subsets
-  // this page draws rather than reading every location and discarding most of
-  // them here. A standing allocation's `ref` is a taproom, so the two subsets
-  // together still name every location a reservation points at.
+  // Only a taproom is replenished, so list_locations filters the destinations
+  // in Postgres. Any other location may send the stock, whatever its uses, so
+  // the sources are every location; that list also names the location a
+  // standing allocation is held at.
   // The selected taproom's allocations and suggestions wait only on the taproom list, not on the other reads.
   const taproomRead = runCommand("list_locations", { use: "taproom" }, ctx) as Promise<LocationRow[]>;
   const forTaproom = async () => {
@@ -33,13 +33,12 @@ export default async function ReplenishmentPage({ searchParams }: { searchParams
     ]) : [[], []];
     return { taprooms, toLocationId, allocations, suggestions };
   };
-  const [shortfalls, { taprooms, toLocationId, allocations, suggestions }, warehouses, skus] = await Promise.all([
+  const [shortfalls, { taprooms, toLocationId, allocations, suggestions }, locationRows, skus] = await Promise.all([
     runCommand("get_shortfalls", sku ? { skuId: sku } : {}, ctx) as Promise<Shortfall[]>,
     forTaproom(),
-    runCommand("list_locations", { use: "warehouse" }, ctx) as Promise<LocationRow[]>,
+    runCommand("list_locations", {}, ctx) as Promise<LocationRow[]>,
     runCommand("list_skus", {}, ctx) as Promise<{ id: string; name: string; formats: { name: string; package_type: string } | null; format_volume: { bbl_per_unit: number } | null }[]>,
   ]);
-  const locationRows = [...taprooms, ...warehouses];
   const selectedLocation = taprooms.find(t => t.id === toLocationId);
   const model: ReplenishmentViewModel = {
     backHref: "/work",
@@ -51,7 +50,7 @@ export default async function ReplenishmentPage({ searchParams }: { searchParams
       href: `/replenishment?location=${t.id}${sku ? `&sku=${sku}` : ""}`,
     })),
     locationsHref: "/locations",
-    warehouses: warehouses.filter(w => w.id !== toLocationId).map(w => ({ id: w.id, name: w.name })),
+    sources: locationRows.filter(l => l.id !== toLocationId).map(l => ({ id: l.id, name: l.name })),
     suggestions,
     allocations: allocations.map(a => ({ id: a.id, skuId: a.sku_id, sku: a.skus?.name ?? a.sku_id, qty: Number(a.qty) })),
     shortfalls: shortfalls.map(shortfall => {

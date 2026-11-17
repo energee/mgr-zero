@@ -78,7 +78,7 @@ All import values are strings. Required fields precede the semicolon:
 | `channel_prices` | `saleChannelId`, `priceGroupId`, `formatId`, `unitPriceCents` |
 | `opening_balances` | `skuId`, `locationId`, `binId`, `qty`; `note` |
 
-Unknown row fields are rejected. Reference ID fields accept either an existing
+An unknown column is named in the `error` of a blocked row. A row that commits is not blocked by it. Reference ID fields accept either an existing
 UUID or a trimmed, case-insensitive exact record name. Missing or ambiguous names
 block the row; use the UUID to distinguish duplicate names. Bin names resolve
 within the row's location; pour formats resolve within its price group. Product

@@ -5,6 +5,7 @@ import type { RecipeDraft } from "@/lib/mgr/recipe-view";
 import { EMPTY_WATER } from "@/lib/mgr/recipe-process-view";
 
 const draft: RecipeDraft = {
+  batchBbl: "22",
   numbers: { preBoil: "10", boilMin: "60", whirlpoolMin: "", whirlpoolTemp: "", whirlpoolRest: "", knockoutTemp: "66", efficiency: "72.5", attenuation: "78" },
   notes: "More Citra",
   lines: [{ materialId: "m1", perBblQty: "1.2", stage: "dry_hop", timingMinutes: "" }],
@@ -45,6 +46,12 @@ it("throws on a malformed record", () => {
   expect(() => readRecipeDraft(JSON.stringify({ baseVersionId: "v2", draft: { notes: 3 } }), "v2")).toThrow();
 });
 
+it("refuses a draft kept before the batch size was part of it, so the form drops it with its usual message", () => {
+  const older: Partial<RecipeDraft> = { ...draft };
+  delete older.batchBbl;
+  expect(() => readRecipeDraft(JSON.stringify({ baseVersionId: "v2", draft: older }), "v2")).toThrow();
+});
+
 it("names actor, brewery and recipe in the key", () => {
   expect(recipeDraftKey({ actorId: "actor", breweryId: "brewery" } as Parameters<typeof recipeDraftKey>[0], "recipe")).toBe(key);
 });
@@ -58,4 +65,15 @@ it("keeps nothing for an untouched copy, so returning shows no notice", () => {
 
 it("keeps a draft once one dry hop changes", () => {
   expect(shouldKeepDraft(draft, { ...draft, lines: [{ ...draft.lines[0], perBblQty: "1.5" }] })).toBe(true);
+});
+
+it("keeps a draft once the batch size changes, or is cleared", () => {
+  expect(shouldKeepDraft(draft, { ...draft, batchBbl: "30" })).toBe(true);
+  expect(shouldKeepDraft(draft, { ...draft, batchBbl: "" })).toBe(true);
+});
+
+it("counts a copy loaded by Use this again as an unsaved change, unless it matches what is saved", () => {
+  const earlier = { ...draft, notes: "Before the Citra change", lines: [{ ...draft.lines[0], perBblQty: "0.8" }] };
+  expect(shouldKeepDraft(draft, earlier)).toBe(true);
+  expect(shouldKeepDraft(draft, structuredClone(draft))).toBe(false);
 });

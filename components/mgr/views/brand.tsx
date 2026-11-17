@@ -2,8 +2,10 @@
 // (fixture values, uncontrolled) and app/(app)/catalog/brands/[id] (controlled
 // through `controls`, bound to upsert_brand). Two columns from 48rem, stacked
 // below, as on Customer: the left is the form Save brand commits (identity,
-// selling, sell sheet); the right is what saves on its own (Sells as,
-// compliance sheets and saved COLA labels). Sells as is one switch per packaged format (on means the
+// then style, ABV, category and price group on one row, then the sell sheet);
+// the right is what saves on its own (Sells as, compliance sheets and saved
+// COLA labels, each a thumbnail that opens). Save brand is pinned under both
+// columns so it stays in view. Sells as is one switch per packaged format (on means the
 // brand sells it: an active SKU), then the packages inside the switched-on
 // ones and the price group's pours, each with its prices; pours and prices
 // are edited on the price group, which the section links to. The header
@@ -17,8 +19,9 @@
 "use client";
 import { Fragment, useId, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
 import { E } from "@/components/mgr/e";
-import { FieldDescription } from "@/components/ui/field";
 import { RegistryInput, RegistrySelect, rowAction } from "@/components/mgr/views/registry-fields";
 import { BRAND_ABV, brandAbvError } from "@/lib/mgr/brand-abv";
 import { useTouchedLines } from "@/lib/mgr/touched-lines";
@@ -30,6 +33,11 @@ import { submitReason } from "@/lib/mgr/submit-reason";
 export type BrandControls = Partial<Record<"name" | "alias" | "style" | "abv" | "category" | "priceGroup" | "description" | "hops", (value: string) => void>>;
 
 const asOptions = (names: string[]) => names.map((name) => ({ value: name, label: name }));
+
+/** A row's name with its facts beside it, so a format, its contents or a pour takes one line. */
+function nameAndFacts(name: ReactNode, facts: ReactNode): ReactNode {
+  return facts ? <span>{name}<span className="font-normal text-muted-foreground"> · {facts}</span></span> : name;
+}
 
 /** A switched-on format's SKU sheet: the live slot, or the drawn verb; a format with no SKU has nothing to open. */
 function sellsDetail(row: SellsAsRow, details?: (row: SellsAsRow) => ReactNode): ReactNode {
@@ -98,6 +106,7 @@ export function BrandView({
   nameError?: string;
 }) {
   const abvId = useId();
+  const descriptionId = useId();
   const touched = useTouchedLines(!controls.abv || validationAttempted);
   return (
     <div className="@container flex min-w-0 flex-col gap-6">
@@ -119,37 +128,46 @@ export function BrandView({
               <FieldDescription id="brand-alias-help">An informal name staff use, such as a series number. Search finds it; buyers never see it.</FieldDescription>
             </div>,
           )}
-          {E.cols(
-            <RegistryInput label="Style" value={model.style} onChange={controls.style} suggestions={model.styleOptions} />,
-            E.edit("ABV %", model.abv, "number", undefined, { id: abvId, onChange: controls.abv, onBlur: () => touched.touch(0), error: touched.shown(0) ? brandAbvError(model.abv) : undefined, min: BRAND_ABV.min, max: BRAND_ABV.max, step: "any" }),
-          )}
-          <div className="flex flex-col gap-1">
-            <RegistrySelect label="Category" value={model.category} options={[{ value: "", label: "Uncategorized" }, ...asOptions(model.categoryOptions)]} onChange={controls.category} />
-            {categoryAction}
+          {/* Four short facts share a row once the column is wide enough, two by
+              two below that. Style gets the most room: its names run long. ABV
+              takes its stepper's own width, which does not shrink. */}
+          <div className="grid grid-cols-2 items-start gap-x-4 gap-y-3 [&>*]:min-w-0 @min-[36rem]:grid-cols-[minmax(0,3fr)_auto_minmax(0,2.5fr)_minmax(0,2.5fr)]">
+            <RegistryInput label="Style" value={model.style} onChange={controls.style} suggestions={model.styleOptions} />
+            {E.edit("ABV %", model.abv, "number", undefined, { id: abvId, onChange: controls.abv, onBlur: () => touched.touch(0), error: touched.shown(0) ? brandAbvError(model.abv) : undefined, min: BRAND_ABV.min, max: BRAND_ABV.max, step: "any" })}
+            <div className="flex flex-col gap-1">
+              <RegistrySelect label="Category" value={model.category} options={[{ value: "", label: "Uncategorized" }, ...asOptions(model.categoryOptions)]} onChange={controls.category} />
+              {categoryAction}
+            </div>
+            <div className="flex flex-col gap-1">
+              <RegistrySelect label="Price group" value={model.priceGroup} options={model.priceGroupOptions} onChange={controls.priceGroup} />
+              <FieldDescription>{model.priceGroupOptions.length === 1 && <>No price groups yet. </>}{E.link("Manage price groups", "Price groups", pricingHref)}</FieldDescription>
+            </div>
           </div>
-          {E.ttl("Selling")}
-          <RegistrySelect label="Price group" value={model.priceGroup} options={model.priceGroupOptions} onChange={controls.priceGroup} />
-          <FieldDescription>{model.priceGroupOptions.length === 1 && <>No price groups yet. </>}{E.link("Manage price groups", "Price groups", pricingHref)}. Leave No price group to keep this brand unpriced.</FieldDescription>
-          {model.suggestion
-            ? E.row(model.suggestion.title, model.suggestion.detail, suggestionAction(model.suggestion, controls.priceGroup), model.suggestion.kind === "unknown" ? "w" : "")
-            : null}
+          {model.suggestion && (model.suggestion.kind === "group"
+            ? E.row(model.suggestion.title, model.suggestion.detail, suggestionAction(model.suggestion, controls.priceGroup))
+            // Nothing to act on here, so the cost note is one quiet line under the price group it explains.
+            : <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">{E.status(model.suggestion.title, model.suggestion.kind === "unknown" ? "w" : "")}{model.suggestion.detail}</p>)}
           {E.ttl("Sell sheet")}
-          <RegistryInput label="Description" value={model.description} onChange={controls.description} />
-          <RegistryInput label="Hops" value={model.hops} onChange={controls.hops} />
-          {messages}
-          {footer !== undefined ? footer : E.submit("Save brand", { submitting: busy, reason: brandAbvError(model.abv) ?? submitReason(model.name.trim() ? [] : ["a brand name"]), className: "w-full md:w-fit md:self-end" })}
-          {!model.isNew && E.info("Brands cannot be deleted or archived; to stop selling a format, switch it off under Sells as.")}
+          <div className="grid items-start gap-x-4 gap-y-3 [&>*]:min-w-0 @min-[36rem]:grid-cols-[3fr_2fr]">
+            <Field>
+              <FieldLabel htmlFor={descriptionId}>Description</FieldLabel>
+              <Textarea id={descriptionId} aria-label="Description" {...(controls.description ? { value: model.description, onChange: (event) => controls.description?.(event.target.value) } : { defaultValue: model.description })} />
+            </Field>
+            <RegistryInput label="Hops" value={model.hops} onChange={controls.hops} />
+          </div>
         </section>
         <section aria-label="Sells as and compliance" className="flex min-w-0 flex-col gap-3">
           {model.isNew ? E.info("Save the brand to add SKUs and compliance.") : (
             <>
               {E.ttl("Sells as", "sells-as")}
-              {model.sells.packages.length
-                ? E.info("Switch on a packaged format to create a SKU for this brand. A format alone is not a SKU.")
-                : E.info("Add a packaged format in Catalog, then return here and switch it on to create this brand’s SKU.")}
-              {formatAction !== undefined ? formatAction : E.btn("Manage formats", "g")}
+              <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+                <FieldDescription className="min-w-0 flex-1 basis-56">{model.sells.packages.length
+                  ? "Switch on a packaged format to create a SKU for this brand. A format alone is not a SKU."
+                  : "Add a packaged format in Catalog, then return here and switch it on to create this brand’s SKU."}</FieldDescription>
+                {formatAction !== undefined ? formatAction : E.btn("Manage formats", "g")}
+              </div>
               {model.sells.packages.map((row) => (
-                <div key={row.formatId}>{E.row(row.name, row.prices, (
+                <div key={row.formatId}>{E.row(nameAndFacts(row.name, row.prices), "", (
                   <span className="flex items-center gap-2">
                     {sellsDetail(row, sellsDetails)}
                     {E.sw(row.on, `Sells as ${row.name}`, onSellsAs && ((on) => onSellsAs(row, on)), sellsDisabled)}
@@ -157,18 +175,25 @@ export function BrandView({
                 ))}</div>
               ))}
               {sellsMessages}
-              {model.sells.contents.map((line) => <div key={line.key}>{E.row(line.label, line.prices)}</div>)}
-              {E.ttl("Pours")}
-              {model.sells.pours.map((pour) => <div key={pour.key}>{E.row(pour.name, `${pour.size} · ${pour.prices}`)}</div>)}
-              {model.sells.pours.length === 0 && E.info(model.sells.unpriced
-                ? "Choose a price group and save the brand before adding pours or setting prices."
-                : "No pours on this price group. Add a pour on Price groups; pours are servings, not SKUs.")}
-              {!model.sells.unpriced && linkRows !== false && E.nav("Edit on price group", "", "", undefined, linkRows ? model.sells.priceGroupHref : undefined)}
+              {model.sells.contents.map((line) => <div key={line.key}>{E.row(nameAndFacts(line.label, line.prices))}</div>)}
+              {/* Pours are the group's servings, not SKUs: listed with what the beer sells as, tagged instead of switched. */}
+              {model.sells.pours.map((pour) => <div key={pour.key}>{E.row(nameAndFacts(pour.name, `${pour.size} · ${pour.prices}`), "", "Pour")}</div>)}
+              {model.sells.unpriced
+                ? E.info("Choose a price group and save the brand before adding pours or setting prices.")
+                : <FieldDescription>
+                  {model.sells.pours.length ? "Pours are servings from the tap, shared by every brand on this price group." : "No pours on this price group yet. Pours are servings from the tap, not SKUs."}
+                  {linkRows !== false && <> {E.link("Edit pours", "Price groups", linkRows ? model.sells.priceGroupHref : undefined)}</>}
+                </FieldDescription>}
               {E.ttl("Compliance", "compliance")}
               {model.compliance.map((row) => (
                 <div key={row.key}>
                   {E.row(row.title, row.detail, rowAction(row, actions), row.warning ? "w" : "")}
-                  {row.image && images?.[row.key] && <div className="py-2">{images[row.key]}</div>}
+                  {/* The label opens from its own thumbnail, the size of Catalog's until then. */}
+                  {row.image && images?.[row.key] && (
+                    <details className="group py-2">
+                      <summary title="Show or hide the full label" className="w-fit cursor-pointer list-none overflow-hidden rounded-sm group-open:h-auto! group-open:w-full! has-[img]:h-12 has-[img]:w-16 [&::-webkit-details-marker]:hidden">{images[row.key]}</summary>
+                    </details>
+                  )}
                 </div>
               ))}
               {addCompliance !== undefined ? addCompliance : E.btns([["Add approval", "g"], ["Add registration", "g"]])}
@@ -176,6 +201,17 @@ export function BrandView({
           )}
         </section>
       </div>
+      {/* Still a note (#1311), in one sentence; quiet text here, because the page already ends in the Save bar. */}
+      {!model.isNew && <FieldDescription role="note">Brands cannot be deleted or archived; to stop selling a format, switch it off under Sells as.</FieldDescription>}
+      {/* Save stays in view under both columns: the switches and compliance
+          rows above it save on their own, the fields only with this button.
+          --bar is the surface the view sits on (the page, or a sheet's
+          popover); the shadow paints it over the host's bottom padding, so
+          no row shows under the bar. */}
+      <footer data-brand-footer className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-x-4 gap-y-2 border-t bg-(--bar) py-3 shadow-[0_2rem_0_var(--bar)] [--bar:var(--background)] in-data-[slot=sheet-content]:[--bar:var(--popover)]">
+        {messages}
+        {footer !== undefined ? footer : E.submit("Save brand", { submitting: busy, reason: brandAbvError(model.abv) ?? submitReason(model.name.trim() ? [] : ["a brand name"]), className: "w-full md:w-fit" })}
+      </footer>
     </div>
   );
 }

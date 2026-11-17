@@ -15,7 +15,7 @@ export function ReplenishForm({ model, skus, workHrefs }: {
   workHrefs: Record<string, string>;
 }) {
   const initialQtys = () => Object.fromEntries(model.suggestions.map(s => [s.skuId, String(s.suggested)]));
-  const [fromLocationId, setFromLocationId] = useState(model.warehouses[0]?.id ?? "");
+  const [fromLocationId, setFromLocationId] = useState(model.sources[0]?.id ?? "");
   const [qtys, setQtys] = useState<Record<string, string>>(initialQtys);
   const lines = replenishmentLines(model.suggestions, qtys);
   const form = useCommandForm("create_replenishment_order", {
@@ -30,7 +30,7 @@ export function ReplenishForm({ model, skus, workHrefs }: {
     workHrefs={workHrefs}
     fromLocationId={fromLocationId}
     qtys={qtys}
-    onWarehouse={setFromLocationId}
+    onSource={setFromLocationId}
     onQuantity={(skuId, qty) => setQtys(prev => ({ ...prev, [skuId]: qty }))}
     onSubmit={event => {
       if (!model.canEdit) { event.preventDefault(); return; }

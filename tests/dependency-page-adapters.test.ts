@@ -29,7 +29,10 @@ async function query(name: string, input: unknown) {
     case "list_orders": return { rows: [], nextCursor: null };
     case "list_customers": return [{ id: "buyer", name: "Buyer", shipTos: [{ id: "ship", label: "Door", is_default: true }] }];
     case "get_customer": return { customer: { name: "Buyer" }, shipTos: [{ id: "ship", label: "Door", is_default: true }] };
-    case "list_locations": return state.locations ?? [{ id: "tap", name: "Taproom", uses: ["taproom"] }];
+    case "list_locations": {
+      const use = (input as { use?: string }).use;
+      return (state.locations ?? [{ id: "tap", name: "Taproom", uses: ["taproom"] }]).filter(l => !use || l.uses.includes(use));
+    }
     case "list_skus": return [{ id: "active", name: "Keg", active: true, formats: { name: "keg", package_type: "keg" }, format_volume: { bbl_per_unit: .5 } }, { id: "inactive", name: "Old", active: false }];
     case "get_shortfalls": return [{ skuId: "active", skuName: "Keg", onHand: 1, allocated: 3, atp: -2, reservations: state.reservations ?? [{ id: "reserve", source: "order_line", ref: "line", qty: 3, orderId: "order", orderNo: 42 }] }];
     case "list_standing_allocations": return [];
@@ -102,6 +105,18 @@ it("names the location a standing allocation is held at, taproom or not", async 
     href: "/replenishment?location=shed&sku=active#standing-allocations",
   });
   state.locations = null; state.reservations = null;
+});
+
+it("offers every other location as a replenishment source, whatever its uses", async () => {
+  state.roles = ["sales"]; state.calls = [];
+  state.locations = [
+    { id: "tap", name: "Taproom", uses: ["taproom", "warehouse"] },
+    { id: "second", name: "Second taproom", uses: ["taproom"] },
+    { id: "shed", name: "Overflow shed", uses: ["storage"] },
+  ];
+  const page = await ReplenishmentPage({ searchParams: Promise.resolve({ location: "tap" }) });
+  expect(page.props.model.sources).toEqual([{ id: "second", name: "Second taproom" }, { id: "shed", name: "Overflow shed" }]);
+  state.locations = null;
 });
 
 it("keeps global shortfall facts separate from taproom scope and Warehouse readonly", async () => {

@@ -220,6 +220,31 @@ describe("recipes and immutable versions", () => {
     await expect(bad({ yeastAttenuation: 0 })).rejects.toMatchObject({ code: "invalid_input" });
   });
 
+  it("saves the batch size a copy is written for, leaves it empty when not given, and refuses 0", async () => {
+    const recipe = (await runCommand("create_recipe", { name: "Batch size IPA" }, ctx)) as { id: string };
+    const save = (process?: Record<string, number>) => runCommand("create_recipe_version", {
+      recipeId: recipe.id, mashSchedule: [{ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 }], brewhouseEfficiency: 0.75, yeastAttenuation: 0.78,
+      ingredients: [{ materialId: malt, perBblQty: 60, stage: "mash" }], process,
+    }, ctx) as Promise<{ batch_bbl: number | null }>;
+    const batchBbl = async (version?: number) => ((await runCommand("get_recipe", { recipeId: recipe.id, version }, ctx)) as { version: { batch_bbl: number | null } }).version.batch_bbl;
+
+    expect(Number((await save({ batchBbl: 22 })).batch_bbl)).toBe(22);
+    expect(Number(await batchBbl())).toBe(22);
+    // Each copy carries its own: the next one is saved without a batch size and does not inherit 22.
+    expect((await save({ preBoilBbl: 24 })).batch_bbl).toBeNull();
+    expect(await batchBbl()).toBeNull();
+    expect(Number(await batchBbl(1))).toBe(22);
+
+    for (const bad of [0, -5, 10_000_000]) await expect(save({ batchBbl: bad })).rejects.toMatchObject({ code: "invalid_input" });
+    // Past the command's own check: the column refuses a zero batch from any writer.
+    const { error } = await ctx.db.rpc("create_recipe_version", {
+      p_brewery: ctx.breweryId, p_recipe: recipe.id, p_mash_schedule: [{ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 }],
+      p_fermentation_schedule: [], p_process: { batch_bbl: 0 }, p_brewhouse_efficiency: 0.75, p_yeast_attenuation: 0.78, p_boil_minutes: null,
+      p_target_ibu: null, p_note: null, p_ingredients: [{ material_id: malt, per_bbl_qty: 60, stage: "mash", timing_minutes: null }], p_request_id: crypto.randomUUID(),
+    });
+    expect(error?.message).toMatch(/recipe_versions_batch_bbl_check/);
+  });
+
   it("keeps targets off recipe_versions: gravity is predicted, never stored", () => {
     expect(sql(`select column_name from information_schema.columns
       where table_schema='public' and table_name='recipe_versions'
@@ -687,10 +712,11 @@ describe("a batch split across tanks", () => {
     const first = (await runCommand("get_brew_day", { batchId: batch.id }, ctx)) as { occupancy: { id: string } };
     await runCommand("record_cellar_transfer", { fromOccupancyId: first.occupancy.id, toVesselId: bt.id, volumeBbl: 5 }, ctx);
 
-    await runCommand("record_fermentation_reading", { occupancyId: first.occupancy.id, at: "2026-10-01T12:00:00Z", tempF: 65 }, ctx);
-    await runCommand("record_fermentation_reading", { occupancyId: first.occupancy.id, at: "2026-10-02T12:00:00Z", tempF: 68 }, ctx);
+    await runCommand("record_fermentation_reading", { occupancyId: first.occupancy.id, at: "2026-10-01T12:00:00Z", tempF: 65, gravityPlato: 15 }, ctx);
+    await runCommand("record_fermentation_reading", { occupancyId: first.occupancy.id, at: "2026-10-02T12:00:00Z", tempF: 68, gravityPlato: 5 }, ctx);
     const plain = (await runCommand("list_batches", {}, ctx)) as { id: string; active_occupancies: object[] }[];
     expect(plain.find((r) => r.id === batch.id)!.active_occupancies[0]).not.toHaveProperty("latest_reading");
+    expect(plain.find((r) => r.id === batch.id)!).not.toHaveProperty("og_reading");
     const brewDay = (await runCommand("get_brew_day", { batchId: batch.id }, ctx)) as { occupancy: object };
     expect(brewDay.occupancy).not.toHaveProperty("latest_reading");
     const listed = (await runCommand("list_batches", { readings: true }, ctx)) as { id: string; vessel_name: string | null; active_occupancies: { id: string; vessel_name: string; latest_reading: { temp_f: number } | null }[] }[];
@@ -699,6 +725,8 @@ describe("a batch split across tanks", () => {
     expect(result.active_occupancies).toHaveLength(2);
     expect(result.active_occupancies[0]).toMatchObject({ id: first.occupancy.id, vessel_name: fv.name, latest_reading: { temp_f: 68 } });
     expect(result.active_occupancies[1]).toMatchObject({ vessel_name: bt.name, latest_reading: null });
+    // The batch's first gravity reading, the OG its tanks' current figures are measured from.
+    expect(result).toMatchObject({ og_reading: { gravity_plato: 15 } });
     const day = (await runCommand("get_brew_day", { batchId: batch.id }, ctx)) as { occupancy: { vessel_name: string; initial_bbl: number } };
     expect(day.occupancy).toMatchObject({ vessel_name: fv.name, initial_bbl: 20 });
   });

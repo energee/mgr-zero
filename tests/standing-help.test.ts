@@ -92,11 +92,15 @@ describe("a note said twice is said once (#1518)", () => {
   });
 
   it("a cut recipe with one mash step does not repeat it as a summary", () => {
-    const step = { title: "Single infusion", detail: "152 °F · 60 min" };
-    const model = { title: "Pale v3", ingredients: [], mash: { title: "Mash schedule · 1 step", detail: "Total 60 min · 152 °F saccharification rest", rows: [step] } };
-    expect(text(createElement(RecipeView, { model, readOnly: true }))).not.toContain("Total 60 min");
-    const two = { ...model, mash: { ...model.mash, rows: [step, { title: "Mash out", detail: "168 °F · 10 min" }], detail: "Total 70 min · 152 °F saccharification rest" } };
-    expect(text(createElement(RecipeView, { model: two, readOnly: true }))).toContain("Total 70 min");
+    const rest = { name: "Single infusion", kind: "infusion", tempF: 152, minutes: 60 };
+    const model = { title: "Pale v3", ingredients: [], mashSchedule: [rest] };
+    // The band draws the rest with its own minutes, once, and adds no total after it.
+    const one = text(createElement(RecipeView, { model, readOnly: true }));
+    expect(one.match(/60 min/g)).toHaveLength(1);
+    expect(one).not.toMatch(/Total|1 hour/);
+    // Two rests are worth totalling.
+    const two = { ...model, mashSchedule: [rest, { name: "Mash out", kind: "infusion", tempF: 168, minutes: 10 }] };
+    expect(text(createElement(RecipeView, { model: two, readOnly: true }))).toContain("1 hour 10 minutes");
   });
 });
 

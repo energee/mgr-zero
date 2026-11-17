@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { FermentationScheduleView } from "../components/mgr/views/fermentation-schedule";
-import { fermentationStageDetail, fermentationSummary, fromIngredientFields, ingredientDetail, ingredientReason, mashStepReason, stageReason, toIngredientFields, ionReadout, mashRowSummary, mashStepDetail, mashSummary, moveItem, perBblDisplay, processReadout, profileIons, splitByStage, suggestAdditions, upsertAt, waterAdditionDetail, waterRowSummary, type FermentationStage, type MashStep, type SaltMaterial, type WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { fermentationStageDetail, fermentationSummary, fromIngredientFields, ingredientDetail, ingredientTiming, packsFieldText, packsLabel, packsToPerBbl, ingredientReason, mashStepReason, stageReason, toIngredientFields, ionReadout, mashStepDetail, mashSummary, moveItem, perBblDisplay, profileIons, splitByStage, suggestAdditions, upsertAt, waterAdditionDetail, type FermentationStage, type MashStep, type SaltMaterial, type WaterDraft } from "@/lib/mgr/recipe-process-view";
 
 const mash: MashStep[] = [
   { name: "Mash-in", kind: "infusion", tempF: 104, minutes: 15 },
@@ -31,41 +31,30 @@ describe("schedule drafts", () => {
   it("the longest in-range rest wins over the first, as the RPC derives mash_temp_f", () => {
     expect(mashSummary([{ name: "Beta", kind: "rest", tempF: 145, minutes: 20 }, { name: "Alpha", kind: "rest", tempF: 158, minutes: 40 }])).toBe("Total 60 min. The 158 °F rest is recorded as the mash temperature.");
   });
-  it("reads a cut version's process facts out, skipping what it does not carry", () => {
-    const names = (id: string | null) => (id === "hazy" ? "Hazy target" : null);
-    expect(processReadout({ pre_boil_bbl: 12.5, whirlpool_minutes: 20, whirlpool_temp_f: 180, whirlpool_rest_minutes: null, knockout_temp_f: null, target_water_profile_id: "hazy", source_water_profile_id: null, mash_water_gal: 9.5, sparge_water_gal: null, target_mash_ph: 5.35 }, names)).toEqual([
-      ["Pre-boil volume", "12.5 bbl"], ["Whirlpool", "20 min at 180 °F"], ["Source profile", "No source"], ["Target profile", "Hazy target"], ["Mash water", "9.5 gal"], ["Target mash pH", "5.35"],
-    ]);
-  });
   it("summaries name the recorded mash-temperature rest and the total days", () => {
     expect(mashSummary(mash)).toBe("Total 85 min. The 152 °F rest is recorded as the mash temperature.");
     expect(mashSummary([{ name: "Mash-out", kind: "direct heat", tempF: 168, minutes: 10 }])).toBe("Total 10 min. No rest falls between 144 and 162 °F, so no mash temperature is recorded.");
     expect(fermentationSummary(ferm)).toBe("Total 6 days.");
   });
-  it("an ingredient row names its stage in sentence case, as the Stage pick does (#1139)", () => {
-    expect(ingredientDetail("whirlpool", 4, "1.2", "lb")).toBe("Whirlpool · 4 min · 1.2 lb / bbl");
+  it("an ingredient row reads its timing and amount, and leaves the stage to whoever draws it", () => {
+    // The brewsheet draws a line under its step's heading, so the detail does not repeat the step.
+    expect(ingredientDetail("whirlpool", 4, "1.2", "lb")).toBe("4 min · 1.2 lb / bbl");
     // Fermentation and dry hop are timed in days from the start of fermentation (#1478).
-    expect(ingredientDetail("dry_hop", 3 * 1440, "1.2", "lb")).toBe("Dry hop · day 3 · 1.2 lb / bbl");
-    expect(ingredientDetail("mash", null, "40.9")).toBe("Mash · 40.9 / bbl");
+    expect(ingredientDetail("dry_hop", 3 * 1440, "1.2", "lb")).toBe("day 3 · 1.2 lb / bbl");
+    expect(ingredientDetail("mash", null, "40.9")).toBe("40.9 / bbl");
+    // The brewsheet prints the timing in its own column.
+    expect(ingredientTiming("whirlpool", 4)).toBe("4 min");
+    expect(ingredientTiming("dry_hop", 3 * 1440)).toBe("day 3");
+    expect([ingredientTiming("mash", null), ingredientTiming("boil", "")]).toEqual(["", ""]);
   });
   it("a water addition row reads its amount and its stage in sentence case (#1139)", () => {
     expect(waterAdditionDetail({ qty: 4, unit: "g", stage: "mash" })).toBe("4 g · Mash");
     expect(waterAdditionDetail({ qty: 3, unit: "mL", stage: "sparge" })).toBe("3 mL · Sparge");
   });
-  it("the water row summary names the target profile and counts the additions, in sentence case (#1139)", () => {
-    expect(waterRowSummary("Hazy target", 3)).toBe("Target Hazy target · 3 additions");
-    expect(waterRowSummary(undefined, 0)).toBe("No target · 0 additions");
-    expect(waterRowSummary(undefined, 1)).toBe("No target · 1 addition");
-  });
   it("prints a per-bbl quantity to three significant digits, never two fraction digits", () => {
     expect(perBblDisplay(40.909091)).toBe("40.9");
     expect(perBblDisplay(0.045455)).toBe("0.0455");
     expect(perBblDisplay(0.011364)).toBe("0.0114");
-  });
-  it("the mash row summary gives the total and the saccharification rest", () => {
-    expect(mashRowSummary([{ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 }])).toBe("Total 60 min · 152 °F saccharification rest");
-    expect(mashRowSummary([{ name: "Mash-in", kind: "infusion", tempF: 152, minutes: 60 }, { name: "Mash-out", kind: "direct heat", tempF: 168, minutes: 10 }])).toBe("Total 70 min · 152 °F saccharification rest");
-    expect(mashRowSummary([{ name: "Mash-out", kind: "direct heat", tempF: 168, minutes: 10 }])).toBe("Total 10 min · no saccharification rest");
   });
   it("a mash step's detail hides the kind when it repeats the name", () => {
     expect(mashStepDetail({ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 })).toBe("Infusion · 152 °F · 60 min");
@@ -155,5 +144,39 @@ describe("ingredient timing and schedule rows (#1478)", () => {
     expect(stageReason({ name: "Primary", kind: "primary", tempF: "68", days: "1e1" })).toBe("Still needed: a duration above zero.");
     expect(stageReason({ name: "Primary", kind: "primary", tempF: "-10", days: "7" })).toBe("Still needed: a temperature from 25 to 212 °F.");
     expect(stageReason({ name: "Primary", kind: "primary", tempF: "68", days: "7" })).toBeNull();
+  });
+});
+
+describe("an ingredient typed in packs", () => {
+  const bags = { factor: 55, unit: "lb", packName: "bag" as const, batchBbl: 22 };
+  const sacks = { ...bags, factor: 50, packName: null };
+  it("works the per-bbl amount out from a count of packs: packs × pack size ÷ batch size, to 6 decimals", () => {
+    expect(packsToPerBbl("23", bags)).toBe("57.5");
+    expect(packsToPerBbl("2.5", bags)).toBe("6.25");
+    expect(packsToPerBbl("1", sacks)).toBe("2.272727");
+  });
+  it("gives no per-bbl amount while the count is not a number", () => {
+    expect(packsToPerBbl("", bags)).toBe("");
+    expect(packsToPerBbl("1e1", bags)).toBe("");
+  });
+  it("reads a per-bbl amount as its count of packs, so the two fields stay in step", () => {
+    expect(packsFieldText("57.5", "", bags)).toBe("23");
+    expect(packsFieldText("44", "", bags)).toBe("17.6");
+    // 2.272727 lb/bbl at 22 bbl is 49.999994 lb, which is 50 lb to the 4 decimals a material quantity keeps.
+    expect(packsFieldText("2.272727", "", sacks)).toBe("1");
+    expect(packsFieldText("", "", bags)).toBe("");
+    expect(packsFieldText("0", "", bags)).toBe("");
+  });
+  it("keeps the count as typed while the per-bbl amount is still the one it gave", () => {
+    // Mid-typing "2.5": the dot must not snap back to "2".
+    expect(packsFieldText("5", "2.", bags)).toBe("2.");
+    expect(packsFieldText("", "", bags)).toBe("");
+    // The per-bbl field was edited since, so the count follows it.
+    expect(packsFieldText("57.5", "2.", bags)).toBe("23");
+  });
+  it("labels the count with the pack word, the pack size and the batch it is for", () => {
+    expect(packsLabel(bags)).toBe("Bags (55 lb) for 22 bbl");
+    expect(packsLabel({ ...bags, factor: 44, packName: "box" })).toBe("Boxes (44 lb) for 22 bbl");
+    expect(packsLabel(sacks)).toBe("Packs (50 lb) for 22 bbl");
   });
 });

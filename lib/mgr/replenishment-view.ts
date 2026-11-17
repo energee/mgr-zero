@@ -9,7 +9,8 @@ export type ReplenishmentViewModel = {
   locationId: string | null;
   locationName: string | null;
   locations: { value: string; label: string; href?: string }[];
-  warehouses: { id: string; name: string }[];
+  /** Where the stock can come from: every location but the taproom being replenished. */
+  sources: { id: string; name: string }[];
   suggestions: ReplenishmentSuggestion[];
   allocations: ReplenishmentAllocation[];
   shortfalls: ReplenishmentShortfall[];

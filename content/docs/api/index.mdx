@@ -227,8 +227,8 @@ operations are ones the screens need that the backend has not built. Calling
 one returns `404 unknown_command`.
 
 Both lists are generated from the command registry and from the screens, so
-neither can drift from the product. The designed list is the roadmap: what is
-coming, and which screen is waiting on it. No dates.
+neither can drift from the product. Each designed entry names the screen that is
+waiting on it. No dates.
 
 ## Authentication & roles [#authentication]
 
@@ -603,6 +603,7 @@ omitted. They have no roles until they are built.
 | `update_location` | Inventory & locations | ✓ |  |  |  |  |  |
 | `update_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |  |
 | `update_purchase_order` | Purchasing & materials | ✓ |  | ✓ |  |  |  |
+| `update_recipe` | Production | ✓ |  |  | ✓ |  |  |
 | `update_sku` | Catalog & pricing | ✓ | ✓ |  |  |  |  |
 | `update_staff_role` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `upsert_brand` | Catalog & pricing | ✓ | ✓ |  |  |  |  |
@@ -811,7 +812,7 @@ operation's field table rather than assuming a volume field takes a string.
 keep. An optional field you leave out may be cleared or set back to its
 default. A few fields keep their saved value when omitted instead:
 `upsert_material`'s `active`, `purchaseUomFactor`, `lotTracked`, `reorderPoint`,
-`extractPotential`, and `alphaAcid`; `upsert_vendor`'s `paymentTerms` and `active`;
+`extractPotential`, `alphaAcid`, and `packName`; `upsert_vendor`'s `paymentTerms` and `active`;
 `upsert_customer`'s `paymentTerms`; and `upsert_ship_to`'s `isDefault`. Sending
 a field is the only way to be sure. `upsert_brand_approval`,
 `upsert_state_registration`, and `upsert_brewery_state_license` keep any
@@ -827,7 +828,10 @@ filters, to read the next page. Keep its timestamp precision; do not convert it
 through a JavaScript `Date`. New records appear when restarting from the newest page.
 
 `list_batch_history` requires `status: "completed"` or `status: "cancelled"`;
-each status has its own cursor. `list_packaging_history` pages closed and
+each status has its own cursor. Each completed batch carries `og_reading` and
+`fg_reading`: its first and last gravity readings (`id`, `gravity_plato`),
+each `null` when the batch has none. A batch with one gravity reading has the
+same reading in both. Cancelled batches carry neither. `list_packaging_history` pages closed and
 cancelled runs together. These history queries default to 50 rows and accept
 `limit` from 1 through 200.
 
@@ -835,7 +839,9 @@ cancelled runs together. These history queries default to 50 rows and accept
 record, not history envelopes. For `list_batches`, `open: true` selects brewed,
 unclosed batches, `open: false` selects unstarted plans, and omitting `open`
 returns both. All three exclude cancelled batches. `readings: true` adds the
-latest reading only for each active batch's open occupancies.
+latest reading only for each active batch's open occupancies. It also adds
+`og_reading` to each active batch: its first gravity reading (`id`,
+`gravity_plato`), or `null` when the batch has none.
 
 ### Fields the server computes [#computed]
 

@@ -22,8 +22,8 @@ const { materials, lotsByMaterial } = cellarAdditionCitra;
 
 describe("cellar action triggers (#1115)", () => {
   it("turns Transfer off when the map says no tank holds beer", () => {
-    expect(renderToStaticMarkup(createElement(CellarTransferForm, { occupancies: [], vessels, disabled: true }))).toMatch(off("Transfer"));
-    expect(renderToStaticMarkup(createElement(CellarTransferForm, { occupancies, vessels, disabled: false }))).not.toMatch(off("Transfer"));
+    expect(renderToStaticMarkup(createElement(CellarTransferForm, { occupancies: [], vessels, plannedBatches: [], disabled: true }))).toMatch(off("Transfer"));
+    expect(renderToStaticMarkup(createElement(CellarTransferForm, { occupancies, vessels, plannedBatches: [], disabled: false }))).not.toMatch(off("Transfer"));
   });
 
   it("turns Addition off when the map says no tank holds beer", () => {

@@ -1591,14 +1591,14 @@ isOneToOne: false
                   ]
                 },"materials": {
                   Row: {
-                    "active": boolean,"alpha_acid": number | null,"base_uom": Database["public"]['Enums']["uom"],"brewery_id": string,"category": Database["public"]['Enums']["material_category"],"created_at": string,"default_vendor_id": string | null,"extract_potential": number | null,"id": string,"lot_tracked": boolean,"name": string,"purchase_uom": Database["public"]['Enums']["uom"],"purchase_uom_factor": number,"reorder_point": number | null
+                    "active": boolean,"alpha_acid": number | null,"base_uom": Database["public"]['Enums']["uom"],"brewery_id": string,"category": Database["public"]['Enums']["material_category"],"created_at": string,"default_vendor_id": string | null,"extract_potential": number | null,"id": string,"lot_tracked": boolean,"name": string,"pack_name": string | null,"purchase_uom": Database["public"]['Enums']["uom"],"purchase_uom_factor": number,"reorder_point": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "active"?: boolean,"alpha_acid"?: number | null,"base_uom": Database["public"]['Enums']["uom"],"brewery_id": string,"category": Database["public"]['Enums']["material_category"],"created_at"?: string,"default_vendor_id"?: string | null,"extract_potential"?: number | null,"id"?: string,"lot_tracked"?: boolean,"name": string,"purchase_uom": Database["public"]['Enums']["uom"],"purchase_uom_factor"?: number,"reorder_point"?: number | null
+                    "active"?: boolean,"alpha_acid"?: number | null,"base_uom": Database["public"]['Enums']["uom"],"brewery_id": string,"category": Database["public"]['Enums']["material_category"],"created_at"?: string,"default_vendor_id"?: string | null,"extract_potential"?: number | null,"id"?: string,"lot_tracked"?: boolean,"name": string,"pack_name"?: string | null,"purchase_uom": Database["public"]['Enums']["uom"],"purchase_uom_factor"?: number,"reorder_point"?: number | null
                   }
                   Update: {
-                    "active"?: boolean,"alpha_acid"?: number | null,"base_uom"?: Database["public"]['Enums']["uom"],"brewery_id"?: string,"category"?: Database["public"]['Enums']["material_category"],"created_at"?: string,"default_vendor_id"?: string | null,"extract_potential"?: number | null,"id"?: string,"lot_tracked"?: boolean,"name"?: string,"purchase_uom"?: Database["public"]['Enums']["uom"],"purchase_uom_factor"?: number,"reorder_point"?: number | null
+                    "active"?: boolean,"alpha_acid"?: number | null,"base_uom"?: Database["public"]['Enums']["uom"],"brewery_id"?: string,"category"?: Database["public"]['Enums']["material_category"],"created_at"?: string,"default_vendor_id"?: string | null,"extract_potential"?: number | null,"id"?: string,"lot_tracked"?: boolean,"name"?: string,"pack_name"?: string | null,"purchase_uom"?: Database["public"]['Enums']["uom"],"purchase_uom_factor"?: number,"reorder_point"?: number | null
                   }
                   Relationships: [
                     {
@@ -3041,14 +3041,14 @@ isOneToOne: false
                   ]
                 },"recipe_versions": {
                   Row: {
-                    "boil_minutes": number | null,"brewery_id": string,"brewhouse_efficiency": number | null,"created_at": string,"created_by": string,"fermentation_schedule": NonNullable<Json>,"id": string,"knockout_temp_f": number | null,"mash_schedule": NonNullable<Json>,"mash_temp_f": number | null,"mash_water_gal": number | null,"note": string | null,"pre_boil_bbl": number | null,"recipe_id": string,"source_water_profile_id": string | null,"sparge_water_gal": number | null,"target_ibu": number | null,"target_mash_ph": number | null,"target_water_profile_id": string | null,"version": number,"whirlpool_minutes": number | null,"whirlpool_rest_minutes": number | null,"whirlpool_temp_f": number | null,"yeast_attenuation": number | null
+                    "batch_bbl": number | null,"boil_minutes": number | null,"brewery_id": string,"brewhouse_efficiency": number | null,"created_at": string,"created_by": string,"fermentation_schedule": NonNullable<Json>,"id": string,"knockout_temp_f": number | null,"mash_schedule": NonNullable<Json>,"mash_temp_f": number | null,"mash_water_gal": number | null,"note": string | null,"pre_boil_bbl": number | null,"recipe_id": string,"source_water_profile_id": string | null,"sparge_water_gal": number | null,"target_ibu": number | null,"target_mash_ph": number | null,"target_water_profile_id": string | null,"version": number,"whirlpool_minutes": number | null,"whirlpool_rest_minutes": number | null,"whirlpool_temp_f": number | null,"yeast_attenuation": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "boil_minutes"?: number | null,"brewery_id": string,"brewhouse_efficiency"?: number | null,"created_at"?: string,"created_by": string,"fermentation_schedule"?: NonNullable<Json>,"id"?: string,"knockout_temp_f"?: number | null,"mash_schedule"?: NonNullable<Json>,"mash_temp_f"?: number | null,"mash_water_gal"?: number | null,"note"?: string | null,"pre_boil_bbl"?: number | null,"recipe_id": string,"source_water_profile_id"?: string | null,"sparge_water_gal"?: number | null,"target_ibu"?: number | null,"target_mash_ph"?: number | null,"target_water_profile_id"?: string | null,"version": number,"whirlpool_minutes"?: number | null,"whirlpool_rest_minutes"?: number | null,"whirlpool_temp_f"?: number | null,"yeast_attenuation"?: number | null
+                    "batch_bbl"?: number | null,"boil_minutes"?: number | null,"brewery_id": string,"brewhouse_efficiency"?: number | null,"created_at"?: string,"created_by": string,"fermentation_schedule"?: NonNullable<Json>,"id"?: string,"knockout_temp_f"?: number | null,"mash_schedule"?: NonNullable<Json>,"mash_temp_f"?: number | null,"mash_water_gal"?: number | null,"note"?: string | null,"pre_boil_bbl"?: number | null,"recipe_id": string,"source_water_profile_id"?: string | null,"sparge_water_gal"?: number | null,"target_ibu"?: number | null,"target_mash_ph"?: number | null,"target_water_profile_id"?: string | null,"version": number,"whirlpool_minutes"?: number | null,"whirlpool_rest_minutes"?: number | null,"whirlpool_temp_f"?: number | null,"yeast_attenuation"?: number | null
                   }
                   Update: {
-                    "boil_minutes"?: number | null,"brewery_id"?: string,"brewhouse_efficiency"?: number | null,"created_at"?: string,"created_by"?: string,"fermentation_schedule"?: NonNullable<Json>,"id"?: string,"knockout_temp_f"?: number | null,"mash_schedule"?: NonNullable<Json>,"mash_temp_f"?: number | null,"mash_water_gal"?: number | null,"note"?: string | null,"pre_boil_bbl"?: number | null,"recipe_id"?: string,"source_water_profile_id"?: string | null,"sparge_water_gal"?: number | null,"target_ibu"?: number | null,"target_mash_ph"?: number | null,"target_water_profile_id"?: string | null,"version"?: number,"whirlpool_minutes"?: number | null,"whirlpool_rest_minutes"?: number | null,"whirlpool_temp_f"?: number | null,"yeast_attenuation"?: number | null
+                    "batch_bbl"?: number | null,"boil_minutes"?: number | null,"brewery_id"?: string,"brewhouse_efficiency"?: number | null,"created_at"?: string,"created_by"?: string,"fermentation_schedule"?: NonNullable<Json>,"id"?: string,"knockout_temp_f"?: number | null,"mash_schedule"?: NonNullable<Json>,"mash_temp_f"?: number | null,"mash_water_gal"?: number | null,"note"?: string | null,"pre_boil_bbl"?: number | null,"recipe_id"?: string,"source_water_profile_id"?: string | null,"sparge_water_gal"?: number | null,"target_ibu"?: number | null,"target_mash_ph"?: number | null,"target_water_profile_id"?: string | null,"version"?: number,"whirlpool_minutes"?: number | null,"whirlpool_rest_minutes"?: number | null,"whirlpool_temp_f"?: number | null,"yeast_attenuation"?: number | null
                   }
                   Relationships: [
                     {
@@ -5616,7 +5616,7 @@ isOneToOne: false
 { Args: { "p_actuals"?: Json,"p_batch": string,"p_brewed_on": string,"p_brewery": string,"p_confirm_empty"?: boolean,"p_initial_bbl": number,"p_process"?: Json,"p_request_id": string,"p_vessel": string }; Returns: Json
                            },
 "record_cellar_transfer":
-{ Args: { "p_brewery": string,"p_from_occupancy": string,"p_loss_bbl": number,"p_request_id": string,"p_to_vessel": string,"p_volume_bbl": number }; Returns: Json
+{ Args: { "p_brewery": string,"p_from_occupancy": string,"p_loss_bbl": number,"p_request_id": string,"p_to_batch"?: string,"p_to_vessel": string,"p_volume_bbl": number }; Returns: Json
                            },
 "record_chat_callback_receipt":
 { Args: { "p_callback_id": string,"p_callback_kind": string,"p_external_installation_id": string,"p_external_user_id": string,"p_payload_hash": string,"p_provider": string }; Returns: Json
@@ -5950,6 +5950,9 @@ isOneToOne: false
 "update_purchase_order":
 { Args: { "p_brewery": string,"p_expected_on": string,"p_lines": Json,"p_po": string,"p_request_id": string,"p_vendor": string }; Returns: Json
                            },
+"update_recipe":
+{ Args: { "p_brewery": string,"p_name": string,"p_note": string,"p_recipe": string,"p_request_id": string }; Returns: Json
+                           },
 "update_sku":
 { Args: { "p_active": boolean,"p_batch_share"?: number,"p_brewery": string,"p_clear_batch_share"?: boolean,"p_clear_keg_pool"?: boolean,"p_id": string,"p_keg_pool"?: string,"p_request_id": string,"p_upc": string }; Returns: Json
                            },
@@ -5972,7 +5975,7 @@ isOneToOne: false
 { Args: { "p_basis": Database["public"]['Enums']["format_basis"],"p_bbl_per_unit": number,"p_brewery": string,"p_id": string,"p_keg_size": Database["public"]['Enums']["keg_size"],"p_name": string,"p_ounces"?: number,"p_package_type": Database["public"]['Enums']["package_type"],"p_price_group"?: string,"p_request_id": string,"p_units_per_case": number }; Returns: Json
                            },
 "upsert_material":
-{ Args: { "p_active": boolean,"p_alpha_acid": number,"p_base_uom": Database["public"]['Enums']["uom"],"p_brewery": string,"p_category": Database["public"]['Enums']["material_category"],"p_default_vendor": string,"p_extract_potential": number,"p_lot_tracked": boolean,"p_material": string,"p_name": string,"p_purchase_uom": Database["public"]['Enums']["uom"],"p_purchase_uom_factor": number,"p_reorder_point": number,"p_request_id": string }; Returns: Json
+{ Args: { "p_active": boolean,"p_alpha_acid": number,"p_base_uom": Database["public"]['Enums']["uom"],"p_brewery": string,"p_category": Database["public"]['Enums']["material_category"],"p_default_vendor": string,"p_extract_potential": number,"p_lot_tracked": boolean,"p_material": string,"p_name": string,"p_pack_name"?: string,"p_purchase_uom": Database["public"]['Enums']["uom"],"p_purchase_uom_factor": number,"p_reorder_point": number,"p_request_id": string }; Returns: Json
                            },
 "upsert_material_contract":
 { Args: { "p_brewery": string,"p_contract": string,"p_contract_no": string,"p_ends_on": string,"p_material": string,"p_qty_committed": number,"p_request_id": string,"p_starts_on": string,"p_unit_cost_cents": number,"p_vendor": string }; Returns: Json
