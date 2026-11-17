@@ -87,7 +87,7 @@ import { TapBoardView, TapKegView } from "@/components/mgr/views/tap-board";
 import { AccountingView, DisconnectQuickBooksView, QboConnectionView, QboSyncView } from "@/components/mgr/views/accounting";
 import { accountingExpired, quickBooksMappings } from "@/lib/mgr/fixtures/accounting";
 import { tapBoard, tapBoardSkus, kickKeg, swapKeg } from "@/lib/mgr/fixtures/taproom";
-import { cellarAdditionCitra, cellarTransferPils } from "@/lib/mgr/fixtures/production";
+import { cellarAdditionCitra, cellarTransferPlannedBatch } from "@/lib/mgr/fixtures/production";
 import { brewTurnModel } from "@/lib/mgr/brew-day-view";
 import { CustomerView } from "@/components/mgr/views/customer";
 import { CustomersView } from "@/components/mgr/views/customers";
@@ -1974,11 +1974,11 @@ export const SCREENS: Screen[] = [
     name: "Cellar transfer",
     to: { "Record transfer": "Cellar map" },
     job: "Write one transfer row that carries its own loss volume",
-    reads: "list_occupancies · list_vessels",
-    writes: "record_cellar_transfer [one RPC: create target occupancy(initial_bbl=0) when empty + append transfer + a generic loss volume adjustment on the source when loss > 0 + close source occupancy iff fully emptied]",
-    states: permitted("brewer or admin required"),
-    spec: "Drawn as a blend into an occupied brite: BT1 keeps its occupancy and B-0412 keeps its identity: the schema has one batch per occupancy, and blends are transfers into the surviving one (renaming a blend as a new batch is a plan §8 schema gap). An empty target (BT2) gets a new occupancy starting at zero bbl in the same RPC; the transfer row stays immutable; a fully emptied source closes its occupancy. A partial transfer never implies loss: the person explicitly holds the remainder or records loss. No vessel status. With no other vessel, the To list says so and links Add a vessel for an admin; anyone else is told to ask Admin.",
-    body: <><CellarTransferView model={cellarTransferPils} footer={null} />{E.pin(<CellarTransferFooter />)}</>,
+    reads: "list_occupancies · list_vessels · list_batches",
+    writes: "record_cellar_transfer [one RPC: create target occupancy(initial_bbl=0) when empty, for the chosen planned batch when one is given (marking it brewed today) and otherwise for the source's batch + append transfer + a generic loss volume adjustment on the source when loss > 0 + close source occupancy iff fully emptied]",
+    states: [...permitted("brewer or admin required"), ["planned batch", "Start a planned batch shows only for an empty destination when an unstarted plan exists; choosing one makes the beer moved that batch"], ["blend", "a destination that holds beer keeps its batch, and the picker is not offered"]],
+    spec: "Drawn as a split into an empty brite: BT2 gets a new occupancy starting at zero bbl in the same RPC, and Start a planned batch makes that occupancy the planned B-0420, so part of B-0409 becomes another beer. With no planned batch chosen, the new occupancy continues the source's batch. A target that holds beer (BT1) is a blend: it keeps its occupancy and B-0412 keeps its identity, because the schema has one batch per occupancy and blends are transfers into the surviving one; the picker is not offered there. The transfer row stays immutable; a fully emptied source closes its occupancy. A partial transfer never implies loss: the person explicitly holds the remainder or records loss. No vessel status. With no other vessel, the To list says so and links Add a vessel for an admin; anyone else is told to ask Admin.",
+    body: <><CellarTransferView model={cellarTransferPlannedBatch} footer={null} />{E.pin(<CellarTransferFooter />)}</>,
   },
   {
     name: "Packaging plan",

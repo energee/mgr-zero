@@ -57,6 +57,9 @@ export type BrewDayViewModel = {
   /** A completed batch: the day it completed, the loss its completion wrote off (null when none), and the barrels its
    *  closed packaging runs packaged (get_brew_day's packagedBbl). */
   completion?: { on: string; writeOffBbl: number | null; packagedBbl: number };
+  /** A batch with no brew record that started from a transfer (get_brew_day's startedFrom): the source batch's label,
+   *  where it opens, and the barrels transferred in. `brewedOn` is then the day it started. */
+  startedFrom?: { label: string; href?: string; bbl: number };
   sheet?: { title: string; detail: string };
   tapeHead?: [string, string][];
 };

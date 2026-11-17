@@ -179,7 +179,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, brewer
 
-One batch, with its intended brand's name, and the occupancy it is currently sitting in (the oldest open one when split across tanks): the vessel's name and the volume that went in; closed_at is set once the batch is completed; then writeOffBbl is the barrels its completion wrote off as loss (null when none) and packagedBbl the barrels its closed packaging runs packaged (both null before completion)
+One batch, with its intended brand's name, and the occupancy it is currently sitting in (the oldest open one when split across tanks): the vessel's name and initial_bbl, the knockout volume that opened it, which is 0 for an occupancy opened by a transfer, where the beer arrives as the transfer; startedFrom is null for a brewed batch, and for a batch with no brew record that started from a transfer (record_cellar_transfer with toBatchId) it names the source batch of the first transfer in (batch_id, batch_no, brand_name), the bbl transferred in from other batches, and at, when the first arrived; closed_at is set once the batch is completed; then writeOffBbl is the barrels its completion wrote off as loss (null when none) and packagedBbl the barrels its closed packaging runs packaged (both null before completion)
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -248,7 +248,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, brewer
 
-Each brewed batch of a recipe, newest first: OG, FG, ABV, apparent attenuation and brewhouse efficiency from its gravity readings and knockout, beside what its own version predicted and assumed. A batch split across tanks that held beer at the same time comes once per tank, with that tank's vessel name and figures and the batch's efficiency. Also each brewed batch of another recipe whose own version has the same mash lines as the requested version (latest by default), with its recipeName, OG and efficiency and no FG, ABV or attenuation; sameGrainBill marks every batch on that grain bill. A figure is null when an input is missing, and efficiency is null until the batch closes. Computed on read, never stored
+Each brewed batch of a recipe, newest first: OG, FG, ABV, apparent attenuation and brewhouse efficiency from its gravity readings and knockout, beside what its own version predicted and assumed. A batch split across tanks that held beer at the same time comes once per tank, with that tank's vessel name and figures and the batch's efficiency. Also each brewed batch of another recipe whose own version has the same mash lines as the requested version (latest by default), with its recipeName, OG and efficiency and no FG, ABV or attenuation; sameGrainBill marks every batch on that grain bill. A batch started from a transfer (record_cellar_transfer with toBatchId) is not listed: it has no brew record and its first reading is beer already fermenting. A figure is null when an input is missing, and efficiency is null until the batch closes. Computed on read, never stored
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -414,7 +414,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, brewer
 
-Move beer out of one occupancy into a vessel: opens an occupancy if the vessel is empty, blends into the open one if it is not, and closes the source when it empties
+Move beer out of one occupancy into a vessel: opens an occupancy if the vessel is empty, blends into the open one if it is not, and closes the source when it empties. With toBatchId the vessel must be empty and the occupancy it opens starts that planned batch, brewed today, instead of continuing the source's batch
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -422,6 +422,7 @@ Move beer out of one occupancy into a vessel: opens an occupancy if the vessel i
 | `toVesselId` | uuid | yes |
 | `volumeBbl` | number | yes |
 | `lossBbl` | number | no |
+| `toBatchId` | uuid | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
