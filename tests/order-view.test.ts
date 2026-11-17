@@ -284,6 +284,13 @@ describe("Order view loop", () => {
     expect(model.next).toBe("Next: put back");
   });
 
+  it("a cancelled order holding staged beer offers Put back on its own page", () => {
+    const cancelled = { ...orderPickedRestock, order: { ...orderPickedRestock.order, status: "cancelled" as const } };
+    const model = toOrderViewProps(cancelled);
+    expect(model.putBackHref).toBe("#");
+    expect(model.next).toBe("Next: put back");
+  });
+
   it("the Order inventory record is OrderView painted from that fixture", () => {
     const screen = SCREENS.find((s) => s.name === "Order");
     expect(isValidElement(screen!.body)).toBe(true);
