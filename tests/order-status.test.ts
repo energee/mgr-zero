@@ -5,7 +5,8 @@ import { describe, expect, it } from "vitest";
 import { getCommandDefinition, STAFF_ROLES } from "@/lib/commands/registry";
 import "@/lib/commands/orders";
 import { pickDoneHref, type PickSnapshot } from "@/lib/mgr/pick-view";
-import { nextAction, parseOrderStatus, salesRoles, shownState, warehouseRoles, type OrderStatus } from "@/lib/mgr/order-status";
+import { nextAction, ORDER_MOVES, ORDER_STATUSES, orderAllows, parseOrderStatus, salesRoles, shownState, stepRedirect, warehouseRoles, type OrderStatus } from "@/lib/mgr/order-status";
+import { Constants } from "@/lib/supabase/database.generated";
 
 /** The command each list verb finishes. */
 const COMMAND: [OrderStatus, boolean, string][] = [
@@ -79,5 +80,43 @@ describe("pickDoneHref (#1503)", () => {
   it("returns to the order while a line is short or staged beer waits", () => {
     expect(pickDoneHref(order(), lines, { a: "2" })).toBe("/orders/o");
     expect(pickDoneHref(order({ needs_restock: true }), lines, { a: "3" })).toBe("/orders/o");
+  });
+});
+
+describe("the order lifecycle has one owner", () => {
+  it("lists exactly the database's order statuses, in order", () => {
+    expect([...ORDER_STATUSES]).toEqual([...Constants.public.Enums.order_status]);
+  });
+
+  it("keys its legal moves by registered order commands", () => {
+    for (const command of Object.keys(ORDER_MOVES)) expect(getCommandDefinition(command), command).toBeDefined();
+  });
+
+  it("answers which statuses a command accepts", () => {
+    expect(ORDER_STATUSES.filter((s) => orderAllows("ship_order", s))).toEqual(["picked"]);
+    expect(ORDER_STATUSES.filter((s) => orderAllows("record_pick", s))).toEqual(["confirmed", "picked"]);
+    expect(ORDER_STATUSES.filter((s) => orderAllows("cancel_order", s))).toEqual(["draft", "submitted", "confirmed", "picked"]);
+    expect(ORDER_STATUSES.filter((s) => orderAllows("set_order_pickup", s))).toEqual(["draft", "submitted", "confirmed", "picked"]);
+  });
+
+  it("offers Put back wherever beer is staged, cancelled and shipped orders included", () => {
+    for (const status of ["confirmed", "picked", "shipped", "cancelled"] as const) {
+      expect(nextAction(status, true, "o", ["warehouse"]), status).toMatchObject({ verb: "Put back", href: "/orders/o/restock" });
+      expect(nextAction(status, true, "o", ["sales"]).verb, status).toBe("Open");
+    }
+    expect(shownState("cancelled", true, null, false)).toEqual({ label: "Cancelled", next: "put back" });
+    expect(shownState("shipped", true, "delivered", false)).toEqual({ label: "Delivered", next: "put back" });
+    expect(shownState("cancelled", false, null, false)).toEqual({ label: "Cancelled", next: "none" });
+  });
+
+  it("sends a step page's visitor to Put back or the order when the command would refuse", () => {
+    const order = (status: OrderStatus, needs_restock = false) => ({ id: "o", status, needs_restock });
+    expect(stepRedirect("ship_order", order("picked"))).toBeUndefined();
+    expect(stepRedirect("ship_order", order("confirmed"))).toBe("/orders/o");
+    // ship_order and record_pick both refuse while staged beer waits
+    expect(stepRedirect("ship_order", order("picked", true))).toBe("/orders/o/restock");
+    expect(stepRedirect("record_pick", order("confirmed", true))).toBe("/orders/o/restock");
+    expect(stepRedirect("confirm_order", order("submitted"))).toBeUndefined();
+    expect(stepRedirect("update_draft_order", order("submitted"))).toBe("/orders/o");
   });
 });

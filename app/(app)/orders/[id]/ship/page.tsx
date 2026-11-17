@@ -10,8 +10,9 @@ import { toShipmentDoneViewProps } from "@/lib/mgr/shipment-done-view";
 import type { KegShortage } from "@/lib/mgr/keg-fleet-view";
 import "@/lib/commands/all";
 import { navTitle } from "@/lib/mgr/nav";
+import { stepRedirect, type OrderStatus } from "@/lib/mgr/order-status";
 
-type Snapshot = { order: ShippingSnapshot["order"] & { status: string }; lines: ShippingSnapshot["lines"]; events: { event: string; payload: { invoice_id?: string | null; warnings?: KegShortage[] } }[]; shipment: { id: string; invoice_timing: "now" | "on_delivery"; deliveries: unknown[] } | null };
+type Snapshot = { order: ShippingSnapshot["order"] & { status: OrderStatus; needs_restock: boolean }; lines: ShippingSnapshot["lines"]; events: { event: string; payload: { invoice_id?: string | null; warnings?: KegShortage[] } }[]; shipment: { id: string; invoice_timing: "now" | "on_delivery"; deliveries: unknown[] } | null };
 
 const getShipPageData = cache(async function getShipPageData(id: string) {
   const brewery = await getActiveBrewery();
@@ -26,7 +27,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { snapshot: { order, shipment } } = await getShipPageData(id);
   if (order.kind !== "wholesale") redirect(`/orders/${order.id}`);
   if (!(order.status === "shipped" && shipment)) {
-    if (order.status !== "picked") redirect(`/orders/${order.id}`);
+    const away = stepRedirect("ship_order", order);
+    if (away) redirect(away);
     await getOrderShipSources(id);
   }
   return { title: navTitle("/orders") };
@@ -46,7 +48,8 @@ export default async function ShipPage({ params }: { params: Promise<{ id: strin
     const routeHref = !order.pickup && shipment.deliveries.length === 0 ? `/routes/new?add=${shipment.id}` : undefined;
     return <ShipmentDoneView model={toShipmentDoneViewProps({ order, lines, warnings: shipped?.warnings, invoice: detail?.invoice ?? null, invoiceTiming: shipment.invoice_timing, invoiceHref: invoiceId ? `/invoices/${invoiceId}` : undefined, routeHref, backHref: `/orders/${order.id}` })} />;
   }
-  if (order.status !== "picked") redirect(`/orders/${order.id}`);
+  const away = stepRedirect("ship_order", order);
+  if (away) redirect(away);
   const available = await getOrderShipSources(id);
   return <ShipForm snapshot={{ order, lines, locations, backHref: `/orders/${order.id}` }} available={available} />;
 }
