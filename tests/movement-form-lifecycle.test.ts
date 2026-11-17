@@ -10,6 +10,12 @@ vi.mock("react", async original => ({
   ...await original<typeof React>(),
   useEffect: () => {},
   useCallback: (callback: unknown) => callback,
+  // A ref is one more slot kept across route renders, like the state below.
+  useRef: (initial: unknown) => {
+    const index = state.cursor++;
+    if (!(index in state.values)) state.values[index] = { current: initial };
+    return state.values[index];
+  },
   useState: (initial: unknown) => {
     const index = state.cursor++;
     if (!(index in state.values)) state.values[index] = typeof initial === "function" ? initial() : initial;
