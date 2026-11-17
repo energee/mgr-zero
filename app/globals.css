@@ -232,6 +232,27 @@
   color: var(--foreground);
 }
 
+/* A row action marked quiet (Catalog's Find COLA) rests as plain text and
+   takes its tint when its table row is hovered or focused, so a column of
+   them does not compete with the rows. Touch has no hover and the phone list
+   has no table row, so there the action keeps its tint. */
+@media (hover: hover) {
+  tr:not(:hover, :focus-within) [data-quiet-action] [data-row-action] {
+    background-color: transparent;
+    color: var(--muted-foreground);
+  }
+}
+
+/* A quiet field (a Price groups cell) reads as a number in its table: it
+   takes the field fill when its row is hovered or focused. Touch has no
+   hover, so there it keeps the fill. The extra attribute outranks the fill
+   rule below. */
+@media (hover: hover) {
+  tr:not(:hover, :focus-within) [data-slot="input-group"][data-quiet-field] {
+    background-color: transparent;
+  }
+}
+
 /* Fields and outline buttons are filled, not outlined. Applied to the
    data-slot hooks so components/ui stays untouched; unlayered, so it beats
    the stock border and background utilities. An outline button is matched by
@@ -268,6 +289,12 @@
   padding-left: max(0.75rem, var(--page-bleed, 0px));
 }
 [data-mgr-page-scroll] [data-slot="table-row"] > :last-child {
+  padding-right: max(0.75rem, var(--page-bleed, 0px));
+}
+/* Price groups folds columns behind a switch. While it is off, the last column
+   showing ([data-row-edge]) is the row's edge, not the hidden last cell, so it
+   takes the gutter. */
+[data-mgr-page-scroll] [data-price-grid]:not(:has([role="switch"][data-state="checked"])) [data-row-edge] {
   padding-right: max(0.75rem, var(--page-bleed, 0px));
 }
 /* A table or row inside a bordered box, a width-capped column, or a column of

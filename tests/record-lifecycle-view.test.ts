@@ -43,8 +43,9 @@ describe("record lifecycle availability (#1311)", () => {
   });
 
   // The owner kept these notes (#1311) and cut each to one sentence (#1512, #1518).
+  // A note is an alert box, or (Brand) a quiet paragraph; both carry role="note".
   const lifecycleNote = (html: string, pattern: RegExp) =>
-    (html.match(/<[^>]*role="note"[^>]*>[\s\S]*?<\/div><\/div>/g) ?? []).map(note => note.replace(/<[^>]+>/g, "").trim()).find(note => pattern.test(note));
+    (html.match(/<p[^>]*role="note"[^>]*>[\s\S]*?<\/p>|<[^>]*role="note"[^>]*>[\s\S]*?<\/div><\/div>/g) ?? []).map(note => note.replace(/<[^>]+>/g, "").trim()).find(note => pattern.test(note));
 
   it.each(["Brand", "Water profiles", "Locations"])("%s explains unsupported lifecycle actions in one sentence, without a fake removal control", name => {
     const html = screenHtml(name);

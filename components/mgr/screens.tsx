@@ -87,7 +87,7 @@ import { TapBoardView, TapKegView } from "@/components/mgr/views/tap-board";
 import { AccountingView, DisconnectQuickBooksView, QboConnectionView, QboSyncView } from "@/components/mgr/views/accounting";
 import { accountingExpired, quickBooksMappings } from "@/lib/mgr/fixtures/accounting";
 import { tapBoard, tapBoardSkus, kickKeg, swapKeg } from "@/lib/mgr/fixtures/taproom";
-import { cellarAdditionCitra, cellarTransferPils } from "@/lib/mgr/fixtures/production";
+import { cellarAdditionCitra, cellarTransferPlannedBatch } from "@/lib/mgr/fixtures/production";
 import { brewTurnModel } from "@/lib/mgr/brew-day-view";
 import { CustomerView } from "@/components/mgr/views/customer";
 import { CustomersView } from "@/components/mgr/views/customers";
@@ -229,7 +229,7 @@ import {
   correctReceiptPo, draftPoCanSource, editPoCanSource, newPoDraft, newPoIncomplete, purchaseOrdersWarehouse, receiptPoPartial, receivePoSent, vendorDetail, vendorEdit, vendorsList,
 } from "@/lib/mgr/fixtures/purchasing";
 import { kegBalanceRidgeline, kegFleet, kegHistoryLedger, kegReportOwned } from "@/lib/mgr/fixtures/kegs";
-import { packagingRuns, repackCase, schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
+import { packagingReady, packagingRuns, repackCase, schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
 import { planningDemo } from "@/lib/mgr/fixtures/planning";
 import { monthlyComplianceAmended, monthlyComplianceAugust, monthlyComplianceSeptember, monthlyComplianceUnbalanced } from "@/lib/mgr/fixtures/monthly-compliance";
 import { confirmDeliveryStop1, driverRouteA, returnRouteA, routeAPlan, routesDriver } from "@/lib/mgr/fixtures/delivery";
@@ -293,7 +293,7 @@ import { toPutBackViewProps } from "@/lib/mgr/put-back-view";
 import { toQuestionInvoiceViewProps } from "@/lib/mgr/question-invoice-view";
 import { toRecipesViewProps } from "@/lib/mgr/recipes-view";
 import { toRecordMovementViewProps } from "@/lib/mgr/record-movement-view";
-import { toPackagingRunsViewProps } from "@/lib/mgr/packaging-runs-view";
+import { toPackagingRunsViewProps, toReadyToPackage } from "@/lib/mgr/packaging-runs-view";
 import { toPlanningViewProps } from "@/lib/mgr/planning-view";
 import { beforeBooksState, toMonthlyComplianceViewProps } from "@/lib/mgr/monthly-compliance-view";
 import { toReverseMovementViewProps } from "@/lib/mgr/reverse-movement-view";
@@ -1611,13 +1611,13 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Catalog",
-    to: { "Bulk process COLAs": "Bulk process COLAs", "Hazy IPA": "Brand", Pils: "Brand", Stout: "Brand", "New format": "Format", "16 oz can": "Format", "four-pack": "Format", "case · 24×16oz": "Format", "½ bbl keg": "Format" },
+    to: { "Bulk process COLAs": "Bulk process COLAs", "Find COLA": "Bulk process COLAs", "Hazy IPA": "Brand", Pils: "Brand", Stout: "Brand", "New format": "Format", "16 oz can": "Format", "four-pack": "Format", "case · 24×16oz": "Format", "½ bbl keg": "Format" },
     job: "Define brands, their sellable formats and prices without ledger writes",
     reads: "list_brands [incl. recorded COLA approvals and selected images] · list_skus · list_catalog_categories · get_cola_image",
     writes: "upsert_brand · create_sku · update_sku",
     states: DEFAULT_STATES,
-    spec: "Brand facts (ABV and tax class) edit on Brand; SKU associates the brand with a Format. Volume and packaging stay on the Format. This page remains a list with simple pricing, never the v1 price matrix.",
-    body: <CatalogView model={toCatalogViewProps(catalogBrands)} images={Object.fromEntries(toCatalogViewProps(catalogBrands).brands.flatMap(brand => brand.image ? [[brand.key, <ColaLabelImageView key={brand.key} label={`${brand.name} · COLA ${brand.image.ttbId}`} src="/mock/cola-label.svg" compact />]] : []))} controls={<ListControls resultCount={catalogBrands.brands.length} search={{ label: "Search brands or aliases", value: "", keep: {} }} scopes={toCatalogScopes({ sort: "name", category: "", categories: ["Core", "Seasonal"] })} />} formats={toFormatsViewProps({ ...formatsInventory, formats: formatsInventory.formats.filter(format => format.basis === "packaged") })} />,
+    spec: "Brand facts (ABV and tax class) edit on Brand; SKU associates the brand with a Format. Volume and packaging stay on the Format. This page remains a list with simple pricing, never the v1 price matrix. The COLA column stays quiet about the usual case. A green check opens TTB's page for the newest approved COLA, with the approval date as its label; a COLA saved without a date reads On file and links the same way; IDs read on Brand. A brand with no COLA shows Find COLA, which opens the COLA review on that one brand; it rests as plain text until its row is hovered or focused. A role without that action reads None on file. Hovering a label thumbnail opens the label larger with its approval date and a link to TTB.",
+    body: <CatalogView model={toCatalogViewProps(catalogBrands)} images={Object.fromEntries(toCatalogViewProps(catalogBrands).brands.flatMap(brand => brand.image ? [[brand.key, <ColaLabelImageView key={brand.key} label={`${brand.name} · COLA ${brand.image.ttbId}`} src="/mock/cola-label.svg" compact />]] : []))} previews={Object.fromEntries(toCatalogViewProps(catalogBrands).brands.flatMap(brand => brand.image ? [[brand.key, <ColaLabelImageView key={brand.key} label={`${brand.name} · COLA ${brand.image.ttbId}`} src="/mock/cola-label.svg" />]] : []))} controls={<ListControls resultCount={catalogBrands.brands.length} search={{ label: "Search brands or aliases", value: "", keep: {} }} scopes={toCatalogScopes({ sort: "name", category: "", categories: ["Core", "Seasonal"] })} />} formats={toFormatsViewProps({ ...formatsInventory, formats: formatsInventory.formats.filter(format => format.basis === "packaged") })} />,
   },
   {
     step: 5,
@@ -1909,7 +1909,7 @@ export const SCREENS: Screen[] = [
     job: "See planned and active batches with the next brew or cellar action",
     reads: "list_batches · list_batch_history · list_vessels · list_brands · list_recipes · get_gravity_unit",
     writes: "none [scheduling happens on the New batch sheet; recording on Brew day or Fermentation reading; existing commands]",
-    states: [["planned", "Brew is the next action and opens the brew-day page"], ["active", "each open occupancy is a line with its latest reading and its own Reading action · ABV and Attenuation give each tank's figure so far, from the batch's first gravity reading to the tank's latest, and stay blank until a second gravity reading"], ["completed", "closed batches stay available in their own group"], ["empty", "New batch and vessel setup remain available"], ["brewer", "New vessel hidden; vessels are admin-managed"], ["retired vessel", "listed as Inactive"]],
+    states: [["planned", "Brew is the next action and opens the brew-day page"], ["active", "each open occupancy is a line with its latest reading and its own Reading action · ABV and Attenuation give each tank's figure so far, from the batch's first gravity reading to the tank's latest, and stay blank until a second gravity reading"], ["completed", "closed batches stay available in their own group · ABV and Attenuation give each batch's final figure, from its first gravity reading to its last, blank with fewer than two · no vessel column, a completed batch is in no tank"], ["empty", "New batch and vessel setup remain available"], ["brewer", "New vessel hidden; vessels are admin-managed"], ["retired vessel", "listed as Inactive"]],
     spec: "The Work list with the Batches tab active. Each lifecycle group is a table on the desk and a list on the phone. The batch number is the link that opens a batch; only a planned batch adds Brew. A vessel name opens that vessel's page, editable only by an admin; New vessel shows only to an admin. The Vessels table lists retired vessels as Inactive. New batch opens the New batch sheet. Its Schedule batch returns here, and so does Brew day.",
     body: <BatchesView model={toBatchesViewProps(batchesBrewer)} completedPagination={{ moreHref: "#" }} cancelledPagination={{ moreHref: "#" }} />,
   },
@@ -1974,11 +1974,11 @@ export const SCREENS: Screen[] = [
     name: "Cellar transfer",
     to: { "Record transfer": "Cellar map" },
     job: "Write one transfer row that carries its own loss volume",
-    reads: "list_occupancies · list_vessels",
-    writes: "record_cellar_transfer [one RPC: create target occupancy(initial_bbl=0) when empty + append transfer + a generic loss volume adjustment on the source when loss > 0 + close source occupancy iff fully emptied]",
-    states: permitted("brewer or admin required"),
-    spec: "Drawn as a blend into an occupied brite: BT1 keeps its occupancy and B-0412 keeps its identity: the schema has one batch per occupancy, and blends are transfers into the surviving one (renaming a blend as a new batch is a plan §8 schema gap). An empty target (BT2) gets a new occupancy starting at zero bbl in the same RPC; the transfer row stays immutable; a fully emptied source closes its occupancy. A partial transfer never implies loss: the person explicitly holds the remainder or records loss. No vessel status. With no other vessel, the To list says so and links Add a vessel for an admin; anyone else is told to ask Admin.",
-    body: <><CellarTransferView model={cellarTransferPils} footer={null} />{E.pin(<CellarTransferFooter />)}</>,
+    reads: "list_occupancies · list_vessels · list_batches",
+    writes: "record_cellar_transfer [one RPC: create target occupancy(initial_bbl=0) when empty, for the chosen planned batch when one is given (marking it brewed today) and otherwise for the source's batch + append transfer + a generic loss volume adjustment on the source when loss > 0 + close source occupancy iff fully emptied]",
+    states: [...permitted("brewer or admin required"), ["planned batch", "Start a planned batch shows only for an empty destination when an unstarted plan exists; choosing one makes the beer moved that batch"], ["blend", "a destination that holds beer keeps its batch, and the picker is not offered"]],
+    spec: "Drawn as a split into an empty brite: BT2 gets a new occupancy starting at zero bbl in the same RPC, and Start a planned batch makes that occupancy the planned B-0420, so part of B-0409 becomes another beer. With no planned batch chosen, the new occupancy continues the source's batch. A target that holds beer (BT1) is a blend: it keeps its occupancy and B-0412 keeps its identity, because the schema has one batch per occupancy and blends are transfers into the surviving one; the picker is not offered there. The transfer row stays immutable; a fully emptied source closes its occupancy. A partial transfer never implies loss: the person explicitly holds the remainder or records loss. No vessel status. With no other vessel, the To list says so and links Add a vessel for an admin; anyone else is told to ask Admin.",
+    body: <><CellarTransferView model={cellarTransferPlannedBatch} footer={null} />{E.pin(<CellarTransferFooter />)}</>,
   },
   {
     name: "Packaging plan",
@@ -2024,13 +2024,13 @@ export const SCREENS: Screen[] = [
     slice: 5,
     tab: "Work",
     name: "Packaging runs",
-    to: { Resolve: "Close packaging run", Start: "Packaging plan", "Pick source": "Packaging plan" },
+    to: { Resolve: "Close packaging run", Start: "Packaging plan", "Pick source": "Packaging plan", Schedule: "Schedule packaging run" },
     job: "See what is planned, what is due and what closed, and schedule the next run",
     reads: "list_packaging_runs · list_packaging_history · list_brands · list_occupancies · list_skus · list_locations · list_bins",
     writes: "none [scheduling and closing happen on their own surfaces]",
-    states: [["short", "a planned run whose materials fall short says so beneath its run number and its next action is Resolve, not Start"], ["overdue", "an unstarted active plan before brewery-local today is marked Overdue; finished runs never are"], ["due today", "the same run also appears in Today for the brewer"], ["closed", "finished runs stay under Recent, grouped by planned day; a low yield is drawn as a warning"], ["cancelled", "a cancelled run says Cancelled where its output would be"], ["empty", "no runs planned: the empty state points at Schedule run"]],
-    spec: "Reuse the responsive RecordTable register shared with Batches: sortable columns on desktop and labeled records on phones. Keep Upcoming and Recent separate. Upcoming shows run, brand, planned date, source, planned quantity and next action. Recent does not sort: it is grouped under a heading per planned day, newest first, naming the day, its closed runs and their barrels packaged. Each row shows run, brand and actual output in package units, with a bar splitting its barrels between cans or bottles and kegs when every format has a volume. Yield (barrels packaged over barrels drawn) appears only when a run has barrels drawn, never inferred from planned quantities. Schedule run and Repack keep their existing forms. A run number opens its record; finished runs have no next action.",
-    body: <PackagingRunsView model={toPackagingRunsViewProps(packagingRuns, DEMO_TIME_ZONE)} pagination={{ moreHref: "#" }} />,
+    states: [["ready", "beer in a brite tank with no run planned from it is listed first under Ready to package; Schedule opens the run sheet on that tank and its brand"], ["short", "a planned run whose materials fall short of stock on hand and on order says so beneath its run number and its next action is Resolve, not Start"], ["overdue", "an unstarted active plan before brewery-local today is marked Overdue; finished runs never are"], ["due today", "the same run also appears in Today for the brewer"], ["closed", "finished runs stay under Recent, grouped by planned day; a run that packaged under 90% of its plan is drawn as a warning"], ["cancelled", "a cancelled run says Cancelled where its output would be"], ["empty", "no runs planned: the empty state points at Schedule run"]],
+    spec: "Reuse the responsive RecordTable register shared with Batches: sortable columns on desktop and labeled records on phones. Ready to package comes first, then Upcoming, then Recent. Ready to package shows tank, brand, batch, volume and Schedule. Upcoming shows run, brand, planned date, source, planned quantity by package unit and next action. Recent does not sort: it is grouped under a heading per planned day, newest first, naming the day, its closed runs and their barrels packaged. Each row shows run, brand and actual output in package units, with a bar splitting its barrels between cans or bottles and kegs when every format has a volume. The last column sets barrels packaged against barrels planned, as a bar filled toward the plan and both figures; with nothing planned it states the packaged barrels alone. Schedule run and Repack keep their existing forms. A run number opens its record; finished runs have no next action.",
+    body: <PackagingRunsView model={toPackagingRunsViewProps(packagingRuns, DEMO_TIME_ZONE)} ready={toReadyToPackage(packagingReady)} pagination={{ moreHref: "#" }} />,
   },
   {
     step: 8,
@@ -2598,7 +2598,7 @@ export const SCREENS: Screen[] = [
     job: "Review the brewery’s approved labels and select a catalog image for each brand",
     reads: "search_colas · get_cola_details · get_cola_image",
     writes: "upsert_brand_approval",
-    states: [["selection", "brands with no COLA on file start selected; select all or any shown brand"], ["review", "the only matching COLA and its only label image start chosen; save or skip each brand"], ["no match", "show all labels under the permit or skip"], ["not approved", "TTB must report APPROVED before images can be selected", 1], ["complete", "saved choices stay; skipped brands are unchanged"]],
+    states: [["selection", "brands with no COLA on file start selected; select all or any shown brand"], ["one brand", "Find COLA on a Catalog row reviews that brand alone: TTB is searched on opening, with no selection step and nothing to skip"], ["review", "the only matching COLA and its only label image start chosen; save or skip each brand"], ["no match", "show all labels under the permit or skip"], ["not approved", "TTB must report APPROVED before images can be selected", 1], ["complete", "saved choices stay; skipped brands are unchanged"]],
     body: <ColaReviewView brands={colaReviewBrands} selected={colaReviewBrands.map(brand => brand.id)} missing={missingColaIds(colaReviewBrands)} queue={colaReviewBrands} index={0} saved={0} candidates={[colaReviewRecord]} ttbId={colaReviewRecord.ttbId} details={colaReviewDetails} imageUrl={colaReviewDetails.images[0]!.url} showAll={false} images={Object.fromEntries(colaReviewDetails.images.map(image => [image.url, <ColaLabelImageView key={image.url} label={image.label} src="/mock/cola-label.svg" />]))} />,
   },
   {
@@ -3193,8 +3193,8 @@ export const SCREENS: Screen[] = [
     job: "Price every beer from one grid: groups down, formats across, a tab per sale channel",
     reads: "list_sale_channels · list_price_groups · list_formats · list_channel_prices",
     writes: "set_channel_price · clear_channel_price · upsert_price_group · delete_price_group",
-    states: [["permission", "sales or admin required", 1], ["empty cell", "unpriced · an order for a SKU on that group and format is refused on that channel", 1], ["empty", "no price groups yet: New price group is the only action"], ["in use", "a group a brand sits on, or a cell prices, cannot be removed", 1]],
-    spec: "Reached from More and from Catalog; back returns to More. The brewery's price sheet is one grid: rows are price groups, columns are packaged formats plus pours owned by a group (one column per pour name, headed Pour · and the name, so a keg and a pour of one name differ). One tab per sale channel; the grid shows the selected channel, the first by default, and the address keeps the tab. A beer sits on one group (Catalog → Brand → Price group) and a customer sits on one channel, so the price of any SKU for any customer is the single cell where the two meet. Every cell is a dollars field edited in place: Enter or leaving the input saves. Saving and Saved appear inline; invalid, negative, exponent, or extra-precision amounts are refused without rounding. Zero is valid. An unpriced cell is empty with a dash. Emptying a priced cell and leaving it clears the price; no cell carries its own Clear button. A group with no pour of a column's name shows + add, which opens Add pour on that group with the name filled in. A group's name opens Price group, where its position, cost ceiling, and pours live.",
+    states: [["permission", "sales or admin required", 1], ["empty cell", "unpriced · an order for a SKU on that group and format is refused on that channel", 1], ["folded", "formats no group prices on the channel hide behind one Show switch; a channel with no prices folds none"], ["empty", "no price groups yet: New price group is the only action"], ["in use", "a group a brand sits on, or a cell prices, cannot be removed", 1]],
+    spec: "Reached from More and from Catalog; back returns to More. The brewery's price sheet is one grid: rows are price groups, columns are packaged formats plus pours owned by a group (one column per pour name, headed Pour · and the name, so a keg and a pour of one name differ). One tab per sale channel; the grid shows the selected channel, the first by default, and the address keeps the tab. A beer sits on one group (Catalog → Brand → Price group) and a customer sits on one channel, so the price of any SKU for any customer is the single cell where the two meet. A format no group prices on the selected channel is folded: a switch above the grid, Show n formats not priced on the channel, brings those columns back to price, and a channel with no prices folds none. Each group's cost ceiling reads under its name. On a phone the grid is one block per group with a line per format, so nothing scrolls sideways. Every cell is a dollars field edited in place: Enter or leaving the input saves. A cell reads as a number and takes the field fill when its row is pointed at or focused; touch keeps the fill. Saving and Saved appear beside the field; invalid, negative, exponent, or extra-precision amounts are refused without rounding. Zero is valid. An unpriced cell is empty with a dash. Emptying a priced cell and leaving it clears the price; no cell carries its own Clear button. A group with no pour of a column's name shows + add, which opens Add pour on that group with the name filled in. A group's name opens Price group, where its position, cost ceiling, and pours live.",
     body: <PriceGroupsView model={toPriceGroupsViewProps(pricingGrid)} />,
   },
   {

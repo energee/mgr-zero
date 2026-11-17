@@ -45,14 +45,18 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord, ac
     {model.cancelled ? <PlanCancelled /> : value.recorded ? <>
       {actions}
       {E.fld("Vessel", model.vesselName || "No open occupancy")}
-      {E.fld("Knockout", model.initialBbl ? model.initialBbl + " bbl" : "Unavailable after the occupancy closes")}
-      {E.fld("Brewed on", model.brewedOn ? formatDate(model.brewedOn) : "Unavailable")}
+      {model.startedFrom
+        ? E.fld("Started from", <>{model.startedFrom.href ? E.link(model.startedFrom.label, undefined, model.startedFrom.href) : model.startedFrom.label} · {bblExact(model.startedFrom.bbl, 3)} by transfer</>)
+        : E.fld("Knockout", model.initialBbl ? model.initialBbl + " bbl" : "Unavailable after the occupancy closes")}
+      {E.fld(model.startedFrom ? "Started on" : "Brewed on", model.brewedOn ? formatDate(model.brewedOn) : "Unavailable")}
       {model.completion && <>
         {E.fld("Completed", model.completion.on)}
         {E.fld("Packaged", bblExact(model.completion.packagedBbl, 8))}
         {E.fld("Written off as loss", model.completion.writeOffBbl === null ? "None" : bblExact(model.completion.writeOffBbl, 8))}
       </>}
-      {!(model.records?.length) && E.note("Historical frozen brew sheet unavailable. This brew predates confirmed material records.")}
+      {!(model.records?.length) && E.note(model.startedFrom
+        ? "No brew sheet. This batch started from a transfer, so its ingredients are on the batch it came from."
+        : "Historical frozen brew sheet unavailable. This brew predates confirmed material records.")}
       {(model.records ?? []).map(record => <section key={record.id} className="flex flex-col gap-2 rounded border p-3">
         {E.ttl(`Turn ${record.turn} · ${record.corrects_id ? "Corrected brew record" : "Original brew record"}`)}
         {showsTurnKnockout(model.records ?? [], model.initialBbl) && E.fld("Confirmed knockout", `${record.initial_bbl} bbl`)}
@@ -64,7 +68,7 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord, ac
       </section>)}
       {currentBrewRecords(model.records ?? []).map(record => <Fragment key={record.id}>{cloneElement(E.act(`Correct turn ${record.turn}`, "attention", undefined, () => change(brewCorrectionModel(model, record)), busy), { "data-preview-action": true } as Record<string, unknown>)}</Fragment>)}
       {model.vesselId && model.records?.length ? cloneElement(E.act("Add brew turn", "attention", undefined, () => change(brewTurnModel(model)), busy), { "data-preview-action": true } as Record<string, unknown>) : null}
-      {!model.completion && E.info("Already brewed. Cellar transfers and fermentation readings continue from the current occupancy, when one is open.")}
+      {!model.completion && E.info(`${model.startedFrom ? "Started by transfer" : "Already brewed"}. Cellar transfers and fermentation readings continue from the current occupancy, when one is open.`)}
     </> : <form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); if (!busy && ready) onRecord?.(); }}>
 
       {value.correctionRecordId ? E.fld("Vessel", "Fixed by the recorded turn") : E.pick("Vessel", value.vesselId, vesselOptions(value.vessels), { onChange: vesselId => change({ vesselId }), disabled: busy || Boolean(value.addingTurn), required: true, placeholder: "Choose vessel", id: id + "-vessel" })}

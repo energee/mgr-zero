@@ -463,9 +463,9 @@ describe("SCREENS", () => {
     const verbs = new Set([
       "Correct receipt", "Add brew turn", "Correct turn 1", "Correct turn 2",
       "Add", "Add reading", "Add stop", "Add to route", "Adjust", "Assign", "Cancel plan", "Reschedule", "Change", "Check", "Check in", "Choose lot", "Choose who gets it", "Close", "Confirm", "Confirm all", "Connect", "Count", "Create",
-      "Deliver", "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Edit SKU", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Mark sent", "Open", "Open format",
+      "Deliver", "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Edit SKU", "Find COLA", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Mark sent", "Open", "Open format",
       "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Reading", "Receive", "Record movement", "Record opening count", "Record return", "Release", "Reload", "Remove", "Reorder", "Re-push",
-      "Resolve", "Resume", "Retry", "Return", "Return and credit", "Review", "Review history", "Review sales", "Select", "Send", "Send PO", "Set vendor", "Shortfall", "Skip", "Start", "Swap", "Switch", "Tap",
+      "Resolve", "Resume", "Retry", "Return", "Return and credit", "Review", "Review history", "Review sales", "Schedule", "Select", "Send", "Send PO", "Set vendor", "Shortfall", "Skip", "Start", "Swap", "Switch", "Tap",
       "Unlink", "Use", "Write off", "Fix registration", "Forgot password?", "Import CSV", "Invite staff", "Invite portal user",
     ]);
     for (const screen of SCREENS) {
@@ -731,6 +731,15 @@ describe("SCREENS", () => {
     expect(transfer.writes).not.toMatch(/\[design/);
     // record_repack is live (#278 slice 6): the child leg is derived, so the gate is lifted.
     expect(SCREENS.find((x) => x.name === "Repack")!.writes).not.toMatch(/SCHEMA-GATE/);
+  });
+
+  it("draws Cellar transfer starting a planned batch in an empty tank", () => {
+    const transfer = SCREENS.find((x) => x.name === "Cellar transfer")!;
+    const html = renderToStaticMarkup(createElement("div", null, transfer.body));
+    expect(html).toContain("Start a planned batch");
+    expect(html).toContain("Dry-Hopped Pils · B-0420");
+    expect(html).toContain("Transfer preview: BT2 0 + 3 = 3 / 10 bbl");
+    expect(transfer.states?.map(([name]) => name)).toContain("planned batch");
   });
 
   it("gives every Work create form the shared E.pin footer (#1226)", () => {
