@@ -19,7 +19,7 @@ import type { OrderCogs } from "@/lib/commands/orders";
 import type { PortalUser, TeamMember } from "@/lib/commands/invites";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toOrderViewProps, type OrderSnapshot } from "@/lib/mgr/order-view";
-import type { DeliveryOutcome, OrderStatus } from "@/lib/mgr/order-status";
+import { orderAllows, type DeliveryOutcome, type OrderStatus } from "@/lib/mgr/order-status";
 import "@/lib/commands/all";
 import { getOrderPageData } from "../order-data";
 import { CancelOrderAction, LifecycleButtons, OrderActionScope } from "./lifecycle-buttons";
@@ -37,7 +37,7 @@ export async function OrderDetail({ id }: { id: string }) {
   const { order, lines, events, atp, deposits, shipment } = snapshot as { order: Order; lines: OrderLine[]; events: OrderEvent[]; atp: Atp[]; deposits: OrderSnapshot["deposits"]; shipment: { deliveries: { outcome: DeliveryOutcome | null }[]; invoices: NonNullable<OrderSnapshot["invoice"]>[] } | null };
   const canSell = canRun(ctx, "confirm_order"), canFulfill = canRun(ctx, "record_pick");
   // Lines change in place where adjust_order_lines may run: Admin or Sales, confirmed or picked.
-  const editable = canSell && (order.status === "confirmed" || order.status === "picked");
+  const editable = canSell && orderAllows("adjust_order_lines", order.status);
   const [locations, cogs, team, buyers, skuRows, emailStatuses]: [{ id: string; name: string }[], OrderCogs | undefined, TeamMember[], PortalUser[], SkuRow[], OrderSnapshot["emailStatuses"]] = await Promise.all([
     runCommand("list_locations", {}, ctx) as Promise<{ id: string; name: string }[]>,
     // Cost and margin are for Admin and Sales (#810); only a shipped order has any.
@@ -63,7 +63,7 @@ export async function OrderDetail({ id }: { id: string }) {
         editable={editable}
         skus={skuRows.map(toSkuOption)}
         model={model}
-        pickup={canRun(ctx, "set_order_pickup") && order.kind === "wholesale" && order.status !== "shipped" && order.status !== "cancelled" ? { value: order.pickup } : undefined}
+        pickup={canRun(ctx, "set_order_pickup") && order.kind === "wholesale" && orderAllows("set_order_pickup", order.status) ? { value: order.pickup } : undefined}
         actions={<LifecycleButtons canSell={canSell} canFulfill={canFulfill} transfer={order.kind === "taproom_transfer"} restockFirst={model.putBackHref !== undefined} orderId={order.id} status={order.status} />}
         footer={<CancelOrderAction canSell={canSell} orderId={order.id} status={order.status} />}
       />

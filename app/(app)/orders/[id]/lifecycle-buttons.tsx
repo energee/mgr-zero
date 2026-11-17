@@ -2,7 +2,8 @@
 // drawn into OrderView's slots: LifecycleButtons fills the header (Submit for
 // a draft, which then opens Review and confirm (#1503); Ship or Complete transfer once picked; Record pick
 // while confirmed or picked), primary first, and makes its fulfillment
-// verbs secondary while Put back leads; CancelOrderAction fills the bottom
+// verbs secondary while Put back leads (their pages redirect to Put back
+// until it is done; lib/mgr/order-status.ts stepRedirect); CancelOrderAction fills the bottom
 // row with the quiet Cancel order (any pre-ship status, via
 // cancel-order-dialog.tsx). OrderActionScope wraps the page so both share one
 // command action: Submit and Cancel see the same busy and error state.
@@ -20,7 +21,7 @@ import { E } from "@/components/mgr/e";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { CancelOrderButton, OrderCancelRow } from "@/components/mgr/views/order";
 import { useCommandAction } from "@/lib/commands/use-command-form";
-import type { OrderStatus } from "@/lib/mgr/order-status";
+import { orderAllows, type OrderStatus } from "@/lib/mgr/order-status";
 import { CancelOrderDialog } from "./cancel-order-dialog";
 
 const OrderAction = createContext<ReturnType<typeof useCommandAction> | null>(null);
@@ -55,14 +56,13 @@ export function LifecycleButtons({
   const router = useRouter();
   const action = useOrderAction();
   const { busy, error } = action;
-  const open = status === "confirmed" || status === "picked";
   const fulfil = restockFirst ? "g" : "p";
 
   return (
     <>
-      {canSell && status === "draft" && E.btn("Submit", busy ? "p disabled" : "p", undefined, () => void action.run("submit_order", { orderId }, () => router.push(`/orders/${orderId}/confirm`)))}
-      {canFulfill && status === "picked" && E.btn(transfer ? "Complete transfer" : "Ship", fulfil, `/orders/${orderId}/${transfer ? "complete" : "ship"}`)}
-      {canFulfill && open && E.btn("Record pick", status === "confirmed" ? fulfil : "g", `/orders/${orderId}/pick`)}
+      {canSell && orderAllows("submit_order", status) && E.btn("Submit", busy ? "p disabled" : "p", undefined, () => void action.run("submit_order", { orderId }, () => router.push(`/orders/${orderId}/confirm`)))}
+      {canFulfill && orderAllows("ship_order", status) && E.btn(transfer ? "Complete transfer" : "Ship", fulfil, `/orders/${orderId}/${transfer ? "complete" : "ship"}`)}
+      {canFulfill && orderAllows("record_pick", status) && E.btn("Record pick", status === "confirmed" ? fulfil : "g", `/orders/${orderId}/pick`)}
       {error ? <div className="basis-full"><CommandFormMessage error={error} /></div> : null}
     </>
   );
@@ -72,7 +72,7 @@ export function LifecycleButtons({
 export function CancelOrderAction({ orderId, status, canSell }: { orderId: string; status: OrderStatus; canSell: boolean }) {
   const router = useRouter();
   const action = useOrderAction();
-  if (!canSell || status === "shipped" || status === "cancelled") return null;
+  if (!canSell || !orderAllows("cancel_order", status)) return null;
   return (
     <OrderCancelRow>
       <CancelOrderDialog orderId={orderId} action={action} trigger={<CancelOrderButton disabled={action.busy} />} onCancelled={() => router.refresh()} />
