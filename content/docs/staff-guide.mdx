@@ -625,7 +625,7 @@ If a pick saves but this browser cannot clear or update its working counts, the 
 
 For a refused delivery, Admin or Sales can open the shipped order and choose **Reorder refused beer**. MGR creates an editable draft containing only the refused quantities, with the same customer, ship-to, fulfillment source, pickup choice, customer PO and note. It uses current prices and leaves the new ship date blank for scheduling. Review or change the draft before submitting it. Each shipped order is reordered once: afterwards its history shows **Reorder created** with the draft's number, the button is gone, and another attempt is refused. This does not check in the refused beer or move stock; use **Check in refused beer** separately when the truck brings it back.
 
-An order waiting for **Put back** cannot record another pick or short pick. Confirm **Put back** first so the timeline retains the physical put-back quantities; recording a pick never clears that obligation.
+An order waiting for **Put back** cannot record another pick or short pick. Confirm **Put back** first so the timeline retains the physical put-back quantities; recording a pick never clears that obligation. **Ship** and **Complete transfer** work the same way: opening either on an order still waiting for **Put back** sends you to **Put back** first.
 
 The Ship preview and the shipment confirmation describe each stock change as **removed for sale**. When the ship-to has a state, the row adds **ships to PA** (using that state's abbreviation); with no state supplied, that clause is absent.
 
