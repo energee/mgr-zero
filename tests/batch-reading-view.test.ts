@@ -29,16 +29,16 @@ it("leaves the note out of a list's latest reading and keeps it on Vessel detail
   expect(formatVesselReading(reading, "plato")).toBe("5.0 °P · 69 °F · pH 4.14 · Lolev fermentation");
 });
 
-it("gives a tank its current ABV and attenuation from the batch's first gravity and the tank's latest", () => {
+it("gives a tank its current ABV and attenuation from the batch's first gravity and the tank's newest gravity", () => {
   const latest = { id: "latest", at: "2026-09-29T12:00:00Z", temp_f: 68, gravity_plato: 5 as number | null, ph: null, note: null };
   const batch = { id: "batch", batch_no: 1, planned_on: "2026-09-27", planned_bbl: 10, brewed_on: "2026-09-27", closed_at: null, cancelled_at: null, brand_name: "Pils", recipe_name: null, vessel_name: "FV1",
-    og_reading: { id: "og", gravity_plato: 20 }, active_occupancies: [{ id: "first", vessel_name: "FV1", latest_reading: latest }] };
+    og_reading: { id: "og", gravity_plato: 20 }, active_occupancies: [{ id: "first", vessel_name: "FV1", latest_reading: latest, recent_gravity: [{ id: "latest", at: latest.at, gravity_plato: 5 }] }] };
   const tank = (row: typeof batch | Omit<typeof batch, "og_reading">) => batchesFromQuery([row], []).active![0].readings![0];
   expect(tank(batch)).toMatchObject({ abv: "8.3%", attenuation: "76%" });
   // One gravity reading is the OG alone: nothing has fermented yet, so there is no figure.
   expect(tank({ ...batch, og_reading: { id: "latest", gravity_plato: 5 } })).not.toHaveProperty("abv");
-  // A latest reading with no gravity, and a batch with no gravity reading, give none either.
-  expect(tank({ ...batch, active_occupancies: [{ id: "first", vessel_name: "FV1", latest_reading: { ...latest, gravity_plato: null } }] })).not.toHaveProperty("attenuation");
+  // A tank with no gravity reading, and a batch with no gravity reading, give none either.
+  expect(tank({ ...batch, active_occupancies: [{ id: "first", vessel_name: "FV1", latest_reading: { ...latest, gravity_plato: null }, recent_gravity: [] }] })).not.toHaveProperty("attenuation");
   const { og_reading: _none, ...noGravity } = batch;
   expect(tank(noGravity)).not.toHaveProperty("abv");
 });
