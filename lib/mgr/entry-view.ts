@@ -122,7 +122,7 @@ export function passwordReturnHref(next?: string, fallback = "/"): string {
   return `${destination.pathname}${destination.search}${destination.hash}`;
 }
 
-/** This outcome must remain readable after Auth clears cookies on a failed sign-out. */
+/** This outcome must stay readable whether a failed sign-out cleared the session (local scope) or kept it (global scope, `canRetry`). */
 export function toPasswordSavedViewProps(error: string | undefined, canRetry: boolean): EntryViewModel {
   let warning = "We could not confirm that other sessions were signed out.";
   if (error === "signout_failed") warning = "Other sessions were signed out, but we could not confirm that this reset session ended.";

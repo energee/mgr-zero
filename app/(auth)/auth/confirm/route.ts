@@ -39,7 +39,11 @@ export async function GET(req: NextRequest) {
     const { data, error } = await db.auth.verifyOtp({ token_hash: tokenHash, type: "invite" });
     const kind: unknown = data.user?.user_metadata?.mgr_invite_kind;
     if (!error && kind === audience) return redirect(`/accept?audience=${audience}`);
-    if (!error) await db.auth.signOut();
+    if (!error) {
+      const { error: signOutError } = await db.auth.signOut();
+      // A failed global sign-out keeps the session; local scope clears this browser before it asks Auth.
+      if (signOutError) await db.auth.signOut({ scope: "local" });
+    }
     return redirect("/invite-expired");
   }
   if (code) {

@@ -1,4 +1,5 @@
-// Gates the staff deep-link redirect, shared hidden form field, and consent-first email callback.
+// Gates the staff deep-link redirect, shared hidden form field, consent-first email callback,
+// and the callback's local sign-out when a wrong-audience invite cannot be revoked.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { createElement } from "react";
@@ -9,6 +10,8 @@ const identity = vi.hoisted(() => vi.fn());
 const pending = vi.hoisted(() => vi.fn(async () => [] as unknown[]));
 const requestHeaders = vi.hoisted(() => new Headers());
 const exchangeCodeForSession = vi.hoisted(() => vi.fn());
+const verifyOtp = vi.hoisted(() => vi.fn());
+const signOut = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/commands/registry", async original => ({ ...await original<typeof Registry>(), runCommand: pending }));
 vi.mock("@/lib/auth/request-context", () => ({
   getRequestIdentity: identity,
@@ -23,7 +26,7 @@ vi.mock("@/lib/auth/request-context", () => ({
 }));
 vi.mock("next/headers", () => ({ headers: async () => requestHeaders, cookies: async () => ({ get: () => undefined }) }));
 vi.mock("next/navigation", () => ({ redirect: (path: string): never => { throw new Error(`redirect:${path}`); } }));
-vi.mock("@supabase/ssr", () => ({ createServerClient: () => ({ auth: { exchangeCodeForSession } }) }));
+vi.mock("@supabase/ssr", () => ({ createServerClient: () => ({ auth: { exchangeCodeForSession, verifyOtp, signOut } }) }));
 
 import { getActiveBrewery } from "@/lib/brewery";
 import LoginPage from "@/app/(auth)/login/page";
@@ -69,5 +72,15 @@ describe("staff deep-link sign-in (#1399)", () => {
     const response = await GET(new NextRequest(`http://localhost:3000/auth/confirm?${new URLSearchParams({ code: "recovery", next })}`));
     expect(response.headers.get("location")).toBe(`http://localhost:3000${next}`);
     expect(exchangeCodeForSession).toHaveBeenCalledWith("recovery");
+  });
+});
+
+describe("wrong-audience invite link", () => {
+  it("ends the verified session locally when Auth cannot revoke it", async () => {
+    verifyOtp.mockResolvedValue({ data: { user: { user_metadata: { mgr_invite_kind: "staff" } } }, error: null });
+    signOut.mockResolvedValueOnce({ error: { code: "unexpected_failure" } }).mockResolvedValueOnce({ error: null });
+    const response = await GET(new NextRequest("http://localhost:3000/auth/confirm?token_hash=synthetic&type=invite&audience=customer"));
+    expect(response.headers.get("location")).toBe("http://localhost:3000/invite-expired");
+    expect(signOut.mock.calls).toEqual([[], [{ scope: "local" }]]);
   });
 });

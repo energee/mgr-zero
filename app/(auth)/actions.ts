@@ -58,7 +58,9 @@ export async function emailLogin(form: FormData) {
 
 export async function logout() {
   const db = await createServerClient();
-  await db.auth.signOut();
+  const { error } = await db.auth.signOut();
+  // A failed global sign-out keeps the session; local scope clears this browser before it asks Auth.
+  if (error) await db.auth.signOut({ scope: "local" });
   redirect("/login");
 }
 

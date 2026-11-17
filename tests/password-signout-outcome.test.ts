@@ -12,7 +12,7 @@ vi.mock("next/headers", () => ({
 vi.mock("next/navigation", () => ({ redirect: (path: string): never => { throw new Error(`redirect:${path}`); } }));
 
 import PasswordPage from "@/app/(auth)/password/page";
-import { endPasswordSessions, savePassword } from "@/app/(auth)/actions";
+import { endPasswordSessions, logout, savePassword } from "@/app/(auth)/actions";
 import { PASSWORD_SAVED_COOKIE } from "@/lib/auth/password";
 
 /** Exercise the installed Auth and SSR cookie adapters, not a signOut stub.
@@ -56,29 +56,42 @@ async function signedInBoundary(failureScope: "local" | "global" | "others") {
   return { db, removed };
 }
 
-describe("saved password outcome after installed SDK cookie clearing", () => {
-  it.each(["local", "global"] as const)("keeps saved result reachable after failed %s logout clears the session", async (scope) => {
+describe("saved password outcome with the installed SDK sign-out", () => {
+  it("keeps saved result reachable after failed local logout clears the session", async () => {
     savedCookies.clear();
-    const { db, removed } = await signedInBoundary(scope);
-    if (scope === "global") savedCookies.add(PASSWORD_SAVED_COOKIE);
-    if (scope === "local") {
-      const form = new FormData();
-      form.set("password", "synthetic-new-password");
-      form.set("confirmPassword", "synthetic-new-password");
-      await expect(savePassword(form)).rejects.toThrow("redirect:/password?saved=1&error=signout_failed");
-    } else {
-      await expect(endPasswordSessions()).rejects.toThrow("redirect:/password?saved=1&error=revoke_failed");
-    }
+    const { db, removed } = await signedInBoundary("local");
+    const form = new FormData();
+    form.set("password", "synthetic-new-password");
+    form.set("confirmPassword", "synthetic-new-password");
+    await expect(savePassword(form)).rejects.toThrow("redirect:/password?saved=1&error=signout_failed");
     expect(removed.some(name => name.includes("auth-token"))).toBe(true);
     expect((await db.auth.getSession()).data.session).toBeNull();
-    const page = await PasswordPage({ searchParams: Promise.resolve({ saved: "1", error: scope === "local" ? "signout_failed" : "revoke_failed" }) });
+    const page = await PasswordPage({ searchParams: Promise.resolve({ saved: "1", error: "signout_failed" }) });
     const html = renderToStaticMarkup(page);
     expect(html).toContain("Password saved");
     expect(html).toContain("You do not need to change it again.");
     expect(html).toContain('href="/login"');
     expect(html).not.toContain('name="password"');
     expect(html).not.toContain("Reset link expired");
-    expect(html).toContain(scope === "local" ? "Other sessions were signed out" : "could not confirm that other sessions were signed out");
+    expect(html).toContain("Other sessions were signed out");
+    await expect(endPasswordSessions()).rejects.toThrow("redirect:/password?saved=1&error=revoke_failed");
+  });
+
+  it("keeps the session and offers the retry after a failed global logout", async () => {
+    savedCookies.clear();
+    const { db, removed } = await signedInBoundary("global");
+    savedCookies.add(PASSWORD_SAVED_COOKIE);
+    await expect(endPasswordSessions()).rejects.toThrow("redirect:/password?saved=1&error=revoke_failed");
+    expect(removed.some(name => name.includes("auth-token"))).toBe(false);
+    expect((await db.auth.getSession()).data.session).not.toBeNull();
+    const html = renderToStaticMarkup(await PasswordPage({ searchParams: Promise.resolve({ saved: "1", error: "revoke_failed" }) }));
+    expect(html).toContain("Password saved");
+    expect(html).toContain("could not confirm that other sessions were signed out");
+    expect(html).toContain("You do not need to change it again. Select Sign out all sessions to try again.");
+    expect(html).toContain("Sign out all sessions");
+    expect(html).not.toContain('href="/login"');
+    expect(html).not.toContain('name="password"');
+    expect(html).not.toContain("Reset link expired");
     await expect(endPasswordSessions()).rejects.toThrow("redirect:/password?saved=1&error=revoke_failed");
   });
 
@@ -116,5 +129,14 @@ describe("saved password outcome after installed SDK cookie clearing", () => {
     boundary.db = createSSR("https://password-outcome.supabase.co", "synthetic-publishable-key", { cookies: { getAll: () => [], setAll: () => {} } });
     const html = renderToStaticMarkup(await PasswordPage({ searchParams: Promise.resolve({ saved: "1", portal: "1", error: "signout_failed" }) }));
     expect(html).toContain('href="/portal/login"');
+  });
+});
+
+describe("Sign out when Auth cannot revoke the session", () => {
+  it("still clears this browser's session and lands on sign-in", async () => {
+    const { db, removed } = await signedInBoundary("global");
+    await expect(logout()).rejects.toThrow("redirect:/login");
+    expect(removed.some(name => name.includes("auth-token"))).toBe(true);
+    expect((await db.auth.getSession()).data.session).toBeNull();
   });
 });
