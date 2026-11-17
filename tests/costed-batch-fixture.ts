@@ -18,8 +18,9 @@ export async function costedBatch(receiptCost: number | null = 100) {
   const turn = { batchId: batch.id, vesselId: vessel.id, initialBbl: 5, actuals: [{ materialId, stage: "mash", locationId: location.id, binId: location.binId, lotId: lot.id, qty: 50 }] };
   const brewed = await runCommand("record_brew_day", { ...turn, brewedOn: "2026-10-01" }, ctx) as { record: { id: string }; occupancy: { id: string } };
   await runCommand("record_brew_day", { ...turn, brewedOn: "2026-10-02" }, ctx);
-  async function close(qty = 4, draw = 2, actuals?: { materialId: string; locationId: string; binId: string; lotId: string | null; used: number; loss: number; unused: number }[]) {
-    const run = await runCommand("schedule_packaging_run", { brandId: catalog.brandId, occupancyId: brewed.occupancy.id, plannedOn: "2026-10-03", outputs: [{ skuId: catalog.skuId, qtyPlanned: qty }] }, ctx) as { id: string };
+  /** Packages `qty` kegs from `draw` barrels of the brewed batch's tank, or of `occupancyId` (a batch split off it). */
+  async function close(qty = 4, draw = 2, actuals?: { materialId: string; locationId: string; binId: string; lotId: string | null; used: number; loss: number; unused: number }[], occupancyId = brewed.occupancy.id) {
+    const run = await runCommand("schedule_packaging_run", { brandId: catalog.brandId, occupancyId, plannedOn: "2026-10-03", outputs: [{ skuId: catalog.skuId, qtyPlanned: qty }] }, ctx) as { id: string };
     await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-10-03T12:00:00Z" }, ctx);
     const input = { runId: run.id, bblDrawn: draw, outputs: [{ skuId: catalog.skuId, qtyActual: qty }], lotCode: `COST-${run.id}`, packagedOn: "2026-10-03", locationId: location.id, binId: location.binId };
     const requestId = crypto.randomUUID();

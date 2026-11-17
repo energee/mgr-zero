@@ -10,7 +10,7 @@ import { PriceCellInput, PriceGroupsView } from "../components/mgr/views/price-g
 import { priceGroupTwo, pricingGrid } from "../lib/mgr/fixtures/pricing";
 import { money } from "../lib/mgr/money";
 import { priceGroupFieldErrors, priceGroupReason, toPriceGroupViewProps } from "../lib/mgr/price-group-view";
-import { cellCommit, toPriceGroupsViewProps } from "../lib/mgr/price-groups-view";
+import { cellCommit, stepCell, toPriceGroupsViewProps } from "../lib/mgr/price-groups-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
@@ -359,4 +359,36 @@ it("bounds Position as the command does: a required whole number from 1 (#447)",
   expect(position).toContain('min="1"');
   expect(position).toContain('step="1"');
   expect(position).toContain("required");
+});
+
+describe("stepCell: arrow keys move between price fields like a spreadsheet", () => {
+  // Row 1 has no field in column 1 (an add-pour button, or a folded column).
+  const fields = [
+    [true, true, true],
+    [true, false, true],
+    [true, true, false],
+  ];
+
+  it("moves one field in the arrow's direction", () => {
+    expect(stepCell(fields, 0, 0, "ArrowDown")).toEqual([1, 0]);
+    expect(stepCell(fields, 1, 0, "ArrowUp")).toEqual([0, 0]);
+    expect(stepCell(fields, 0, 0, "ArrowRight")).toEqual([0, 1]);
+    expect(stepCell(fields, 0, 2, "ArrowLeft")).toEqual([0, 1]);
+  });
+
+  it("skips a cell with no field", () => {
+    expect(stepCell(fields, 0, 1, "ArrowDown")).toEqual([2, 1]);
+    expect(stepCell(fields, 1, 0, "ArrowRight")).toEqual([1, 2]);
+  });
+
+  it("stays put at an edge, and ignores other keys", () => {
+    expect(stepCell(fields, 0, 0, "ArrowUp")).toBeNull();
+    expect(stepCell(fields, 2, 1, "ArrowRight")).toBeNull();
+    expect(stepCell(fields, 0, 0, "Enter")).toBeNull();
+  });
+});
+
+it("the price grid is wrapped in the arrow-key handler", () => {
+  const view = readFileSync("components/mgr/views/price-groups.tsx", "utf8");
+  expect(view).toContain("<ArrowKeyGrid data-price-grid");
 });
