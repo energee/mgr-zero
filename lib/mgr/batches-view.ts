@@ -14,7 +14,7 @@ import { wholePercent } from "./recipe-view";
 /** One open occupancy of a brewed batch: the tank, its latest reading line, and where Reading goes.
  *  `abv` and `attenuation` are where the beer in this tank stands now, from the batch's first
  *  gravity reading to this tank's latest; absent until a second gravity reading. */
-export type BatchOccupancyView = { key: string; vessel: string; reading: string; abv?: string; attenuation?: string; href?: string };
+export type BatchOccupancyView = { key: string; vessel: string; reading: string; abv?: string; attenuation?: string; state?: FermentationState; href?: string };
 
 /** One batch. `brand` and `recipe` are null when the plan names none. `vessel`
  *  is the query's joined open-tank names. `readings` is set only for a brewed,
@@ -83,15 +83,27 @@ export function toBatchesViewProps(s: BatchesSnapshot): BatchesViewModel {
 }
 
 type GravityReading = { id: string; gravity_plato: number };
-export type BatchListRow = { id: string; batch_no: number | null; planned_on: string; planned_bbl: number; brewed_on: string | null; closed_at: string | null; cancelled_at: string | null; brand_name: string | null; recipe_name: string | null; vessel_name: string | null; og_reading?: GravityReading | null; fg_reading?: GravityReading | null; active_occupancies: { id: string; vessel_name: string; latest_reading?: VesselReading | null }[] };
+/** One of a tank's last two gravity readings, newest first (list_batches readings). */
+export type RecentGravity = GravityReading & { at: string };
+export type BatchListRow = { id: string; batch_no: number | null; planned_on: string; planned_bbl: number; brewed_on: string | null; closed_at: string | null; cancelled_at: string | null; brand_name: string | null; recipe_name: string | null; vessel_name: string | null; og_reading?: GravityReading | null; fg_reading?: GravityReading | null; active_occupancies: { id: string; vessel_name: string; latest_reading?: VesselReading | null; recent_gravity?: RecentGravity[] }[] };
 export type BatchVessel = { id: string; name: string; kind: string; capacity_bbl: number; active: boolean };
 
-/** ABV and apparent attenuation from the batch's first gravity reading, the OG, to `latest`: a tank's latest reading
- *  for the figures so far, or a completed batch's last gravity reading for the final ones. Nothing when the latest
- *  reading is the OG itself or has no gravity.
- *  ponytail: reads only the tank's newest reading, so a temperature-only check blanks the figures until the next
- *  gravity; have list_batches return the newest gravity reading if that turns out to matter. */
-function currentFigures(og: BatchListRow["og_reading"], latest: { id: string; gravity_plato: number | null } | null | undefined): { abv?: string; attenuation?: string } {
+export type FermentationState = "Fermenting" | "Finished";
+/** Whether a tank's beer still looks to be fermenting, from its last two gravity readings (newest first).
+ *  Finished means terminal gravity: the two hold within 0.2 °P and were read at least a day apart.
+ *  Nothing with fewer than two, since one reading cannot show a trend. */
+export function fermentationState(recent: RecentGravity[] = []): FermentationState | undefined {
+  const [last, prior] = recent;
+  if (!last || !prior) return undefined;
+  const steady = Math.abs(last.gravity_plato - prior.gravity_plato) <= 0.2 + 1e-9; // float slack: 5 - 4.8 is 0.2000…02
+  const dayApart = Date.parse(last.at) - Date.parse(prior.at) >= 24 * 3_600_000;
+  return steady && dayApart ? "Finished" : "Fermenting";
+}
+
+/** ABV and apparent attenuation from the batch's first gravity reading, the OG, to `latest`: a tank's newest gravity
+ *  reading for the figures so far, or a completed batch's last gravity reading for the final ones. Nothing when
+ *  `latest` is the OG itself or has no gravity. */
+export function currentFigures(og: BatchListRow["og_reading"], latest: { id: string; gravity_plato: number | null } | null | undefined): { abv?: string; attenuation?: string } {
   if (!og || !latest || latest.gravity_plato === null || latest.id === og.id) return {};
   const { abv, apparentAttenuation } = measuredGravity({ ogPlato: og.gravity_plato, fgPlato: latest.gravity_plato, potentialPointsPerBbl: null, plannedBbl: 0, knockoutBbl: null });
   return { ...(abv !== null && { abv: `${abv.toFixed(1)}%` }), ...(apparentAttenuation !== null && { attenuation: wholePercent(apparentAttenuation) }) };
@@ -113,7 +125,8 @@ export function batchesFromQuery(batches: BatchListRow[], vessels: BatchVessel[]
       row.readings = batch.active_occupancies.map(occupancy => ({
         key: occupancy.id, vessel: occupancy.vessel_name,
         reading: formatLatestReading(occupancy.latest_reading, display.unit, display.timeZone),
-        ...currentFigures(batch.og_reading, occupancy.latest_reading),
+        ...currentFigures(batch.og_reading, occupancy.recent_gravity?.[0]),
+        state: fermentationState(occupancy.recent_gravity),
         href: hrefs?.reading?.(occupancy.id),
       }));
     }

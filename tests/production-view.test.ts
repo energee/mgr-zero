@@ -768,6 +768,14 @@ describe("cellar readings (#700)", () => {
     expect(Object.keys(readings)).toEqual(["o1"]);
     // The tile reads the values, then how long ago, not a full date and time.
     expect(readings.o1).toEqual({ values: "4.5 °P · 66 °F", ago: "1d ago" });
+    // With the batch's OG and two steady gravities, the tile also says ABV and that it looks finished.
+    const steady = cellarReadings([{ og_reading: { id: "og", gravity_plato: 15 }, active_occupancies: [{ id: "o1", latest_reading: reading,
+      recent_gravity: [{ id: "r1", at: reading.at, gravity_plato: 4.5 }, { id: "r0", at: "2026-08-30T15:00:00Z", gravity_plato: 4.6 }] }] }], "plato", new Date("2026-09-02T15:00:00Z"));
+    expect(steady.o1).toMatchObject({ abv: expect.stringMatching(/% ABV$/), state: "Finished" });
+    const finished = toCellarMapViewProps([{ id: "v1", name: "FV1", kind: "fermenter" as const, capacity_bbl: 10 }], [{ vessel_id: "v1", occupancy_id: "o1", brand_name: null, bbl: 2 }], steady, {}, id => `/cellar/${id}/reading`).tiles[0];
+    const tileHtml = htmlOf(createElement(CellarMapView, { model: { tiles: [finished] } }));
+    expect(tileHtml).toContain("Finished");
+    expect(tileHtml).toContain("% ABV");
     const read = toCellarMapViewProps([{ id: "v1", name: "FV1", kind: "fermenter" as const, capacity_bbl: 10 }], [{ vessel_id: "v1", occupancy_id: "o1", brand_name: null, bbl: 2 }], readings, {}, id => `/cellar/${id}/reading`).tiles[0];
     expect(read).toMatchObject({ reading: "4.5 °P · 66 °F", readAgo: "1d ago" });
     const html = htmlOf(createElement(CellarMapView, { model: { tiles: [read] } }));

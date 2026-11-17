@@ -1,5 +1,6 @@
 import { formatVesselReading, type VesselReading } from "./vessel-detail-view";
 import { formatAgo } from "@/lib/date-format";
+import { currentFigures, fermentationState, type FermentationState, type RecentGravity } from "./batches-view";
 import type { GravityUnit } from "./gravity-unit";
 
 export type CellarMapViewModel = {
@@ -13,7 +14,7 @@ export type CellarMapViewModel = {
    *  makes the reading line a link, or with no reading yet draws an Add
    *  reading button. The inventory gives "" to draw either inert. */
   backHref?: string; addHref?: string | null; readingHref?: string | null; actionsOff?: boolean; actionHint?: string; brewHref?: string;
-  tiles: { name: string; group: string; detail: string; volume?: string; reading?: string; readAgo?: string; warning?: boolean; fill?: number; href?: string; readingHref?: string }[];
+  tiles: { name: string; group: string; detail: string; volume?: string; reading?: string; readAgo?: string; abv?: string; state?: FermentationState; warning?: boolean; fill?: number; href?: string; readingHref?: string }[];
   detail?: { title: string; description: string; href?: string };
 };
 
@@ -61,7 +62,7 @@ export function toCellarMapViewProps(vessels: (OrderedVessel & { capacity_bbl: n
     const link = readingHref?.(occupancy.occupancy_id);
     const latest = readings[occupancy.occupancy_id];
     // A linked tile with no reading has no reading line: the view draws Add reading there.
-    return { ...tile, detail: occupancy.brand_name ?? "No brand yet", volume: `${quantity} / ${capacity} bbl`, reading: latest?.values ?? (link === undefined ? "No readings yet" : undefined), readAgo: latest?.ago, fill: capacity > 0 ? quantity / capacity * 100 : undefined, readingHref: link };
+    return { ...tile, detail: occupancy.brand_name ?? "No brand yet", volume: `${quantity} / ${capacity} bbl`, reading: latest?.values ?? (link === undefined ? "No readings yet" : undefined), readAgo: latest?.ago, abv: latest?.abv, state: latest?.state, fill: capacity > 0 ? quantity / capacity * 100 : undefined, readingHref: link };
   }) };
 }
 
@@ -70,9 +71,18 @@ export function toCellarMapViewProps(vessels: (OrderedVessel & { capacity_bbl: n
 // newest reading per open occupancy, so the cellar map never asks per tank (#700).
 // A tank with no reading has no entry: the map words that line itself.
 // A tile is narrow, so it reads the values and their age ("1d ago"), not a
-// full date and time; the note is left out, as Vessel detail shows it.
-export type CellarReading = { values: string; ago: string };
-export function cellarReadings(batches: { active_occupancies: { id: string; latest_reading?: VesselReading | null }[] }[], unit: GravityUnit, now: Date = new Date()): Record<string, CellarReading> {
-  return Object.fromEntries(batches.flatMap(batch => batch.active_occupancies).flatMap(({ id, latest_reading: reading }) => reading
-    ? [[id, { values: formatVesselReading({ ...reading, note: null }, unit), ago: formatAgo(reading.at, now) }]] : []));
+// full date and time; the note is left out, as Vessel detail shows it. ABV and
+// Fermenting/Finished come from the same figures Batches shows for the tank.
+export type CellarReading = { values: string; ago: string; abv?: string; state?: FermentationState };
+type CellarBatch = { og_reading?: { id: string; gravity_plato: number } | null; active_occupancies: { id: string; latest_reading?: VesselReading | null; recent_gravity?: RecentGravity[] }[] };
+export function cellarReadings(batches: CellarBatch[], unit: GravityUnit, now: Date = new Date()): Record<string, CellarReading> {
+  return Object.fromEntries(batches.flatMap(batch => batch.active_occupancies.flatMap(({ id, latest_reading: reading, recent_gravity }) => {
+    if (!reading) return [];
+    const { abv } = currentFigures(batch.og_reading, recent_gravity?.[0]);
+    const tile: CellarReading = { values: formatVesselReading({ ...reading, note: null }, unit), ago: formatAgo(reading.at, now) };
+    if (abv) tile.abv = `${abv} ABV`;
+    const state = fermentationState(recent_gravity);
+    if (state) tile.state = state;
+    return [[id, tile]];
+  })));
 }

@@ -1,6 +1,6 @@
 import { formatLatestReading, formatVesselReading } from "@/lib/mgr/vessel-detail-view";
 import { expect, it } from "vitest";
-import { batchesFromQuery } from "@/lib/mgr/batches-view";
+import { batchesFromQuery, fermentationState } from "@/lib/mgr/batches-view";
 
 it("keeps split occupancies and absent readings explicit with exact recording links", () => {
   const batch = { id: "batch", batch_no: 1, planned_on: "2026-09-27", planned_bbl: 10, brewed_on: "2026-09-27", closed_at: null, cancelled_at: null, brand_name: "Pils", recipe_name: null, vessel_name: "FV1, FV2", active_occupancies: [
@@ -50,4 +50,23 @@ it("gives a completed batch its final ABV and attenuation from its first and las
   expect(done(batch)).toMatchObject({ abv: "8.3%", attenuation: "76%" });
   // One gravity reading is both first and last: the figures stay blank, and the columns still draw.
   expect(done({ ...batch, fg_reading: batch.og_reading })).toMatchObject({ abv: "", attenuation: "" });
+});
+
+const gravity = (at: string, gravity_plato: number) => ({ id: at, at, gravity_plato });
+
+it("calls a tank Finished once its last two gravities hold within 0.2 °P at least a day apart", () => {
+  expect(fermentationState([])).toBeUndefined();
+  expect(fermentationState([gravity("2026-09-27T12:00:00Z", 5)])).toBeUndefined();
+  expect(fermentationState([gravity("2026-09-28T12:00:00Z", 4.8), gravity("2026-09-27T12:00:00Z", 5)])).toBe("Finished");
+  // Under a day apart proves nothing yet; a falling gravity is still fermenting.
+  expect(fermentationState([gravity("2026-09-28T11:00:00Z", 5), gravity("2026-09-27T12:00:00Z", 5)])).toBe("Fermenting");
+  expect(fermentationState([gravity("2026-09-29T12:00:00Z", 4.5), gravity("2026-09-27T12:00:00Z", 5)])).toBe("Fermenting");
+});
+
+it("figures ABV from the newest gravity reading, so a later temperature check does not blank it", () => {
+  const batch = { id: "batch", batch_no: 1, planned_on: "2026-09-20", planned_bbl: 10, brewed_on: "2026-09-20", closed_at: null, cancelled_at: null, brand_name: "Pils", recipe_name: null, vessel_name: "FV1",
+    og_reading: { id: "og", gravity_plato: 15 }, active_occupancies: [{ id: "first", vessel_name: "FV1",
+      latest_reading: { id: "temp", at: "2026-09-29T12:00:00Z", temp_f: 34, gravity_plato: null, ph: null, note: null },
+      recent_gravity: [gravity("2026-09-28T12:00:00Z", 3), gravity("2026-09-27T12:00:00Z", 3.1)] }] };
+  expect(batchesFromQuery([batch], []).active?.[0].readings?.[0]).toMatchObject({ abv: expect.stringMatching(/^\d+\.\d%$/), attenuation: expect.stringMatching(/%$/), state: "Finished" });
 });
