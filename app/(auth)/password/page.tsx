@@ -23,8 +23,8 @@ export default async function PasswordPage({ searchParams }: { searchParams: Pro
   const [{ error, next, saved, portal }, { data: { user } }, { data: verified, error: claimsError }, cookieStore] = await Promise.all([
     searchParams, db.auth.getUser(), db.auth.getClaims(), cookies(),
   ]);
-  // Local/global signOut clears cookies even on some provider failures. The
-  // already-saved result must not require the session it just attempted to end.
+  // A failed local signOut still clears the session cookies; a failed global one keeps them.
+  // The already-saved result must not require the session it just attempted to end.
   if (saved === "1" && cookieStore.has(PASSWORD_SAVED_COOKIE)) {
     return <EntrySurface>
       {E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>)}
