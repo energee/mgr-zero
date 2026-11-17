@@ -56,7 +56,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "cancel_stock_transfer", description: "Cancel an unreceived stock transfer with a reason; its picks are released and no stock moves, since a pick never left the source bin",
+  name: "cancel_stock_transfer", description: "Cancel an unreceived stock transfer with a reason; its picks are released and no stock moves, since a pick never left the source bin. Refused while the transfer is an open route stop",
   compensation: "Cannot be undone; start again with create_stock_transfer.",
   roles: [...roles], requiresConfirmation: true,
   input: z.object({ transferId: z.string().uuid(), reason: z.string().trim().min(1).max(500).describe("Why the transfer is cancelled") }),
