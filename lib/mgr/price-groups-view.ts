@@ -4,15 +4,26 @@
 // formats are one column each. Pours owned by a price group share a column by
 // name; a group with no pour of that name has a null formatId there (the grid
 // offers to add it). A cell is the dollars-input text ("12.50"), or null when
-// unpriced.
-import { dollarsInput, toCents } from "./money";
+// unpriced. A column no group prices on the showing channel is folded: the
+// grid hides it behind one switch, so a tab leads with the formats that
+// channel sells.
+import { dollarsInput, money, toCents } from "./money";
 
-export type PriceGroupsRowView = { id: string; name: string; cells: (string | null)[]; formatIds: (string | null)[] };
+export type PriceGroupsRowView = {
+  id: string;
+  name: string;
+  /** The group's cost ceiling in words, drawn under its name. */
+  note: string;
+  cells: (string | null)[];
+  formatIds: (string | null)[];
+};
 
 export type PriceGroupsChannelView = {
   id: string;
   name: string;
   rows: PriceGroupsRowView[];
+  /** Per column: true when no group prices it on this channel. All false when the channel has no prices at all. */
+  folded: boolean[];
 };
 
 export type PriceGroupsViewModel = {
@@ -94,6 +105,23 @@ export function toPriceGroupsViewProps({ channels, groups, formats, cells, chann
   const columns = pricingColumns(formats);
   const tab = Math.max(0, channels.findIndex((c) => c.id === channelId));
   const channel = channels[tab];
+  const rows = channel ? groups.map((group) => {
+    const formatIds = columns.map((column) => column.formatId(group.id));
+    return {
+      id: group.id,
+      name: group.name,
+      note: group.cost_ceiling_cents == null ? "No cost ceiling" : `Up to ${money(group.cost_ceiling_cents)}/bbl cost`,
+      formatIds,
+      cells: formatIds.map((formatId) => {
+        if (!formatId) return null;
+        const cents = byKey.get(cellKey(channel.id, group.id, formatId));
+        return cents === undefined ? null : dollarsInput(cents);
+      }),
+    };
+  }) : [];
+  const priced = columns.map((_, col) => rows.some((row) => row.cells[col] != null));
+  // With nothing priced there is no priced column to lead with, so none folds.
+  const anyPriced = priced.includes(true);
   return {
     formats: columns.map((c) => c.label),
     headers: columns.map((c) => c.header),
@@ -101,23 +129,7 @@ export function toPriceGroupsViewProps({ channels, groups, formats, cells, chann
     tabs: channels.map((c) => c.name),
     tab,
     ...(channelHref ? { tabHrefs: channels.map((c): [string, string] => [c.name, channelHref(c.id)]) } : {}),
-    channel: channel ? {
-      id: channel.id,
-      name: channel.name,
-      rows: groups.map((group) => {
-        const formatIds = columns.map((column) => column.formatId(group.id));
-        return {
-          id: group.id,
-          name: group.name,
-          formatIds,
-          cells: formatIds.map((formatId) => {
-            if (!formatId) return null;
-            const cents = byKey.get(cellKey(channel.id, group.id, formatId));
-            return cents === undefined ? null : dollarsInput(cents);
-          }),
-        };
-      }),
-    } : null,
+    channel: channel ? { id: channel.id, name: channel.name, rows, folded: priced.map((p) => anyPriced && !p) } : null,
   };
 }
 

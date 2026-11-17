@@ -45,7 +45,7 @@ export const batchesBrewer: BatchesSnapshot = {
     { key: "b0414", batchNo: "B-0414", brand: "Porter", recipe: "Robust porter", plannedOn: "Sep 1, 2026", plannedBbl: 10, vessel: null, readings: [] },
   ],
   completed: [
-    { key: "b0401", batchNo: "B-0401", brand: "Amber ale", recipe: "Amber ale", plannedOn: "Aug 2, 2026", plannedBbl: 10, vessel: null },
+    { key: "b0401", batchNo: "B-0401", brand: "Amber ale", recipe: "Amber ale", plannedOn: "Aug 2, 2026", plannedBbl: 10, vessel: null, abv: "5.6%", attenuation: "78%" },
   ],
   cancelled: [
     { key: "b0412", batchNo: "B-0412", brand: null, recipe: "Pale ale", plannedOn: "Aug 30, 2026", plannedBbl: 15, vessel: null },
@@ -369,7 +369,10 @@ export const cellarTransferPils = {
     { occupancy_id: "bt1-occupancy", vessel_id: "bt1", vessel_name: "BT1", brand_name: "Pils", batch_no: 412, bbl: 7 },
   ],
   vessels: [{ id: "bt1", name: "BT1", capacity_bbl: 10 }, { id: "bt2", name: "BT2", capacity_bbl: 10 }],
+  plannedBatches: [{ id: "b-0420", label: "Dry-Hopped Pils · B-0420" }], toBatchId: "",
 };
+/** The same transfer into the empty BT2, starting the planned batch there. */
+export const cellarTransferPlannedBatch = { ...cellarTransferPils, toId: "bt2", toBatchId: "b-0420" };
 
 export const cellarAdditionCitra = {
   occupancyId: "fv2-occupancy", materialId: "citra", lotId: "l-0790", stage: "dry_hop" as const, qty: "18",

@@ -227,8 +227,8 @@ operations are ones the screens need that the backend has not built. Calling
 one returns `404 unknown_command`.
 
 Both lists are generated from the command registry and from the screens, so
-neither can drift from the product. The designed list is the roadmap: what is
-coming, and which screen is waiting on it. No dates.
+neither can drift from the product. Each designed entry names the screen that is
+waiting on it. No dates.
 
 ## Authentication & roles [#authentication]
 
@@ -828,7 +828,10 @@ filters, to read the next page. Keep its timestamp precision; do not convert it
 through a JavaScript `Date`. New records appear when restarting from the newest page.
 
 `list_batch_history` requires `status: "completed"` or `status: "cancelled"`;
-each status has its own cursor. `list_packaging_history` pages closed and
+each status has its own cursor. Each completed batch carries `og_reading` and
+`fg_reading`: its first and last gravity readings (`id`, `gravity_plato`),
+each `null` when the batch has none. A batch with one gravity reading has the
+same reading in both. Cancelled batches carry neither. `list_packaging_history` pages closed and
 cancelled runs together. These history queries default to 50 rows and accept
 `limit` from 1 through 200.
 

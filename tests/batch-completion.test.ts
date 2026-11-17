@@ -335,6 +335,20 @@ describe("batch completion reconciliation", () => {
     expect(after.rows.find((batch) => batch.id === source.batchId)?.closed_at).not.toBeNull();
   });
 
+  it("list_batch_history gives a completed batch its first and last gravity readings", async () => {
+    const source = await brew(0.01);
+    for (const [at, gravityPlato] of [["2026-09-01T12:00:00Z", 15], ["2026-09-03T12:00:00Z", 5]] as const) {
+      await runCommand("record_fermentation_reading", { occupancyId: source.occupancyId, at, tempF: 65, gravityPlato }, ctx);
+    }
+    // A later reading with no gravity is not the final gravity.
+    await runCommand("record_fermentation_reading", { occupancyId: source.occupancyId, at: "2026-09-04T12:00:00Z", tempF: 40 }, ctx);
+    await complete(source.batchId);
+    const completed = await runCommand("list_batch_history", { status: "completed" }, ctx) as { rows: { id: string }[] };
+    expect(completed.rows.find((batch) => batch.id === source.batchId)).toMatchObject({ og_reading: { gravity_plato: 15 }, fg_reading: { gravity_plato: 5 } });
+    const cancelled = await runCommand("list_batch_history", { status: "cancelled" }, ctx) as { rows: object[] };
+    for (const row of cancelled.rows) expect(row).not.toHaveProperty("fg_reading");
+  });
+
   // #431: a lossless full transfer leaves a zero baseline (1 in − 1 out). That is
   // a batch with nothing left to account for, not an error, so it must close.
   it("completes a batch whose whole volume moved losslessly into another batch's tank (zero baseline)", async () => {

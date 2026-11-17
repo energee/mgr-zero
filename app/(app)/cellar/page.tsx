@@ -2,7 +2,8 @@
 // now (list_occupancies), each opening its reading log; latest readings
 // come embedded in list_batches({ readings: true, open: true }), one read for
 // every tank (every open occupancy belongs to a brewed, uncompleted batch); Transfer is
-// cellar-transfer-form.tsx → record_cellar_transfer; Addition is
+// cellar-transfer-form.tsx → record_cellar_transfer, which may start one of
+// the unstarted plans from list_batches({ open: false }); Addition is
 // cellar-addition-form.tsx → record_batch_addition.
 import { CellarMapView } from "@/components/mgr/views/cellar-map";
 import { cellarReadings, toCellarMapViewProps, type OrderedVessel } from "@/lib/mgr/cellar-map-view";
@@ -14,6 +15,7 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { canRun } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { CellarTransferForm } from "./cellar-transfer-form";
+import { plannedBatchChoices } from "@/lib/mgr/cellar-transfer-view";
 import { CellarAdditionForm } from "./cellar-addition-form";
 import type { AdditionLot, AdditionMaterial } from "@/lib/mgr/cellar-addition-view";
 import { BatchCompletionForm } from "./batch-completion-form";
@@ -36,15 +38,15 @@ type Batch = {
 export default async function CellarPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [occupancies, vessels, batches, unit, materials, lots] = (await Promise.all([
+  const [occupancies, vessels, batches, unit, materials, lots, planned] = (await Promise.all([
     runCommand("list_occupancies", {}, ctx), runCommand("list_vessels", {}, ctx), runCommand("list_batches", { readings: true, open: true }, ctx), runCommand("get_gravity_unit", {}, ctx), runCommand("list_materials", {}, ctx),
-    runCommand("list_material_lots", {}, ctx),
-  ])) as [Occupancy[], Vessel[], Batch[], { effective: GravityUnit }, AdditionMaterial[], (AdditionLot & { material_id: string })[]];
+    runCommand("list_material_lots", {}, ctx), runCommand("list_batches", { open: false }, ctx),
+  ])) as [Occupancy[], Vessel[], Batch[], { effective: GravityUnit }, AdditionMaterial[], (AdditionLot & { material_id: string })[], Parameters<typeof plannedBatchChoices>[0]];
   const { materials: additionMaterials, lotsByMaterial } = additionChoices(materials, lots);
   const completionCandidates = batches.map((batch) => ({ id: batch.id, label: batchLabel(batch.batch_no, batch.brand_name) }));
 
   const readings = cellarReadings(batches, unit.effective, brewery.timeZone);
   const model = toCellarMapViewProps(vessels, occupancies, readings, Object.fromEntries(vessels.map(vessel => [vessel.id, `/cellar/vessels/${vessel.id}`])), occupancyId => `/cellar/${occupancyId}/reading?from=/cellar`);
   model.backHref = "/beer"; model.addHref = canRun(ctx, "upsert_vessel") ? "/cellar/vessels/new" : null; model.brewHref = "/batches";
-  return <CellarMapView model={model} transfer={<CellarTransferForm occupancies={occupancies} vessels={vessels} addVesselHref={model.addHref} disabled={model.actionsOff} />} addition={<CellarAdditionForm occupancies={occupancies} materials={additionMaterials} lotsByMaterial={lotsByMaterial} disabled={model.actionsOff} />} complete={<BatchCompletionForm batches={completionCandidates} />} />;
+  return <CellarMapView model={model} transfer={<CellarTransferForm occupancies={occupancies} vessels={vessels} plannedBatches={plannedBatchChoices(planned)} addVesselHref={model.addHref} disabled={model.actionsOff} />} addition={<CellarAdditionForm occupancies={occupancies} materials={additionMaterials} lotsByMaterial={lotsByMaterial} disabled={model.actionsOff} />} complete={<BatchCompletionForm batches={completionCandidates} />} />;
 }
