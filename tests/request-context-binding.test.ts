@@ -227,6 +227,8 @@ describe("request context headers", () => {
     expect((await wrong.rpc("cancel_stock_transfer", { p_transfer: transferId, p_reason: "wrong brewery", p_request_id: refusedId })).error?.code).toBe("42501");
     expect(sql(`select count(*) from private.command_requests where actor_id='${actor.id}' and request_id='${refusedId}'`)).toEqual(["0"]);
 
+    // The fixture's transfer is a stop on an undeparted route, and an open stop refuses cancel; take it off the route first.
+    expect((await admin.from("deliveries").delete().eq("id", deliveryId)).error).toBeNull();
     const unscoped = await db();
     expect((await unscoped.rpc("cancel_stock_transfer", { p_transfer: transferId, p_reason: "no header", p_request_id: crypto.randomUUID() })).error).toBeNull();
   });
