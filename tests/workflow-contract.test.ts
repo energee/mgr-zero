@@ -127,11 +127,10 @@ describe("production-readiness workflow contract", () => {
     expect(checkouts.size).toBe(1);
   });
 
-  it("runs pure screen tests in parallel and the remaining suite in three isolated database shards", () => {
+  it("runs the pure project in parallel and the database project in three isolated shards", () => {
     expect(ci).toContain('shard: ["1/3", "2/3", "3/3"]');
-    expect(ci).toContain("bunx vitest run --fileParallelism --maxWorkers=2");
-    expect(ci).toContain('bunx vitest run --shard=${{ matrix.shard }}');
-    expect(ci).toContain("--exclude tests/mgr-screens.test.ts");
+    expect(ci).toContain("bunx vitest run --project pure --fileParallelism --maxWorkers=2");
+    expect(ci).toContain('bunx vitest run --project database --shard=${{ matrix.shard }}');
     expect(ci).toMatch(/needs: \[quality, pure_tests, test_shard\]/);
     expect(ci).toContain("supabase start --workdir tests/supabase");
     expect(ci).toContain("supabase status --workdir tests/supabase -o env");
