@@ -1,11 +1,10 @@
-import { sentenceCase } from "./labels";
 // lib/mgr/portal-invoice-view.ts — view-model for one portal invoice. Domain
 // comes from portal_invoice (number, total, due/status, lines, brewery phone).
 // Pay vs unavailable vs paid is a presentation prop on the view, not a mode.
 import { formatDate } from "@/lib/date-format";
 import { docNo } from "./doc-no";
 import { money } from "./money";
-import { invoiceCurrentState, invoiceCurrentTotalCents, invoiceIsSettledWithoutPayment } from "./invoice-state";
+import { invoiceCurrentState, invoiceCurrentTotalCents, invoiceIsSettledWithoutPayment, type InvoiceCurrentState } from "./invoice-state";
 
 export type PortalInvoiceLineView = {
   key: string;
@@ -29,6 +28,18 @@ export type PortalInvoiceViewModel = {
   breweryPhone: string | null;
   lines: PortalInvoiceLineView[];
 };
+
+const STATUS = { unpaid: "Unpaid", paid: "Paid", voided: "Voided", deleted: "Deleted", written_off: "Written off" } as const satisfies Record<InvoiceCurrentState, PortalInvoiceViewModel["status"]>;
+
+/** The one status word a buyer reads for an invoice: the invoice list, the
+ *  invoice page and the order page all ask here, so they cannot disagree.
+ *  An unpaid invoice an accountant edited in QuickBooks reads Review. */
+export function portalInvoiceStatus(invoice: Parameters<typeof invoiceCurrentState>[0] & { kind: "invoice" | "credit_memo"; qbo_accountant_drift?: boolean }): PortalInvoiceViewModel["status"] {
+  if (invoice.kind === "credit_memo") return "Credit";
+  const state = invoiceCurrentState(invoice);
+  if (state === "unpaid" && invoice.qbo_accountant_drift) return "Review";
+  return invoiceIsSettledWithoutPayment(invoice) ? "Settled" : STATUS[state];
+}
 
 /** Financial state, not payment availability or provider-sync success. */
 export const portalInvoiceStatusTone = {
@@ -72,13 +83,7 @@ export type PortalInvoiceSnapshot = {
 /** Map a portal_invoice payload onto PortalInvoiceView. */
 export function toPortalInvoiceViewProps({ invoice, lines, brewery, backHref }: PortalInvoiceSnapshot): PortalInvoiceViewModel {
   const credit = invoice.kind === "credit_memo";
-  const state = invoiceCurrentState(invoice);
-  const paid = !credit && state === "paid";
-  const settled = !credit && !invoice.qbo_accountant_drift && invoiceIsSettledWithoutPayment(invoice);
-  const status = invoice.qbo_accountant_drift && state === "unpaid"
-    ? "Review"
-    : settled ? "Settled"
-    : sentenceCase(state) as PortalInvoiceViewModel["status"];
+  const status = portalInvoiceStatus(invoice);
   return {
     backHref,
     title: docNo(credit ? "CM" : "INV", invoice.invoice_no, credit ? "Credit memo" : "Invoice"),
@@ -86,11 +91,11 @@ export function toPortalInvoiceViewProps({ invoice, lines, brewery, backHref }: 
     due: status === "Unpaid" && invoice.due_on ? formatDate(invoice.due_on) : undefined,
     // Legacy paid_at may be an invoice edit or sync confirmation, not settlement.
     paidOn: undefined,
-    paid,
-    payable: !credit && status === "Unpaid" && typeof invoice.qbo_balance_cents === "number" && invoice.qbo_balance_cents > 0,
+    paid: status === "Paid",
+    payable: status === "Unpaid" && typeof invoice.qbo_balance_cents === "number" && invoice.qbo_balance_cents > 0,
     kind: invoice.kind,
     issued: formatDate(invoice.issued_on),
-    status: credit ? "Credit" : status,
+    status,
     breweryName: brewery.name,
     breweryPhone: brewery.customer_phone,
     lines: lines.map((l) => ({

@@ -48,7 +48,7 @@ it("preserves current totals, credit settlement, and voided invoices without inv
   expect(drift.total.cents).toBe(104000);
   expect(drift.accounting).toMatch(/review/i);
   const voided = toInvoiceListRow({ ...invoice, paid_at: "2026-09-01", qbo_remote_state: "voided" }, ["admin"], false, "America/New_York");
-  expect(voided.payment).toBe("Not paid");
+  expect(voided.payment).toBe("Voided");
   expect(voided.accounting).toMatch(/voided/i);
   expect(voided.quickbooksHref).toBeNull();
 });

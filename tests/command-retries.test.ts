@@ -89,6 +89,33 @@ it("keeps a sheet's submit from reaching an enclosing page form", async () => {
   expect(seen).toEqual({ prevented: true, stopped: true });
 });
 
+it("ignores a close while its command is in flight, so the fields and a refusal survive", async () => {
+  let respond!: (status: number) => void;
+  vi.stubGlobal("fetch", vi.fn(() => new Promise(resolve => {
+    respond = status => resolve({ status, json: async () => (status === 200 ? { ok: true, data: {} } : { ok: false, error: { message: "in use" } }) });
+  })));
+  const reset = vi.fn();
+  let form: ReturnType<typeof useCommandForm>;
+  function Harness() { form = useCommandForm("update_bin", { build: () => ({}), reset }); return null; }
+  renderToStaticMarkup(createElement(Harness));
+  const refused = form!.submit(submitEvent().event);
+  form!.setOpen(false);
+  expect(reset).not.toHaveBeenCalled();
+  respond(400);
+  await refused;
+  // A refusal leaves the sheet open; now the user may close it.
+  expect(reset).not.toHaveBeenCalled();
+  form!.setOpen(false);
+  expect(reset).toHaveBeenCalledTimes(1);
+  // A secondary verb's own success callback may still close the sheet.
+  const removed = form!.run("delete_bin", {}, () => form!.setOpen(false));
+  form!.setOpen(false);
+  expect(reset).toHaveBeenCalledTimes(1);
+  respond(200);
+  await removed;
+  expect(reset).toHaveBeenCalledTimes(2);
+});
+
 it("runs a sheet's secondary action (Remove, Delete, Clear) through the form's one error slot (#447)", async () => {
   const names: string[] = [];
   vi.stubGlobal("fetch", vi.fn(async (_url, init) => {

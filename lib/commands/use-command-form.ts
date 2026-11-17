@@ -6,10 +6,11 @@
 // components/mgr/command-form.tsx), and hands back its `run` so a sheet's
 // secondary verb (Remove, Delete, Clear) shares the one error slot that closing
 // clears (#447). Its `setError` lets a form clear a refusal when the field it
-// names is edited (#1492). Forms own only their fields and how to build the command input.
+// names is edited (#1492). It ignores a close while its command is in flight, so
+// no sheet needs its own guard. Forms own only their fields and how to build the command input.
 "use client";
 
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { useRouter } from "next/navigation";
 import { useBrewery, useCommandContext } from "@/lib/brewery-provider";
 import { beginRecovery, finishRecovery, inFlightRequests, readRecoveries, RECOVERY_CHANGED, type RecoveryAttempt } from "./recovery";
@@ -144,14 +145,23 @@ export function useCommandForm(name: string, opts: { build: () => unknown; reset
   const [open, setOpenState] = useState(opts.defaultOpen ?? false);
   // The command in flight: `submitting` is the form's own verb, `busy` any.
   const [running, setRunning] = useState<string | null>(null);
+  // A ref, not `running`: a close arriving in the same render as the send must already see it.
+  const inFlight = useRef(false);
 
   /** Runs a secondary verb (Remove, Delete, Clear) in this sheet's error slot; options as in useCommandAction's run. */
   async function run(command: string, input: unknown, onSuccess?: (data: unknown) => void, options?: CommandRunOptions) {
     setRunning(command);
-    try { return await runAction(command, input, onSuccess, options); } finally { setRunning(null); }
+    inFlight.current = true;
+    // The command has answered once onSuccess runs, so a callback that closes the sheet is let through.
+    const settled = (data: unknown) => { inFlight.current = false; onSuccess?.(data); };
+    try { return await runAction(command, input, settled, options); } finally { inFlight.current = false; setRunning(null); }
   }
 
+  /** Opens or closes the sheet, resetting its fields and error. A close while a
+   *  command is in flight is ignored: closing would wipe the fields and hide a
+   *  refusal that lands afterwards. */
   function setOpen(next: boolean) {
+    if (!next && inFlight.current) return;
     setOpenState(next);
     opts.reset();
     setError(null);
