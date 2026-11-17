@@ -39,7 +39,7 @@ if [ "$(have)" = "$want" ] && [ -z "${MGR_TEST_DB_RESET:-}" ] &&
   [ "$(psql_test "select count(*) from pg_proc where pronamespace='public'::regnamespace and proname ~ '^mgr_test_identity_[a-f0-9]{32}$'")" = 1 ]; then
   echo "test-db: schema unchanged; skipping reset"
 else
-  bunx supabase db reset --local --workdir "$WD"
+  bunx supabase db reset --workdir "$WD"
   node scripts/test-db-schema.mjs install
   # Readiness must execute this reset's new identity RPC, not an old table.
   bash scripts/wait-rest.sh
