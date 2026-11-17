@@ -10,9 +10,11 @@ import { TabBar } from "@/components/mgr/qty";
 // The one table is drawn two ways by CSS, so each cell mounts once: a grid
 // from md up, and on a phone one block per group with a line per format.
 // Formats the channel does not price stay in the table, hidden until the
-// switch above it is on.
+// switch above it is on. ArrowKeyGrid moves focus between the fields on the
+// arrow keys.
 import { useId, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { ArrowKeyGrid } from "@/components/mgr/views/price-grid-keys";
 import { LinkTabs } from "@/components/mgr/work-tabs";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
@@ -94,7 +96,7 @@ export function PriceGroupsView({
       {E.info("Price groups down, formats across. A beer sits on one group and a customer on one channel; the cell where they meet is the price.")}
       {model.groupCount === 0 ? E.blank("Add a price group, then put each brand on one from Catalog.")
         : !channel ? E.blank("No sale channels yet")
-        : <div data-price-grid className="group/grid flex shrink-0 flex-col gap-2">
+        : <ArrowKeyGrid data-price-grid className="group/grid flex shrink-0 flex-col gap-2">
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
             {model.tabHrefs
               ? <LinkTabs items={model.tabHrefs} current={channel.name} className="w-full overflow-x-auto overflow-y-hidden [scrollbar-width:none] md:w-fit" />
@@ -126,7 +128,7 @@ export function PriceGroupsView({
               ))}
             </TableBody>
           </Table>
-        </div>}
+        </ArrowKeyGrid>}
     </>
   );
 }
