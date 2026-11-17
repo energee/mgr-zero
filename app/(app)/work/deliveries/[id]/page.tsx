@@ -11,7 +11,7 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { docNo } from "@/lib/mgr/doc-no";
 import { orNotFound } from "@/lib/mgr/not-found";
-import { sentenceCase } from "@/lib/mgr/labels";
+import { deliveryOutcomeLabel, type DeliveryOutcome } from "@/lib/mgr/order-status";
 import type { ShipToSnapshot } from "@/lib/mgr/ship-to-view";
 import { DeliveredForm } from "./delivered-form";
 import { navTitle } from "@/lib/mgr/nav";
@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 type Stop = {
   delivery: {
-    id: string; stop_no: number; delivered_at: string | null; signed_by: string | null; outcome: string | null;
+    id: string; stop_no: number; delivered_at: string | null; signed_by: string | null; outcome: DeliveryOutcome | null;
     routes: { id: string; name: string | null; delivery_date: string; driver_user_id: string | null; departed_at: string | null } | null;
     shipments: { invoice_timing: "now" | "on_delivery"; orders: { order_no: number | null; customers: { name: string } | null; ship_tos: ShipToSnapshot | null } } | null;
     stock_transfers: { transfer_no: number | null; to_location: { name: string } | null } | null;
@@ -54,7 +54,7 @@ export default async function DeliveryStopPage({ params }: { params: Promise<{ i
   let readout: DeliveryReadout | undefined;
   if (delivery.delivered_at) {
     readout = {
-      kind: "delivered", receivedBy: delivery.signed_by ?? "", outcome: sentenceCase(delivery.outcome ?? "delivered"),
+      kind: "delivered", receivedBy: delivery.signed_by ?? "", outcome: deliveryOutcomeLabel(delivery.outcome),
       transfer: Boolean(transfer), invoice: docNo("INV", invoice?.invoice_no ?? null, "Delivered"),
       refused: Boolean(delivery.outcome && delivery.outcome !== "delivered"), checkInHref: `/work/deliveries/${delivery.id}/return`,
     };

@@ -10,6 +10,7 @@ import type { TodayItem } from "./today";
 import { formatDate } from "@/lib/date-format";
 import { poNo } from "@/lib/mgr/doc-no";
 import { plural } from "@/lib/mgr/plural";
+import { purchaseOrderNext } from "@/lib/mgr/purchase-orders-view";
 import { TODAY_VERB } from "@/lib/mgr/today-view";
 import { onlyRoles } from "@/lib/mgr/roles";
 import type { StaffRole } from "./registry";
@@ -109,7 +110,8 @@ defineQuery({
       ...today.map((t) => ({ kind: KIND[t.reason], id: t.subjectId, ...(t.subjectType === "order" ? { orderId: t.subjectId } : {}), label: t.safeLabel, detail: t.detail, href: t.href, verb: TODAY_VERB[t.reason][0], tone: TODAY_VERB[t.reason][1], dueAt: t.dueAt })),
       ...pos.map((p) => ({
         kind: "POs" as const, id: p.id, label: `${poNo(p.po_no)} · ${p.vendor_name ?? "vendor"}`, detail: p.status.replace("_", " ") + (p.expected_on ? ` · due ${formatDate(p.expected_on)}` : ""),
-        href: `/purchase-orders/${p.id}`, verb: p.status === "draft" ? "Mark sent" : "Receive", tone: "info" as const, dueAt: p.expected_on,
+        // list_purchase_orders returns only open orders, and every open order has a next step.
+        href: `/purchase-orders/${p.id}`, ...purchaseOrderNext(p.status)!, dueAt: p.expected_on,
       })),
       ...routes.map((r) => ({
         kind: "routes" as const, id: r.id, label: r.name ?? "Route", detail: `${plural(r.deliveries[0]?.count ?? 0, "stop")} · ${formatDate(r.delivery_date)}`,

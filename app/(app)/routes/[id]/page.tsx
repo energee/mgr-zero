@@ -13,7 +13,7 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { notFound } from "next/navigation";
 import { formatTime } from "@/lib/time-window";
-import { sentenceCase } from "@/lib/mgr/labels";
+import { deliveryOutcomeLabel } from "@/lib/mgr/order-status";
 import { driverLabel, type RouteList } from "../labels";
 import { RouteForm } from "../route-form";
 import { ReturnRoute } from "../route-run";
@@ -66,7 +66,7 @@ export default async function RoutePage({ params }: { params: Promise<{ id: stri
             title: `Stop ${s.stop_no} · ${s.label}`,
             outstanding: s.outstanding_qty,
             returnHref: `/work/deliveries/${s.id}/return`,
-            detail: s.delivered_at ? `${sentenceCase(s.outcome ?? "delivered")} ${formatTime(s.delivered_at, brewery.timeZone)}` : "",
+            detail: s.delivered_at ? `${deliveryOutcomeLabel(s.outcome)} ${formatTime(s.delivered_at, brewery.timeZone)}` : "",
           })),
         }}
         action={action}
@@ -83,7 +83,7 @@ export default async function RoutePage({ params }: { params: Promise<{ id: stri
         stops: route.stops.map((s) => {
           const isNext = s.id === next?.id;
           if (s.delivered_at) {
-            const done = { key: s.id, title: `Stop ${s.stop_no} · ${s.label}`, detail: `${sentenceCase(s.outcome ?? "delivered")} ${formatTime(s.delivered_at, brewery.timeZone)}` };
+            const done = { key: s.id, title: `Stop ${s.stop_no} · ${s.label}`, detail: `${deliveryOutcomeLabel(s.outcome)} ${formatTime(s.delivered_at, brewery.timeZone)}` };
             return s.outstanding_qty
               ? { ...done, trailing: `${s.outstanding_qty} awaiting check-in`, verb: "Check in", href: `/work/deliveries/${s.id}/return`, warning: true }
               : { ...done, trailing: "Done", ok: true };

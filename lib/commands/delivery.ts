@@ -9,6 +9,7 @@ import { hasAnyRole } from "@/lib/mgr/roles";
 import { ROUTE_STATUSES } from "@/lib/mgr/routes-view";
 import type { TeamMember } from "./invites";
 import { isoDate, breweryToday, completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, rows, runCommand, unwrap } from "./registry";
+import type { DeliveryOutcome } from "@/lib/mgr/order-status";
 
 const ROLES = ["admin", "warehouse"] as const;
 const READ = ["admin", "warehouse", "sales"] as const;
@@ -34,7 +35,7 @@ defineCommand({
 type ShipmentRow = { id: string; orders: { order_no: number | null; customers: { name: string } | null; ship_tos: { label: string } | null } | null };
 type TransferRow = { id: string; transfer_no: number | null; to_location: { name: string } | null };
 type RouteRow = { id: string; name: string | null; delivery_date: string; driver_user_id: string | null; vehicle: string | null; note: string | null; departed_at: string | null; returned_at: string | null };
-export type DeliveryRow = { id: string; route_id: string; stop_no: number; outcome?: string | null; outstanding_qty?: number; delivered_at: string | null; shipment_id: string | null; stock_transfer_id: string | null };
+export type DeliveryRow = { id: string; route_id: string; stop_no: number; outcome?: DeliveryOutcome | null; outstanding_qty?: number; delivered_at: string | null; shipment_id: string | null; stock_transfer_id: string | null };
 /** A document a stop can deliver, with its one line of copy: "ORD-0012 · Ridgeline · Dock" / "TRF-0003 · Storage". */
 export type StopDoc = { id: string; label: string; kind: "shipment" | "transfer" };
 
