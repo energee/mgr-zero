@@ -252,6 +252,28 @@ describe("pick and ship", () => {
     // Release the open allocation so later ATP assertions in this file see the same stock.
     expect((await staffDb.rpc("cancel_order", { p_order: id, p_reason: "test cleanup", p_request_id: crypto.randomUUID() })).error).toBeNull();
   });
+  it("cancelling a confirmed order that still holds picked beer flags it for put-back", async () => {
+    // Pick in full, then add a line: the order drops back to confirmed with ten kegs still staged.
+    const id = await confirmedOrder(10);
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 10 }], p_request_id: crypto.randomUUID() });
+    const second = await seedCatalog(b.id, { product: "Restock Pils", sku: "Restock Pils 1/2bbl", packageType: "keg", bblPerUnit: 0.5 });
+    await priceSku(b.id, { saleChannelId, brandId: second.brandId, formatId: second.formatId, cents: 12000 });
+    const adjusted = await staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 10 }, { sku_id: second.skuId, qty: 1 }], p_reason: "added a keg", p_request_id: crypto.randomUUID() });
+    expect(adjusted.error).toBeNull();
+    const staged = await admin.from("order_lines").select("qty_picked").eq("order_id", id).eq("sku_id", skuId).single();
+    expect((await admin.from("orders").select("status,needs_restock").eq("id", id).single()).data).toEqual({ status: "confirmed", needs_restock: false });
+    expect(staged.data).toEqual({ qty_picked: 10 });
+    expect((await staffDb.rpc("cancel_order", { p_order: id, p_reason: "customer closed", p_request_id: crypto.randomUUID() })).error).toBeNull();
+    expect((await admin.from("orders").select("status,needs_restock").eq("id", id).single()).data).toEqual({ status: "cancelled", needs_restock: true });
+    // Put back clears it, so later tests in this file see the same stock.
+    expect((await staffDb.rpc("confirm_restock", { p_order: id, p_request_id: crypto.randomUUID() })).error).toBeNull();
+  });
+  it("cancelling an order nobody picked leaves nothing to put back", async () => {
+    const id = await confirmedOrder(2);
+    expect((await staffDb.rpc("cancel_order", { p_order: id, p_reason: "customer closed", p_request_id: crypto.randomUUID() })).error).toBeNull();
+    expect((await admin.from("orders").select("status,needs_restock").eq("id", id).single()).data).toEqual({ status: "cancelled", needs_restock: false });
+  });
   it("ship rejects when p_ship omits an order line", async () => {
     const id = await confirmedOrder(3);
     const line = await lineOf(id);

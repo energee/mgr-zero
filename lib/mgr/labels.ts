@@ -34,11 +34,12 @@ export const paymentTermLabel = (term: string) => PAYMENT_TERM_LABEL[term as Pay
 export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = { cash: "Cash", check: "Check", ach: "ACH", other: "Other" };
 
 /** How a QuickBooks or Square connection state reads as a status (qbo_connections / pos_connections.state).
- *  "Reconnect required" names what recovery_required asks the admin to do (#1151). */
+ *  "Reconnect required" names what recovery_required asks the admin to do (#1151).
+ *  A Slack installation's states (chat_installations.state) read through the same function. */
 const CONNECTION_STATE_LABEL: Record<string, string> = { connected: "Connected", disconnected: "Not connected", recovery_required: "Reconnect required" };
 
-/** A stored connection state as a status; the check constraints allow only the three above, so the
- *  sentence-case fallback only keeps a future state readable until it gets its own label. */
+/** A stored connection state as a status. QuickBooks and Square allow only the three above; Slack's
+ *  other states (active, disabled, needs_reauthorization, pending) and any future one read in sentence case. */
 export const connectionStateLabel = (state: string) => CONNECTION_STATE_LABEL[state] ?? sentenceCase(state);
 
 /** Catalog's Sort options, in BRAND_SORTS order (lib/mgr/enums.ts). */

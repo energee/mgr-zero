@@ -94,6 +94,10 @@ export const nextState = (status: OrderStatus, needsRestock: boolean) =>
 export type DeliveryOutcome = "delivered" | "partial" | "refused";
 const OUTCOME: Record<DeliveryOutcome, string> = { delivered: "Delivered", partial: "Partly delivered", refused: "Refused" };
 
+/** A closed stop's outcome in words, for the order, the route and the delivery
+ *  page alike. A stop closed before outcomes were recorded reads Delivered. */
+export const deliveryOutcomeLabel = (outcome?: DeliveryOutcome | null) => OUTCOME[outcome ?? "delivered"];
+
 /** The state and next step staff read (#1483). orders.status stops at shipped,
  *  so a closed delivery stop names what happened there. A closed stop or a
  *  shipped pickup (which never gets a stop) has no next step, unless beer it

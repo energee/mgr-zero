@@ -2,6 +2,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 const { push, refresh } = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh }) }));
 vi.mock("@/lib/brewery-provider", () => ({ useBrewery: () => "brewery", useCommandContext: () => ({ actorId: "actor", breweryId: "brewery" }) }));
@@ -46,4 +47,11 @@ it.each([false, true])("actual command run keeps the saved pick open and refresh
   expect(fetch).toHaveBeenCalledOnce();
   // Successful transport recovery was retired: no false "Retry saved request" remains.
   expect(sessionStorage.getItem('mgr-command-recovery-v1:["actor","brewery",null]')).toBeNull();
+});
+
+it.each(["pick-form.tsx", "short-pick-form.tsx"])("%s shows Saving… only while the command runs, and stays disabled once saved", file => {
+  // After a save whose cleanup failed the form stays on screen beside "… saved, but …"; its button must not still say Saving….
+  const src = readFileSync(`app/(app)/orders/[id]/${file}`, "utf8");
+  expect(src).toMatch(/submitting=\{busy\}/);
+  expect(src).toMatch(/disabled=\{[^}]*\bsaved\b[^}]*\}/);
 });
