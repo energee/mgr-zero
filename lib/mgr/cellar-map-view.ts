@@ -1,4 +1,5 @@
-import { formatLatestReading, type VesselReading } from "./vessel-detail-view";
+import { formatVesselReading, type VesselReading } from "./vessel-detail-view";
+import { formatAgo } from "@/lib/date-format";
 import type { GravityUnit } from "./gravity-unit";
 
 export type CellarMapViewModel = {
@@ -12,7 +13,7 @@ export type CellarMapViewModel = {
    *  makes the reading line a link, or with no reading yet draws an Add
    *  reading button. The inventory gives "" to draw either inert. */
   backHref?: string; addHref?: string | null; readingHref?: string | null; actionsOff?: boolean; actionHint?: string; brewHref?: string;
-  tiles: { name: string; group: string; detail: string; volume?: string; reading?: string; warning?: boolean; fill?: number; href?: string; readingHref?: string }[];
+  tiles: { name: string; group: string; detail: string; volume?: string; reading?: string; readAgo?: string; warning?: boolean; fill?: number; href?: string; readingHref?: string }[];
   detail?: { title: string; description: string; href?: string };
 };
 
@@ -39,7 +40,7 @@ export function nextTankOccupancy(vessels: OrderedVessel[], occupancies: TileOcc
   return at === -1 ? null : order[at + 1] ?? null;
 }
 
-export function toCellarMapViewProps(vessels: (OrderedVessel & { capacity_bbl: number })[], occupancies: { vessel_id: string; occupancy_id: string; brand_name: string | null; bbl: number }[], readings: Record<string, string> = {}, hrefs: Record<string, string> = {}, readingHref?: (occupancyId: string) => string): CellarMapViewModel {
+export function toCellarMapViewProps(vessels: (OrderedVessel & { capacity_bbl: number })[], occupancies: { vessel_id: string; occupancy_id: string; brand_name: string | null; bbl: number }[], readings: Record<string, CellarReading> = {}, hrefs: Record<string, string> = {}, readingHref?: (occupancyId: string) => string): CellarMapViewModel {
   // The map's top Reading button can only be bound when a single tank is
   // occupied; with several there is no unambiguous target and guessing records
   // the reading against the wrong one, so the view hides it and each occupied
@@ -58,8 +59,9 @@ export function toCellarMapViewProps(vessels: (OrderedVessel & { capacity_bbl: n
     if (!occupancy) return { ...tile, detail: `Empty · ${capacity} bbl` };
     const quantity = Number(occupancy.bbl);
     const link = readingHref?.(occupancy.occupancy_id);
+    const latest = readings[occupancy.occupancy_id];
     // A linked tile with no reading has no reading line: the view draws Add reading there.
-    return { ...tile, detail: occupancy.brand_name ?? "No brand yet", volume: `${quantity} / ${capacity} bbl`, reading: readings[occupancy.occupancy_id] ?? (link === undefined ? "No readings yet" : undefined), fill: capacity > 0 ? quantity / capacity * 100 : undefined, readingHref: link };
+    return { ...tile, detail: occupancy.brand_name ?? "No brand yet", volume: `${quantity} / ${capacity} bbl`, reading: latest?.values ?? (link === undefined ? "No readings yet" : undefined), readAgo: latest?.ago, fill: capacity > 0 ? quantity / capacity * 100 : undefined, readingHref: link };
   }) };
 }
 
@@ -67,7 +69,10 @@ export function toCellarMapViewProps(vessels: (OrderedVessel & { capacity_bbl: n
 // list_batches({ readings: true }) read — the batch list already embeds the
 // newest reading per open occupancy, so the cellar map never asks per tank (#700).
 // A tank with no reading has no entry: the map words that line itself.
-export function cellarReadings(batches: { active_occupancies: { id: string; latest_reading?: VesselReading | null }[] }[], unit: GravityUnit, timeZone: string): Record<string, string> {
-  return Object.fromEntries(batches.flatMap(batch => batch.active_occupancies).filter(occupancy => occupancy.latest_reading)
-    .map(occupancy => [occupancy.id, formatLatestReading(occupancy.latest_reading, unit, timeZone)]));
+// A tile is narrow, so it reads the values and their age ("1d ago"), not a
+// full date and time; the note is left out, as Vessel detail shows it.
+export type CellarReading = { values: string; ago: string };
+export function cellarReadings(batches: { active_occupancies: { id: string; latest_reading?: VesselReading | null }[] }[], unit: GravityUnit, now: Date = new Date()): Record<string, CellarReading> {
+  return Object.fromEntries(batches.flatMap(batch => batch.active_occupancies).flatMap(({ id, latest_reading: reading }) => reading
+    ? [[id, { values: formatVesselReading({ ...reading, note: null }, unit), ago: formatAgo(reading.at, now) }]] : []));
 }

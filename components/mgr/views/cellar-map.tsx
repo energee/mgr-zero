@@ -9,12 +9,15 @@ import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { CellarMapViewModel } from "@/lib/mgr/cellar-map-view";
 
-/** A tile's last line: its latest reading, linked to Reading when the tile has a path there, or Add reading when it has a path but no reading yet. */
+/** A tile's last lines: its latest reading, linked to Reading when the tile has a path there, or Add reading when it has a path but no reading yet; under it, how long ago it was read. */
 function tileReading(tile: CellarMapViewModel["tiles"][number]): ReactNode {
   if (tile.readingHref === undefined) return E.polite(tile.reading);
   const href = tile.readingHref || undefined;
   if (!tile.reading) return E.act("Add reading", "primary", href);
-  return E.link(tile.reading, "Fermentation reading", href);
+  return <span className="flex flex-col gap-0.5">
+    {E.link(tile.reading, "Fermentation reading", href)}
+    {tile.readAgo && <span className="text-xs text-muted-foreground">{tile.readAgo}</span>}
+  </span>;
 }
 
 export function CellarMapView({ model, transfer, addition, complete }: { model: CellarMapViewModel; transfer?: ReactNode; addition?: ReactNode; complete?: ReactNode }) {

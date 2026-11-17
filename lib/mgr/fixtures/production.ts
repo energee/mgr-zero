@@ -18,12 +18,12 @@ import { waterProfiles } from "./catalog";
 export const cellarMapBrewer: CellarMapViewModel = {
   readingHref: null,
   tiles: [
-    { name: "FV1", group: "Fermenters", detail: "Pils", volume: "12.8 / 15 bbl", reading: "1.9 °P · read 4 h", fill: 85, readingHref: "" },
-    { name: "FV2", group: "Fermenters", detail: "Hazy", volume: "9.0 / 15 bbl", reading: "7.5 °P · read 8 h", fill: 60, readingHref: "" },
+    { name: "FV1", group: "Fermenters", detail: "Pils", volume: "12.8 / 15 bbl", reading: "1.9 °P · 68 °F", readAgo: "4h ago", fill: 85, readingHref: "" },
+    { name: "FV2", group: "Fermenters", detail: "Hazy", volume: "9.0 / 15 bbl", reading: "7.5 °P · 67 °F", readAgo: "8h ago", fill: 60, readingHref: "" },
     { name: "FV3", group: "Fermenters", detail: "Stout", volume: "13.5 / 15 bbl", reading: "5.2 °P · overdue 31 h", warning: true, fill: 90, readingHref: "" },
     { name: "BT1", group: "Brite tanks", detail: "Pils", volume: "7.0 / 10 bbl", fill: 70, readingHref: "" },
     { name: "BT2", group: "Brite tanks", detail: "Empty · 10 bbl" },
-    { name: "FB1", group: "Barrels", detail: "Saison", volume: "0.4 / 1 bbl", reading: "aging · read 1 d", fill: 40, readingHref: "" },
+    { name: "FB1", group: "Barrels", detail: "Saison", volume: "0.4 / 1 bbl", reading: "64 °F", readAgo: "1d ago", fill: 40, readingHref: "" },
   ],
   detail: { title: "FV3 · fermenter · 15 bbl", description: "occupancy, readings and vessel facts" },
 };

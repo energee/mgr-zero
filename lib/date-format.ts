@@ -37,6 +37,15 @@ export const formatDayHeader = (value: string | Date, timeZone: string) => zoned
 export const formatDateTime = (value: string | Date, timeZone: string) => zoned(DATE_TIME, timeZone).format(new Date(value));
 /** "8:30 PM" in the brewery's zone. */
 export const formatTimeOfDay = (value: string | Date, timeZone: string) => zoned(TIME, timeZone).format(new Date(value));
+/** How long ago an instant was, briefly: "just now", "20m ago", "3h ago", "1d ago".
+ *  Zone-free (an age is the same everywhere); a clock slightly ahead reads "just now". */
+export function formatAgo(value: string | Date, now: Date = new Date()): string {
+  const minutes = Math.floor((now.getTime() - new Date(value).getTime()) / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return hours < 24 ? `${hours}h ago` : `${Math.floor(hours / 24)}d ago`;
+}
 /** The calendar day (YYYY-MM-DD) `at` falls on in `timeZone`. A date field's
  *  default is the brewery's day, not the UTC day `toISOString()` names — which
  *  is already tomorrow on a US evening (#437). breweryToday(ctx) is the caller. */

@@ -62,7 +62,7 @@ it("cellar derives fills from occupancy and keeps links explicit", () => {
   // An empty tank says so in one line: no volume, reading or fill bar.
   expect(model.tiles[1]).toEqual({ name: "Empty tank", group: "Fermenters", detail: "Empty · 5 bbl", href: undefined });
   expect(htmlOf(createElement(CellarMapView, { model })).match(/aria-label="Fill"/g)).toHaveLength(1);
-  const live = toCellarMapViewProps(vessels, occupancies, { o1: "Actual reading" }, { v1: "/cellar/vessels/v1" });
+  const live = toCellarMapViewProps(vessels, occupancies, { o1: { values: "Actual reading", ago: "1h ago" } }, { v1: "/cellar/vessels/v1" });
   expect(htmlOf(createElement(CellarMapView, { model: live }))).toContain('href="/cellar/vessels/v1"');
   expect(htmlOf(createElement(CellarMapView, { model }))).not.toContain('href="/cellar');
   expect(toCellarMapViewProps([{ ...vessels[0], capacity_bbl: 0 }], occupancies).tiles[0].fill).toBeUndefined();
@@ -732,8 +732,8 @@ it("explains a disabled cellar Reading instead of leaving a dead end (#715)", ()
   // Each tile opens Reading on its own tank (#1508): with no reading yet, through an Add reading button.
   expect(html.match(/<a[^>]*data-slot="button"[^>]*href="\/cellar\/o\d\/reading"[^>]*>Add reading<\/a>/g)).toHaveLength(2);
   // Once a tank has a reading, that line is the link and the button is gone.
-  const read = htmlOf(createElement(CellarMapView, { model: toCellarMapViewProps(vessels, one, { o1: "4.5 °P · Sep 1" }, {}, reading) }));
-  expect(read).toMatch(/<a href="\/cellar\/o1\/reading"[^>]*>4\.5 °P · Sep 1<\/a>/);
+  const read = htmlOf(createElement(CellarMapView, { model: toCellarMapViewProps(vessels, one, { o1: { values: "4.5 °P", ago: "2h ago" } }, {}, reading) }));
+  expect(read).toMatch(/<a href="\/cellar\/o1\/reading"[^>]*>4\.5 °P<\/a>/);
   expect(read).not.toContain("Add reading");
 });
 
@@ -763,10 +763,16 @@ describe("cellar readings (#700)", () => {
     const readings = cellarReadings([
       { active_occupancies: [{ id: "o1", latest_reading: reading }, { id: "o2", latest_reading: null }] },
       { active_occupancies: [] },
-    ], "plato", "UTC");
+    ], "plato", new Date("2026-09-02T15:00:00Z"));
     // A tank with no reading has no entry, so a linked tile has no reading line and draws Add reading instead.
     expect(Object.keys(readings)).toEqual(["o1"]);
-    expect(readings.o1).toContain("2026");
+    // The tile reads the values, then how long ago, not a full date and time.
+    expect(readings.o1).toEqual({ values: "4.5 °P · 66 °F", ago: "1d ago" });
+    const read = toCellarMapViewProps([{ id: "v1", name: "FV1", kind: "fermenter" as const, capacity_bbl: 10 }], [{ vessel_id: "v1", occupancy_id: "o1", brand_name: null, bbl: 2 }], readings, {}, id => `/cellar/${id}/reading`).tiles[0];
+    expect(read).toMatchObject({ reading: "4.5 °P · 66 °F", readAgo: "1d ago" });
+    const html = htmlOf(createElement(CellarMapView, { model: { tiles: [read] } }));
+    expect(html).toContain(">4.5 °P · 66 °F</a>");
+    expect(html).toContain("1d ago");
     const vessels = [{ id: "v2", name: "FV2", kind: "fermenter" as const, capacity_bbl: 10 }];
     const tile = toCellarMapViewProps(vessels, [{ vessel_id: "v2", occupancy_id: "o2", brand_name: null, bbl: 2 }], readings, {}, id => `/cellar/${id}/reading`).tiles[0];
     expect(tile).toMatchObject({ reading: undefined, readingHref: "/cellar/o2/reading" });
