@@ -663,21 +663,22 @@ type BatchRow = {
 
 const BATCH_COLUMNS = "id, batch_no, intended_brand_id, recipe_version_id, planned_on, planned_bbl, brewed_on, closed_at, cancelled_at, completion_adjustment_id, note, brand:brands(name), recipe_version:recipe_versions(recipe:recipes(name))";
 
-/** Each batch's first gravity reading, its OG, by batch id. A batch with no gravity reading has no entry. */
-async function firstGravityReadings(ctx: Ctx, batchIds: string[]) {
+/** Each batch's first gravity reading, its OG, by batch id; with `last`, its last one instead, the gravity it
+ *  finished at. A batch with no gravity reading has no entry. */
+async function gravityReadings(ctx: Ctx, batchIds: string[], last = false) {
   const rows = await inChunks(batchIds, chunk => completeRows("Batches", start => ctx.db.from("batches")
     .select("id, fermentation_readings(id, gravity_plato)", { count: "exact" }).eq("brewery_id", ctx.breweryId).in("id", chunk)
     .not("fermentation_readings.gravity_plato", "is", null)
-    .order("at", { referencedTable: "fermentation_readings" }).order("id", { referencedTable: "fermentation_readings" })
+    .order("at", { referencedTable: "fermentation_readings", ascending: !last }).order("id", { referencedTable: "fermentation_readings", ascending: !last })
     .limit(1, { referencedTable: "fermentation_readings" }).order("id").range(start, start + PAGE_SIZE - 1)));
-  return new Map(rows.flatMap(r => r.fermentation_readings.map(first => [r.id, { id: first.id, gravity_plato: num(first.gravity_plato) }] as const)));
+  return new Map(rows.flatMap(r => r.fermentation_readings.map(reading => [r.id, { id: reading.id, gravity_plato: num(reading.gravity_plato) }] as const)));
 }
 
 /** Only brewed, unfinished batches need occupancy reads. History has no current vessels.
  *  With readings, each of those batches also carries og_reading, null when it has no gravity reading. */
 async function batchListRows<T extends BatchRow>(ctx: Ctx, batches: T[], readings = false) {
   const activeIds = batches.filter(b => b.brewed_on && !b.closed_at && !b.cancelled_at).map(b => b.id);
-  const [vessels, ogs] = await Promise.all([openVessels(ctx, activeIds, readings), readings ? firstGravityReadings(ctx, activeIds) : undefined]);
+  const [vessels, ogs] = await Promise.all([openVessels(ctx, activeIds, readings), readings ? gravityReadings(ctx, activeIds) : undefined]);
   return batches.map(({ brand, recipe_version, ...batch }) => ({
     ...batch,
     ...(ogs && activeIds.includes(batch.id) && { og_reading: ogs.get(batch.id) ?? null }),
@@ -743,7 +744,7 @@ defineQuery({
 });
 
 defineQuery({
-  name: "list_batch_history", description: "One page of completed or cancelled batches, newest created first, with brand and embedded recipe",
+  name: "list_batch_history", description: "One page of completed or cancelled batches, newest created first, with brand and embedded recipe; each completed batch also carries its first and last gravity readings (og_reading and fg_reading, each null when it has no gravity reading)",
   input: z.object({ status: z.enum(["completed", "cancelled"]).describe("Which finished batches to list"), ...historyInput }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {
     let q = ctx.db.from("batches").select(`${BATCH_COLUMNS}, created_at`)
@@ -751,7 +752,11 @@ defineQuery({
     q = i.status === "cancelled" ? q.not("cancelled_at", "is", null) : q.not("closed_at", "is", null).is("cancelled_at", null);
     const fetched = (await unwrap(newestFirst(q, i.cursor))) ?? [];
     const page = historyResult(fetched as unknown as (BatchRow & HistoryRow)[], i.limit);
-    return { ...page, rows: await batchListRows(ctx, page.rows) };
+    const rows = await batchListRows(ctx, page.rows);
+    if (i.status === "cancelled") return { ...page, rows };
+    const ids = page.rows.map(b => b.id);
+    const [ogs, fgs] = await Promise.all([gravityReadings(ctx, ids), gravityReadings(ctx, ids, true)]);
+    return { ...page, rows: rows.map(row => ({ ...row, og_reading: ogs.get(row.id) ?? null, fg_reading: fgs.get(row.id) ?? null })) };
   },
 });
 

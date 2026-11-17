@@ -45,7 +45,7 @@ export const batchesBrewer: BatchesSnapshot = {
     { key: "b0414", batchNo: "B-0414", brand: "Porter", recipe: "Robust porter", plannedOn: "Sep 1, 2026", plannedBbl: 10, vessel: null, readings: [] },
   ],
   completed: [
-    { key: "b0401", batchNo: "B-0401", brand: "Amber ale", recipe: "Amber ale", plannedOn: "Aug 2, 2026", plannedBbl: 10, vessel: null },
+    { key: "b0401", batchNo: "B-0401", brand: "Amber ale", recipe: "Amber ale", plannedOn: "Aug 2, 2026", plannedBbl: 10, vessel: null, abv: "5.6%", attenuation: "78%" },
   ],
   cancelled: [
     { key: "b0412", batchNo: "B-0412", brand: null, recipe: "Pale ale", plannedOn: "Aug 30, 2026", plannedBbl: 15, vessel: null },
