@@ -5,7 +5,7 @@ import { formatDate } from "@/lib/date-format";
 import { Button } from "@/components/ui/button";
 import { TimeWindowField } from "@/components/mgr/time-window-field";
 import { TimezonePicker } from "@/components/mgr/timezone-picker";
-import { timezoneLabel } from "@/lib/mgr/labels";
+import { connectionStateLabel, timezoneLabel } from "@/lib/mgr/labels";
 import { formatWindow, parseClock } from "@/lib/time-window";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { SettingsSaveStatus } from "@/components/mgr/settings-save-status";
@@ -52,7 +52,7 @@ export function ChatSettingsView({ health, timezone, readingDueHours, configured
     {!connected && E.info("Bring today’s assigned, due and overdue work into chat. Slack shows the work; MGR stays the record.")}
     {oauthError && E.note("Slack connection was cancelled or could not finish. Try again; your existing settings remain available.", "alert")}
     {installed && E.info("Slack authorization completed. Choose a private operations channel below.")}
-    {E.row(connected ? `Slack · ${installation.workspace}` : "Slack", connected ? installation.state.replaceAll("_", " ") : "Not connected", connected ? E.act("Disconnect", "destructive", disconnectHref) : "", connected && installation.state === "active" ? "ok" : "w", SlackMark)}
+    {E.row(connected ? `Slack · ${installation.workspace}` : "Slack", connected ? connectionStateLabel(installation.state) : "Not connected", connected ? E.act("Disconnect", "destructive", disconnectHref) : "", connected && installation.state === "active" ? "ok" : "w", SlackMark)}
     <details><summary>Connection permissions</summary>{E.fld("Required scopes", "chat:write · im:write · groups:read · users:read")}{connected && E.fld("Granted scopes", installation.scopes.join(" · ") || "None recorded; reauthorize Slack")}</details>
     {installation?.lastError && E.note(`Last provider error: ${installation.lastError.replaceAll("_", " ")}`, "alert")}
     {installation?.state === "disconnected" && installation.lastError === "credential_delete_failed" && E.btn("Retry credential cleanup", "g", disconnectHref)}
@@ -193,7 +193,7 @@ export function ChatHealthView({ health, configured = true, connection, disable,
   return <>
     {E.back("Chat", "Health", undefined, backHref)}
     {installation?.state === "active" ? E.info("Slack delivery is enabled. Blocked channels do not receive team digests; eligible personal sends continue.") : E.note("Slack delivery is stopped. Your MGR work remains available.")}
-    {E.row("Connection", installation?.state.replaceAll("_", " ") ?? "Not connected")}
+    {E.row("Connection", installation ? connectionStateLabel(installation.state) : "Not connected")}
     {E.row("Last successful message from Slack", health.lastCallback ?? "None yet", health.lastCallback ? E.status("Succeeded", "ok") : "")}
     {E.row("Last successful delivery", health.lastDelivery ?? "None yet", health.lastDelivery ? E.status("Succeeded", "ok") : "")}
     {connected && Object.entries(health.queue).map(([state, count]) => <div key={state}>{E.row(state.replaceAll("_", " "), `${count} deliveries`, state === "queued" && installation?.state !== "active" ? E.status("Paused", "w") : "", count ? "w" : "")}</div>)}

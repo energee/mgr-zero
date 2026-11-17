@@ -82,7 +82,7 @@ export function PickForm({ snapshot }: { snapshot: PickSnapshot }) {
         catch { setDraftError("Working counts could not be kept. Stay on Pick and try again."); }
       }}
       onShort={setShortId}
-      onPrint={() => window.print()} submitting={busy || saved} disabled={needsCounts.length > 0} messages={<><CommandFormMessage error={error ?? (needsCounts.length ? "Re-enter every line before saving." : draftError)} />{saved && error && <Link className="text-sm underline" href={pickDoneHref(snapshot.order, snapshot.lines, qtys)}>Continue to saved order</Link>}</>} />
+      onPrint={() => window.print()} submitting={busy} disabled={needsCounts.length > 0 || saved} messages={<><CommandFormMessage error={error ?? (needsCounts.length ? "Re-enter every line before saving." : draftError)} />{saved && error && <Link className="text-sm underline" href={pickDoneHref(snapshot.order, snapshot.lines, qtys)}>Continue to saved order</Link>}</>} />
   </form>
   {shortLine && <ShortPickForm key={shortLine.id} snapshot={{ order: snapshot.order, line: { ...shortLine, qty_picked: Number(qtys[shortLine.id]) }, locations: snapshot.locations }} onClose={() => setShortId(null)} />}
   </>;

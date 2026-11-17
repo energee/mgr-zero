@@ -9,7 +9,7 @@ import { chatSettingIsSaved, type ChatSettingSave } from "../lib/mgr/chat-save-f
 import { ChatDisconnectView, ChatLinkedPeopleView, ChatLinkConsentView, ChatHealthView, ChatSettingsView, ChatPersonalPreferencesView, ChatQuietHoursView, ChatSettingsFieldsView } from "../components/mgr/views/chat";
 import { SCREENS } from "../components/mgr/screens";
 import { personalQuietHoursReason, breweryQuietHoursReason } from "../lib/chat/quiet-hours";
-import { chatConnected } from "../lib/mgr/fixtures/chat";
+import { chatConnected, chatRecovery } from "../lib/mgr/fixtures/chat";
 
 it("derives quiet-hours readiness from the saved window and timezone, including reverts", () => {
   const initial = { start: "22:00", end: "06:00", timezone: "America/New_York" };
@@ -315,4 +315,13 @@ it("offers a searchable timezone picker with the saved timezone and busy state",
   expect(html).toMatch(/<button\b[^>]*aria-label="Show options"/);
   const busy = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences, busy: true }));
   expect(busy).toMatch(/<input(?=[^>]*role="combobox")(?=[^>]*disabled)[^>]*>/);
+});
+
+it("words the Slack installation state like the other connections, not as the stored value", () => {
+  const settings = renderToStaticMarkup(createElement(ChatSettingsView, { health: chatRecovery, timezone: "America/New_York", readingDueHours: 24 }));
+  expect(settings).toContain("Needs reauthorization");
+  expect(settings).not.toContain("needs reauthorization");
+  const health = renderToStaticMarkup(createElement(ChatHealthView, { health: chatRecovery }));
+  expect(health).toContain("Needs reauthorization");
+  expect(health).not.toContain("needs reauthorization");
 });
