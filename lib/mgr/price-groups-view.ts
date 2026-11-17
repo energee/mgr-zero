@@ -147,3 +147,19 @@ export function cellCommit(initial: string, dollars: string): CellCommit {
   // "7" over a saved "7.00" is the same price: nothing to save.
   return cents === toCents(initial) ? { kind: "none" } : { kind: "save", cents };
 }
+
+const STEPS: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+
+/**
+ * Where an arrow key moves focus in a grid of price fields: the nearest cell
+ * in that direction that has a field, as [row, col]. `fields[row][col]` is
+ * true where a field is showing. Null at an edge, or for any other key.
+ */
+export function stepCell(fields: boolean[][], row: number, col: number, key: string): [number, number] | null {
+  const step = STEPS[key];
+  if (!step) return null;
+  for (let r = row + step[0], c = col + step[1]; fields[r]?.[c] !== undefined; r += step[0], c += step[1]) {
+    if (fields[r]![c]) return [r, c];
+  }
+  return null;
+}
