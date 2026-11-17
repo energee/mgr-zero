@@ -2,10 +2,11 @@
 // the roles of the command that verb runs, so the list never offers a step the
 // command would refuse, and never hides one it would allow.
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { getCommandDefinition, STAFF_ROLES } from "@/lib/commands/registry";
 import "@/lib/commands/orders";
 import { pickDoneHref, type PickSnapshot } from "@/lib/mgr/pick-view";
-import { nextAction, ORDER_MOVES, ORDER_STATUSES, orderAllows, parseOrderStatus, salesRoles, shownState, stepRedirect, warehouseRoles, type OrderStatus } from "@/lib/mgr/order-status";
+import { deliveryOutcomeLabel, nextAction, ORDER_MOVES, ORDER_STATUSES, orderAllows, parseOrderStatus, salesRoles, shownState, stepRedirect, warehouseRoles, type OrderStatus } from "@/lib/mgr/order-status";
 import { Constants } from "@/lib/supabase/database.generated";
 
 /** The command each list verb finishes. */
@@ -62,6 +63,15 @@ describe("shownState (#1483)", () => {
   it("leaves every earlier state and the staged-beer override as they were", () => {
     expect(shownState("confirmed", false, null, false)).toEqual({ label: "Confirmed", next: "pick" });
     expect(shownState("picked", true, null, false)).toEqual({ label: "Picked", next: "put back" });
+  });
+  it("words a stop's outcome the same on the order, the route and the delivery page", () => {
+    expect(deliveryOutcomeLabel("partial")).toBe("Partly delivered");
+    expect(deliveryOutcomeLabel("refused")).toBe("Refused");
+    // A stop closed before outcomes were recorded reads Delivered.
+    expect(deliveryOutcomeLabel(null)).toBe("Delivered");
+    for (const page of ["app/(app)/routes/[id]/page.tsx", "app/(app)/work/deliveries/[id]/page.tsx"]) {
+      expect(readFileSync(page, "utf8"), page).not.toMatch(/sentenceCase\([^)]*outcome/);
+    }
   });
   it("accepts Delivered as a list filter beside the lifecycle states", () => {
     expect(parseOrderStatus("delivered")).toBe("delivered");
