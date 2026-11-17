@@ -7,7 +7,7 @@ import { E } from "@/components/mgr/e";
 import { runPageQuery } from "@/lib/mgr/page-query";
 import type { Ctx } from "@/lib/commands/registry";
 import type { AdditionLot, AdditionMaterial } from "@/lib/mgr/cellar-addition-view";
-import type { TransferOccupancy, TransferVessel } from "@/lib/mgr/cellar-transfer-view";
+import { plannedBatchChoices, type TransferOccupancy, type TransferVessel } from "@/lib/mgr/cellar-transfer-view";
 import { CellarTransferForm } from "./cellar-transfer-form";
 import { CellarAdditionForm } from "./cellar-addition-form";
 import { BatchCompletionForm } from "./batch-completion-form";
@@ -23,14 +23,15 @@ export function additionChoices(materials: AdditionMaterial[], lots: (AdditionLo
 export async function OccupancyActions({ ctx, occupancyId, batch, readingHref }: {
   ctx: Ctx; occupancyId: string; batch: { id: string; label: string }; readingHref?: string;
 }) {
-  const [occupancies, vessels, materials, lots] = await Promise.all([
+  const [occupancies, vessels, materials, lots, planned] = await Promise.all([
     runPageQuery("list_occupancies", {}, ctx), runPageQuery("list_vessels", {}, ctx),
     runPageQuery("list_materials", {}, ctx), runPageQuery("list_material_lots", {}, ctx),
-  ]) as [TransferOccupancy[], TransferVessel[], AdditionMaterial[], (AdditionLot & { material_id: string })[]];
+    runPageQuery("list_batches", { open: false }, ctx),
+  ]) as [TransferOccupancy[], TransferVessel[], AdditionMaterial[], (AdditionLot & { material_id: string })[], Parameters<typeof plannedBatchChoices>[0]];
   const choices = additionChoices(materials, lots);
   return <div className="flex flex-wrap gap-2">
     {readingHref && E.btn("Reading", "g", readingHref)}
-    <CellarTransferForm occupancies={occupancies} vessels={vessels} fromId={occupancyId} />
+    <CellarTransferForm occupancies={occupancies} vessels={vessels} plannedBatches={plannedBatchChoices(planned)} fromId={occupancyId} />
     <CellarAdditionForm occupancies={occupancies} materials={choices.materials} lotsByMaterial={choices.lotsByMaterial} occupancyId={occupancyId} />
     <BatchCompletionForm batches={[batch]} />
   </div>;

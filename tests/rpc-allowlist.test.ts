@@ -169,7 +169,7 @@ const AUTHENTICATED_RPCS = [
   "correct_brew_record(uuid,uuid,text,numeric,jsonb,jsonb,boolean,uuid)",
   "get_brew_day_plan(uuid,uuid)", "get_brew_record(uuid,uuid)",
   "save_batch_pulls(uuid,uuid,uuid,jsonb,uuid)",
-  "record_cellar_transfer(uuid,uuid,uuid,numeric,numeric,uuid)",
+  "record_cellar_transfer(uuid,uuid,uuid,numeric,numeric,uuid,uuid)",
   "record_fermentation_reading(uuid,uuid,uuid,timestamp with time zone,numeric,numeric,numeric,text,uuid)",
   "record_historical_batch(uuid,uuid,date,date,numeric,jsonb,uuid)",
   "record_historical_packaging_run(uuid,uuid,date,jsonb,text,uuid)",

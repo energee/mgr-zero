@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { transferDestinations, transferPreview, transferReason } from "../lib/mgr/cellar-transfer-view";
+import { destinationChange, plannedBatchChoices, transferDestinations, transferPreview, transferReason } from "../lib/mgr/cellar-transfer-view";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CellarTransferView } from "../components/mgr/views/cellar-transfer";
-import { cellarTransferPils } from "../lib/mgr/fixtures/production";
+import { cellarTransferPils, cellarTransferPlannedBatch } from "../lib/mgr/fixtures/production";
 
 describe("cellar transfer preview", () => {
   it("shares the blend, remainder and explicit partial-loss controls without replacing the footer", () => {
@@ -61,5 +61,32 @@ describe("cellar transfer preview", () => {
     expect(brewer).toContain("No other vessel. Ask Admin to add one.");
     expect(brewer).not.toContain("Add a vessel");
     expect(renderToStaticMarkup(createElement(CellarTransferView, { model: cellarTransferPils, footer: null }))).not.toContain("No other vessel");
+  });
+  it("starts a planned batch only in an empty destination", () => {
+    // BT2 is empty; BT1 holds B-0412.
+    expect(transferReason(cellarTransferPlannedBatch)).toBeNull();
+    expect(transferReason({ ...cellarTransferPlannedBatch, toId: "bt1" })).toBe("Still needed: an empty destination vessel to start a planned batch.");
+    expect(transferReason({ ...cellarTransferPlannedBatch, toId: "bt1", toBatchId: "" })).toBeNull();
+  });
+  it("names a planned batch like an occupancy, brand then batch number", () => {
+    expect(plannedBatchChoices([{ id: "a", batch_no: 420, brand_name: "Dry-Hopped Pils" }, { id: "b", batch_no: 421, brand_name: null }]))
+      .toEqual([{ id: "a", label: "Dry-Hopped Pils · B-0420" }, { id: "b", label: "No brand yet · B-0421" }]);
+  });
+  it("offers Start a planned batch only for an empty destination with a planned batch to start", () => {
+    const render = (model: typeof cellarTransferPlannedBatch) => renderToStaticMarkup(createElement(CellarTransferView, { model, footer: null }));
+    const offered = render(cellarTransferPlannedBatch);
+    expect(offered).toContain("Start a planned batch");
+    // The preview names the batch the transfer starts; with none chosen the tank just opens a new occupancy.
+    expect(offered).toContain("starts Dry-Hopped Pils · B-0420");
+    expect(render({ ...cellarTransferPlannedBatch, toBatchId: "" })).toContain("opens a new occupancy");
+    expect(offered).toContain("Dry-Hopped Pils · B-0420");
+    expect(offered).toContain("The beer moved becomes that batch.");
+    expect(render({ ...cellarTransferPlannedBatch, toId: "bt1" })).not.toContain("Start a planned batch");
+    expect(render({ ...cellarTransferPlannedBatch, toId: "" })).not.toContain("Start a planned batch");
+    expect(render({ ...cellarTransferPlannedBatch, toBatchId: "", plannedBatches: [] })).not.toContain("Start a planned batch");
+  });
+  it("clears the chosen batch when the destination changes to a tank that holds beer", () => {
+    expect(destinationChange(cellarTransferPlannedBatch, "bt1")).toEqual({ toId: "bt1", toBatchId: "" });
+    expect(destinationChange({ ...cellarTransferPlannedBatch, toId: "bt1" }, "bt2")).toEqual({ toId: "bt2" });
   });
 });
