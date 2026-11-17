@@ -81,11 +81,9 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with: { bun-version-file: ".bun-version" }
       - run: bun install --frozen-lockfile
-      - run: >
-          bunx vitest run --fileParallelism --maxWorkers=2
-          tests/mgr-screens.test.ts tests/tap-coverage.test.ts tests/screen-links.test.ts
-          tests/theme-contrast.test.ts tests/screen-persona.test.ts
-          tests/design-docs.test.ts tests/docs.test.ts
+      # The "pure" project in vitest.config.mts lists every database-free file;
+      # the shards below run the "database" project, which is everything else.
+      - run: bunx vitest run --project pure --fileParallelism --maxWorkers=2
   test_shard:
     name: test shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
@@ -137,12 +135,7 @@ jobs:
           supabase status --workdir tests/supabase -o env | node scripts/supabase-env.mjs >> "$GITHUB_ENV"
           echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54352/postgres" >> "$GITHUB_ENV"
           echo "MGR_TEST_STACK=1" >> "$GITHUB_ENV"
-      - run: >
-          bunx vitest run --shard=${{ matrix.shard }}
-          --exclude tests/mgr-screens.test.ts --exclude tests/tap-coverage.test.ts
-          --exclude tests/screen-links.test.ts --exclude tests/theme-contrast.test.ts
-          --exclude tests/screen-persona.test.ts --exclude tests/design-docs.test.ts
-          --exclude tests/docs.test.ts
+      - run: bunx vitest run --project database --shard=${{ matrix.shard }}
       - if: always()
         run: supabase stop --workdir tests/supabase --no-backup || true
 
