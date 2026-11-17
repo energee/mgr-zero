@@ -40,7 +40,7 @@ export default async function BatchesPage({ searchParams }: { searchParams: Prom
   const today = breweryDate(brewery.timeZone);
   // A link naming no listed recipe, or one without a version, opens nothing: the page reads as plain Batches.
   const linkedVersionId = recipes.find(recipe => recipe.id === linkedRecipe)?.latest_version_id ?? undefined;
-  return <BatchesView model={toBatchesViewProps(batchesFromQuery([...planned, ...active, ...completed.rows, ...cancelled.rows], vessels, { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}`, reading: id => `/cellar/${id}/reading?from=/batches` }, { unit: gravity.effective, timeZone: brewery.timeZone, today }))}
+  return <BatchesView model={toBatchesViewProps(batchesFromQuery([...planned, ...active, ...completed.rows, ...cancelled.rows], vessels, { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}`, reading: id => `/cellar/${id}/reading?from=/batches` }, { unit: gravity.effective, today }))}
     completedPagination={completedPage.pagination} cancelledPagination={cancelledPage.pagination} cancelledOpen={!!cancelledCursor}
     createAction={<NewBatchForm recipeVersionId={linkedVersionId} brands={brands} recipeVersions={recipeVersions} today={today} brandsHref={canRun(ctx, "upsert_brand") ? "/catalog" : null} />}
     workHrefs={workHrefsFor(brewery.roles)}
