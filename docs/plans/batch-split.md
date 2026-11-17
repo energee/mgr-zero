@@ -173,5 +173,10 @@ today. Re-check both when the migration is written.
 - `toBatchId` was added to the field vocabulary, so an agent's proposal card names the batch.
 - `tests/rpc-allowlist.test.ts` and `tests/rls-taproom.test.ts` pin the procedure's signature and were updated for the
   seventh parameter.
+- Cost fix, in `20261117090000_split_batch_cost.sql`: a split batch has no brew record, so its packages froze with no
+  cost. `private.batch_liquid_cost_per_bbl` now gives it the source batch's cost per barrel, plus its own additions
+  spread over the barrels transferred in. Packaging close and output correction both call it. A brewed batch's cost
+  is unchanged, and a brewed batch that receives a blend is still not apportioned. Ceiling: the source's cost per
+  barrel is read when the split batch's run closes, not at the split, so a later addition to the source is shared.
 - Known and left as is: on a split batch's page the pre-filled brew-day actuals are still built, though **Add brew turn**
   is hidden for it and the database refuses the turn.

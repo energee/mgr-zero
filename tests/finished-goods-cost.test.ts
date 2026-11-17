@@ -159,3 +159,113 @@ describe("finished-goods cost (#810 PR1)", () => {
     expect(await runCommand("get_inventory_value", {}, outsider)).toEqual({ value_cents: 0, uncosted_qty: 0 });
   });
 });
+
+// A batch started by a cellar transfer has no brew record: its beer carries the
+// source batch's cost per barrel, plus its own additions (docs/plans/batch-split.md).
+// The fixture's batch A is 10 bbl for 10,000 cents: 1,000 cents a barrel, 500 a half-barrel keg.
+describe("cost of a batch started by a transfer", () => {
+  type Fixture = Awaited<ReturnType<typeof costedBatch>>;
+
+  /** Starts a planned batch from `bbl` of that tank's beer and returns the new batch's occupancy. */
+  async function splitOff(f: Fixture, fromOccupancyId: string, bbl: number, { plannedBbl = bbl, lossBbl = 0 } = {}) {
+    const batch = await runCommand("schedule_batch", { plannedOn: "2026-10-01", plannedBbl, intendedBrandId: f.catalog.brandId }, f.ctx) as { id: string };
+    const vessel = await runCommand("upsert_vessel", { name: `Split FV ${crypto.randomUUID()}`, kind: "fermenter", capacityBbl: 20 }, f.ctx) as { id: string };
+    const moved = await runCommand("record_cellar_transfer", { fromOccupancyId, toVesselId: vessel.id, volumeBbl: bbl, lossBbl, toBatchId: batch.id }, f.ctx) as { to_occupancy: { id: string } };
+    return moved.to_occupancy.id;
+  }
+
+  /** An 800-cent dry hop into that tank: 8 units of the fixture's malt lot at its 100-cent receipt price. */
+  async function dryHop(f: Fixture, occupancyId: string) {
+    await seedMovement(f.brewery.id, { materialId: f.materialId, locationId: f.location.id, binId: f.location.binId, lotId: f.lot.id, qty: 8, type: "receipt", unitCostCents: 100, createdBy: f.ctx.userId });
+    await runCommand("record_batch_addition", { occupancyId, materialId: f.materialId, lotId: f.lot.id, stage: "dry_hop", qty: 8 }, f.ctx);
+  }
+
+  it("carries the source batch's cost per barrel and leaves the source's own cost unchanged", async () => {
+    const f = await costedBatch();
+    const split = await splitOff(f, f.brewed.occupancy.id, 4);
+    expect(Number((await f.close(4, 2, undefined, split)).cost)).toBe(500);
+    expect(Number((await f.close()).cost)).toBe(500);
+    expect(await runCommand("get_inventory_value", {}, f.ctx)).toEqual({ value_cents: 4000, uncosted_qty: 0 });
+  });
+
+  it("adds the split batch's own addition, spread over the barrels transferred in", async () => {
+    const f = await costedBatch();
+    const split = await splitOff(f, f.brewed.occupancy.id, 4);
+    await dryHop(f, split);
+    // 4 bbl at 1,000 cents plus 800 cents of hops: 1,200 cents a barrel.
+    expect(Number((await f.close(4, 2, undefined, split)).cost)).toBe(600);
+    expect(Number((await f.close()).cost)).toBe(500);
+  });
+
+  it("costs a split of a split at the middle batch's cost per barrel", async () => {
+    const f = await costedBatch();
+    const middle = await splitOff(f, f.brewed.occupancy.id, 4);
+    await dryHop(f, middle);
+    const last = await splitOff(f, middle, 2);
+    expect(Number((await f.close(2, 1, undefined, last)).cost)).toBe(600);
+    expect(Number((await f.close(2, 1, undefined, middle)).cost)).toBe(600);
+  });
+
+  it("divides by the barrels transferred in, not the barrels the batch was planned at", async () => {
+    const f = await costedBatch();
+    const split = await splitOff(f, f.brewed.occupancy.id, 4, { plannedBbl: 6 });
+    expect(Number((await f.close(4, 2, undefined, split)).cost)).toBe(500);
+  });
+
+  it("does not charge the split batch, or the source, for beer lost in the transfer", async () => {
+    const f = await costedBatch();
+    const split = await splitOff(f, f.brewed.occupancy.id, 4, { lossBbl: 1 });
+    expect(Number((await f.close(4, 2, undefined, split)).cost)).toBe(500);
+    expect(Number((await f.close()).cost)).toBe(500);
+  });
+
+  it("stays uncosted when the split batch's own addition has no cost", async () => {
+    const f = await costedBatch();
+    const split = await splitOff(f, f.brewed.occupancy.id, 4);
+    const unpriced = await ins("material_lots", { brewery_id: f.brewery.id, material_id: f.materialId, lot_code: "UNPRICED-HOPS", received_on: "2026-10-02" });
+    await seedMovement(f.brewery.id, { materialId: f.materialId, locationId: f.location.id, binId: f.location.binId, lotId: unpriced.id, qty: 8, type: "opening_balance", createdBy: f.ctx.userId });
+    await runCommand("record_batch_addition", { occupancyId: split, materialId: f.materialId, lotId: unpriced.id, stage: "dry_hop", qty: 8 }, f.ctx);
+    expect((await f.close(4, 2, undefined, split)).cost).toBeNull();
+  });
+
+  it("known ceiling: shares an addition made to the source after the split, when the split batch closes later", async () => {
+    const f = await costedBatch();
+    const split = await splitOff(f, f.brewed.occupancy.id, 4);
+    await dryHop(f, f.brewed.occupancy.id);
+    // The source is now 10,800 cents over its 10 bbl knockout: 1,080 cents a barrel.
+    expect(Number((await f.close(4, 2, undefined, split)).cost)).toBe(540);
+  });
+
+  it("averages two source batches by the barrels each brought in", async () => {
+    const f = await costedBatch();
+    const split = await splitOff(f, f.brewed.occupancy.id, 4);
+    // A second batch: 5 bbl from 10 units of malt at 100 cents, so 200 cents a barrel.
+    await seedMovement(f.brewery.id, { materialId: f.materialId, locationId: f.location.id, binId: f.location.binId, lotId: f.lot.id, qty: 10, type: "receipt", unitCostCents: 100, createdBy: f.ctx.userId });
+    const cheap = await runCommand("schedule_batch", { plannedOn: "2026-10-01", plannedBbl: 5, intendedBrandId: f.catalog.brandId }, f.ctx) as { id: string };
+    const cheapVessel = await runCommand("upsert_vessel", { name: "Cheap FV", kind: "fermenter", capacityBbl: 20 }, f.ctx) as { id: string };
+    const brewed = await runCommand("record_brew_day", { batchId: cheap.id, vesselId: cheapVessel.id, initialBbl: 5, brewedOn: "2026-10-01", actuals: [{ ...f.turn.actuals[0], qty: 10 }] }, f.ctx) as { occupancy: { id: string } };
+    const splitTank = (await admin.from("vessel_occupancies").select("vessel_id").eq("id", split).single().throwOnError()).data!;
+    await runCommand("record_cellar_transfer", { fromOccupancyId: brewed.occupancy.id, toVesselId: splitTank.vessel_id, volumeBbl: 2, lossBbl: 0 }, f.ctx);
+    // 4 bbl at 1,000 cents plus 2 bbl at 200: 4,400 cents over 6 bbl, and a keg is half a barrel.
+    expect(Number((await f.close(4, 2, undefined, split)).cost)).toBeCloseTo(4400 / 6 / 2);
+  });
+
+  it("stays uncosted when the source batch has no cost", async () => {
+    const f = await costedBatch(null);
+    const split = await splitOff(f, f.brewed.occupancy.id, 4);
+    expect((await f.close(4, 2, undefined, split)).cost).toBeNull();
+  });
+
+  it("re-freezes the same rule when the run's outputs are corrected", async () => {
+    const f = await costedBatch();
+    const split = await splitOff(f, f.brewed.occupancy.id, 4);
+    const saved = await f.close(4, 2, undefined, split);
+    await runCommand("correct_packaging_run_outputs", {
+      runId: saved.runId, previousCorrectionId: null, reason: "Counted 2 kegs, not 4", bblDrawn: 2,
+      outputs: [{ skuId: f.catalog.skuId, qtyActual: 2 }], locationId: f.location.id, binId: f.location.binId,
+    }, f.ctx);
+    // The same 2 bbl drawn at 1,000 cents a barrel, now over two kegs.
+    const output = (await admin.from("packaging_run_outputs").select("unit_cost_cents").eq("run_id", saved.runId).single().throwOnError()).data!;
+    expect(Number(output.unit_cost_cents)).toBe(1000);
+  });
+});

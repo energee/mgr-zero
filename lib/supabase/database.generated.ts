@@ -3910,7 +3910,7 @@ isOneToOne: false
                   ]
                 },"bin_on_hand": {
                   Row: {
-                    "bin_id": string | null,"brewery_id": string | null,"location_id": string | null,"qty": number | null,"sku_id": string | null
+                    "bin_id": string,"brewery_id": string,"location_id": string,"qty": number | null,"sku_id": string
                   }
                   ComputedFields: never
                   Relationships: [
@@ -3948,7 +3948,7 @@ isOneToOne: false
                   ]
                 },"contract_balances": {
                   Row: {
-                    "brewery_id": string | null,"contract_id": string | null,"material_id": string | null,"qty_available": number | null,"qty_committed": number | null,"qty_on_order": number | null,"qty_received": number | null,"vendor_id": string | null
+                    "brewery_id": string,"contract_id": string,"material_id": string,"qty_available": number | null,"qty_committed": number,"qty_on_order": number | null,"qty_received": number | null,"vendor_id": string
                   }
                   ComputedFields: never
                   Relationships: [
@@ -3974,7 +3974,7 @@ isOneToOne: false
                   ]
                 },"format_volumes": {
                   Row: {
-                    "basis": Database["public"]['Enums']["format_basis"] | null,"bbl_per_unit": number | null,"brewery_id": string | null,"composed": boolean | null,"id": string | null,"name": string | null
+                    "basis": Database["public"]['Enums']["format_basis"],"bbl_per_unit": number | null,"brewery_id": string,"composed": boolean | null,"id": string,"name": string
                   }
                   ComputedFields: never
                   Insert: {
@@ -3994,7 +3994,7 @@ isOneToOne: false
                   ]
                 },"inventory_value": {
                   Row: {
-                    "brewery_id": string | null,"uncosted_qty": number | null,"value_cents": number | null
+                    "brewery_id": string,"uncosted_qty": number | null,"value_cents": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4008,7 +4008,7 @@ isOneToOne: false
                   ]
                 },"invoice_totals": {
                   Row: {
-                    "brewery_id": string | null,"collected_cents": number | null,"customer_id": string | null,"invoice_id": string | null,"kind": Database["public"]['Enums']["invoice_kind"] | null,"local_credit_cents": number | null,"local_paid_cents": number | null,"paid_at": string | null,"qbo_balance_cents": number | null,"qbo_sync_status": Database["public"]['Enums']["qbo_sync_status"] | null,"qbo_tax_cents": number | null,"qbo_total_cents": number | null,"subtotal_cents": number | null
+                    "brewery_id": string,"collected_cents": number | null,"customer_id": string,"invoice_id": string,"kind": Database["public"]['Enums']["invoice_kind"],"local_credit_cents": number | null,"local_paid_cents": number | null,"paid_at": string | null,"qbo_balance_cents": number | null,"qbo_sync_status": Database["public"]['Enums']["qbo_sync_status"],"qbo_tax_cents": number | null,"qbo_total_cents": number | null,"subtotal_cents": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4036,7 +4036,7 @@ isOneToOne: false
                   ]
                 },"keg_bin_totals": {
                   Row: {
-                    "bin_id": string | null,"brewery_id": string | null,"keg_size": Database["public"]['Enums']["keg_size"] | null,"location_id": string | null,"pool_id": string | null,"qty": number | null
+                    "bin_id": string,"brewery_id": string,"keg_size": Database["public"]['Enums']["keg_size"],"location_id": string,"pool_id": string,"qty": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4068,7 +4068,7 @@ isOneToOne: false
                   ]
                 },"keg_customer_balances": {
                   Row: {
-                    "brewery_id": string | null,"customer_id": string | null,"keg_size": Database["public"]['Enums']["keg_size"] | null,"pool_id": string | null,"qty": number | null
+                    "brewery_id": string,"customer_id": string | null,"keg_size": Database["public"]['Enums']["keg_size"],"pool_id": string,"qty": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4094,7 +4094,7 @@ isOneToOne: false
                   ]
                 },"keg_deposit_balances": {
                   Row: {
-                    "brewery_id": string | null,"customer_id": string | null,"deposit_cents": number | null,"keg_pool_id": string | null,"keg_size": Database["public"]['Enums']["keg_size"] | null,"kegs_on_deposit": number | null
+                    "brewery_id": string,"customer_id": string,"deposit_cents": number | null,"keg_pool_id": string | null,"keg_size": Database["public"]['Enums']["keg_size"] | null,"kegs_on_deposit": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4114,7 +4114,7 @@ isOneToOne: false
                   ]
                 },"keg_fleet_totals": {
                   Row: {
-                    "brewery_id": string | null,"keg_size": Database["public"]['Enums']["keg_size"] | null,"pool_id": string | null,"qty": number | null
+                    "brewery_id": string,"keg_size": Database["public"]['Enums']["keg_size"],"pool_id": string,"qty": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4134,7 +4134,7 @@ isOneToOne: false
                   ]
                 },"keg_location_shortages": {
                   Row: {
-                    "brewery_id": string | null,"keg_size": Database["public"]['Enums']["keg_size"] | null,"location": string | null,"location_id": string | null,"pool": string | null,"pool_id": string | null,"short": number | null
+                    "brewery_id": string | null,"keg_size": Database["public"]['Enums']["keg_size"] | null,"location": string,"location_id": string | null,"pool": string,"pool_id": string | null,"short": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4142,7 +4142,7 @@ isOneToOne: false
                   ]
                 },"keg_loss_rates": {
                   Row: {
-                    "brewery_id": string | null,"loss_rate": number | null,"lost": number | null,"pool_id": string | null,"shipped": number | null
+                    "brewery_id": string,"loss_rate": number | null,"lost": number | null,"pool_id": string,"shipped": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4162,7 +4162,7 @@ isOneToOne: false
                   ]
                 },"lot_on_hand": {
                   Row: {
-                    "brewery_id": string | null,"location_id": string | null,"lot_id": string | null,"qty": number | null,"sku_id": string | null
+                    "brewery_id": string,"location_id": string,"lot_id": string | null,"qty": number | null,"sku_id": string
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4200,7 +4200,7 @@ isOneToOne: false
                   ]
                 },"material_bin_on_hand": {
                   Row: {
-                    "bin_id": string | null,"brewery_id": string | null,"location_id": string | null,"material_id": string | null,"qty": number | null
+                    "bin_id": string,"brewery_id": string,"location_id": string,"material_id": string,"qty": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4232,7 +4232,7 @@ isOneToOne: false
                   ]
                 },"material_last_cost": {
                   Row: {
-                    "brewery_id": string | null,"created_at": string | null,"material_id": string | null,"unit_cost_cents": number | null
+                    "brewery_id": string,"created_at": string | null,"material_id": string,"unit_cost_cents": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4252,7 +4252,7 @@ isOneToOne: false
                   ]
                 },"material_lot_bin_on_hand": {
                   Row: {
-                    "bin_id": string | null,"brewery_id": string | null,"location_id": string | null,"lot_id": string | null,"material_id": string | null,"qty": number | null
+                    "bin_id": string,"brewery_id": string,"location_id": string,"lot_id": string | null,"material_id": string,"qty": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4290,7 +4290,7 @@ isOneToOne: false
                   ]
                 },"material_lot_on_hand": {
                   Row: {
-                    "brewery_id": string | null,"lot_id": string | null,"material_id": string | null,"qty": number | null,"received_on": string | null
+                    "brewery_id": string,"lot_id": string | null,"material_id": string,"qty": number | null,"received_on": string | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4316,7 +4316,7 @@ isOneToOne: false
                   ]
                 },"material_on_hand": {
                   Row: {
-                    "brewery_id": string | null,"material_id": string | null,"qty": number | null
+                    "brewery_id": string,"material_id": string,"qty": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4336,7 +4336,7 @@ isOneToOne: false
                   ]
                 },"material_on_order": {
                   Row: {
-                    "brewery_id": string | null,"material_id": string | null,"qty": number | null
+                    "brewery_id": string,"material_id": string,"qty": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4356,7 +4356,7 @@ isOneToOne: false
                   ]
                 },"material_receipt_costs": {
                   Row: {
-                    "brewery_id": string | null,"cost_at": string | null,"cost_order_key": string | null,"lot_id": string | null,"material_id": string | null,"movement_id": string | null,"unit_cost_cents": number | null
+                    "brewery_id": string,"cost_at": string | null,"cost_order_key": string | null,"lot_id": string | null,"material_id": string,"movement_id": string,"unit_cost_cents": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4382,7 +4382,7 @@ isOneToOne: false
                   ]
                 },"material_requirements": {
                   Row: {
-                    "base_uom": Database["public"]['Enums']["uom"] | null,"brewery_id": string | null,"buy_by": string | null,"contract_id": string | null,"contract_qty_available": number | null,"contract_unit_cost_cents": number | null,"lead_time_days": number | null,"material_id": string | null,"material_name": string | null,"needed_by": string | null,"on_hand": number | null,"on_order": number | null,"out_of_reach": boolean | null,"projected": number | null,"purchase_units_short": number | null,"purchase_uom": Database["public"]['Enums']["uom"] | null,"purchase_uom_factor": number | null,"required": number | null,"short": number | null,"vendor_id": string | null,"vendor_name": string | null
+                    "base_uom": Database["public"]['Enums']["uom"],"brewery_id": string | null,"buy_by": string | null,"contract_id": string | null,"contract_qty_available": number | null,"contract_unit_cost_cents": number | null,"lead_time_days": number | null,"material_id": string | null,"material_name": string,"needed_by": string | null,"on_hand": number | null,"on_order": number | null,"out_of_reach": boolean | null,"projected": number | null,"purchase_units_short": number | null,"purchase_uom": Database["public"]['Enums']["uom"],"purchase_uom_factor": number,"required": number | null,"short": number | null,"vendor_id": string | null,"vendor_name": string | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4390,7 +4390,7 @@ isOneToOne: false
                   ]
                 },"occupancy_volumes": {
                   Row: {
-                    "batch_id": string | null,"bbl": number | null,"brewery_id": string | null,"ended_at": string | null,"occupancy_id": string | null,"started_at": string | null,"vessel_id": string | null
+                    "batch_id": string,"bbl": number | null,"brewery_id": string,"ended_at": string | null,"occupancy_id": string,"started_at": string,"vessel_id": string
                   }
                   ComputedFields: never
                   Insert: {
@@ -4436,7 +4436,7 @@ isOneToOne: false
                   ]
                 },"order_line_cogs": {
                   Row: {
-                    "brewery_id": string | null,"cost_cents": number | null,"order_id": string | null,"qty": number | null,"sku_id": string | null,"uncosted_qty": number | null
+                    "brewery_id": string,"cost_cents": number | null,"order_id": string | null,"qty": number | null,"sku_id": string,"uncosted_qty": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4462,7 +4462,7 @@ isOneToOne: false
                   ]
                 },"packaging_run_requirements": {
                   Row: {
-                    "brewery_id": string | null,"material_id": string | null,"on_hand": number | null,"on_order": number | null,"required": number | null,"run_id": string | null,"short": number | null
+                    "brewery_id": string,"material_id": string | null,"on_hand": number | null,"on_order": number | null,"required": number | null,"run_id": string,"short": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4476,7 +4476,7 @@ isOneToOne: false
                   ]
                 },"packaging_run_yields": {
                   Row: {
-                    "bbl_drawn": number | null,"bbl_packaged": number | null,"brewery_id": string | null,"loss_bbl": number | null,"run_id": string | null
+                    "bbl_drawn": number | null,"bbl_packaged": number | null,"brewery_id": string,"loss_bbl": number | null,"run_id": string
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4490,7 +4490,7 @@ isOneToOne: false
                   ]
                 },"po_open_balances": {
                   Row: {
-                    "brewery_id": string | null,"contract_id": string | null,"material_id": string | null,"po_id": string | null,"po_line_id": string | null,"qty_open": number | null,"qty_ordered": number | null,"qty_received": number | null
+                    "brewery_id": string,"contract_id": string | null,"material_id": string,"po_id": string,"po_line_id": string,"qty_open": number | null,"qty_ordered": number,"qty_received": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4600,7 +4600,7 @@ isOneToOne: false
                   ]
                 },"pos_unmapped_items": {
                   Row: {
-                    "brewery_id": string | null,"connection_id": string | null,"external_item_id": string | null,"external_variation_id": string | null
+                    "brewery_id": string,"connection_id": string,"external_item_id": string | null,"external_variation_id": string | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4620,7 +4620,7 @@ isOneToOne: false
                   ]
                 },"product_volume_requirements": {
                   Row: {
-                    "brand_id": string | null,"brand_name": string | null,"brew_bbl": number | null,"brewery_id": string | null,"demand_bbl": number | null,"supply_bbl": number | null
+                    "brand_id": string,"brand_name": string,"brew_bbl": number | null,"brewery_id": string,"demand_bbl": number | null,"supply_bbl": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4634,7 +4634,7 @@ isOneToOne: false
                   ]
                 },"projected_batch_packaging_units": {
                   Row: {
-                    "brewery_id": string | null,"needed_by": string | null,"sku_id": string | null,"units": number | null
+                    "brewery_id": string,"needed_by": string | null,"sku_id": string,"units": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4648,7 +4648,7 @@ isOneToOne: false
                   ]
                 },"recipe_version_costs": {
                   Row: {
-                    "brewery_id": string | null,"cost_cents_per_bbl": number | null,"recipe_version_id": string | null,"uncosted_material_ids": (string)[] | null
+                    "brewery_id": string,"cost_cents_per_bbl": number | null,"recipe_version_id": string,"uncosted_material_ids": (string)[] | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4668,7 +4668,7 @@ isOneToOne: false
                   ]
                 },"refused_delivery_returns": {
                   Row: {
-                    "brewery_id": string | null,"customer_id": string | null,"customer_name": string | null,"delivery_id": string | null,"invoice_timing": string | null,"order_id": string | null,"order_line_id": string | null,"order_no": number | null,"outstanding_qty": number | null,"qty_refused": number | null,"route_id": string | null,"sku_id": string | null,"sku_name": string | null
+                    "brewery_id": string,"customer_id": string | null,"customer_name": string,"delivery_id": string,"invoice_timing": string,"order_id": string,"order_line_id": string,"order_no": number | null,"outstanding_qty": number | null,"qty_refused": number,"route_id": string,"sku_id": string,"sku_name": string
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4688,7 +4688,7 @@ isOneToOne: false
                   ]
                 },"route_loads": {
                   Row: {
-                    "brewery_id": string | null,"customer_id": string | null,"order_id": string | null,"qty": number | null,"route_id": string | null,"shipment_id": string | null,"sku_id": string | null,"stop_no": number | null
+                    "brewery_id": string,"customer_id": string | null,"order_id": string,"qty": number | null,"route_id": string,"shipment_id": string | null,"sku_id": string,"stop_no": number
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4714,7 +4714,7 @@ isOneToOne: false
                   ]
                 },"sku_inventory_value": {
                   Row: {
-                    "brewery_id": string | null,"sku_id": string | null,"uncosted_qty": number | null,"value_cents": number | null
+                    "brewery_id": string,"sku_id": string,"uncosted_qty": number | null,"value_cents": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4740,7 +4740,7 @@ isOneToOne: false
                   ]
                 },"sku_prices": {
                   Row: {
-                    "active": boolean | null,"brand_name": string | null,"brewery_id": string | null,"sale_channel_id": string | null,"sku_id": string | null,"sku_name": string | null,"unit_price_cents": number | null
+                    "active": boolean,"brand_name": string,"brewery_id": string,"sale_channel_id": string,"sku_id": string,"sku_name": string,"unit_price_cents": number
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4762,7 +4762,7 @@ isOneToOne: false
                   ]
                 },"taproom_replenishment": {
                   Row: {
-                    "brewery_id": string | null,"location_id": string | null,"on_hand_qty": number | null,"par_qty": number | null,"sku_id": string | null,"suggested_qty": number | null
+                    "brewery_id": string,"location_id": string,"on_hand_qty": number | null,"par_qty": number,"sku_id": string,"suggested_qty": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4794,7 +4794,7 @@ isOneToOne: false
                   ]
                 },"vendor_lead_times": {
                   Row: {
-                    "avg_first_lead_days": number | null,"avg_late_days": number | null,"avg_lead_days": number | null,"brewery_id": string | null,"n": number | null,"sent_via": string | null,"vendor_id": string | null
+                    "avg_first_lead_days": number | null,"avg_late_days": number | null,"avg_lead_days": number | null,"brewery_id": string,"n": number | null,"sent_via": string | null,"vendor_id": string
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4814,7 +4814,7 @@ isOneToOne: false
                   ]
                 },"vessel_contents": {
                   Row: {
-                    "batch_id": string | null,"bbl": number | null,"brewery_id": string | null,"capacity_bbl": number | null,"kind": Database["public"]['Enums']["vessel_kind"] | null,"name": string | null,"occupancy_id": string | null,"vessel_id": string | null
+                    "batch_id": string | null,"bbl": number | null,"brewery_id": string,"capacity_bbl": number,"kind": Database["public"]['Enums']["vessel_kind"],"name": string,"occupancy_id": string | null,"vessel_id": string
                   }
                   ComputedFields: never
                   Relationships: [
