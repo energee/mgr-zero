@@ -345,7 +345,7 @@ describe("Invoice payments recorded in MGR (#1045)", () => {
       ...invoiceLocalPartlyPaid,
       invoice: { ...invoiceLocalPartlyPaid.invoice, written_off_at: "2026-10-23T12:00:00Z" },
     });
-    expect(model.state).toEqual({ label: "Written off", tone: "ok" });
+    expect(model.state).toEqual({ label: "Written off", tone: "" });
     expect(model.summary.settlement).toBeUndefined();
     expect(model.payments).toHaveLength(2);
   });

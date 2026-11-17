@@ -6,7 +6,8 @@ import { money } from "./money";
 import { orderLineCents } from "./order-view";
 import { shipToLine } from "./ship-to-view";
 import { buyerStatus } from "./order-status";
-import { invoiceCurrentState, invoiceCurrentTotalCents, invoiceIsSettledWithoutPayment } from "./invoice-state";
+import { invoiceCurrentState, invoiceCurrentTotalCents } from "./invoice-state";
+import { portalInvoiceStatus } from "./portal-invoice-view";
 
 export type PortalOrderLineView = {
   key: string;
@@ -76,6 +77,7 @@ export type PortalOrderSnapshot = {
       qbo_remote_state?: "live" | "voided" | "deleted";
       qbo_balance_cents?: number | null;
       qbo_total_cents?: number | null;
+      qbo_accountant_drift?: boolean;
       written_off_at?: string | null;
       invoice_lines: { amount_cents: number }[];
     }[];
@@ -119,9 +121,7 @@ export function toPortalOrderViewProps({ order, lines, events, shipment, backHre
     invoice: invoice
       ? {
         title: docNo("INV", invoice.invoice_no, "Invoice"),
-        detail: invoiceState === "paid" ? "paid"
-          : invoiceIsSettledWithoutPayment(invoice) ? "settled"
-          : invoiceState === "written_off" ? "written off" : invoiceState ?? "unpaid",
+        detail: portalInvoiceStatus(invoice).toLowerCase(),
         amount: money(invoiceCurrentTotalCents(invoice, invoice.invoice_lines.reduce((n, x) => n + x.amount_cents, 0))),
         href: `/portal/invoices/${invoice.id}`,
         paid: invoiceState === "paid",

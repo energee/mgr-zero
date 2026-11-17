@@ -606,6 +606,9 @@ describe("account and invoice reads", () => {
     expect(one.invoice.id).toBe(inv!.id);
     expect(one.invoice).toMatchObject({ total_cents: 10500, qbo_tax_cents: 500, qbo_balance_cents: 10500, qbo_accountant_drift: true });
     expect(one.lines.map((l) => Number(l.qty))).toEqual([2]);
+    // The list carries the accountant-edit flag too, so it can say Review as the invoice page does.
+    const { rows } = await runCommand("portal_invoices", {}, custCtx) as { rows: { id: string; qbo_accountant_drift: boolean }[] };
+    expect(rows.find((row) => row.id === inv!.id)?.qbo_accountant_drift).toBe(true);
     await expect(runCommand("portal_invoice", { invoiceId: foreign!.id }, custCtx)).rejects.toMatchObject({ code: "not_found" });
   });
 });

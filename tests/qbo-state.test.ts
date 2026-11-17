@@ -515,11 +515,11 @@ describe("QuickBooks current invoice state", () => {
     const { rows: portalList } = await runCommand("portal_invoices", {}, portalCtx) as { rows: Parameters<typeof toPortalInvoicesViewProps>[0]["invoices"] };
     expect(toPortalInvoiceViewProps(portalDetail)).toMatchObject({ total: "$105.00", payable: false, paid: false, status: "Review" });
     expect(toPortalInvoicesViewProps({ invoices: portalList }).rows[0])
-      .toMatchObject({ total: "$105.00", unpaid: true });
+      .toMatchObject({ total: "$105.00", unpaid: true, detail: "review" });
     expect(toPortalOrderViewProps({
       ...portalOrderShipped,
       shipment: { id: "shipment-1", invoices: [{ ...invoice, invoice_lines: [{ amount_cents: 10000 }] }] },
-    }).invoice).toMatchObject({ amount: "$105.00", detail: "unpaid", paid: false });
+    }).invoice).toMatchObject({ amount: "$105.00", detail: "review", paid: false });
 
     const local = { ...invoice, qbo_total_cents: null, qbo_accountant_drift: false };
     expect(toInvoiceViewProps({ ...detail, invoice: local, questions: [], timeZone: "America/New_York" }).summary.total?.value).toBe("$100.00");
