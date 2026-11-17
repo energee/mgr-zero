@@ -169,7 +169,7 @@ describe("Batches view", () => {
     const base: BatchListRow = { id: "late", batch_no: 3, planned_on: "2026-09-12", planned_bbl: 10, brewed_on: null, closed_at: null, cancelled_at: null, brand_name: null, recipe_name: null, vessel_name: null, active_occupancies: [] };
     const rows = [base, { ...base, id: "today", planned_on: "2026-10-28" }, { ...base, id: "brewed", brewed_on: "2026-09-12" }, { ...base, id: "gone", cancelled_at: "2026-09-13" }];
     const hrefs = { batch: (id: string) => `/batches/${id}`, vessel: (id: string) => `/cellar/vessels/${id}` };
-    const model = toBatchesViewProps(batchesFromQuery(rows, [], hrefs, { unit: "plato", timeZone: "UTC", today: "2026-10-28" }));
+    const model = toBatchesViewProps(batchesFromQuery(rows, [], hrefs, { unit: "plato", today: "2026-10-28" }));
     expect(model.planned[0]).toMatchObject({ key: "late", overdue: true, href: `/batches/late#${CHANGE_PLAN_ID}` });
     expect(model.planned[1]).toMatchObject({ key: "today", href: "/batches/today" });
     expect(model.planned[1].overdue).toBeUndefined();

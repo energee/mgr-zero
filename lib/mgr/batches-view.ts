@@ -110,7 +110,7 @@ export function currentFigures(og: BatchListRow["og_reading"], latest: { id: str
 }
 
 /** `display.today` is the brewery's day (YYYY-MM-DD); without it no batch is marked overdue. */
-export function batchesFromQuery(batches: BatchListRow[], vessels: BatchVessel[], hrefs?: { batch: (id: string) => string; vessel: (id: string) => string; reading?: (id: string) => string }, display: { unit: GravityUnit; timeZone: string; today?: string } = { unit: "plato", timeZone: "UTC" }): BatchesSnapshot {
+export function batchesFromQuery(batches: BatchListRow[], vessels: BatchVessel[], hrefs?: { batch: (id: string) => string; vessel: (id: string) => string; reading?: (id: string) => string }, display: { unit: GravityUnit; today?: string } = { unit: "plato" }): BatchesSnapshot {
   const snapshot: BatchesSnapshot = { title: "Batches", planned: [], active: [], completed: [], cancelled: [], vessels: vessels.map(vessel => ({ key: vessel.id, name: vessel.name, kind: sentenceCase(vessel.kind), capacityBbl: Number(vessel.capacity_bbl), active: vessel.active, href: hrefs?.vessel(vessel.id) })) };
   for (const batch of batches) {
     const group = (batch.cancelled_at ? snapshot.cancelled : batch.closed_at ? snapshot.completed : batch.brewed_on ? snapshot.active : snapshot.planned)!;
@@ -124,7 +124,7 @@ export function batchesFromQuery(batches: BatchListRow[], vessels: BatchVessel[]
     if (batch.brewed_on && !batch.closed_at) {
       row.readings = batch.active_occupancies.map(occupancy => ({
         key: occupancy.id, vessel: occupancy.vessel_name,
-        reading: formatLatestReading(occupancy.latest_reading, display.unit, display.timeZone),
+        reading: formatLatestReading(occupancy.latest_reading, display.unit),
         ...currentFigures(batch.og_reading, occupancy.recent_gravity?.[0]),
         state: fermentationState(occupancy.recent_gravity),
         href: hrefs?.reading?.(occupancy.id),

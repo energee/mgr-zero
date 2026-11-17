@@ -23,8 +23,9 @@ it("preserves an absent temperature instead of printing a synthetic value", () =
 
 it("leaves the note out of a list's latest reading and keeps it on Vessel detail", () => {
   const reading = { id: "r", at: "2026-09-27T12:00:00Z", temp_f: 69, gravity_plato: 5, ph: 4.14, note: "Lolev fermentation" };
-  const latest = formatLatestReading(reading, "plato", "UTC");
-  expect(latest).toMatch(/^5\.0 °P · 69 °F · pH 4\.14 · /);
+  const latest = formatLatestReading(reading, "plato", new Date("2026-09-29T12:00:00Z"));
+  // A list line says how long ago, like a Cellar tile, not a full date and time.
+  expect(latest).toBe("5.0 °P · 69 °F · pH 4.14 · 2d ago");
   expect(latest).not.toContain("Lolev fermentation");
   expect(formatVesselReading(reading, "plato")).toBe("5.0 °P · 69 °F · pH 4.14 · Lolev fermentation");
 });
