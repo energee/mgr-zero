@@ -25,7 +25,7 @@ const quoteInput = z.object({
 type PortalTaxClient = Pick<QboOAuthClient, "calculateSalesTax" | "refresh">;
 
 // Buyer invoice columns every portal invoice read needs (portal_invoices, #754).
-const INVOICE_ROW = "id, invoice_no, kind, paid_at, qbo_remote_state, qbo_total_cents, qbo_balance_cents, written_off_at";
+const INVOICE_ROW = "id, invoice_no, kind, paid_at, qbo_remote_state, qbo_total_cents, qbo_balance_cents, qbo_accountant_drift, written_off_at";
 // Buyer order columns the portal order list and detail reads share (#788).
 // The list uses only some of them; one constant keeps the two responses alike.
 const ORDER_ROW = "id, customer_id, order_no, status, ship_to_id, requested_ship_date, po_number, note, created_at";
@@ -258,7 +258,7 @@ defineQuery({
     const customerId = requireCustomer(ctx);
     // RLS already scopes to the caller's customer; the customer_id filter makes a foreign id a plain not_found
     const [row, brewery] = await Promise.all([
-      unwrap(ctx.db.from("portal_invoices").select(`${INVOICE_ROW}, issued_on, due_on, qbo_tax_cents, qbo_accountant_drift, invoice_lines`).eq("id", i.invoiceId).eq("customer_id", customerId).single()),
+      unwrap(ctx.db.from("portal_invoices").select(`${INVOICE_ROW}, issued_on, due_on, qbo_tax_cents, invoice_lines`).eq("id", i.invoiceId).eq("customer_id", customerId).single()),
       unwrap(ctx.db.from("portal_brewery").select("name, customer_phone").eq("id", ctx.breweryId).single()),
     ]);
     // .single() makes unwrap throw on zero rows; the view type is just nullable.

@@ -153,6 +153,17 @@ describe("Order detail view", () => {
     expect(model.invoice?.amount).toBe(money(4 * SKU_HAZY.unit_price_cents));
   });
 
+  it("says review for an invoice edited in QuickBooks, as the invoice page does", () => {
+    const model = toPortalOrderViewProps({
+      ...portalOrderShipped,
+      shipment: {
+        ...portalOrderShipped.shipment!,
+        invoices: portalOrderShipped.shipment!.invoices.map((invoice) => ({ ...invoice, paid_at: null, qbo_balance_cents: 100, qbo_accountant_drift: true })),
+      },
+    });
+    expect(model.invoice?.detail).toBe("review");
+  });
+
   it("renders Reorder, ORD-0225, and buyer status from the view", () => {
     const html = htmlOf(createElement(PortalOrderView, { model: toPortalOrderViewProps(portalOrderShipped) }));
     expect(html).toMatch(/>Reorder</);

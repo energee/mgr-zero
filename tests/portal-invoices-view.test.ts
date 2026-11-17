@@ -156,13 +156,16 @@ describe("Portal invoice view", () => {
     const snapshot = { ...portalInvoiceUnpaid, invoice: { ...portalInvoiceUnpaid.invoice, ...invoice } };
     const model = toPortalInvoiceViewProps(snapshot);
     expect(model).toMatchObject({ status, payable: status === "Unpaid" });
-    if (status !== "Review") {
-      const list = toPortalInvoicesViewProps({
-        invoices: [{ ...snapshot.invoice, invoice_lines: snapshot.lines }],
-      });
-      const row = list.rows[0];
-      expect(row.tone).toBe(tone);
-    }
+    const list = toPortalInvoicesViewProps({
+      invoices: [{ ...snapshot.invoice, invoice_lines: snapshot.lines }],
+    });
+    expect(list.rows[0].tone).toBe(tone);
+  });
+
+  it("gives an invoice edited in QuickBooks the same Review state in the list as on its page", () => {
+    const invoice = { ...portalInvoiceUnpaid.invoice, qbo_accountant_drift: true, qbo_balance_cents: 94800 };
+    const row = toPortalInvoicesViewProps({ invoices: [{ ...invoice, invoice_lines: portalInvoiceUnpaid.lines }] }).rows[0];
+    expect(row).toMatchObject({ detail: "review", unpaid: true, tone: "w" });
   });
 
   it.each([undefined, "/invoices"])("uses warning tokens on status badges without losing words or links (%s)", (href) => {

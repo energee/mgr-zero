@@ -5,8 +5,8 @@ import type { EmptyState } from "./empty-state";
 import { formatDate } from "@/lib/date-format";
 import { docNo } from "./doc-no";
 import { money } from "./money";
-import { invoiceCurrentState, invoiceCurrentTotalCents, invoiceIsSettledWithoutPayment } from "./invoice-state";
-import { portalInvoiceStatusTone, type PortalInvoiceViewModel } from "./portal-invoice-view";
+import { invoiceCurrentTotalCents } from "./invoice-state";
+import { portalInvoiceStatus, portalInvoiceStatusTone } from "./portal-invoice-view";
 
 export type PortalInvoicesRowView = {
   key: string;
@@ -33,19 +33,11 @@ export type PortalInvoicesSnapshot = {
     qbo_remote_state?: "live" | "voided" | "deleted";
     qbo_balance_cents?: number | null;
     qbo_total_cents?: number | null;
+    qbo_accountant_drift?: boolean;
     written_off_at?: string | null;
     invoice_lines: { amount_cents: number }[];
   }[];
 };
-
-function invoiceDetail(inv: PortalInvoicesSnapshot["invoices"][number]): string {
-  if (inv.kind === "credit_memo") return "credit";
-  const state = invoiceCurrentState(inv);
-  if (state === "paid") return "paid";
-  if (invoiceIsSettledWithoutPayment(inv)) return "settled";
-  if (state !== "unpaid") return state === "written_off" ? "written off" : state;
-  return inv.due_on ? `due ${formatDate(inv.due_on)}` : "unpaid";
-}
 
 /** Map a portal_invoices payload onto PortalInvoicesView. */
 export function toPortalInvoicesViewProps({ invoices }: PortalInvoicesSnapshot): PortalInvoicesViewModel {
@@ -53,18 +45,15 @@ export function toPortalInvoicesViewProps({ invoices }: PortalInvoicesSnapshot):
     empty: invoices.length === 0 ? { title: "No invoices yet" } : undefined,
     rows: invoices.map((inv) => {
       const credit = inv.kind === "credit_memo";
-      const state = invoiceCurrentState(inv);
       const total = invoiceCurrentTotalCents(inv, inv.invoice_lines.reduce((sum, l) => sum + l.amount_cents, 0));
-      const status: PortalInvoiceViewModel["status"] = credit ? "Credit"
-        : invoiceIsSettledWithoutPayment(inv) ? "Settled"
-        : state === "written_off" ? "Written off"
-        : state === "voided" ? "Voided" : state === "deleted" ? "Deleted"
-        : state === "paid" ? "Paid" : "Unpaid";
-      const unpaid = status === "Unpaid";
+      const status = portalInvoiceStatus(inv);
+      // Review is still owed: it keeps the row's link to the invoice page, which says why.
+      const unpaid = status === "Unpaid" || status === "Review";
       return {
         key: inv.id,
         title: docNo(credit ? "CM" : "INV", inv.invoice_no, credit ? "Credit memo" : "Invoice"),
-        detail: invoiceDetail(inv),
+        // The status word in lower case; an unpaid invoice with a due date names the date instead.
+        detail: status === "Unpaid" && inv.due_on ? `due ${formatDate(inv.due_on)}` : status.toLowerCase(),
         total: money(total),
         href: `/portal/invoices/${inv.id}`,
         unpaid,
