@@ -150,7 +150,7 @@ describe("filtered stock reads on a 50,000-movement ledger", () => {
       const orderId = created.rows[0].r.order_id;
       await client.query("select public.submit_order($1, $2)", [orderId, crypto.randomUUID()]);
       await client.query("select public.confirm_order($1, $2)", [orderId, crypto.randomUUID()]);
-      await client.query("select public.adjust_order_lines($1, $2, 'short week', $3)",
+      await client.query("select public.adjust_order_lines($1, $2, 'short week', $3,'customer_request')",
         [orderId, JSON.stringify([{ sku_id: target.skuId, qty: 30 }]), crypto.randomUUID()]);
       await client.query("rollback");
 

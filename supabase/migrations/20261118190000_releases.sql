@@ -570,7 +570,7 @@ begin
     select (e->>'depositPoolId')::uuid from jsonb_array_elements(v_row.snapshot->'lines') e
     where e->>'depositPoolId' is not null
   ) order by k.id for update;
-  -- Releases (20261118170000): the snapshot below rechecks remaining under this lock.
+  -- Releases (20261118190000): the snapshot below rechecks remaining under this lock.
   -- A draft being submitted is locked first, as submit_order locks the order
   -- before its releases, so the two never wait on each other in a cycle.
   if p_order is not null then

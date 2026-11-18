@@ -50,6 +50,6 @@ describe("shippedNav", () => {
       .toEqual(["Menu", "Vendors", "Planning"]);
     expect(navFor(shippedNav(STAFF_NAV), ["taproom"]).map((t) => t.label)).toEqual(["Today", "Beer"]);
     expect(navFor(shippedNav(STAFF_NAV), ["admin"]).find((t) => t.label === "More")!.children!.map((c) => c.label))
-      .toEqual(["Invoices", "Catalog", "Menu", "Customers", "Price groups", "Recipes", "Vendors", "Compliance", "Planning", "Settings"]);
+      .toEqual(["Invoices", "Changes after confirm", "Catalog", "Menu", "Customers", "Price groups", "Recipes", "Vendors", "Compliance", "Planning", "Settings"]);
   });
 });

@@ -233,6 +233,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Customer keg balance", file: "app/(app)/kegs/customers/[customerId]/page.tsx" },
   { name: "Keg report", file: "app/(app)/kegs/report/page.tsx" },
   { name: "Keg event history", file: "app/(app)/kegs/history/page.tsx" },
+  { name: "Changes after confirm", file: "app/(app)/orders/changes/page.tsx" },
   { name: "Routes", file: "app/(app)/routes/page.tsx" },
   { name: "Route", file: "app/(app)/routes/[id]/page.tsx", additionalFiles: ["app/(app)/routes/new/page.tsx"] },
   { name: "Return route", file: "app/(app)/routes/[id]/page.tsx" },

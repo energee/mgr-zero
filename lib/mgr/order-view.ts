@@ -317,7 +317,9 @@ export function toOrderViewProps({ order, lines, events, atp, locations, deliver
       const reason = typeof e.payload.reason === "string" ? e.payload.reason.trim() : "";
       let detail = reason;
       if (e.event === "lines_adjusted") {
-        detail = `${lineChange(e.payload.before, skuNames)} to ${lineChange(e.payload.lines, skuNames)}${reason ? ` (${reason})` : ""}`;
+        // A change after confirm names its reason code first; the reason is then its note.
+        const why = [typeof e.payload.reason_code === "string" ? sentenceCase(e.payload.reason_code) : "", reason].filter(Boolean).join(": ");
+        detail = `${lineChange(e.payload.before, skuNames)} to ${lineChange(e.payload.lines, skuNames)}${why ? ` (${why})` : ""}`;
       } else if (e.event === "pickup_changed") {
         detail = e.payload.pickup ? "Delivery to pickup" : "Pickup to delivery";
       } else if (e.event === "reorder_created") {

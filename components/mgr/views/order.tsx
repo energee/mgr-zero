@@ -10,7 +10,8 @@
 // Cancel order dialog simulates locally); the live page passes LifecycleButtons
 // and CancelOrderAction (app/(app)/orders/[id]/lifecycle-buttons.tsx), and
 // footer={null} draws no bottom row. With onQuantity, Ordered is the shared
-// number field and, with onReason, a required Reason follows the lines;
+// number field and, with onReason, a required Reason follows the lines (with
+// onReasonCode, Reason picks a code and the text is its Note, required for Other);
 // `lineActions` (Save lines, or the saved lines' ATP warnings) follows that.
 // With `lineEdit`, each line has ✕ and Add line appends a line that picks its
 // SKU: the live page adds, removes and adjusts lines in place
@@ -19,6 +20,7 @@ import { plural } from "@/lib/mgr/plural";
 import type { ComponentProps, ReactNode } from "react";
 import { OrderQuantity, OrderSkuPicker, PickupSwitch } from "./new-order";
 import { E } from "@/components/mgr/e";
+import { ORDER_CHANGE_REASON_OPTIONS } from "@/lib/mgr/labels";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { FactsGrid } from "@/components/mgr/views/facts-grid";
 import { PriceSummary } from "@/components/mgr/views/price-summary";
@@ -73,6 +75,8 @@ export function OrderView({
   onQuantity,
   reason,
   onReason,
+  reasonCode,
+  onReasonCode,
   lineActions,
   pickup,
   onReorderRefused,
@@ -91,6 +95,9 @@ export function OrderView({
   /** Shown, and required, with onReason: adjust_order_lines records it. */
   reason?: string;
   onReason?: (value: string) => void;
+  /** A confirmed or picked order's change names one reason code; reason is then its Note. */
+  reasonCode?: string;
+  onReasonCode?: (value: string) => void;
   /** Save lines and Discard changes, or the saved lines' ATP warnings, drawn under the lines (and Reason). */
   lineActions?: ReactNode;
   /** Present only when staff may change fulfillment before shipping; fixtures simulate the switch locally. */
@@ -226,7 +233,11 @@ export function OrderView({
           ))}
         </ul>
         {lineEdit ? <Button type="button" variant="ghost" className="mt-3 w-fit" data-preview-action onClick={lineEdit.onAdd}>Add line</Button> : null}
-        {onReason || lineActions ? <div className="mt-3 flex flex-col gap-2">{onReason ? E.edit("Reason", reason ?? "", "text", undefined, { onChange: onReason, required: true }) : null}{lineActions}</div> : null}
+        {onReason || lineActions ? <div className="mt-3 flex flex-col gap-2">
+          {onReason && onReasonCode ? E.pick("Reason", reasonCode ?? "", [{ value: "", label: "Choose a reason" }, ...ORDER_CHANGE_REASON_OPTIONS], { onChange: onReasonCode, required: true }) : null}
+          {onReason ? E.edit(onReasonCode ? "Note" : "Reason", reason ?? "", "text", undefined, { onChange: onReason, required: onReasonCode ? reasonCode === "other" : true }) : null}
+          {lineActions}
+        </div> : null}
       </section>
 
       {model.kegCharges.length ? (

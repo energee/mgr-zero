@@ -1,5 +1,5 @@
 // lib/mgr/portal-order-view.ts — view-model for portal Order detail.
-// portal_order (order, lines, events, shipment.invoices) plus buyerStatus.
+// portal_order (order, lines, events, changes after confirm, shipment.invoices) plus buyerStatus.
 import { plural } from "@/lib/mgr/plural";
 import { docNo } from "./doc-no";
 import { money } from "./money";
@@ -8,6 +8,7 @@ import { shipToLine } from "./ship-to-view";
 import { buyerStatus } from "./order-status";
 import { invoiceCurrentState, invoiceCurrentTotalCents } from "./invoice-state";
 import { portalInvoiceStatus } from "./portal-invoice-view";
+import { changedAfterConfirmText, type OrderLineChange } from "./order-changes-view";
 
 export type PortalOrderLineView = {
   key: string;
@@ -35,6 +36,8 @@ export type PortalOrderViewModel = {
   note?: string;
   lines: PortalOrderLineView[];
   adjusted?: string;
+  /** Each change after confirm, oldest first: "Changed after confirm: Damaged, Monarch 1/6 bbl −2". */
+  changes: string[];
   shortageExplanation?: string;
   invoice?: PortalOrderInvoiceView;
   reorder: boolean;
@@ -66,6 +69,8 @@ export type PortalOrderSnapshot = {
     event: string;
     created_at: string;
   }[];
+  /** portal_order_change_rows: changes made after confirm, each with its reason code. */
+  changes?: PortalOrderChange[];
   shipment: {
     id: string;
     invoice_timing?: "now" | "on_delivery";
@@ -84,8 +89,11 @@ export type PortalOrderSnapshot = {
   } | null;
 };
 
+/** One change the brewery made after confirm: when, why, and each SKU's change. */
+export type PortalOrderChange = { id: string; created_at: string; reason_code: string; changes: OrderLineChange[] };
+
 /** Map a portal_order payload onto PortalOrderView. */
-export function toPortalOrderViewProps({ order, lines, events, shipment, backHref }: PortalOrderSnapshot): PortalOrderViewModel {
+export function toPortalOrderViewProps({ order, lines, events, changes = [], shipment, backHref }: PortalOrderSnapshot): PortalOrderViewModel {
   const invoice = shipment?.invoices.find((v) => v.kind === "invoice");
   const invoiceState = invoice ? invoiceCurrentState(invoice) : null;
   const ship = order.ship_tos;
@@ -115,6 +123,7 @@ export function toPortalOrderViewProps({ order, lines, events, shipment, backHre
     adjusted: events.some((e) => e.event === "lines_adjusted")
       ? "The brewery adjusted this order. Quantities above are what ships."
       : undefined,
+    changes: changes.map((c) => changedAfterConfirmText(c.reason_code, c.changes)),
     shortageExplanation: shortLines.length
       ? `The brewery shipped less than ordered.${shortReasons.length ? ` Reason: ${shortReasons.join("; ")}.` : " A shortage reason was not recorded."} The unshipped ${plural(unshipped, "unit was", "units were")} cancelled when this order closed; no units remain to ship.`
       : undefined,

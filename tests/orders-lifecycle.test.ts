@@ -61,7 +61,7 @@ describe("order lifecycle", () => {
     const id = await createOrder(10);
     await staffDb.rpc("submit_order", { p_order: id, p_request_id: crypto.randomUUID() });
     await staffDb.rpc("confirm_order", { p_order: id, p_request_id: crypto.randomUUID() });
-    const { error: adjErr } = await staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 4 }], p_reason: "short week", p_request_id: crypto.randomUUID() });
+    const { error: adjErr } = await staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 4 }], p_reason_code: "customer_request", p_reason: "short week", p_request_id: crypto.randomUUID() });
     expect(adjErr).toBeNull();
     const { data: line } = await admin.from("order_lines").select().eq("order_id", id).single();
     expect(Number(line!.qty_ordered)).toBe(4);

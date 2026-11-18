@@ -108,6 +108,7 @@ import { KegBalanceView } from "@/components/mgr/views/keg-balance";
 import { KegFleetView } from "@/components/mgr/views/keg-fleet";
 import { KegReportView } from "@/components/mgr/views/keg-report";
 import { KegHistoryView } from "@/components/mgr/views/keg-history";
+import { OrderChangesView } from "@/components/mgr/views/order-changes";
 import { LocationBinsView } from "@/components/mgr/views/location-bins";
 import { LicenseView } from "@/components/mgr/views/license";
 import { LocationView } from "@/components/mgr/views/location";
@@ -221,7 +222,7 @@ import { PICK_SHEET_DATE_CHIPS, pickSheet } from "@/lib/mgr/fixtures/pick-sheet"
 import { ridgelineComingUp, ridgelineReviewOrder, ridgelineShop } from "@/lib/mgr/fixtures/portal";
 import { portalAccountRidgeline, portalMeRidgeline } from "@/lib/mgr/fixtures/portal-account";
 import { portalInvoicePaid, portalInvoiceUnpaid, portalInvoicesRidgeline } from "@/lib/mgr/fixtures/portal-invoices";
-import { portalOrderShipped, portalOrdersList } from "@/lib/mgr/fixtures/portal-orders";
+import { portalOrderChangedAfterConfirm, portalOrdersList } from "@/lib/mgr/fixtures/portal-orders";
 import { priceGroupTwo, pricingGrid } from "@/lib/mgr/fixtures/pricing";
 import { channelExport, saleChannelsList } from "@/lib/mgr/fixtures/settings-catalog";
 import { newTransferDraft, transferDetailSubmitted, transfersList } from "@/lib/mgr/fixtures/transfers";
@@ -262,6 +263,8 @@ import { toKegBalanceViewProps } from "@/lib/mgr/keg-balance-view";
 import { toKegFleetViewProps } from "@/lib/mgr/keg-fleet-view";
 import { toKegReportViewProps } from "@/lib/mgr/keg-report-view";
 import { toKegHistoryViewProps } from "@/lib/mgr/keg-history-view";
+import { toOrderChangesViewProps } from "@/lib/mgr/order-changes-view";
+import { orderChangesReport } from "@/lib/mgr/fixtures/order-changes";
 import { toLocationBinsViewProps } from "@/lib/mgr/location-bins-view";
 import { toLocationViewProps } from "@/lib/mgr/location-view";
 import { toLotTraceViewProps } from "@/lib/mgr/lot-trace-view";
@@ -1506,6 +1509,19 @@ export const SCREENS: Screen[] = [
     body: <InvoicesView rows={invoiceList} connection={{ connected: true, detail: "Connected · company 9341", canConnect: true }} sync={<QboSyncView status={invoicesSync} />} />,
   },
   {
+    step: 5,
+    slice: 1,
+    tab: "More",
+    name: "Changes after confirm",
+    to: { "ORD-0231 · Ridgeline Tap Room": "Order", "ORD-0228 · Al’s Bar": "Order", "ORD-0225 · Ridgeline Tap Room": "Order" },
+    job: "See each change made to an order after the brewery confirmed it, and why",
+    reads: "list_order_changes · list_team_members · list_customers",
+    writes: "none",
+    states: [["permission", "admin or sales required", 1], ["all", "newest first · reason, lines, who, when and note"], ["filtered", "reason, staff and customer picks combine · each has All · the URL keeps them"], ["empty", "no changes after confirm, or none matching"]],
+    spec: "A confirmed or picked order can still change when beer is short or damaged, so what ships matches what the buyer sees. Each such change names one reason: Short, Damaged, Customer request, Brewery error or Other (Other needs a note). This list keeps those changes rare and visible. A pre-order change, made before confirm, is not listed, and neither is a change recorded before changes took a reason. A taproom transfer reads as one, since it has no customer. A row opens its order.",
+    body: <OrderChangesView model={toOrderChangesViewProps(orderChangesReport)} />,
+  },
+  {
     step: 5, slice: 1, tab: "More",
     name: "Invoices unavailable",
     to: { Connect: "Invoices unavailable" },
@@ -1765,9 +1781,9 @@ export const SCREENS: Screen[] = [
     job: "One order’s status, lines and the invoice when it exists",
     reads: "portal_order [existing] · portal_invoices [existing]",
     writes: "none",
-    states: [["confirmed", "ships date · no invoice yet"], ["adjusted", "lines show ordered vs shipped"], ["shipped", "invoice link · Reorder"], ["shipped · stop delivered", "the order stays shipped · invoice link · Reorder"]],
+    states: [["confirmed", "ships date · no invoice yet"], ["adjusted", "lines show ordered vs shipped"], ["changed after confirm", "each change after the brewery confirmed names its reason and each line's change; never who or the staff note"], ["shipped", "invoice link · Reorder"], ["shipped · stop delivered", "the order stays shipped · invoice link · Reorder"]],
     spec: "Opened from Order history. Status is the buyer-facing state. Reorder is on shipped orders, whether or not the stop is delivered. The invoice link is absent until the brewery has billed.",
-    body: <PortalOrderView model={toPortalOrderViewProps(portalOrderShipped)} />,
+    body: <PortalOrderView model={toPortalOrderViewProps(portalOrderChangedAfterConfirm)} />,
   },
   {
     step: 6,

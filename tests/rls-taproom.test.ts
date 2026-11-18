@@ -282,6 +282,8 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   readNames.push("get_stored_cola_label_image");
   // Portal releases: staff counts (Taproom refused) and a buyer's own open releases.
   readNames.push("release_rows", "portal_releases");
+  // Changes after confirm: Admin and Sales read the report; a buyer reads its own order's (Phase C).
+  readNames.push("order_change_rows", "portal_order_change_rows");
   // Existing-account consent is authenticated own-identity work, covered by existing-account-invites.test.ts.
   const ownNames = ["leave_agent_note","record_agent_step","begin_agent_proposal","create_agent_proposal","decline_agent_proposal","finish_agent_proposal","accept_account_invitation","set_my_gravity_unit","consume_chat_link_proof","unlink_chat_user","set_notification_preference","set_personal_notification_destination","create_chat_conversation","append_chat_message"];
   const existing = [...readFileSync(new URL("./rls-command-boundary.test.ts", import.meta.url), "utf8").matchAll(/rpc: "(\w+)"/g)].map(m => m[1]);
@@ -302,6 +304,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   readSignatures.push("get_saved_cola_image_permit(uuid,text,text)");
   readSignatures.push("get_stored_cola_label_image(uuid,text,text)");
   readSignatures.push("release_rows(uuid,uuid[],uuid[],uuid[],boolean)", "portal_releases(uuid)");
+  readSignatures.push("order_change_rows(uuid,text,uuid,uuid)", "portal_order_change_rows(uuid)");
   const ownSignatures = ["leave_agent_note(uuid,text,text)","record_agent_step(uuid,text,text,integer,uuid,text,text,text,text,uuid)","begin_agent_proposal(uuid,uuid)","create_agent_proposal(uuid,text,jsonb)","decline_agent_proposal(uuid)","finish_agent_proposal(uuid,text,text)","accept_account_invitation(uuid,uuid)","set_my_gravity_unit(uuid,text,uuid)","consume_chat_link_proof(uuid,text,uuid)","unlink_chat_user(uuid,uuid,uuid)","set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text,boolean,uuid)","set_personal_notification_destination(uuid,text,uuid,uuid)","create_chat_conversation(uuid,text,uuid)","append_chat_message(uuid,uuid,text,text,uuid)"];
   expect(catalog.filter(c => readNames.includes(c.name)).map(c => c.signature).sort()).toEqual(readSignatures.sort());
   expect(catalog.filter(c => ownNames.includes(c.name)).map(c => c.signature).sort()).toEqual([...ownSignatures].sort());

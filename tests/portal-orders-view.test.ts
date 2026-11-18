@@ -9,7 +9,7 @@ import { SCREENS } from "../components/mgr/screens";
 import { PortalOrderView } from "../components/mgr/views/portal-order";
 import { PortalOrdersView } from "../components/mgr/views/portal-orders";
 import { SKU_HAZY, SKU_PILS } from "../lib/mgr/fixtures/demo";
-import { portalOrderShipped, portalOrdersList } from "../lib/mgr/fixtures/portal-orders";
+import { portalOrderChangedAfterConfirm, portalOrderShipped, portalOrdersList } from "../lib/mgr/fixtures/portal-orders";
 import { toPortalOrderViewProps } from "../lib/mgr/portal-order-view";
 import { toPortalOrdersViewProps } from "../lib/mgr/portal-orders-view";
 import { money } from "../lib/mgr/money";
@@ -196,7 +196,7 @@ describe("inventory and live portal orders", () => {
   it("the Order detail inventory record is PortalOrderView", () => {
     const body = SCREENS.find((s) => s.name === "Order detail")!.body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(PortalOrderView);
-    expect(body.props.model).toEqual(toPortalOrderViewProps(portalOrderShipped));
+    expect(body.props.model).toEqual(toPortalOrderViewProps(portalOrderChangedAfterConfirm));
   });
 
   it("the live portal order pages mount the views with no second E.* tree", () => {

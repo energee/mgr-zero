@@ -16,7 +16,7 @@ afterEach(closePgSessions);
 type Warning = { sku_id: string; atp: number };
 type Stock = Awaited<ReturnType<typeof stockedSkus>>;
 const confirmSql = "select public.confirm_order($1,$2) result";
-const adjustSql = "select public.adjust_order_lines($1,$2,'raise',$3) result";
+const adjustSql = "select public.adjust_order_lines($1,$2,'raise',$3,'customer_request') result";
 const standingSql = "select public.set_standing_allocation($1,$2,$3,$4) result";
 const lines = (...ls: [string, number][]) => JSON.stringify(ls.map(([sku_id, qty]) => ({ sku_id, qty })));
 

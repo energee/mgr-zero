@@ -186,7 +186,7 @@ describe("navGroups (#1159)", () => {
 
   it("draws admin's More under Sales, Production, Setup and Menu, with one Settings entry (#1513)", () => {
     expect(drawn(moreFor(["admin"]))).toEqual([
-      ["Sales", ["Invoices", "Catalog", "Customers", "Price groups", "Compliance"]],
+      ["Sales", ["Invoices", "Changes after confirm", "Catalog", "Customers", "Price groups", "Compliance"]],
       ["Production", ["Recipes", "Vendors", "Planning"]],
       ["Setup", ["Settings"]],
       ["Menu", ["Menu"]],
