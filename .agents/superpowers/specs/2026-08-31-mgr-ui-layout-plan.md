@@ -376,7 +376,7 @@ recorded. It is an audit surface, not decoration, and never implies a row can be
 | `--destructive` | `#B52D51` | `#ff7a70` | Errors and destructive actions; passes AA as text on card and popover |
 | `--attention` / `--attention-foreground` | `#FFF0E7` / `#99451C` | `#2e2350` / `#e26be2` | Review (needs attention) surface and text |
 | `--warning` / `--warning-foreground` | `#FDF3DC` / `#755800` | `#2f3326` / `#ffe763` | Warning surface and text; never yellow on white |
-| `--border` | `#E3E3DC` | `#2a4478` | Hairline dividers |
+| `--border` | derived (≈ `#E4E4E1`) | derived (≈ `#1B1F2A`) | Hairline dividers: 10% foreground over background in both modes |
 
 The remaining shadcn tokens (secondary, muted, accent, destructive, sidebar,
 chart) are set in `app/globals.css`; that file is the source of truth. The

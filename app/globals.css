@@ -99,7 +99,9 @@
   --accent-foreground: #1E1F1A;
   --destructive: #B52D51;
   --destructive-foreground: #FFFFFF;
-  --border: #E3E3DC;
+  /* Hairline dividers: 10% of the way from the page to the text, so dark mode
+     derives the same quiet step from its own colors (about #E4E4E1 here). */
+  --border: color-mix(in srgb, var(--foreground) 10%, var(--background));
   /* Interactive boundaries stay distinct from decorative dividers. The input
      alias supplies field and outline-button fills, toggle borders, and the
      unchecked Switch track; fields themselves draw no border at rest. */
@@ -113,7 +115,7 @@
   --sidebar-primary-foreground: #FFFFFF;
   --sidebar-accent: #E7E7DF;
   --sidebar-accent-foreground: #1E1F1A;
-  --sidebar-border: #E3E3DC;
+  --sidebar-border: var(--border);
   --sidebar-ring: #6453B3;
   --chart-1: #6453B3;
   --chart-2: #236773;
@@ -167,7 +169,6 @@
   --accent-foreground: #dddddd;
   --destructive: #ff7a70;
   --destructive-foreground: #191919;
-  --border: #2a4478;
   --control-border: #798fac;
   --input: var(--control-border);
   --ring: #60a4ec;
@@ -177,7 +178,6 @@
   --sidebar-primary-foreground: #102040;
   --sidebar-accent: #1a3058;
   --sidebar-accent-foreground: #dddddd;
-  --sidebar-border: #213a68;
   --sidebar-ring: #60a4ec;
   --chart-1: #60a4ec;
   --chart-2: #60b6cb;

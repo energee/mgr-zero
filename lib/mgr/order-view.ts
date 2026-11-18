@@ -198,10 +198,11 @@ function orderSummary(
   const depositCents = deposits.reduce((sum, d) => sum + Number(d.amount_cents), 0);
   const feeCents = lines.reduce((sum, l) => sum + (l.one_way_fee_cents ? orderLineCents(l.qty_ordered, l.one_way_fee_cents) : 0), 0);
   const total = money(itemsCents + depositCents + feeCents);
+  // A keg charge row shows only when it adds something; $0 rows are noise.
   const rows = [
     { label: "Ordered items", value: items },
-    { label: "Returnable keg deposits", value: money(depositCents) },
-    { label: "One-way keg fees", value: money(feeCents) },
+    ...(depositCents ? [{ label: "Returnable keg deposits", value: money(depositCents) }] : []),
+    ...(feeCents ? [{ label: "One-way keg fees", value: money(feeCents) }] : []),
   ];
   if (order.status === "cancelled") {
     return { rows, total: { label: "Cancelled order amount · before tax", value: total }, note: "What the order came to when it was cancelled: history, not an amount to collect." };
