@@ -65,7 +65,8 @@ export default async function KegsPage({ searchParams }: { searchParams: Promise
       })}
       createAction={<PoolForm vendors={vendors} />}
       poolActions={Object.fromEntries(fleet.pools.map((p) => [p.id, <PoolForm key={`${p.id}-${p.name}-${p.vendor_id}-${p.per_fill_cents}-${p.deposit_cents}-${p.active}`} pool={p} vendors={vendors} />]))}
-      eventForm={<KegEventForm autoOpen={recordEvent === "1"} pools={activePools} locations={locations} bins={bins} customers={customers} stock={fleet.rows} balances={fleet.balances} />}
+      // ponytail: the key only silences a dev-only "unique key" warning seen once in Next 16.4.5 dev and never reproduced; the element is not in a list.
+      eventForm={<KegEventForm key="record-keg-event" autoOpen={recordEvent === "1"} pools={activePools} locations={locations} bins={bins} customers={customers} stock={fleet.rows} balances={fleet.balances} />}
     />
   );
 }
