@@ -115,9 +115,8 @@ money cents.
 default '{}'`. State license numbers live in `brewery_state_licenses`;
 `pa_license_no` was dropped (#1517, `20261029001000_ship_to_label_unique_drop_pa_license.sql`). Premises = brewery (one per). RLS: `staff_read` select `is_staff_of(id)`;
 `admin_update` update `has_staff_role(id, array['admin']::staff_role[])`. No `unique(id, brewery_id)` (it is the root).
-`one_way_keg_fee_cents int not null default 0 check (>= 0)`: the flat fee each
-one-way keg shipped carries instead of a deposit, set by admin-only
-`set_one_way_keg_fee`; 0 adds no fee line (`20261016100700_one_way_keg_fee.sql`).
+The one-way keg fee moved to `sale_channels.one_way_keg_fee_cents` (§16.3,
+`20261117190000_channel_one_way_keg_fee.sql`).
 
 ### `brewery_users` — multiple staff roles (#797)
 pk `(brewery_id, user_id)`, `roles staff_role[] not null check (cardinality(roles) > 0)`.
@@ -298,9 +297,11 @@ definer RPC resolves it server-side.
 ### `order_lines`
 `order_id → orders, sku_id → skus, qty_ordered numeric > 0, qty_picked numeric >= 0,
 qty_shipped numeric >= 0 check (<= qty_ordered), unit_price_cents int >= 0` (snapshot),
-`short_reason text`, `one_way_fee_cents int check (null or > 0)`: the brewery's
-one-way keg fee frozen at ship for a one-way keg line, null otherwise; both
-invoice writers read it, so a later fee change does not move the invoice.
+`short_reason text`, `one_way_fee_cents int check (null or > 0)`: the order's
+channel one-way keg fee, frozen by an insert trigger when a one-way keg line is
+added (drafts included), null otherwise or at $0; both invoice writers read it,
+so a later fee change does not move the line or the invoice
+(`20261117190000_channel_one_way_keg_fee.sql`).
 unique `(order_id, sku_id)`. idx `(sku_id)`. RLS: no
 customer policy; buyers read lines inlined in `portal_orders` (#788); customer
 line replacement happens only through the definer portal/draft RPCs on a draft
@@ -1001,6 +1002,13 @@ sale_channels + tax_treatment      not null default 'taxable'
 customers     + tax_treatment      null = inherit from the channel
 inventory_movements + tax_treatment  resolved and frozen at write time
 ```
+
+`sale_channels.one_way_keg_fee_cents int not null default 0 check (>= 0)` is the
+flat fee each one-way keg on the channel's wholesale orders carries instead of
+a deposit; 0 adds no fee line. Set through `upsert_sale_channel` (admin). It
+replaced the brewery-wide fee; at the move only `export` channels took the old
+fee, since the taproom builds it into its price
+(`20261117190000_channel_one_way_keg_fee.sql`).
 
 **The resolved value is stored on the movement, never looked up at report
 time.** `brewing-domain.md` requires that a filed month is never rewritten by a

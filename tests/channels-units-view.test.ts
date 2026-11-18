@@ -16,7 +16,7 @@ import { SettingsView } from "../components/mgr/views/settings";
 import { meMaria } from "../lib/mgr/fixtures/me";
 import { settingsDemo } from "../lib/mgr/fixtures/settings";
 import { channelExport, saleChannelsList, unitsPlato } from "../lib/mgr/fixtures/settings-catalog";
-import { toChannelViewProps } from "../lib/mgr/channel-view";
+import { oneWayKegFeeError, toChannelViewProps } from "../lib/mgr/channel-view";
 import { CHANNEL_IN_USE_RULE, toSaleChannelsViewProps } from "../lib/mgr/sale-channels-view";
 import { toUnitsViewProps } from "../lib/mgr/units-view";
 
@@ -24,6 +24,12 @@ const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", nu
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 
 describe("Sale channels view", () => {
+  it("names a channel's one-way keg fee on its row, and none at $0", () => {
+    const rows = toSaleChannelsViewProps(saleChannelsList).rows;
+    expect(rows.find(r => r.title === "Export")?.detail).toContain("One-way keg fee $10.00");
+    expect(rows.find(r => r.title === "Taproom")?.detail).not.toContain("One-way keg fee");
+  });
+
   it("preserves channel identity and optional movement counts", () => {
     const model = toSaleChannelsViewProps(saleChannelsList);
     expect(model.backHref).toBeUndefined();
@@ -39,8 +45,8 @@ describe("Sale channels view", () => {
   it("live-shaped rows omit movement counts and label snake_case treatments", () => {
     const model = toSaleChannelsViewProps({
       channels: [
-        { id: "c1", name: "Taproom", tax_treatment: "taxable", in_use: true, system_code: "taproom" },
-        { id: "c2", name: "Bond", tax_treatment: "transfer_in_bond", in_use: false, system_code: null },
+        { id: "c1", name: "Taproom", tax_treatment: "taxable", in_use: true, system_code: "taproom", one_way_keg_fee_cents: 0 },
+        { id: "c2", name: "Bond", tax_treatment: "transfer_in_bond", in_use: false, system_code: null, one_way_keg_fee_cents: 0 },
       ],
     });
     expect(model.rows[0].detail).toContain("Taxable");
@@ -50,7 +56,7 @@ describe("Sale channels view", () => {
 
   it("distinguishes an Export channel name from its treatment on the live list (#1149)", () => {
     const model = toSaleChannelsViewProps({
-      channels: [{ id: "c-export", name: "Export", tax_treatment: "export", in_use: false, system_code: null }],
+      channels: [{ id: "c-export", name: "Export", tax_treatment: "export", in_use: false, system_code: null, one_way_keg_fee_cents: 0 }],
     });
     const row = model.rows[0];
     expect(row.title).toBe("Export");
@@ -61,9 +67,9 @@ describe("Sale channels view", () => {
   // #1207: Delete shows only where delete_sale_channel would succeed.
   const mixed = {
     channels: [
-      { id: "c1", name: "Taproom", tax_treatment: "taxable", in_use: false, system_code: "taproom" },
-      { id: "c2", name: "Wholesale", tax_treatment: "taxable", in_use: true, system_code: null },
-      { id: "c3", name: "Festival", tax_treatment: "taxable", in_use: false, system_code: null },
+      { id: "c1", name: "Taproom", tax_treatment: "taxable", in_use: false, system_code: "taproom", one_way_keg_fee_cents: 0 },
+      { id: "c2", name: "Wholesale", tax_treatment: "taxable", in_use: true, system_code: null, one_way_keg_fee_cents: 0 },
+      { id: "c3", name: "Festival", tax_treatment: "taxable", in_use: false, system_code: null, one_way_keg_fee_cents: 0 },
     ],
   };
 
@@ -215,6 +221,7 @@ describe("Channel view", () => {
       id: "c-vs",
       name: "Lab",
       tax_treatment: "vessel_supplies",
+      one_way_keg_fee_cents: 0,
     });
     expect(model.taxIndex).toBe(2);
     expect(model.taxOptions[2]).toBe("Vessel supplies");
@@ -237,6 +244,27 @@ describe("Channel view", () => {
     expect(html).not.toMatch(/cannot be deleted/);
     expect(html).toMatch(/>Save channel</);
     expect(html).not.toMatch(/→/);
+  });
+
+  it("shows the channel's one-way keg fee in dollars, with help that says 0 bills none", () => {
+    const model = toChannelViewProps(channelExport);
+    expect(model.oneWayKegFee).toBe("10.00");
+    const html = htmlOf(createElement(ChannelView, { model }));
+    expect(html).toContain("One-way keg fee ($)");
+    expect(html).toMatch(/Blank or 0 means no fee/);
+  });
+
+  it("withholds Save for a fee that is not whole cents", () => {
+    const html = htmlOf(createElement(ChannelView, { model: { ...toChannelViewProps(channelExport), oneWayKegFee: "1.234" } }));
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Save channel<\/button>/);
+  });
+
+  it.each(["1.234", "-1", "1e2", "1E2", "Infinity", "NaN", "0x10", "21474836.48"])("refuses fee %s without silently rounding or converting notation", value => {
+    expect(oneWayKegFeeError(value)).toEqual(expect.any(String));
+  });
+
+  it.each(["", "0", "0.00", "1.23", "1.2300", ".50", "21474836.47"])("accepts the whole-cent fee %s", value => {
+    expect(oneWayKegFeeError(value)).toBeUndefined();
   });
 
   it("the Channel inventory record is ChannelView", () => {

@@ -228,18 +228,20 @@ defineCommand({
 const TAX_TREATMENTS = ["taxable", "export", "vessel_supplies", "research", "transfer_in_bond"] as const;
 
 defineQuery({
-  name: "list_sale_channels", description: "Sale channels with their tax treatment, alphabetical; in_use says a record references the channel, and system_code 'taproom' marks the system Taproom channel",
+  name: "list_sale_channels", description: "Sale channels with their tax treatment and one-way keg fee in cents, alphabetical; in_use says a record references the channel, and system_code 'taproom' marks the system Taproom channel",
   input: z.object({}), roles: ["admin", "sales", "warehouse"],
   handler: (ctx) => unwrap(ctx.db.rpc("list_sale_channels", { p_brewery: ctx.breweryId })),
 });
 
 defineCommand({
-  name: "upsert_sale_channel", description: "Create or edit a sale channel: its name and the tax treatment its removals are recorded under",
+  name: "upsert_sale_channel", description: "Create or edit a sale channel: its name, the tax treatment its removals are recorded under, and the one-way keg fee its wholesale orders charge. A one-way keg line takes the fee when it is added and keeps it; a fee change reaches only lines added later",
   compensation: "Reverse an edit with upsert_sale_channel and the previous values, or remove an unused new channel with delete_sale_channel.",
-  input: z.object({ id: z.string().uuid().optional().describe("The sale channel to edit; omit to create one"), name: z.string().trim().min(1).describe("The sale channel's name"), taxTreatment: z.enum(TAX_TREATMENTS) }),
+  input: z.object({ id: z.string().uuid().optional().describe("The sale channel to edit; omit to create one"), name: z.string().trim().min(1).describe("The sale channel's name"), taxTreatment: z.enum(TAX_TREATMENTS),
+    oneWayKegFeeCents: z.number().int().min(0).max(2147483647).optional() }),
   roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_sale_channel", {
     p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_tax_treatment: i.taxTreatment, p_request_id: execution.requestId,
+    p_one_way_keg_fee_cents: i.oneWayKegFeeCents,
   })),
 });
 

@@ -40,7 +40,6 @@ const AUTHENTICATED_RPCS = [
   "set_brewery_books_opened_on(uuid,date,uuid)",
   "correct_reporting_basis(uuid,date,date,text,uuid)",
   "list_compliance_active_months(uuid,date,date)",
-  "set_one_way_keg_fee(uuid,integer,uuid)",
   "set_brewery_ai_model(uuid,text,uuid)",
 
   "begin_csv_import(uuid,text,jsonb,uuid)",
@@ -251,7 +250,7 @@ const AUTHENTICATED_RPCS = [
   "upsert_material(uuid,uuid,text,material_category,uom,uom,numeric,boolean,uuid,numeric,boolean,numeric,numeric,uuid,text)",
   "upsert_material_contract(uuid,uuid,uuid,uuid,numeric,integer,date,date,text,uuid)",
   "upsert_price_group(uuid,uuid,text,integer,integer,uuid)",
-  "upsert_sale_channel(uuid,uuid,text,tax_treatment,uuid)",
+  "upsert_sale_channel(uuid,uuid,text,tax_treatment,uuid,integer)",
   "upsert_ship_to(uuid,uuid,uuid,text,text,text,text,text,text,uuid,boolean,text)",
   "upsert_state_registration(uuid,uuid,text,text,date,date,uuid,text[])",
   "upsert_vendor(uuid,uuid,text,text,text,integer,text,boolean,uuid)",

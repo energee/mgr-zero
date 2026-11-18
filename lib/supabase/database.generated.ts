@@ -463,14 +463,14 @@ isOneToOne: false
                   ]
                 },"breweries": {
                   Row: {
-                    "agents_enabled": boolean,"books_opened_on": string | null,"closed_at": string | null,"created_at": string,"customer_phone": string | null,"days_to_package": number,"fermentation_reading_due_hours": number,"gravity_unit": string,"id": string,"name": string,"one_way_keg_fee_cents": number,"portal_fulfillment_location_id": string | null,"settings": NonNullable<Json>,"timezone": string,"ttb_registry_no": string | null
+                    "agents_enabled": boolean,"books_opened_on": string | null,"closed_at": string | null,"created_at": string,"customer_phone": string | null,"days_to_package": number,"fermentation_reading_due_hours": number,"gravity_unit": string,"id": string,"name": string,"portal_fulfillment_location_id": string | null,"settings": NonNullable<Json>,"timezone": string,"ttb_registry_no": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "agents_enabled"?: boolean,"books_opened_on"?: string | null,"closed_at"?: string | null,"created_at"?: string,"customer_phone"?: string | null,"days_to_package"?: number,"fermentation_reading_due_hours"?: number,"gravity_unit"?: string,"id"?: string,"name": string,"one_way_keg_fee_cents"?: number,"portal_fulfillment_location_id"?: string | null,"settings"?: NonNullable<Json>,"timezone"?: string,"ttb_registry_no"?: string | null
+                    "agents_enabled"?: boolean,"books_opened_on"?: string | null,"closed_at"?: string | null,"created_at"?: string,"customer_phone"?: string | null,"days_to_package"?: number,"fermentation_reading_due_hours"?: number,"gravity_unit"?: string,"id"?: string,"name": string,"portal_fulfillment_location_id"?: string | null,"settings"?: NonNullable<Json>,"timezone"?: string,"ttb_registry_no"?: string | null
                   }
                   Update: {
-                    "agents_enabled"?: boolean,"books_opened_on"?: string | null,"closed_at"?: string | null,"created_at"?: string,"customer_phone"?: string | null,"days_to_package"?: number,"fermentation_reading_due_hours"?: number,"gravity_unit"?: string,"id"?: string,"name"?: string,"one_way_keg_fee_cents"?: number,"portal_fulfillment_location_id"?: string | null,"settings"?: NonNullable<Json>,"timezone"?: string,"ttb_registry_no"?: string | null
+                    "agents_enabled"?: boolean,"books_opened_on"?: string | null,"closed_at"?: string | null,"created_at"?: string,"customer_phone"?: string | null,"days_to_package"?: number,"fermentation_reading_due_hours"?: number,"gravity_unit"?: string,"id"?: string,"name"?: string,"portal_fulfillment_location_id"?: string | null,"settings"?: NonNullable<Json>,"timezone"?: string,"ttb_registry_no"?: string | null
                   }
                   Relationships: [
                     {
@@ -1791,14 +1791,14 @@ isOneToOne: false
                   ]
                 },"order_lines": {
                   Row: {
-                    "brewery_id": string,"id": string,"one_way_fee_captured": boolean,"one_way_fee_cents": number | null,"order_id": string,"qty_ordered": number,"qty_picked": number | null,"qty_refused": number,"qty_shipped": number | null,"short_reason": string | null,"sku_id": string,"unit_price_cents": number
+                    "brewery_id": string,"id": string,"one_way_fee_cents": number | null,"order_id": string,"qty_ordered": number,"qty_picked": number | null,"qty_refused": number,"qty_shipped": number | null,"short_reason": string | null,"sku_id": string,"unit_price_cents": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "brewery_id": string,"id"?: string,"one_way_fee_captured"?: boolean,"one_way_fee_cents"?: number | null,"order_id": string,"qty_ordered": number,"qty_picked"?: number | null,"qty_refused"?: number,"qty_shipped"?: number | null,"short_reason"?: string | null,"sku_id": string,"unit_price_cents": number
+                    "brewery_id": string,"id"?: string,"one_way_fee_cents"?: number | null,"order_id": string,"qty_ordered": number,"qty_picked"?: number | null,"qty_refused"?: number,"qty_shipped"?: number | null,"short_reason"?: string | null,"sku_id": string,"unit_price_cents": number
                   }
                   Update: {
-                    "brewery_id"?: string,"id"?: string,"one_way_fee_captured"?: boolean,"one_way_fee_cents"?: number | null,"order_id"?: string,"qty_ordered"?: number,"qty_picked"?: number | null,"qty_refused"?: number,"qty_shipped"?: number | null,"short_reason"?: string | null,"sku_id"?: string,"unit_price_cents"?: number
+                    "brewery_id"?: string,"id"?: string,"one_way_fee_cents"?: number | null,"order_id"?: string,"qty_ordered"?: number,"qty_picked"?: number | null,"qty_refused"?: number,"qty_shipped"?: number | null,"short_reason"?: string | null,"sku_id"?: string,"unit_price_cents"?: number
                   }
                   Relationships: [
                     {
@@ -3241,14 +3241,14 @@ isOneToOne: false
                   ]
                 },"sale_channels": {
                   Row: {
-                    "brewery_id": string,"id": string,"name": string,"system_code": string | null,"tax_treatment": Database["public"]['Enums']["tax_treatment"]
+                    "brewery_id": string,"id": string,"name": string,"one_way_keg_fee_cents": number,"system_code": string | null,"tax_treatment": Database["public"]['Enums']["tax_treatment"]
                   }
                   ComputedFields: never
                   Insert: {
-                    "brewery_id": string,"id"?: string,"name": string,"system_code"?: string | null,"tax_treatment"?: Database["public"]['Enums']["tax_treatment"]
+                    "brewery_id": string,"id"?: string,"name": string,"one_way_keg_fee_cents"?: number,"system_code"?: string | null,"tax_treatment"?: Database["public"]['Enums']["tax_treatment"]
                   }
                   Update: {
-                    "brewery_id"?: string,"id"?: string,"name"?: string,"system_code"?: string | null,"tax_treatment"?: Database["public"]['Enums']["tax_treatment"]
+                    "brewery_id"?: string,"id"?: string,"name"?: string,"one_way_keg_fee_cents"?: number,"system_code"?: string | null,"tax_treatment"?: Database["public"]['Enums']["tax_treatment"]
                   }
                   Relationships: [
                     {
@@ -5791,9 +5791,6 @@ isOneToOne: false
 "set_notification_preference":
 { Args: { "p_brewery": string,"p_enabled": boolean,"p_quiet_end": string,"p_quiet_start": string,"p_quiet_tz": string,"p_reason": string,"p_request_id": string,"p_set_quiet": boolean }; Returns: Json
                            },
-"set_one_way_keg_fee":
-{ Args: { "p_brewery": string,"p_fee_cents": number,"p_request_id": string }; Returns: Json
-                           },
 "set_order_pickup":
 { Args: { "p_order": string,"p_pickup": boolean,"p_request_id": string }; Returns: Json
                            },
@@ -5984,7 +5981,7 @@ isOneToOne: false
 { Args: { "p_brewery": string,"p_cost_ceiling_cents": number,"p_id": string,"p_name": string,"p_position": number,"p_request_id": string }; Returns: Json
                            },
 "upsert_sale_channel":
-{ Args: { "p_brewery": string,"p_id": string,"p_name": string,"p_request_id": string,"p_tax_treatment": Database["public"]['Enums']["tax_treatment"] }; Returns: Json
+{ Args: { "p_brewery": string,"p_id": string,"p_name": string,"p_one_way_keg_fee_cents"?: number,"p_request_id": string,"p_tax_treatment": Database["public"]['Enums']["tax_treatment"] }; Returns: Json
                            },
 "upsert_ship_to":
 { Args: { "p_address1": string,"p_address2": string,"p_brewery": string,"p_city": string,"p_country"?: string,"p_customer": string,"p_id": string,"p_is_default"?: boolean,"p_label": string,"p_request_id": string,"p_state": string,"p_zip": string }; Returns: Json

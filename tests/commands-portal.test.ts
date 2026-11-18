@@ -551,12 +551,13 @@ describe("portal commands", () => {
 });
 
 describe("one-way keg fee on the portal quote", () => {
-  it("quotes the fee per one-way keg, counts it before tax, and stamps it on the submitted line", async () => {
+  it("quotes the channel fee per one-way keg, counts it before tax, and stamps it on the submitted line", async () => {
     const wh = await seedLocation(b.id, { name: "One-way WH" });
     await runCommand("set_portal_fulfillment_source", { locationId: wh.id }, adminCtx);
     const keg = await seedCatalog(b.id, { product: "Export Pils", sku: "Export Pils one-way sixtel", packageType: "keg", bblPerUnit: 0.1667, format: "One-way sixtel" });
     await priceSku(b.id, { saleChannelId, brandId: keg.brandId, formatId: keg.formatId, cents: 9000 });
-    await runCommand("set_one_way_keg_fee", { feeCents: 1000 }, adminCtx);
+    const setFee = (oneWayKegFeeCents: number) => runCommand("upsert_sale_channel", { id: saleChannelId, name: "Wholesale", taxTreatment: "taxable", oneWayKegFeeCents }, adminCtx);
+    await setFee(1000);
     const quote = await runCommand("portal_quote_order", { shipToId, lines: [{ skuId: keg.skuId, qty: 3 }, { skuId, qty: 1 }] }, custCtx) as {
       quoteId: string; subtotalCents: number; oneWayFeeCents: number; amountBeforeTaxCents: number;
       oneWayFees: { name: string; qty: number; unitPriceCents: number; amountCents: number }[];
@@ -567,7 +568,7 @@ describe("one-way keg fee on the portal quote", () => {
     const placed = await runCommand("portal_submit_quote", { quoteId: quote.quoteId }, custCtx) as { order_id: string };
     expect((await admin.from("order_lines").select("one_way_fee_cents").eq("order_id", placed.order_id).eq("sku_id", keg.skuId).single()).data)
       .toEqual({ one_way_fee_cents: 1000 });
-    await runCommand("set_one_way_keg_fee", { feeCents: 0 }, adminCtx);
+    await setFee(0);
   });
 });
 

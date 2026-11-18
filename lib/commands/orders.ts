@@ -334,7 +334,7 @@ defineQuery({
   input: z.object({ orderId: z.string().uuid() }),
   handler: async (ctx, i) => {
     const [order, lines, events, shipment, deposits] = await Promise.all([
-      unwrap(ctx.db.from("orders").select("*, customers(name), ship_tos(label, country, city, state)")
+      unwrap(ctx.db.from("orders").select("*, customers(name), sale_channels(name), ship_tos(label, country, city, state)")
         .eq("brewery_id", ctx.breweryId).eq("id", i.orderId).single()),
       completeRows("Order lines", start => ctx.db.from("order_lines").select("*, skus(name, brands(name, alias), formats(name))", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).eq("order_id", i.orderId).order("sku_id").range(start, start + PAGE_SIZE - 1)),

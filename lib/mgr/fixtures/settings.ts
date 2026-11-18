@@ -22,7 +22,6 @@ export const settingsDemo: SettingsViewModel = {
   booksOpenedOn: "",
   hasFiledReports: true,
   basisCorrections: [basisCorrectionDemo],
-  oneWayKegFee: "10.00",
   agentsEnabled: false,
   aiModel: "anthropic/claude-sonnet-4.5",
   aiModels: [

@@ -234,7 +234,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Sale channels with their tax treatment, alphabetical; in_use says a record references the channel, and system_code 'taproom' marks the system Taproom channel
+Sale channels with their tax treatment and one-way keg fee in cents, alphabetical; in_use says a record references the channel, and system_code 'taproom' marks the system Taproom channel
 
 Takes no input.
 
@@ -392,13 +392,14 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin
 
-Create or edit a sale channel: its name and the tax treatment its removals are recorded under
+Create or edit a sale channel: its name, the tax treatment its removals are recorded under, and the one-way keg fee its wholesale orders charge. A one-way keg line takes the fee when it is added and keeps it; a fee change reaches only lines added later
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `name` | string | yes |
 | `taxTreatment` | taxable or export or vessel_supplies or research or transfer_in_bond | yes |
 | `id` | uuid | no |
+| `oneWayKegFeeCents` | integer | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

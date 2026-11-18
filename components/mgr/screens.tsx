@@ -3113,7 +3113,7 @@ export const SCREENS: Screen[] = [
     reads: "list_sale_channels",
     writes: "upsert_sale_channel · delete_sale_channel",
     states: [["permission", "admin required", 1], ["in use", "no Delete on a channel a record uses or on the system Taproom channel · rule stated only in the delete confirm · a foreign key or the Taproom check refuses the delete, human copy, not a 23503", 1], ["seeded", "four defaults arrive with the brewery"], ["inherit", "a customer with no override takes the channel default"]],
-    spec: "The channel carries a name and a default tax treatment and nothing else: removal classification stays on the movement type, which is why #42 rejected giving the channel a removal flag or a required-destination-state flag. Resolution order is customer override → channel default, and the resolved value is frozen onto the movement at write time so editing a customer in March never restates January.",
+    spec: "The channel carries a name, a default tax treatment and a one-way keg fee: removal classification stays on the movement type, which is why #42 rejected giving the channel a removal flag or a required-destination-state flag. Resolution order is customer override → channel default, and the resolved value is frozen onto the movement at write time so editing a customer in March never restates January.",
     body: <SaleChannelsView model={toSaleChannelsViewProps({ ...saleChannelsList, canDelete: true })} />,
   },
   {
@@ -3123,11 +3123,11 @@ export const SCREENS: Screen[] = [
     surface: "sheet",
     name: "Channel",
     to: { "Save channel": "Sale channels" },
-    job: "Create or edit one sale channel and its default tax treatment",
+    job: "Create or edit one sale channel, its default tax treatment and its one-way keg fee",
     reads: "list_sale_channels",
     writes: "upsert_sale_channel",
-    states: [["permission", "admin required", 1], ["new", "titled Add channel · name and tax treatment required"], ["edit", "titled with the channel being edited"]],
-    spec: "Drawn editing the Export channel. The sheet has no Delete: removal and its in-use rule live on the Sale channels list. Every selected tax treatment shows its meaning under the chips, including the default Taxable choice. The four removals without payment of tax (Export, Vessel supplies, Research, Transfer in bond) keep their approved TTB meanings.",
+    states: [["permission", "admin required", 1], ["new", "titled Add channel · name and tax treatment required · fee starts at $0.00"], ["fee", "whole cents only; blank or 0 bills none; a change reaches only lines added later"], ["edit", "titled with the channel being edited"]],
+    spec: "Drawn editing the Export channel. The sheet has no Delete: removal and its in-use rule live on the Sale channels list. Every selected tax treatment shows its meaning under the chips, including the default Taxable choice. The one-way keg fee is frozen on each one-way keg line of the channel's wholesale orders when the line is added. The four removals without payment of tax (Export, Vessel supplies, Research, Transfer in bond) keep their approved TTB meanings.",
     body: <ChannelView model={toChannelViewProps(channelExport)} />,
   },
   {

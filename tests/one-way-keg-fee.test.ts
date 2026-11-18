@@ -1,19 +1,25 @@
 // tests/one-way-keg-fee.test.ts — a one-way keg (a keg SKU with no container
-// source) carries the brewery's one-way keg fee on its invoice, never a
+// source) carries its sale channel's one-way keg fee on its invoice, never a
 // deposit, and the fee is refunded only on a refused-delivery credit
 // (docs/plans/lolev-orders.md task 6).
-// The fee is frozen onto the order line at submit, like a keg deposit, so the
-// staff order page and either invoice writer (ship_order now, confirm_delivery
-// on delivery) show and bill the price the order was submitted with.
+// The fee is frozen onto the order line when the line is added, drafts
+// included, so the staff order page and either invoice writer (ship_order now,
+// confirm_delivery on delivery) show and bill the fee the line was added with.
 import { describe, expect, it } from "vitest";
-import { admin, ins, makeBrewery, makeStaffCtx, priceSku, seedCustomer, seedLocation } from "./helpers";
+import { admin, channelId, ins, makeBrewery, makeStaffCtx, priceSku, seedCustomer, seedLocation } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 type Ctx = Awaited<ReturnType<typeof makeStaffCtx>>;
 type Fixture = Awaited<ReturnType<typeof setup>>;
 
-/** A brewery with a one-way sixtel and a returnable sixtel, both priced and stocked. */
+/** Set a sale channel's one-way keg fee, keeping its name and tax treatment. */
+async function setChannelFee(ctx: Ctx, channelId: string, feeCents: number) {
+  const c = (await admin.from("sale_channels").select("name, tax_treatment").eq("id", channelId).single()).data!;
+  return runCommand("upsert_sale_channel", { id: channelId, name: c.name, taxTreatment: c.tax_treatment, oneWayKegFeeCents: feeCents }, ctx);
+}
+
+/** A brewery with a one-way sixtel and a returnable sixtel, both priced and stocked, and the customer's channel fee set. */
 async function setup(feeCents: number) {
   const brewery = await makeBrewery();
   const adminCtx = await makeStaffCtx(brewery.id, "admin");
@@ -31,7 +37,7 @@ async function setup(feeCents: number) {
   const pool = await ins("keg_pools", { brewery_id: brewery.id, name: "Sixtel fleet", kind: "owned", deposit_cents: 3000 });
   const oneWaySku = await sku("One-way sixtel", null);
   const returnableSku = await sku("Sixtel", pool.id);
-  await runCommand("set_one_way_keg_fee", { feeCents }, adminCtx);
+  await setChannelFee(adminCtx, customer.saleChannelId, feeCents);
   return { brewery, adminCtx, wh, customer, oneWaySku, returnableSku };
 }
 
@@ -67,7 +73,7 @@ describe("one-way keg fee", () => {
     expect(frozen.data).toEqual({ one_way_fee_cents: 1000 });
   });
 
-  it("freezes the fee on the line at submit, before the order ships", async () => {
+  it("sets the channel fee when the line is added, and a later channel fee change leaves it", async () => {
     const f = await setup(1000);
     const { order_id: orderId } = await runCommand("create_order", {
       kind: "wholesale", customerId: f.customer.customerId, shipToId: f.customer.shipToId, fromLocationId: f.wh.id,
@@ -75,11 +81,12 @@ describe("one-way keg fee", () => {
     }, f.adminCtx) as { order_id: string };
     const fees = async () => (await admin.from("order_lines").select("sku_id, one_way_fee_cents").eq("order_id", orderId)).data!
       .map(l => [l.sku_id === f.oneWaySku ? "one-way" : "returnable", l.one_way_fee_cents]).sort();
-    expect(await fees()).toEqual([["one-way", null], ["returnable", null]]);
+    // A draft line already carries the fee.
+    expect(await fees()).toEqual([["one-way", 1000], ["returnable", null]]);
+    // A channel fee changed later does not reprice the line.
+    await setChannelFee(f.adminCtx, f.customer.saleChannelId, 1500);
     await runCommand("submit_order", { orderId }, f.adminCtx);
     expect(await fees()).toEqual([["one-way", 1000], ["returnable", null]]);
-    // A fee changed after submit does not reprice the order.
-    await runCommand("set_one_way_keg_fee", { feeCents: 1500 }, f.adminCtx);
     await runCommand("confirm_order", { orderId }, f.adminCtx);
     const lines = (await admin.from("order_lines").select("id, qty_ordered").eq("order_id", orderId)).data!;
     await runCommand("record_pick", { orderId, picks: lines.map(l => ({ lineId: l.id, qty: Number(l.qty_ordered) })) }, f.adminCtx);
@@ -143,20 +150,22 @@ describe("one-way keg fee", () => {
     expect(pushed.error).toBeNull();
   });
 
-  it("adds no fee line when the fee is 0", async () => {
+  it("gives no fee to an order on a $0 channel", async () => {
     const f = await setup(0);
     const s = await ship(f, [{ skuId: f.oneWaySku, qty: 3 }]);
     expect((await invoiceLines(s.invoiceId!)).map(l => l.kind)).toEqual(["sku"]);
+    const line = await admin.from("order_lines").select("one_way_fee_cents").eq("id", s.lineFor(f.oneWaySku)).single();
+    expect(line.data).toEqual({ one_way_fee_cents: null });
   });
 
-  it("keeps a zero fee captured at submit when an adjustment follows a fee increase", async () => {
+  it("keeps a zero fee set when the line was added when an adjustment follows a fee increase", async () => {
     const f = await setup(0);
     const { order_id: orderId } = await runCommand("create_order", {
       kind: "wholesale", customerId: f.customer.customerId, shipToId: f.customer.shipToId, fromLocationId: f.wh.id,
       lines: [{ skuId: f.oneWaySku, qty: 1 }],
     }, f.adminCtx) as { order_id: string };
     await runCommand("submit_order", { orderId }, f.adminCtx);
-    await runCommand("set_one_way_keg_fee", { feeCents: 1500 }, f.adminCtx);
+    await setChannelFee(f.adminCtx, f.customer.saleChannelId, 1500);
     await runCommand("adjust_order_lines", { orderId, reason: "Buyer requested another keg", lines: [{ skuId: f.oneWaySku, qty: 2 }] }, f.adminCtx);
     const line = (await admin.from("order_lines").select("id, one_way_fee_cents").eq("order_id", orderId).single()).data!;
     expect(line.one_way_fee_cents).toBeNull();
@@ -168,11 +177,11 @@ describe("one-way keg fee", () => {
     expect((await invoiceLines(later.invoiceId!)).filter(l => l.kind === "one_way_keg_fee").map(l => l.unit_price_cents)).toEqual([1500]);
   });
 
-  it("bills shipped less refused on delivery, at the fee frozen at submit", async () => {
+  it("bills shipped less refused on delivery, at the fee frozen on the line", async () => {
     const f = await setup(1000);
     const s = await ship(f, [{ skuId: f.oneWaySku, qty: 3 }], "on_delivery");
     expect(s.invoiceId).toBeNull();
-    await runCommand("set_one_way_keg_fee", { feeCents: 1200 }, f.adminCtx);
+    await setChannelFee(f.adminCtx, f.customer.saleChannelId, 1200);
     const shipment = await admin.from("shipments").select("id").eq("order_id", s.orderId).single();
     const { routeId } = await runCommand("save_route", { deliveryDate: "2026-10-20", stops: [{ shipmentId: shipment.data!.id, stopNo: 1 }] }, f.adminCtx) as { routeId: string };
     await runCommand("depart_route", { routeId }, f.adminCtx);
@@ -198,12 +207,26 @@ describe("one-way keg fee", () => {
     expect(String((started.data as { requestBody: string }).requestBody)).toContain('"value": "fee-item"');
   });
 
-  it("lets only an admin set the fee", async () => {
+  it("lets only an admin set a channel fee, and an edit without one keeps it", async () => {
     const f = await setup(1000);
     const sales: Ctx = await makeStaffCtx(f.brewery.id, "sales");
-    await expect(runCommand("set_one_way_keg_fee", { feeCents: 500 }, sales)).rejects.toThrow(/permission|role|not allowed/i);
-    await expect(runCommand("set_one_way_keg_fee", { feeCents: -1 }, f.adminCtx)).rejects.toThrow();
-    const row = await admin.from("breweries").select("one_way_keg_fee_cents").eq("id", f.brewery.id).single();
+    await expect(setChannelFee(sales, f.customer.saleChannelId, 500)).rejects.toThrow(/permission|role|not allowed/i);
+    await expect(setChannelFee(f.adminCtx, f.customer.saleChannelId, -1)).rejects.toThrow();
+    await runCommand("upsert_sale_channel", { id: f.customer.saleChannelId, name: "Wholesale", taxTreatment: "taxable" }, f.adminCtx);
+    const row = await admin.from("sale_channels").select("one_way_keg_fee_cents").eq("id", f.customer.saleChannelId).single();
     expect(row.data).toEqual({ one_way_keg_fee_cents: 1000 });
+  });
+
+  it("charges each order the fee of its own channel", async () => {
+    const f = await setup(1000);
+    const taproom = await channelId(f.brewery.id, "Taproom");
+    const other = await seedCustomer(f.brewery.id, { name: "Taproom buyer", saleChannelId: taproom });
+    await priceSku(f.brewery.id, { saleChannelId: taproom, brandId: (await admin.from("skus").select("brand_id").eq("id", f.oneWaySku).single()).data!.brand_id,
+      formatId: (await admin.from("skus").select("format_id").eq("id", f.oneWaySku).single()).data!.format_id, cents: 9000 });
+    const { order_id: orderId } = await runCommand("create_order", {
+      kind: "wholesale", customerId: other.customerId, shipToId: other.shipToId, fromLocationId: f.wh.id, lines: [{ skuId: f.oneWaySku, qty: 1 }],
+    }, f.adminCtx) as { order_id: string };
+    const line = await admin.from("order_lines").select("one_way_fee_cents").eq("order_id", orderId).single();
+    expect(line.data).toEqual({ one_way_fee_cents: null });
   });
 });

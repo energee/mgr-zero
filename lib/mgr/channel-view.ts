@@ -1,6 +1,8 @@
 // lib/mgr/channel-view.ts — view-model for the Channel sheet, shared by the
 // inventory frame and the live ChannelForm. Chip labels derive from
-// TAX_TREATMENTS; taxHint holds the selected treatment's settled hint copy.
+// TAX_TREATMENTS; taxHint holds the selected treatment's settled hint copy;
+// oneWayKegFee is the channel's one-way keg fee in dollars.
+import { centsMaxError, dollarsInput } from "./money";
 import { sentenceCase } from "./labels";
 import { TAX_TREATMENTS, type TaxTreatment } from "./tax-treatments";
 
@@ -23,16 +25,19 @@ export type ChannelViewModel = {
   taxOptions: string[];
   taxIndex: number;
   taxHint?: string;
+  /** The one-way keg fee in dollars ("10.00"); blank or 0 bills none. */
+  oneWayKegFee: string;
 };
 
 export type ChannelSnapshot = {
   id: string;
   name: string;
   tax_treatment: string;
+  one_way_keg_fee_cents: number;
 };
 
 /** Map one list_sale_channels row onto ChannelView. */
-export function toChannelViewProps({ name, tax_treatment }: ChannelSnapshot): ChannelViewModel {
+export function toChannelViewProps({ name, tax_treatment, one_way_keg_fee_cents }: ChannelSnapshot): ChannelViewModel {
   const label = sentenceCase(tax_treatment);
   const taxIndex = CHANNEL_TAX_TREATMENTS.indexOf(label);
   return {
@@ -40,5 +45,17 @@ export function toChannelViewProps({ name, tax_treatment }: ChannelSnapshot): Ch
     taxOptions: [...CHANNEL_TAX_TREATMENTS],
     taxIndex: taxIndex < 0 ? 0 : taxIndex,
     taxHint: TAX_TREATMENT_HINTS[tax_treatment as TaxTreatment],
+    oneWayKegFee: dollarsInput(one_way_keg_fee_cents),
   };
 }
+
+/** Match the fee's nonnegative integer-cent storage without rounding typed fractions. */
+export function oneWayKegFeeError(value: string): string | undefined {
+  if (value === "") return undefined;
+  if (!/^\+?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value)
+    || (value.split(".")[1]?.replace(/0+$/, "").length ?? 0) > 2) {
+    return "Enter zero or a positive dollar amount with at most two decimal places.";
+  }
+  return centsMaxError(value, "a fee");
+}
+
