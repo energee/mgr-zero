@@ -3,8 +3,6 @@
 // Kept for old links: packages are switched on under the Brand page's Sells as,
 // so there is no New SKU here, and the back link lands on that section.
 // Existing serving identities remain the boundary for poured POS activity.
-// Admin and sales release a SKU for portal ordering here (release-form.tsx);
-// each open release is a row under its SKU with Edit and Withdraw.
 import { cache } from "react";
 import type { KegPoolOption } from "@/lib/mgr/sku-view";
 import type { PriceGroupBarcode } from "@/lib/mgr/price-groups-view";
@@ -18,9 +16,6 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { PourForm } from "../../../pour-form";
 import { SkuEditForm } from "../../../sku-form";
-import { EditReleaseForm, ReleaseForm, WithdrawRelease } from "../../../release-form";
-import { skuReleaseForms, type ReleaseBatchRow, type ReleaseRow } from "@/lib/mgr/release-view";
-import { breweryDate } from "@/lib/date-format";
 import { navTitle } from "@/lib/mgr/nav";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -47,23 +42,17 @@ const getSkuListPageData = cache(async function getSkuListPageData(id: string) {
     canRun(ctx, "list_price_group_barcodes") ? runCommand("list_price_group_barcodes", { brandId: id }, ctx) as Promise<PriceGroupBarcode[]> : Promise.resolve(undefined),
   ]);
   const brand = brands.find((b) => b.id === id) ?? notFound();
-  // Portal releases of this brand's SKUs, and the planned batches a new one can draw on.
-  const skuIds = brand.skus.map((s) => s.id);
-  const [releases, batches] = skuIds.length && canRun(ctx, "list_releases") ? await Promise.all([
-    runCommand("list_releases", { skuIds }, ctx) as Promise<ReleaseRow[]>,
-    canWrite ? runCommand("list_release_batches", { skuIds }, ctx) as Promise<ReleaseBatchRow[]> : Promise.resolve([]),
-  ]) : [[], []];
-  return { canWrite, formats, pools, barcodes, brand, releases, batches, today: breweryDate(brewery.timeZone) };
+  return { canWrite, formats, pools, barcodes, brand };
 });
 
 export default async function SkuListPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { canWrite, formats, pools, barcodes, brand, releases, batches, today } = await getSkuListPageData(id);
+  const { canWrite, formats, pools, barcodes, brand } = await getSkuListPageData(id);
   const formatById = new Map(formats.map((f) => [f.id, f]));
   const skus = brand.skus.map((sku) => ({ ...sku, formats: formatById.get(sku.format_id) ?? null }));
   return (
     <SkuListView
-      model={toSkuListViewProps({ brand, skus, pours: brand.pours, barcodes, releases, backHref: `/catalog/brands/${id}#sells-as` })}
+      model={toSkuListViewProps({ brand, skus, pours: brand.pours, barcodes, backHref: `/catalog/brands/${id}#sells-as` })}
       createAction={null}
       rowAction={canWrite ? (row) => {
         if (row.kind === "poured") {
@@ -72,15 +61,8 @@ export default async function SkuListPage({ params }: { params: Promise<{ id: st
             ? <PourForm key={`${pour.id}-${pour.name}-${pour.ounces}`} priceGroupId={brand.price_group_id} groupName={brand.price_groups?.name} pour={pour} />
             : null;
         }
-        if (row.kind === "release") {
-          const release = releases.find((r) => `release:${r.id}` === row.key)!;
-          return <><EditReleaseForm release={release} /><WithdrawRelease release={release} /></>;
-        }
         const sku = skus.find((s) => s.id === row.key)!;
-        return <>
-          <SkuEditForm sku={sku} formatName={sku.formats?.name ?? "—"} packageType={sku.formats?.package_type} pools={pools} />
-          {sku.active ? <ReleaseForm title={`Release for ordering · ${sku.name}`} forms={skuReleaseForms(sku, batches, today)} /> : null}
-        </>;
+        return <SkuEditForm sku={sku} formatName={sku.formats?.name ?? "—"} packageType={sku.formats?.package_type} pools={pools} />;
       } : undefined}
     />
   );

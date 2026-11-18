@@ -1,7 +1,8 @@
 // app/(app)/catalog/release-form.tsx — live portal release sheets (admin and
 // sales). ReleaseForm is Release for ordering (release_sku) on a Planning
-// batch row or a SKU row; EditReleaseForm (update_release) and
-// WithdrawRelease (withdraw_release) act on an open release's SKU-list row.
+// batch row or Release on a Brand page SKU row; EditReleaseForm
+// (update_release) and WithdrawRelease (withdraw_release) act on an open
+// release's row under its SKU on the Brand page.
 // The drawings are components/mgr/views/release.tsx.
 "use client";
 
@@ -14,8 +15,9 @@ import { ConfirmDeleteControl } from "@/components/mgr/views/confirm-delete";
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
 import { releaseCommand, updateReleaseCommand, type ReleaseForm as Form, type ReleaseRow } from "@/lib/mgr/release-view";
 
-/** `forms` are the sources to choose from (batchReleaseForms gives one, skuReleaseForms several); the first is the default. */
-export function ReleaseForm({ title, forms }: { title: string; forms: Form[] }) {
+/** `forms` are the sources to choose from (batchReleaseForms gives one, skuReleaseForms several); the first is the default.
+ *  The trigger reads `triggerLabel`: Release on a Brand page SKU row, Release for ordering on Planning. */
+export function ReleaseForm({ title, forms, triggerLabel = "Release for ordering" }: { title: string; forms: Form[]; triggerLabel?: string }) {
   const [form, setForm] = useState(forms[0]);
   const reset = () => setForm(forms[0]);
   const command = releaseCommand(form);
@@ -23,7 +25,7 @@ export function ReleaseForm({ title, forms }: { title: string; forms: Form[] }) 
   const line = (index: number, change: Partial<Form["lines"][number]>) =>
     setForm((f) => ({ ...f, lines: f.lines.map((l, i) => (i === index ? { ...l, ...change } : l)) }));
   return (
-    <CommandForm open={sheet.open} onOpenChange={sheet.setOpen} title={title} trigger={<Button variant="outline" size="sm">Release for ordering</Button>}>
+    <CommandForm open={sheet.open} onOpenChange={sheet.setOpen} title={title} trigger={<Button variant="outline" size="sm">{triggerLabel}</Button>}>
       <form onSubmit={(event) => { if (command.reason) { event.preventDefault(); return; } void sheet.submit(event); }} className="flex flex-col gap-4">
         <ReleaseView form={form} sources={forms}
           controls={{

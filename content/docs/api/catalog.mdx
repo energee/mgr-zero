@@ -43,7 +43,9 @@ planned batch (`batchId`; prefill from `list_release_batches`) or, without it,
 from packaged stock, writing one release per line; a stock quantity above what
 is free to promise is refused. `list_releases` reports each release's
 `confirmed`, `preordered` (submitted, not yet confirmed) and `remaining` units
-and whether buyers can still order (`open`). `update_release` never goes below
+and whether buyers can still order (`open`; pass `open` to keep only open or
+only closed releases). Only a portal buyer's own order lines may name a
+release; staff order paths refuse `release_id`. `update_release` never goes below
 `confirmed`; `withdraw_release` stops new orders and keeps the row.
 
 {/* ops:catalog */}
@@ -260,13 +262,14 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer
 
-Releases with their SKU, batch number and batch ready date, quantity, ships-from and order-by dates, whether buyers can still order, and units confirmed, pre-ordered (submitted, not yet confirmed) and remaining; optionally only these ids, SKUs or batches
+Releases with their SKU, batch number and batch ready date, quantity, ships-from and order-by dates, whether buyers can still order (open) and whether its batch was cancelled, and units confirmed, pre-ordered (submitted, not yet confirmed) and remaining; optionally only these ids, SKUs or batches, or only open or closed releases
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `ids` | array of uuid | no |
 | `skuIds` | array of uuid | no |
 | `batchIds` | array of uuid | no |
+| `open` | boolean | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -391,14 +394,13 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Change a release's quantity, ships-from date and order-by date (null clears it); never below the quantity already confirmed on it, and a larger stock release must fit what is free to promise
+Change a release's quantity and order-by date (null clears it); never below the quantity already confirmed on it, and a larger stock release must fit what is free to promise
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `releaseId` | uuid | yes |
 | `qty` | integer | yes |
 | `ordersCloseOn` | date (YYYY-MM-DD) or null | yes |
-| `shipsFrom` | date (YYYY-MM-DD) | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

@@ -18,8 +18,16 @@ export type ReleaseBatchRow = {
 export type ReleaseRow = {
   id: string; batch_id: string | null; batch_no: number | null; sku_id: string; sku_name: string;
   qty: number; ships_from: string; orders_close_on: string | null; withdrawn_at: string | null;
-  ready_on: string | null; open: boolean; confirmed: number; preordered: number; remaining: number;
+  ready_on: string | null; open: boolean; cancelled: boolean; confirmed: number; preordered: number; remaining: number;
 };
+
+/** A batch and SKU that already have an open release (`releases` are list_releases({ open: true })). */
+const releasedKey = (batchId: string | null, skuId: string) => `${batchId}:${skuId}`;
+
+/** An open release's row under its SKU (Brand page Sells as). */
+export const releaseRowView = (row: ReleaseRow) => ({
+  key: row.id, title: `Release · ${row.batch_no ? `Batch ${row.batch_no}` : "Packaged stock"}`, detail: releaseDetail(row),
+});
 
 /** A line of the form: release `qty` (typed text) of one SKU when `include` is ticked. */
 export type ReleaseLine = { skuId: string; name: string; qty: string; include: boolean };
@@ -33,10 +41,14 @@ const batchName = (row: ReleaseBatchRow) => `Batch ${row.batch_no ?? "—"}`;
 const batchSource = (row: ReleaseBatchRow) => `${batchName(row)} · ready ${formatDate(row.needed_by)}`;
 const skuName = (row: ReleaseBatchRow) => row.skus?.name ?? row.sku_id;
 
-/** One form per planned batch, every projected SKU ticked at its projected units.
+/** One form per planned batch, every projected SKU not yet released ticked at
+ *  its projected units; `released` once every one of them has an open release.
  *  title and detail are the batch's Planning row. */
-export function batchReleaseForms(rows: ReleaseBatchRow[]): (ReleaseForm & { title: string; detail: string })[] {
-  return [...Map.groupBy(rows, (row) => row.batch_id).values()].map((batch) => ({
+export function batchReleaseForms(rows: ReleaseBatchRow[], releases: ReleaseRow[] = []): (ReleaseForm & { title: string; detail: string; released: boolean })[] {
+  const released = new Set(releases.map((r) => releasedKey(r.batch_id, r.sku_id)));
+  return [...Map.groupBy(rows, (row) => row.batch_id).values()].map((batch) => {
+    const unreleased = batch.filter((row) => !released.has(releasedKey(row.batch_id, row.sku_id)));
+    return {
     key: batch[0].batch_id,
     batchId: batch[0].batch_id,
     title: `${batchName(batch[0])} · ${batch[0].skus?.brands?.name ?? "No brand"}`,
@@ -44,16 +56,20 @@ export function batchReleaseForms(rows: ReleaseBatchRow[]): (ReleaseForm & { tit
     source: batchSource(batch[0]),
     shipsFrom: batch[0].needed_by,
     ordersCloseOn: "",
-    lines: batch.map((row) => ({ skuId: row.sku_id, name: skuName(row), qty: String(row.units), include: true })),
-  }));
+    released: unreleased.length === 0,
+    lines: unreleased.map((row) => ({ skuId: row.sku_id, name: skuName(row), qty: String(row.units), include: true })),
+    };
+  });
 }
 
 /** The forms one SKU can release from: packaged stock (ships today, quantity
- *  typed) and each planned batch projecting it (prefilled). */
-export function skuReleaseForms(sku: { id: string; name: string }, rows: ReleaseBatchRow[], today: string): ReleaseForm[] {
+ *  typed) and each planned batch projecting it that has no open release of it
+ *  yet (prefilled). */
+export function skuReleaseForms(sku: { id: string; name: string }, rows: ReleaseBatchRow[], today: string, releases: ReleaseRow[] = []): ReleaseForm[] {
+  const released = new Set(releases.map((r) => releasedKey(r.batch_id, r.sku_id)));
   return [
     { key: "stock", source: "Packaged stock", shipsFrom: today, ordersCloseOn: "", lines: [{ skuId: sku.id, name: sku.name, qty: "", include: true }] },
-    ...rows.filter((row) => row.sku_id === sku.id).map((row) => ({
+    ...rows.filter((row) => row.sku_id === sku.id && !released.has(releasedKey(row.batch_id, sku.id))).map((row) => ({
       key: row.batch_id, batchId: row.batch_id, source: batchSource(row), shipsFrom: row.needed_by, ordersCloseOn: "",
       lines: [{ skuId: sku.id, name: sku.name, qty: String(row.units), include: true }],
     })),
@@ -92,11 +108,10 @@ export function updateReleaseCommand(row: ReleaseRow, qty: string, ordersCloseOn
   };
 }
 
-/** "12 of 40 left · 20 confirmed · 8 pre-ordered · ships Dec 4, 2026 · order by
- *  Nov 27, 2026", led by "withdrawn" or "closed" once buyers can no longer order. */
+/** An open release's row: "12 of 40 left · 20 confirmed · 8 pre-ordered ·
+ *  ships Dec 4, 2026 · order by Nov 27, 2026". */
 export function releaseDetail(row: ReleaseRow): string {
   return [
-    row.withdrawn_at ? "withdrawn" : row.open ? undefined : "closed",
     `${row.remaining} of ${row.qty} left`,
     row.confirmed ? `${row.confirmed} confirmed` : undefined,
     row.preordered ? `${row.preordered} pre-ordered` : undefined,

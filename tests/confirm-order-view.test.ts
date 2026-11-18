@@ -8,7 +8,7 @@ import type { ReleaseRow } from "../lib/mgr/release-view";
 
 const release: ReleaseRow = {
   id: "r1", batch_id: "b1", batch_no: 12, sku_id: "s1", sku_name: "Stout · case", qty: 40, ships_from: "2026-12-04",
-  orders_close_on: null, withdrawn_at: null, ready_on: "2026-12-04", open: true, confirmed: 20, preordered: 10, remaining: 10,
+  orders_close_on: null, withdrawn_at: null, ready_on: "2026-12-04", open: true, cancelled: false, confirmed: 20, preordered: 10, remaining: 10,
 };
 const snapshot: ConfirmOrderSnapshot = {
   order: { id: "o1", order_no: 7, status: "submitted", requested_ship_date: "2026-12-05", from_location_id: "l1", customers: { name: "Bar" } },
@@ -29,6 +29,11 @@ describe("Confirm order release flags", () => {
     const slipped = flagsOf({ ...snapshot, releases: [{ ...release, ready_on: "2026-12-11" }] });
     expect(slipped["line-release"]).toEqual(["Slipped: batch ready Dec 11, 2026"]);
     expect(toConfirmOrderViewProps({ ...snapshot, releases: [{ ...release, ready_on: "2026-12-11" }] }).lines.find((l) => l.key === "line-release")?.tone).toBe("w");
+  });
+
+  it("flags a line on a withdrawn release or on a release whose batch was cancelled", () => {
+    expect(flagsOf({ ...snapshot, releases: [{ ...release, withdrawn_at: "2026-11-20T00:00:00Z", open: false }] })["line-release"]).toEqual(["Release withdrawn"]);
+    expect(flagsOf({ ...snapshot, releases: [{ ...release, cancelled: true, open: false }] })["line-release"]).toEqual(["Release closed: batch cancelled"]);
   });
 
   it("flags pre-orders over a release lowered below confirmed plus pre-ordered", () => {

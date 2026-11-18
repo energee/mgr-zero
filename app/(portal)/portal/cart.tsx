@@ -25,7 +25,8 @@ export function submissionFailureMessage(message: string, draftId: string | null
 
 type CartProps = {
   items: CatalogItem[]; shipTos: ShipToOption[]; scope: PortalScope; fulfillmentSource: { id: string; name: string } | null;
-  initial?: { fields: PortalFields; draftId: string | null; removed: string[] };
+  /** A saved draft or reorder (reconcilePortalOrder); releasesClosed names lines whose release closed since. */
+  initial?: { fields: PortalFields; draftId: string | null; removed: string[]; releasesClosed?: string[] };
 };
 const subscribe = () => () => {};
 export function Cart(props: CartProps) {
@@ -158,6 +159,7 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource }: CartPr
       messages={<>
         {!fulfillmentSource && E.info("The brewery has not set where orders ship from. Contact the brewery before starting or submitting a new order. An existing uncertain request can still be retried.")}
         {removed.length ? E.info(`Removed unavailable or unpriced items: ${removed.join(", ")}. Review the remaining quantities.`, "alert") : null}
+        {initial?.releasesClosed?.length ? E.info(`The release you chose has closed for ${initial.releasesClosed.join(", ")}. Check where each now orders from and the requested date.`, "alert") : null}
         {!lines && E.info("Enter whole quantities of zero or more.", "alert")}
         {missingInput && E.info(missingInput, "alert")}
         {unavailable.length > 0 && E.info(`Pending request contains packages no longer in the catalog: ${unavailable.map(line => `${line.skuId} × ${line.qty}`).join(", ")}. Retry retains the original quantities.`, "alert")}

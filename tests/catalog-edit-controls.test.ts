@@ -4,7 +4,6 @@ import { readFileSync } from "node:fs";
 import { admin, asUser, makeBrewery, makeCustomerUser, makeStaffCtx, priceSku, seedCatalog, seedCustomer, seedLocation, seedPriceGroup } from "./helpers";
 import { runCommand } from "../lib/commands/registry";
 import { skuUpdateCommand, toSkuViewProps } from "../lib/mgr/sku-view";
-import { toSkuListViewProps } from "../lib/mgr/sku-list-view";
 import "../lib/commands/all";
 
 let ctx: Awaited<ReturnType<typeof makeStaffCtx>>;
@@ -109,20 +108,10 @@ it("gates catalog mutators and excludes inactive SKUs from New Order picker opti
   expect(readFileSync("app/(app)/orders/new/new-order-client.tsx", "utf8")).toContain("skus.data.filter(sku => sku.active)");
 });
 
-it("edits Orderable from stock on the SKU sheet and names a SKU kept off portal stock in the list", () => {
+it("edits Orderable from stock on the SKU sheet", () => {
   const sku = { id: "s1", name: "Stout · case", upc: null, active: true, format_id: "f1", batch_share: null, portal_from_stock: false, formats: { name: "case" } };
   expect(toSkuViewProps({ sku, formats: [] }).portalFromStock).toBe(false);
   expect(toSkuViewProps({ sku: { ...sku, portal_from_stock: undefined }, formats: [] }).portalFromStock).toBe(true);
   expect(skuUpdateCommand({ skuId: "s1", active: true, upc: "", batchSharePercent: "", portalFromStock: false }).input).toMatchObject({ portalFromStock: false });
-  const list = toSkuListViewProps({ brand: { id: "b1", name: "Stout" }, skus: [{ ...sku, formats: { name: "case", bbl_per_unit: 0.0645 } }] });
-  expect(list.rows[0].detail).toMatch(/not orderable from stock on the portal/);
-  expect(toSkuListViewProps({ brand: { id: "b1", name: "Stout" }, skus: [{ ...sku, portal_from_stock: true, formats: { name: "case", bbl_per_unit: 0.0645 } }] }).rows[0].detail).not.toMatch(/portal/);
 });
 
-it("lists a SKU's open releases under it, each its own row", () => {
-  const sku = { id: "s1", name: "Stout · case", active: true, format_id: "f1", portal_from_stock: true, formats: { name: "case", bbl_per_unit: 0.0645 } };
-  const open = { id: "r1", batch_id: null, batch_no: null, sku_id: "s1", sku_name: "Stout · case", qty: 10, ships_from: "2026-11-18", orders_close_on: null, withdrawn_at: null, ready_on: null, open: true, confirmed: 2, preordered: 1, remaining: 7 };
-  const list = toSkuListViewProps({ brand: { id: "b1", name: "Stout" }, skus: [sku], releases: [open, { ...open, id: "r2", open: false, withdrawn_at: "2026-11-19T00:00:00Z" }] });
-  expect(list.rows.map((r) => [r.key, r.kind, r.title])).toEqual([["s1", undefined, "case"], ["release:r1", "release", "Release · Packaged stock"]]);
-  expect(list.rows[1].detail).toBe("7 of 10 left · 2 confirmed · 1 pre-ordered · ships Nov 18, 2026");
-});

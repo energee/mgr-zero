@@ -131,10 +131,15 @@ export type PortalSavedOrder = {
   order: { id: string; status: string; ship_to_id: string | null; po_number: string | null; note: string | null; requested_ship_date: string | null };
   lines: { sku_id: string; qty_ordered: number; release_id?: string | null; skus?: { name: string } | null }[];
 };
-export function reconcilePortalOrder(saved: PortalSavedOrder, items: { skuId: string }[], shipTos: { id: string }[], reorder: boolean) {
+/** `releasesClosed` names the draft lines whose release is no longer offered:
+ *  those lines drop it, so the buyer must check where they now order from. */
+export function reconcilePortalOrder(saved: PortalSavedOrder, items: { skuId: string; releases?: { releaseId: string }[] }[], shipTos: { id: string }[], reorder: boolean) {
   if (!reorder && saved.order.status !== "draft") throw new Error("Only draft orders can be edited. View the order status.");
   const available = new Set(items.map(i => i.skuId));
+  const offered = (l: PortalSavedOrder["lines"][number]) => items.find(i => i.skuId === l.sku_id)?.releases?.some(r => r.releaseId === l.release_id) ?? false;
+  const kept = saved.lines.filter(l => available.has(l.sku_id));
   return {
+    releasesClosed: reorder ? [] : kept.filter(l => l.release_id && !offered(l)).map(l => l.skus?.name ?? l.sku_id),
     draftId: reorder ? null : saved.order.id,
     removed: saved.lines.filter(l => !available.has(l.sku_id)).map(l => l.skus?.name ?? l.sku_id),
     fields: {
@@ -142,7 +147,7 @@ export function reconcilePortalOrder(saved: PortalSavedOrder, items: { skuId: st
       poNumber: reorder ? "" : saved.order.po_number ?? "", note: reorder ? "" : saved.order.note ?? "",
       requestedShipDate: reorder ? null : saved.order.requested_ship_date,
       // A reorder starts from the current offers; a draft keeps the release it named.
-      lines: saved.lines.filter(l => available.has(l.sku_id)).map(l => ({ skuId: l.sku_id, qty: Number(l.qty_ordered), ...(!reorder && l.release_id ? { releaseId: l.release_id } : {}) })),
+      lines: kept.map(l => ({ skuId: l.sku_id, qty: Number(l.qty_ordered), ...(!reorder && l.release_id && offered(l) ? { releaseId: l.release_id } : {}) })),
     },
   };
 }

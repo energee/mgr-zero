@@ -28,17 +28,15 @@ defineCommand({
 });
 
 defineCommand({
-  name: "update_release", description: "Change a release's quantity, ships-from date and order-by date (null clears it); never below the quantity already confirmed on it, and a larger stock release must fit what is free to promise",
+  name: "update_release", description: "Change a release's quantity and order-by date (null clears it); never below the quantity already confirmed on it, and a larger stock release must fit what is free to promise",
   compensation: "Reverse with update_release and the previous values.",
   roles: [...WRITE_ROLES],
   input: z.object({
     releaseId: z.string().uuid(), qty: units,
-    shipsFrom: isoDate.optional().describe("Earliest delivery date; omit to keep it"),
     ordersCloseOn: isoDate.nullable().describe("Last day buyers can order from this release; null for no limit"),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_release", {
-    p_brewery: ctx.breweryId, p_release: i.releaseId, p_qty: i.qty, p_ships_from: i.shipsFrom ?? null,
-    p_orders_close_on: i.ordersCloseOn, p_request_id: execution.requestId,
+    p_brewery: ctx.breweryId, p_release: i.releaseId, p_qty: i.qty, p_orders_close_on: i.ordersCloseOn, p_request_id: execution.requestId,
   })),
 });
 
@@ -51,18 +49,19 @@ defineCommand({
 });
 
 defineQuery({
-  name: "list_releases", description: "Releases with their SKU, batch number and batch ready date, quantity, ships-from and order-by dates, whether buyers can still order, and units confirmed, pre-ordered (submitted, not yet confirmed) and remaining; optionally only these ids, SKUs or batches",
+  name: "list_releases", description: "Releases with their SKU, batch number and batch ready date, quantity, ships-from and order-by dates, whether buyers can still order (open) and whether its batch was cancelled, and units confirmed, pre-ordered (submitted, not yet confirmed) and remaining; optionally only these ids, SKUs or batches, or only open or closed releases",
   roles: [...READ_ROLES],
   input: z.object({
     ids: z.array(z.string().uuid()).optional().describe("Only these releases"),
     skuIds: z.array(z.string().uuid()).optional().describe("Only releases of these SKUs"),
     batchIds: z.array(z.string().uuid()).optional().describe("Only releases of these batches"),
+    open: z.boolean().optional().describe("true: only releases buyers can order from; false: only withdrawn or closed ones"),
   }),
   handler: async (ctx, i) => {
-    const rows = await unwrap(ctx.db.rpc("release_rows", {
-      p_brewery: ctx.breweryId, p_ids: i.ids, p_skus: i.skuIds, p_batches: i.batchIds,
-    }));
-    return (rows ?? []).map((r) => ({ ...r, qty: Number(r.qty), confirmed: Number(r.confirmed), preordered: Number(r.preordered), remaining: Number(r.remaining) }));
+    const rows = await completeRows("Release list", (start) => ctx.db.rpc("release_rows", {
+      p_brewery: ctx.breweryId, p_ids: i.ids, p_skus: i.skuIds, p_batches: i.batchIds, p_open: i.open,
+    }, { count: "exact" }).range(start, start + PAGE_SIZE - 1));
+    return rows.map((r) => ({ ...r, qty: Number(r.qty), confirmed: Number(r.confirmed), preordered: Number(r.preordered), remaining: Number(r.remaining) }));
   },
 });
 

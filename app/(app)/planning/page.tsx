@@ -6,9 +6,9 @@
 // Because only shortages come back, an empty result says nothing about
 // whether any work is scheduled; the empty state says so. Rows group by
 // vendor, each group with its own draft-button.tsx (admin/warehouse, #1516).
-// Planned batches follow (list_release_batches), each marked Released once a
-// portal release of it is open (list_releases), else offering Release for
-// ordering to admin and sales (release-form.tsx).
+// Planned batches follow (list_release_batches), each marked Released once every
+// package it projects has an open portal release (list_releases, open only),
+// else offering Release for ordering for the rest to admin and sales (release-form.tsx).
 import { PlanningView } from "@/components/mgr/views/planning";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -31,7 +31,7 @@ export default async function PlanningPage() {
     runCommand("list_release_batches", {}, ctx) as Promise<ReleaseBatchRow[]>,
   ]);
   const batchIds = [...new Set(batches.map((b) => b.batch_id))];
-  const releases = batchIds.length ? await runCommand("list_releases", { batchIds }, ctx) as ReleaseRow[] : [];
+  const releases = batchIds.length ? await runCommand("list_releases", { batchIds, open: true }, ctx) as ReleaseRow[] : [];
   const canDraft = brewery.roles.includes("admin") || brewery.roles.includes("warehouse");
 
   return <PlanningView model={toPlanningViewProps({ requirements: gaps, batches, releases, today: breweryDate(brewery.timeZone), backHref: "/more", roles: brewery.roles })}

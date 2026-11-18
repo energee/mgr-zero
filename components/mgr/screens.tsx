@@ -194,7 +194,7 @@ import { CellarMapView } from "@/components/mgr/views/cellar-map";
 import { cellarMapBrewer } from "@/lib/mgr/fixtures/production";
 import { OHIO_STOUT_NOTE, LOC_TAPROOM, LOC_WAREHOUSE } from "@/lib/mgr/fixtures/demo";
 import { beerOverview } from "@/lib/mgr/fixtures/beer";
-import { brandHazy, catalogBrands, formatCan, formatsInventory, packageBomCase, skuHazyHalf, waterProfiles } from "@/lib/mgr/fixtures/catalog";
+import { brandHazy, catalogBrands, formatCan, formatsInventory, packageBomCase, skuHazyHalf, skuListHazy, waterProfiles } from "@/lib/mgr/fixtures/catalog";
 import { customerRidgeline, customersList, customersMissingEmail, shipToMain } from "@/lib/mgr/fixtures/customers";
 import { deniedInvoices } from "@/lib/mgr/fixtures/denied";
 import { expiredInvite, expiredReset, noMembership, portalForgotPassword, portalSetPassword, portalSignIn, portalStaffOnly, resetPassword, setPassword, signIn } from "@/lib/mgr/fixtures/entry";
@@ -232,7 +232,7 @@ import {
 import { kegBalanceRidgeline, kegFleet, kegHistoryLedger, kegReportOwned } from "@/lib/mgr/fixtures/kegs";
 import { packagingReady, packagingRuns, repackCase, schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
 import { planningDemo } from "@/lib/mgr/fixtures/planning";
-import { releaseBatches, releaseHazyKeg, skuListReleased } from "@/lib/mgr/fixtures/releases";
+import { releaseBatches, releaseHazyKeg } from "@/lib/mgr/fixtures/releases";
 import { batchReleaseForms } from "@/lib/mgr/release-view";
 import { monthlyComplianceAmended, monthlyComplianceAugust, monthlyComplianceSeptember, monthlyComplianceUnbalanced } from "@/lib/mgr/fixtures/monthly-compliance";
 import { confirmDeliveryStop1, driverRouteA, returnRouteA, routeAPlan, routesDriver } from "@/lib/mgr/fixtures/delivery";
@@ -1640,12 +1640,12 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Brand",
-    to: { Edit: "Brand approval", "COLA TTB ID 25318001000034": "Brand approval", "OH registration": "State registration", "Add approval": "Brand approval", "Add registration": "State registration", Use: "Brand", "Suggested group 2": "Brand", "Edit SKU": "SKU", "Four Pack · 6 per Case": "Format", Glass: "Price group", "Manage formats": "Catalog" },
+    to: { Edit: "Brand approval", "COLA TTB ID 25318001000034": "Brand approval", "OH registration": "State registration", "Add approval": "Brand approval", "Add registration": "State registration", Use: "Brand", "Suggested group 2": "Brand", "Edit SKU": "SKU", "Four Pack · 6 per Case": "Format", Glass: "Price group", "Manage formats": "Catalog" , Release: "Release for ordering", "Release · Batch 41": "Edit release", Withdraw: "Brand" },
     job: "Sellable brand facts and compliance, including selected COLA label images",
-    reads: "list_brands [incl. the staff-only alias, SKUs and pours] · list_catalog_categories · list_formats [packaged, with contents] · list_channel_prices · list_sale_channels · list_keg_pools · get_compliance_registry [this brand’s approvals and registrations] · get_brand_recipe_cost [recipe cost per barrel and any uncosted ingredient] · get_cola_image",
-    writes: "upsert_brand · save_catalog_category · delete_catalog_category · update_sku · create_sku · upsert_brand_approval · upsert_state_registration",
-    states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class; description, category, price group and hops optional"], ["new style", "typing a style no one has used offers Add; saved with the brand", 0], ["sells as", "one switch per packaged Format · on creates the SKU or turns it back on"], ["switched off", "the SKU turns inactive, never deleted: hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"], ["COLA · None on file", "no recorded COLA; no application status inferred"], ["suggested group", "the recipe cost lands in a ceiling band · Use fills the select, Save brand commits"], ["cost unknown", "an ingredient has no receipt cost yet: the sum is not shown as a cost", 1], ["saved first", "SKUs and compliance wait until the brand is saved; the first save moves to its page"], ["badges", "missing COLA jumps to Compliance; price group or Unpriced, category, active SKU count"]],
-    spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category and hops are optional nullable columns; price group is the row of the price grid the brand sits on, so the price of any of its packaged SKUs is the cell where the customer's sale channel meets that group and the SKU's format. The brand carries no price of its own, and a brand on no group is unpriced everywhere. Package facts live on Formats. Sells as lists every packaged Format with a switch: on means the brand sells it, which is an active SKU, and Edit SKU opens that SKU's sheet (UPC, keg pool, batch share). Under the switches, each switched-on Format's contents read as lines (Four Pack · 6 per Case), then the price group's pours. A pour is a serving from the tap, not a SKU: the menu publishes brand × pour to Square, and a sale depletes the keg SKU. Every line shows its price per sale channel; prices and pours are edited on the price group. No container source editor here. Compliance is the brand’s: its COLA or formula approvals and its state registrations list under the sell sheet, each row opening its sheet, with Add approval and Add registration; a brand with no recorded COLA says None on file, as Catalog does. Manage categories opens beside Category: Admin and Sales can add, rename across all brands, and confirm deletion of unused categories. Uncategorized clears a brand’s assignment when saved. The brewery’s own licenses are the Licenses page under Compliance, never a brand row. Under the price group, the brand’s recipe cost per barrel (its last brewed version, else its newest) is read against the groups’ ceilings and names the band it falls in; Use only fills the select. A recipe with an ingredient that has never been received has no trustworthy cost, so the row says which ingredient instead of a number. No recipe, no row.",
+    reads: "list_releases [open, the SKUs' portal releases] · list_release_batches · list_brands [incl. the staff-only alias, SKUs and pours] · list_catalog_categories · list_formats [packaged, with contents] · list_channel_prices · list_sale_channels · list_keg_pools · get_compliance_registry [this brand’s approvals and registrations] · get_brand_recipe_cost [recipe cost per barrel and any uncosted ingredient] · get_cola_image",
+    writes: "upsert_brand · save_catalog_category · delete_catalog_category · update_sku · create_sku · upsert_brand_approval · upsert_state_registration · release_sku · update_release · withdraw_release",
+    states: [["release", "an active SKU offers Release beside Edit SKU · each open release is a row under it with Edit and Withdraw"], ["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class; description, category, price group and hops optional"], ["new style", "typing a style no one has used offers Add; saved with the brand", 0], ["sells as", "one switch per packaged Format · on creates the SKU or turns it back on"], ["switched off", "the SKU turns inactive, never deleted: hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"], ["COLA · None on file", "no recorded COLA; no application status inferred"], ["suggested group", "the recipe cost lands in a ceiling band · Use fills the select, Save brand commits"], ["cost unknown", "an ingredient has no receipt cost yet: the sum is not shown as a cost", 1], ["saved first", "SKUs and compliance wait until the brand is saved; the first save moves to its page"], ["badges", "missing COLA jumps to Compliance; price group or Unpriced, category, active SKU count"]],
+    spec: "Admin and Sales release an active SKU for portal ordering with Release beside Edit SKU, from packaged stock or a planned batch of the brand; each open release sits under its SKU with Edit (quantity, order-by date) and Withdraw. The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category and hops are optional nullable columns; price group is the row of the price grid the brand sits on, so the price of any of its packaged SKUs is the cell where the customer's sale channel meets that group and the SKU's format. The brand carries no price of its own, and a brand on no group is unpriced everywhere. Package facts live on Formats. Sells as lists every packaged Format with a switch: on means the brand sells it, which is an active SKU, and Edit SKU opens that SKU's sheet (UPC, keg pool, batch share). Under the switches, each switched-on Format's contents read as lines (Four Pack · 6 per Case), then the price group's pours. A pour is a serving from the tap, not a SKU: the menu publishes brand × pour to Square, and a sale depletes the keg SKU. Every line shows its price per sale channel; prices and pours are edited on the price group. No container source editor here. Compliance is the brand’s: its COLA or formula approvals and its state registrations list under the sell sheet, each row opening its sheet, with Add approval and Add registration; a brand with no recorded COLA says None on file, as Catalog does. Manage categories opens beside Category: Admin and Sales can add, rename across all brands, and confirm deletion of unused categories. Uncategorized clears a brand’s assignment when saved. The brewery’s own licenses are the Licenses page under Compliance, never a brand row. Under the price group, the brand’s recipe cost per barrel (its last brewed version, else its newest) is read against the groups’ ceilings and names the band it falls in; Use only fills the select. A recipe with an ingredient that has never been received has no trustworthy cost, so the row says which ingredient instead of a number. No recipe, no row.",
     body: <BrandView model={toBrandViewProps(brandHazy)} images={{ cola: <ColaLabelImageView label="Hazy IPA · COLA 25318001000034" src="/mock/cola-label.svg" /> }} categoryAction={<CatalogCategoriesFixture categories={toBrandViewProps(brandHazy).categoryOptions} />} />,
   },
   {
@@ -1667,13 +1667,13 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "SKU list",
-    to: { Edit: "SKU", Pint: "SKU", "Release for ordering": "Release for ordering", "Release · Batch 41": "Edit release" },
-    job: "See a brand's packaged SKUs and its price group's pours, and release a SKU for portal ordering",
-    reads: "list_skus · list_releases · list_release_batches",
-    writes: "release_sku · update_release · withdraw_release [editing a SKU happens on SKU detail]",
-    states: [["permission", "sales or admin required", 1], ["active", "available to price and sell"], ["inactive", "history remains", 1], ["not orderable from stock", "named on the row · the portal offers it only through a release"], ["release", "an open release is its own row under the SKU · left of total, confirmed, pre-ordered, dates · Edit and Withdraw"], ["empty", "points to Sells as on the Brand page"]],
-    spec: "Kept for old links. Packages are switched on under the Brand page's Sells as, so there is no New SKU here; Brand goes back to that section. Pours (servings from the tap) are added on the price group. Admin and sales release an active SKU for portal ordering here, from packaged stock or a planned batch; each open release sits under its SKU with Edit (quantity, order-by date) and Withdraw.",
-    body: <SkuListView model={toSkuListViewProps(skuListReleased)} createAction={null} />,
+    to: { Edit: "SKU", Pint: "SKU" },
+    job: "See a brand's packaged SKUs and its price group's pours, from an old link",
+    reads: "list_skus",
+    writes: "none [editing happens on SKU detail]",
+    states: [["permission", "sales or admin required", 1], ["active", "available to price and sell"], ["inactive", "history remains", 1], ["empty", "points to Sells as on the Brand page"]],
+    spec: "Kept for old links. Packages are switched on under the Brand page's Sells as, so there is no New SKU here; Brand goes back to that section. Pours (servings from the tap) are added on the price group.",
+    body: <SkuListView model={toSkuListViewProps(skuListHazy)} createAction={null} />,
   },
   {
     step: 5,
@@ -1681,12 +1681,12 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Release for ordering",
-    to: { "Release for ordering": "SKU list" },
+    to: { "Release for ordering": "Brand" },
     job: "Offer a planned batch or packaged stock to portal buyers, up to a quantity, from a date",
     reads: "list_release_batches",
     writes: "release_sku",
-    states: [["permission", "sales or admin required", 1], ["from a batch", "every projected package ticked at its projected units · ships from the batch's ready date"], ["from stock", "quantity typed · ships from today · refused above what is free to promise", 1], ["one SKU", "from the SKU list: pick packaged stock or a planned batch of its brand"], ["already released", "one open release per batch and package; edit it instead", 1]],
-    spec: "Opened from a planned batch on Planning or from a SKU on the SKU list. Untick a package to leave it out, or lower its quantity. Order by is optional; buyers order until that day. Saving writes one release per package. Remaining is the quantity less what submitted and confirmed orders hold; drafts do not count.",
+    states: [["permission", "sales or admin required", 1], ["from a batch", "every projected package ticked at its projected units · ships from the batch's ready date"], ["from stock", "quantity typed · ships from today · refused above what is free to promise", 1], ["one SKU", "from the Brand page: pick packaged stock or a planned batch of its brand that has no open release of it"], ["already released", "one open release per batch and package; edit it instead", 1]],
+    spec: "Opened from a planned batch on Planning (Release for ordering) or from a SKU on the Brand page (Release). Untick a package to leave it out, or lower its quantity. Order by is optional; buyers order until that day. Saving writes one release per package. Remaining is the quantity less what submitted and confirmed orders hold; drafts do not count.",
     body: <ReleaseView form={batchReleaseForms(releaseBatches)[0]} />,
   },
   {
@@ -1695,12 +1695,12 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Edit release",
-    to: { "Save release": "SKU list" },
+    to: { "Save release": "Brand" },
     job: "Change an open release's quantity or order-by date",
     reads: "list_releases",
     writes: "update_release · withdraw_release",
     states: [["permission", "sales or admin required", 1], ["below confirmed", "refused: never below what is confirmed", 1], ["below pre-orders", "allowed · Confirm order flags the pre-orders above it as Over release"], ["withdrawn", "buyers can no longer order · submitted orders stay"]],
-    spec: "Opened by Edit on an open release's row on the SKU list; Withdraw sits beside it. A stock release can grow only within what is free to promise.",
+    spec: "Opened by Edit on an open release's row under its SKU on the Brand page; Withdraw sits beside it. A stock release can grow only within what is free to promise.",
     body: <EditReleaseView qty={String(releaseHazyKeg.qty)} ordersCloseOn={releaseHazyKeg.orders_close_on ?? ""} confirmed={releaseHazyKeg.confirmed} />,
   },
   {

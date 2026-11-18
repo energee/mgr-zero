@@ -39,12 +39,13 @@ export type PlanningSnapshot = {
   roles?: readonly StaffRole[];
   /** list_release_batches: planned batches a release can draw on. */
   batches?: ReleaseBatchRow[];
-  /** list_releases for those batches, to mark a batch Released. */
+  /** list_releases({ open: true }) for those batches, to mark a batch Released. */
   releases?: ReleaseRow[];
 };
 
-/** A planned batch's release row: Released once any of its releases is open,
- *  and Release for ordering (prefilled `form`) for admin and sales. */
+/** A planned batch's release row: Released once every package it projects has
+ *  an open release; until then Release for ordering (`form`, the unreleased
+ *  packages) for admin and sales. */
 export type PlanningReleaseView = { key: string; title: string; detail: string; released: boolean; canRelease: boolean; form: ReleaseForm };
 
 /** The empty list's words, plus the pages where the demand it counts is set up
@@ -130,9 +131,8 @@ export function toPlanningViewProps(snapshot: PlanningSnapshot): PlanningViewMod
     : SETUP_LINKS.map((link) => ({ title: link.title, detail: link.detail }));
   // The inventory (no roles) draws the verb, inert; live, only admin and sales release.
   const canRelease = !roles || hasAnyRole(roles, ["admin", "sales"]);
-  const openBatches = new Set((snapshot.releases ?? []).filter((r) => r.open && r.batch_id).map((r) => r.batch_id));
-  const releaseBatches = snapshot.batches && batchReleaseForms(snapshot.batches).map(({ title, detail, ...form }) => ({
-    key: form.key, title, detail, released: openBatches.has(form.key), canRelease, form,
+  const releaseBatches = snapshot.batches && batchReleaseForms(snapshot.batches, snapshot.releases).map(({ title, detail, released, ...form }) => ({
+    key: form.key, title, detail, released, canRelease, form,
   }));
   return {
     groups,

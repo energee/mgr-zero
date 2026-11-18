@@ -12,7 +12,7 @@ const rows = [batchRow("s-keg", "Stout · ⅙ bbl keg", 40), batchRow("s-case", 
 
 const release: ReleaseRow = {
   id: "r1", batch_id: "b1", batch_no: 12, sku_id: "s-keg", sku_name: "Stout · ⅙ bbl keg", qty: 40, ships_from: "2026-12-04",
-  orders_close_on: "2026-11-27", withdrawn_at: null, ready_on: "2026-12-04", open: true, confirmed: 20, preordered: 8, remaining: 12,
+  orders_close_on: "2026-11-27", withdrawn_at: null, ready_on: "2026-12-04", open: true, cancelled: false, confirmed: 20, preordered: 8, remaining: 12,
 };
 
 describe("release form view-model", () => {
@@ -55,12 +55,25 @@ describe("release form view-model", () => {
 
   it("reads a release as left of total, confirmed and pre-ordered, then its dates", () => {
     expect(releaseDetail(release)).toBe("12 of 40 left · 20 confirmed · 8 pre-ordered · ships Dec 4, 2026 · order by Nov 27, 2026");
-    expect(releaseDetail({ ...release, open: false })).toMatch(/^closed · /);
-    expect(releaseDetail({ ...release, withdrawn_at: "2026-11-20T10:00:00Z" })).toMatch(/^withdrawn · /);
   });
 
   it("edits quantity and order-by date, clearing a blank order-by", () => {
     expect(updateReleaseCommand(release, "30", "")).toEqual({ name: "update_release", input: { releaseId: "r1", qty: 30, ordersCloseOn: null }, reason: null });
     expect(updateReleaseCommand(release, "0", "").reason).toMatch(/whole quantity/);
+  });
+});
+
+describe("release forms skip what is already released", () => {
+  it("leaves a batch's released packages out of its form, and marks it released once all are", () => {
+    const [partly] = batchReleaseForms(rows, [release]);
+    expect(partly.released).toBe(false);
+    expect(partly.lines.map((l) => l.skuId)).toEqual(["s-case"]);
+    const [all] = batchReleaseForms(rows, [release, { ...release, id: "r2", sku_id: "s-case" }]);
+    expect(all.released).toBe(true);
+  });
+
+  it("does not offer a SKU a batch it already has an open release from", () => {
+    const forms = skuReleaseForms({ id: "s-keg", name: "Stout · ⅙ bbl keg" }, rows, "2026-11-18", [release]);
+    expect(forms.map((f) => f.key)).toEqual(["stock"]);
   });
 });

@@ -174,14 +174,19 @@ describe("Planning view", () => {
 
 describe("Planning release rows (portal releases)", () => {
   const batch = (batchId: string, batchNo: number): ReleaseBatchRow => ({ batch_id: batchId, batch_no: batchNo, sku_id: `${batchId}-keg`, units: 40, needed_by: "2026-12-04", skus: { name: "Stout · ⅙ bbl keg", brands: { name: "Stout" } } });
-  const released: ReleaseRow = { id: "r1", batch_id: "b1", batch_no: 12, sku_id: "b1-keg", sku_name: "Stout · ⅙ bbl keg", qty: 40, ships_from: "2026-12-04", orders_close_on: null, withdrawn_at: null, ready_on: "2026-12-04", open: true, confirmed: 0, preordered: 0, remaining: 40 };
+  const released: ReleaseRow = { id: "r1", batch_id: "b1", batch_no: 12, sku_id: "b1-keg", sku_name: "Stout · ⅙ bbl keg", qty: 40, ships_from: "2026-12-04", orders_close_on: null, withdrawn_at: null, ready_on: "2026-12-04", open: true, cancelled: false, confirmed: 0, preordered: 0, remaining: 40 };
   const snapshot = { requirements: [], batches: [batch("b1", 12), batch("b2", 13)], releases: [released] };
 
   it("lists each planned batch once and marks one with an open release Released", () => {
     const model = toPlanningViewProps(snapshot);
     expect(model.releaseBatches?.map((b) => [b.title, b.released])).toEqual([["Batch 12 · Stout", true], ["Batch 13 · Stout", false]]);
-    // A withdrawn release no longer counts.
-    expect(toPlanningViewProps({ ...snapshot, releases: [{ ...released, withdrawn_at: "2026-11-20T00:00:00Z", open: false }] }).releaseBatches?.[0].released).toBe(false);
+  });
+
+  it("keeps Release for ordering on a batch until every package it projects is released", () => {
+    const twoPackages = [batch("b1", 12), { ...batch("b1", 12), sku_id: "b1-case", skus: { name: "Stout · case", brands: { name: "Stout" } } }];
+    const [row] = toPlanningViewProps({ requirements: [], batches: twoPackages, releases: [released] }).releaseBatches!;
+    expect(row).toMatchObject({ released: false, canRelease: true });
+    expect(row.form.lines.map((l) => l.skuId)).toEqual(["b1-case"]);
   });
 
   it("offers Release for ordering to admin and sales only; the inventory draws it inert", () => {

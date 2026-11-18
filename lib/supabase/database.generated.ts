@@ -5779,8 +5779,8 @@ isOneToOne: false
 { Args: { "p_brewery": string,"p_connection": string,"p_lease": string }; Returns: undefined
                            },
 "release_rows":
-{ Args: { "p_batches"?: (string)[],"p_brewery": string,"p_ids"?: (string)[],"p_skus"?: (string)[] }; Returns: {
-              "batch_id": string,"batch_no": number,"confirmed": number,"id": string,"open": boolean,"orders_close_on": string,"preordered": number,"qty": number,"ready_on": string,"released_at": string,"remaining": number,"ships_from": string,"sku_id": string,"sku_name": string,"withdrawn_at": string
+{ Args: { "p_batches"?: (string)[],"p_brewery": string,"p_ids"?: (string)[],"p_open"?: boolean,"p_skus"?: (string)[] }; Returns: {
+              "batch_id": string,"batch_no": number,"cancelled": boolean,"confirmed": number,"id": string,"open": boolean,"orders_close_on": string,"preordered": number,"qty": number,"ready_on": string,"released_at": string,"remaining": number,"ships_from": string,"sku_id": string,"sku_name": string,"withdrawn_at": string
             }[]
                            },
 "release_sku":
@@ -6056,7 +6056,7 @@ isOneToOne: false
 { Args: { "p_brewery": string,"p_name": string,"p_note": string,"p_recipe": string,"p_request_id": string }; Returns: Json
                            },
 "update_release":
-{ Args: { "p_brewery": string,"p_orders_close_on": string,"p_qty": number,"p_release": string,"p_request_id": string,"p_ships_from": string }; Returns: Json
+{ Args: { "p_brewery": string,"p_orders_close_on": string,"p_qty": number,"p_release": string,"p_request_id": string }; Returns: Json
                            },
 "update_sku":
 { Args: { "p_active": boolean,"p_batch_share"?: number,"p_brewery": string,"p_clear_batch_share"?: boolean,"p_clear_keg_pool"?: boolean,"p_id": string,"p_keg_pool"?: string,"p_portal_from_stock"?: boolean,"p_request_id": string,"p_upc": string }; Returns: Json

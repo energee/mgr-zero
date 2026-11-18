@@ -71,6 +71,15 @@ describe("portal offers", () => {
     expect(items.find((i) => i.skuId === hidden.skuId)).toMatchObject({ badge: null, releases: [{ releaseId: r.id }] });
   });
 
+  it("keeps a stock quote line's shape: releaseId appears only on a release line", async () => {
+    const sku = await pricedSku("Shape Shandy", 30);
+    const r = await release({ lines: [{ skuId: sku.skuId, qty: 5 }] });
+    const other = await pricedSku("Shape Stock", 30);
+    const quote = await runCommand("portal_quote_order", { shipToId, requestedShipDate: "2030-02-01", lines: [{ skuId: other.skuId, qty: 1 }, { skuId: sku.skuId, qty: 1, releaseId: r.id }] }, buyer) as { lines: Record<string, unknown>[] };
+    expect(quote.lines.find((l) => l.skuId === other.skuId)).not.toHaveProperty("releaseId");
+    expect(quote.lines.find((l) => l.skuId === sku.skuId)).toMatchObject({ releaseId: r.id });
+  });
+
   it("lowers the stock badge by what a stock release still claims", async () => {
     const sku = await pricedSku("Claimed Kolsch", 25);
     expect((await badges()).get(sku.skuId)).toBe("in");

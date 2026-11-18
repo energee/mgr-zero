@@ -56,6 +56,8 @@ create index order_lines_release_idx on public.order_lines (release_id) where re
 
 -- The release form prefills from this projection, one batch at a time, so it
 -- names the batch. New columns go last; existing readers are unchanged.
+-- needed_by is a batch's ready date; private.batch_ready_on below computes the
+-- same date for definer code, and the two must stay equal.
 create or replace view public.projected_batch_packaging_units with (security_invoker = true) as
   select b.brewery_id, s.id as sku_id,
     floor(b.planned_bbl * s.batch_share / fv.bbl_per_unit) as units,
@@ -76,7 +78,9 @@ create or replace view public.projected_batch_packaging_units with (security_inv
         and (r.batch_id = b.id or o.batch_id = b.id));
 
 -- A batch is packaged once any uncancelled packaging run draws on it: the same
--- signal projected_batch_packaging_units uses to stop projecting it.
+-- signal projected_batch_packaging_units uses to stop projecting it. The view
+-- repeats this predicate instead of calling here because it is security_invoker
+-- and application roles cannot execute private functions; keep the two equal.
 create function private.batch_packaged(p_brewery uuid, p_batch uuid) returns boolean
 language sql stable set search_path = '' as $$
   select exists (
@@ -87,9 +91,18 @@ language sql stable set search_path = '' as $$
 $$;
 revoke all on function private.batch_packaged(uuid, uuid) from public, anon, authenticated, service_role;
 
+-- A batch's ready date: brew date (planned date until brewed) plus the
+-- brewery's days to package. One owner for release_state and release_sku.
+create function private.batch_ready_on(p_brewed_on date, p_planned_on date, p_days_to_package integer) returns date
+language sql immutable set search_path = '' as $$
+  select coalesce(p_brewed_on, p_planned_on) + p_days_to_package;
+$$;
+revoke all on function private.batch_ready_on(date, date, integer) from public, anon, authenticated, service_role;
+
 -- Every release of one brewery with its counts. Counted lines are on orders
 -- that are submitted (pre-ordered) or confirmed, picked or shipped
--- (confirmed); drafts and cancelled orders do not count. A release is open
+-- (confirmed; a shipped line counts what shipped, so a short shipment leaves
+-- the rest of the release claimed); drafts and cancelled orders do not count. A release is open
 -- while it is not withdrawn, its order-by date (brewery time) has not passed,
 -- and its batch is not packaged, completed or cancelled. stock_claim is what
 -- it still holds back from the packaged-stock offer: an open stock release
@@ -107,7 +120,8 @@ language sql stable set search_path = '' as $$
     select (now() at time zone timezone)::date as today, days_to_package from public.breweries where id = p_brewery
   ), counted as (
     select ol.release_id,
-      coalesce(sum(ol.qty_ordered) filter (where o.status in ('confirmed','picked','shipped')), 0) as confirmed,
+      coalesce(sum(case when o.status = 'shipped' then coalesce(ol.qty_shipped, ol.qty_ordered) else ol.qty_ordered end)
+        filter (where o.status in ('confirmed','picked','shipped')), 0) as confirmed,
       coalesce(sum(ol.qty_ordered) filter (where o.status = 'submitted'), 0) as preordered
     from public.order_lines ol
     join public.orders o on o.id = ol.order_id and o.brewery_id = ol.brewery_id
@@ -116,7 +130,7 @@ language sql stable set search_path = '' as $$
   ), base as (
     select r.id, r.batch_id, r.sku_id, r.qty, r.ships_from, r.orders_close_on, r.released_at, r.withdrawn_at,
       coalesce(c.confirmed, 0) as confirmed, coalesce(c.preordered, 0) as preordered,
-      coalesce(b.brewed_on, b.planned_on) + br.days_to_package as ready_on,
+      private.batch_ready_on(b.brewed_on, b.planned_on, br.days_to_package) as ready_on,
       r.batch_id is not null and private.batch_packaged(p_brewery, r.batch_id) as packaged,
       coalesce(b.cancelled_at is not null, false) as cancelled,
       r.withdrawn_at is null and (r.orders_close_on is null or r.orders_close_on >= br.today)
@@ -183,29 +197,31 @@ end $$;
 revoke all on function private.assert_portal_offers(uuid, date, jsonb) from public, anon, authenticated, service_role;
 
 -- Staff read of releases with their counts. Brewers see quantities only, like
--- order_packaging_shortfall_rows; no customer data leaves.
-create function public.release_rows(p_brewery uuid, p_ids uuid[] default null, p_skus uuid[] default null, p_batches uuid[] default null)
+-- order_packaging_shortfall_rows; no customer data leaves. p_open keeps only
+-- releases buyers can (true) or can no longer (false) order from.
+create function public.release_rows(p_brewery uuid, p_ids uuid[] default null, p_skus uuid[] default null, p_batches uuid[] default null, p_open boolean default null)
 returns table (
   id uuid, batch_id uuid, batch_no bigint, sku_id uuid, sku_name text, qty numeric, ships_from date,
   orders_close_on date, released_at timestamptz, withdrawn_at timestamptz, ready_on date, open boolean,
-  confirmed numeric, preordered numeric, remaining numeric
+  cancelled boolean, confirmed numeric, preordered numeric, remaining numeric
 )
 language plpgsql stable security definer set search_path = '' as $$
 begin
   perform private.assert_staff_read(p_brewery, array['admin','sales','warehouse','brewer']::public.staff_role[]);
   return query
     select r.id, r.batch_id, b.batch_no, r.sku_id, s.name, r.qty, r.ships_from, r.orders_close_on,
-      r.released_at, r.withdrawn_at, r.ready_on, r.open, r.confirmed, r.preordered, r.remaining
+      r.released_at, r.withdrawn_at, r.ready_on, r.open, r.cancelled, r.confirmed, r.preordered, r.remaining
     from private.release_state(p_brewery) r
     join public.skus s on s.id = r.sku_id and s.brewery_id = p_brewery
     left join public.batches b on b.id = r.batch_id and b.brewery_id = p_brewery
     where (p_ids is null or r.id = any(p_ids))
       and (p_skus is null or r.sku_id = any(p_skus))
       and (p_batches is null or r.batch_id = any(p_batches))
-    order by r.ships_from, s.name, r.released_at;
+      and (p_open is null or r.open = p_open)
+    order by r.ships_from, s.name, r.released_at, r.id;
 end $$;
-revoke all on function public.release_rows(uuid, uuid[], uuid[], uuid[]) from public, anon, authenticated, service_role;
-grant execute on function public.release_rows(uuid, uuid[], uuid[], uuid[]) to authenticated;
+revoke all on function public.release_rows(uuid, uuid[], uuid[], uuid[], boolean) from public, anon, authenticated, service_role;
+grant execute on function public.release_rows(uuid, uuid[], uuid[], uuid[], boolean) to authenticated;
 
 -- Release SKUs for portal ordering: one row per line. From a batch (planned,
 -- not packaged, every SKU a package of its brand) ships_from defaults to the
@@ -249,7 +265,7 @@ begin
         and s.brand_id is distinct from v_batch.intended_brand_id) then
       raise exception 'every SKU must be a package of the batch''s brand';
     end if;
-    v_ships := coalesce(p_ships_from, (select coalesce(v_batch.brewed_on, v_batch.planned_on) + days_to_package
+    v_ships := coalesce(p_ships_from, (select private.batch_ready_on(v_batch.brewed_on, v_batch.planned_on, days_to_package)
       from public.breweries where id = p_brewery));
   else
     v_ships := coalesce(p_ships_from, (select (now() at time zone timezone)::date from public.breweries where id = p_brewery));
@@ -277,20 +293,23 @@ end $$;
 revoke all on function public.release_sku(uuid, uuid, date, date, jsonb, uuid) from public, anon, authenticated, service_role;
 grant execute on function public.release_sku(uuid, uuid, date, date, jsonb, uuid) to authenticated;
 
--- Change a release's quantity, ships-from and order-by date (null clears it).
+-- Change a release's quantity and order-by date (null clears it).
 -- Never below what is confirmed on it; a lower quantity that pre-orders
 -- already exceed is allowed, and Confirm order flags those pre-orders. A
 -- larger stock release must fit what is free to promise.
 create function public.update_release(
-  p_brewery uuid, p_release uuid, p_qty numeric, p_ships_from date, p_orders_close_on date, p_request_id uuid
+  p_brewery uuid, p_release uuid, p_qty numeric, p_orders_close_on date, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb; v_row public.releases; v_confirmed numeric; v_free numeric;
 begin
   perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'update_release', p_request_id,
-    jsonb_build_object('brewery', p_brewery, 'release', p_release, 'qty', p_qty,
-      'ships_from', p_ships_from, 'orders_close_on', p_orders_close_on));
+    jsonb_build_object('brewery', p_brewery, 'release', p_release, 'qty', p_qty, 'orders_close_on', p_orders_close_on));
   if v_replay is not null then return v_replay; end if;
+  -- The SKU row first, as release_sku and portal_submit_quote lock it before
+  -- any release: the free-stock check below then sees one serialized state.
+  perform 1 from public.skus s join public.releases r on r.sku_id = s.id and r.brewery_id = s.brewery_id
+    where r.id = p_release and r.brewery_id = p_brewery for update of s;
   select * into v_row from public.releases where id = p_release and brewery_id = p_brewery for update;
   if not found then raise exception 'release not found'; end if;
   if v_row.withdrawn_at is not null then raise exception 'a withdrawn release cannot change'; end if;
@@ -307,12 +326,12 @@ begin
       raise exception 'Only % more are available to release from stock', greatest(v_free - (v_row.qty - v_confirmed), 0);
     end if;
   end if;
-  update public.releases set qty = p_qty, ships_from = coalesce(p_ships_from, ships_from), orders_close_on = p_orders_close_on
+  update public.releases set qty = p_qty, orders_close_on = p_orders_close_on
     where id = p_release returning * into v_row;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
-revoke all on function public.update_release(uuid, uuid, numeric, date, date, uuid) from public, anon, authenticated, service_role;
-grant execute on function public.update_release(uuid, uuid, numeric, date, date, uuid) to authenticated;
+revoke all on function public.update_release(uuid, uuid, numeric, date, uuid) from public, anon, authenticated, service_role;
+grant execute on function public.update_release(uuid, uuid, numeric, date, uuid) to authenticated;
 
 -- Withdraw stops new orders against a release. The row and the orders already
 -- submitted against it stay; staff handle those at Confirm order.
@@ -435,8 +454,9 @@ begin
       'unitPriceCents',unit_price_cents,'amountCents',amount_cents,
       'qboItemId',qbo_item_id,'qboRealmId',qbo_realm_id,
       'depositPoolId',pool_id,'depositName',pool_name,'kegSize',keg_size,
-      'depositUnitPriceCents',case when deposit_cents>0 then deposit_cents end,
-      'releaseId',release_id) order by sku_id),
+      'depositUnitPriceCents',case when deposit_cents>0 then deposit_cents end)
+      -- Only a release line carries releaseId, so stock quotes keep their earlier shape.
+      || case when release_id is null then '{}'::jsonb else jsonb_build_object('releaseId',release_id) end order by sku_id),
     coalesce(sum(amount_cents),0)
   into v_lines,v_subtotal from resolved;
   if coalesce(jsonb_array_length(v_lines),0)<>jsonb_array_length(p_lines) then
@@ -537,6 +557,11 @@ begin
     where e->>'depositPoolId' is not null
   ) order by k.id for update;
   -- Releases (20261118170000): the snapshot below rechecks remaining under this lock.
+  -- A draft being submitted is locked first, as submit_order locks the order
+  -- before its releases, so the two never wait on each other in a cycle.
+  if p_order is not null then
+    perform 1 from public.orders where id=p_order and brewery_id=p_brewery and customer_id=p_customer for update;
+  end if;
   perform 1 from public.releases r where r.brewery_id=p_brewery and r.id in (
     select (e->>'release_id')::uuid from jsonb_array_elements(v_row.snapshot#>'{input,lines}') e
   ) order by r.id for update;
@@ -572,7 +597,20 @@ begin
   return private.complete_command_request(p_request_id,v_result);
 end $function$;
 
--- Lines keep the release they name (release_id); staff lines never name one.
+-- A line may name a release only on a buyer's own order (portal paths). Staff
+-- entry points (create_order, staff update_draft_order, replenishment, the
+-- refused-delivery reorder) reach these impls too, so the check lives here.
+create function private.assert_release_lines(p_customer uuid, p_lines jsonb) returns void
+language plpgsql stable set search_path = '' as $$
+begin
+  if exists (select 1 from jsonb_array_elements(p_lines) e where e ? 'release_id')
+    and not exists (select 1 from public.customer_users cu where cu.customer_id = p_customer and cu.user_id = auth.uid()) then
+    raise exception 'only a portal buyer orders from a release' using errcode = '42501';
+  end if;
+end $$;
+revoke all on function private.assert_release_lines(uuid, jsonb) from public, anon, authenticated, service_role;
+
+-- Lines keep the release they name (release_id), checked by assert_release_lines.
 -- Otherwise unchanged.
 create or replace function private.create_order_impl(
   p_brewery uuid, p_kind public.order_kind, p_customer uuid, p_ship_to uuid,
@@ -582,6 +620,7 @@ create or replace function private.create_order_impl(
 declare v_order uuid; v_channel uuid; l record;
 begin
   perform private.assert_order_lines(p_lines);
+  perform private.assert_release_lines(p_customer, p_lines);
   if p_kind = 'taproom_transfer' and p_from_location = p_to_location then
     raise exception 'A transfer needs a different source and destination location.';
   end if;
@@ -617,6 +656,7 @@ declare o public.orders; l record;
 begin
   perform private.assert_order_lines(p_lines);
   o := private.lock_order(p_order, array['draft']::public.order_status[]);
+  perform private.assert_release_lines(o.customer_id, p_lines);
   update public.orders set ship_to_id = coalesce(p_ship_to, ship_to_id),
     requested_ship_date = coalesce(p_requested, requested_ship_date),
     po_number = coalesce(p_po, po_number), note = coalesce(p_note, note),

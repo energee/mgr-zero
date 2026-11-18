@@ -2,7 +2,7 @@
 // Phase A tasks A1–A2): who may release, one open batch release per SKU, the
 // stock release ATP ceiling, the confirmed floor on edits, and withdraw.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, asUser, ins, makeBrewery, makeCustomerUser, makeStaffCtx, priceSku, seedCatalog, seedCustomer, seedLocation } from "./helpers";
+import { admin, asUser, ins, sql, makeBrewery, makeCustomerUser, makeStaffCtx, priceSku, seedCatalog, seedCustomer, seedLocation } from "./helpers";
 import { runCommand } from "../lib/commands/registry";
 import "../lib/commands/all";
 
@@ -92,11 +92,27 @@ describe("release commands", () => {
     await expect(runCommand("update_release", { releaseId: release.id, qty: 6, ordersCloseOn: "2030-01-30" }, salesCtx)).resolves.toMatchObject({ qty: 6, orders_close_on: "2030-01-30" });
     await expect(runCommand("update_release", { releaseId: release.id, qty: 6, ordersCloseOn: null }, warehouseCtx)).rejects.toMatchObject({ code: "permission_denied" });
 
+    // A short shipment counts what shipped: the unshipped units stay claimed by the release.
+    sql(`update public.orders set status = 'shipped' where id = '${order.order_id}'; update public.order_lines set qty_shipped = 4 where order_id = '${order.order_id}'`);
+    const [shipped] = await runCommand("list_releases", { ids: [release.id] }, salesCtx) as { confirmed: number; remaining: number }[];
+    expect(shipped).toMatchObject({ confirmed: 4, remaining: 2 });
+    sql(`update public.order_lines set qty_shipped = null where order_id = '${order.order_id}'; update public.orders set status = 'confirmed' where id = '${order.order_id}'`);
+
+    // Staff paths never store a release on a line, even through the raw RPCs.
+    const staffCreate = await salesCtx.db.rpc("create_order", { p_brewery: breweryId, p_kind: "wholesale", p_customer: customerId, p_ship_to: shipToId, p_from_location: warehouse.id, p_to_location: null as unknown as string, p_requested: null as unknown as string, p_po: null as unknown as string, p_note: null as unknown as string, p_lines: [{ sku_id: sold.skuId, qty: 1, release_id: release.id }], p_request_id: crypto.randomUUID() });
+    expect(staffCreate.error?.message).toMatch(/portal buyer/);
+    const taproom = await seedLocation(breweryId, { name: "Release taproom", uses: ["taproom"] });
+    const replenish = await adminCtx.db.rpc("create_replenishment_order", { p_from: warehouse.id, p_to: taproom.id, p_lines: [{ sku_id: sold.skuId, qty: 1, release_id: release.id }], p_request_id: crypto.randomUUID() });
+    expect(replenish.error?.message).toMatch(/portal buyer/);
+
     await runCommand("withdraw_release", { releaseId: release.id }, adminCtx);
     const kept = (await salesCtx.db.from("releases").select("id, withdrawn_at").eq("id", release.id).single()).data!;
     expect(kept.withdrawn_at).not.toBeNull();
     const [listed] = await runCommand("list_releases", { ids: [release.id] }, warehouseCtx) as { id: string; open: boolean; confirmed: number; remaining: number }[];
     expect(listed).toMatchObject({ id: release.id, open: false, confirmed: 6, remaining: 0 });
+    // open filters in the query: a withdrawn release is only among the closed ones.
+    expect(await runCommand("list_releases", { ids: [release.id], open: true }, warehouseCtx)).toEqual([]);
+    expect(await runCommand("list_releases", { ids: [release.id], open: false }, warehouseCtx)).toHaveLength(1);
     await expect(runCommand("update_release", { releaseId: release.id, qty: 8, ordersCloseOn: null }, salesCtx)).rejects.toThrow(/withdrawn/);
   });
 

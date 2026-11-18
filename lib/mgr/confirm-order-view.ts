@@ -15,9 +15,10 @@ export type ConfirmOrderLineView = {
   /** Stock at the source and brewery ATP for this line. */
   detail: string;
   tone?: "" | "w" | "ok";
-  /** Portal release problems to settle before confirming: "Slipped: …" when
-   *  the batch is now ready after the requested date, "Over release: …" when
-   *  the release was lowered below what is confirmed and pre-ordered on it. */
+  /** Portal release problems to settle before confirming: "Release withdrawn",
+   *  "Release closed: batch cancelled", "Slipped: …" when the batch is now
+   *  ready after the requested date, "Over release: …" when the release was
+   *  lowered below what is confirmed and pre-ordered on it. */
   flags: string[];
 };
 
@@ -55,6 +56,8 @@ function releaseFlags(release: ReleaseRow | undefined, requested: string | null)
   if (!release) return [];
   const ordered = release.confirmed + release.preordered;
   return [
+    release.withdrawn_at ? "Release withdrawn" : "",
+    release.cancelled ? "Release closed: batch cancelled" : "",
     release.ready_on && requested && release.ready_on > requested ? `Slipped: batch ready ${formatDate(release.ready_on)}` : "",
     ordered > release.qty ? `Over release: ${ordered} ordered of ${release.qty}` : "",
   ].filter(Boolean);
