@@ -7,7 +7,7 @@ import { z } from "zod";
 import { MATERIAL_CATEGORIES } from "../lib/mgr/enums";
 import { isDecisionModelConfigured, materialCategoryQuestion, resolveDecisionModel, SUGGESTION_MODEL } from "../lib/mgr/material-category-suggestion";
 
-const USAGE = "Usage: bun scripts/experiment-material-category.ts --dry-run|--live [--model <typesafe:model or gateway decision model id>]";
+const USAGE = "Usage: bun scripts/experiment-material-category.ts --dry-run|--live [--model <typesafe:model or gateway decision model id>] [--cases <file in scripts/>]";
 const THRESHOLDS = [0.6, 0.7, 0.8, 0.9];
 const caseSchema = z.object({ id: z.string().min(1), name: z.string().min(1), expected: z.enum(MATERIAL_CATEGORIES) });
 type Case = z.infer<typeof caseSchema>;
@@ -30,12 +30,21 @@ function percentile(values: number[], fraction: number): number {
   return sorted[Math.max(0, Math.ceil(sorted.length * fraction) - 1)];
 }
 
-function parseArgs(args: string[]): { live: boolean; model: string } {
+function parseArgs(args: string[]): { live: boolean; model: string; casesFile: string } {
   const modes = args.filter(arg => arg === "--dry-run" || arg === "--live");
   const rest = args.filter(arg => arg !== "--dry-run" && arg !== "--live");
-  const modelOnly = rest.length === 0 || (rest.length === 2 && rest[0] === "--model" && !rest[1].startsWith("--"));
-  if (modes.length !== 1 || !modelOnly) throw new Error(USAGE);
-  return { live: modes[0] === "--live", model: rest[1] ?? SUGGESTION_MODEL };
+  const options = new Map<string, string>();
+  for (let i = 0; i < rest.length; i += 2) {
+    const [flag, value] = [rest[i], rest[i + 1]];
+    if (!["--model", "--cases"].includes(flag) || options.has(flag) || !value || value.startsWith("--")) throw new Error(USAGE);
+    options.set(flag, value);
+  }
+  if (modes.length !== 1) throw new Error(USAGE);
+  return {
+    live: modes[0] === "--live",
+    model: options.get("--model") ?? SUGGESTION_MODEL,
+    casesFile: options.get("--cases") ?? "material-category-cases.json",
+  };
 }
 
 function summarize(model: string, results: Result[]): void {
@@ -61,8 +70,9 @@ function summarize(model: string, results: Result[]): void {
 }
 
 async function main(): Promise<void> {
-  const { live, model } = parseArgs(process.argv.slice(2));
-  const cases = z.array(caseSchema).min(1).parse(JSON.parse(await readFile(new URL("./material-category-cases.json", import.meta.url), "utf8")));
+  const { live, model, casesFile } = parseArgs(process.argv.slice(2));
+  // A file beside this script, such as material-category-holdout.json.
+  const cases = z.array(caseSchema).min(1).parse(JSON.parse(await readFile(new URL(`./${casesFile}`, import.meta.url), "utf8")));
   if (new Set(cases.map(item => item.id)).size !== cases.length) throw new Error("Duplicate case IDs");
   if (live && !isDecisionModelConfigured(model)) throw new Error(`Live experiment requires credentials for ${model}. No requests were sent.`);
   print({ type: "run", mode: live ? "live" : "dry_run", model, cases: cases.length, requests: cases.length * 2, syntheticOnly: true });

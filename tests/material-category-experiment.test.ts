@@ -3,7 +3,9 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { MATERIAL_CATEGORIES } from "@/lib/mgr/enums";
+import { materialCategoryQuestion } from "@/lib/mgr/material-category-suggestion";
 import cases from "../scripts/material-category-cases.json";
+import holdout from "../scripts/material-category-holdout.json";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 
@@ -53,11 +55,26 @@ describe("material kind experiment CLI safety", () => {
   });
 });
 
-describe("material kind cases", () => {
+describe.each([["cases", cases], ["holdout", holdout]])("material kind %s", (_set, items) => {
   it("label every case with a stored kind and cover each kind at least 4 times", () => {
-    for (const item of cases) expect(MATERIAL_CATEGORIES).toContain(item.expected);
+    for (const item of items) expect(MATERIAL_CATEGORIES).toContain(item.expected);
     for (const kind of MATERIAL_CATEGORIES) {
-      expect(cases.filter(item => item.expected === kind).length, kind).toBeGreaterThanOrEqual(4);
+      expect(items.filter(item => item.expected === kind).length, kind).toBeGreaterThanOrEqual(4);
     }
+  });
+});
+
+describe("material kind holdout", () => {
+  // The first set's names were partly copied into the kind descriptions, which overstated accuracy.
+  it("uses no name that appears in the descriptions Jev reads", () => {
+    const criteria = JSON.stringify(materialCategoryQuestion()).toLowerCase();
+    expect(holdout.filter(item => criteria.includes(item.name.toLowerCase())).map(item => item.name)).toEqual([]);
+  });
+
+  it("is chosen with --cases and sends nothing in dry-run mode", () => {
+    const result = runExperiment("--dry-run", "--cases", "material-category-holdout.json");
+    expect(result.status).toBe(0);
+    const requests = result.stdout.trim().split("\n").map(line => JSON.parse(line)).filter(record => record.type === "request");
+    expect(requests).toHaveLength(holdout.length * 2);
   });
 });

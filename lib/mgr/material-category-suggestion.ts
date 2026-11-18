@@ -19,10 +19,11 @@ export const MATERIAL_CATEGORY_CRITERIA: Record<MaterialCategory, string> = {
   other: "Anything else, such as CO2 or a lab supply.",
 };
 
-/** Provisional: Task 4 of docs/plans/jev-suggestions.md replaces it with the material kind experiment's number. */
-export const MATERIAL_CATEGORY_MIN_PROBABILITY = 0.8;
+/** Chosen 2026-11-18 from the material kind experiment: on clean holdout names no shown suggestion was wrong,
+ *  and the most confident wrong answer was 0.74 (docs/plans/jev-suggestions.md, Results). */
+export const MATERIAL_CATEGORY_MIN_PROBABILITY = 0.9;
 
-/** Provisional decision model ID: Task 4 of docs/plans/jev-suggestions.md confirms or replaces it.
+/** Chosen 2026-11-18 from the material kind experiment (Jev only, by owner choice).
  *  `typesafe:` calls TypeSafe directly, because the AI Gateway account is on the free tier, which cannot
  *  reach Jev. With Gateway credits, "typesafe-ai/jev-1.14.0" reaches the same model through the Gateway. */
 export const SUGGESTION_MODEL = "typesafe:jev-1.14.0";
