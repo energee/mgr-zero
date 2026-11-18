@@ -3,6 +3,7 @@ import { sentenceCase } from "./labels";
 // inventory mock and for get_order. Mapping lives here so the page does not
 // compose a second E.* tree. It also owns the order's price summary: line
 // amounts and the before-tax order amount, from the order's own frozen facts.
+import { aliasParts, brandLabel, type AliasParts, type BrandedSku } from "./brand-lines";
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { shipToLine } from "./ship-to-view";
@@ -16,7 +17,10 @@ import { palletFit, type PalletFitGroup } from "./pallet-fit";
 
 export type OrderLineView = {
   key: string;
+  /** Full line name for labels: brand · staff alias · format, or the SKU name. */
   name: string;
+  /** The same name in parts when the brand has a staff alias, so the view can show the alias muted under brand and format. */
+  aliased?: AliasParts;
   /** Display quantities: a decimal stays a decimal, null reads "Not recorded" (never 0). */
   ordered: string;
   picked: string;
@@ -74,6 +78,9 @@ export type OrderViewModel = {
   palletFit: PalletFitGroup[];
 };
 
+/** get_order's SKU on a line: BrandedSku, whose format also carries its package facts and pallet fit (absent reads as no fit). */
+type OrderLineSku = (NonNullable<BrandedSku> & { formats?: { name: string; package_type?: string | null; keg_size?: string | null; units_per_case?: number | null; pallet_fit?: number | null } | null }) | null;
+
 export type OrderSnapshot = {
   backHref?: string;
   /** breweries.timezone: event times print in it (#442). */
@@ -112,8 +119,8 @@ export type OrderSnapshot = {
     short_reason?: string | null;
     /** A one-way keg line's channel fee, set when the line is saved and fixed once the order is submitted (order_lines.one_way_fee_cents). */
     one_way_fee_cents?: number | null;
-    /** formats: the package facts and pallet fit get_order embeds; absent or null reads as no fit. */
-    skus: { name: string; formats?: { package_type: string | null; keg_size: string | null; units_per_case: number | null; pallet_fit: number | null } | null } | null;
+    /** A brand and format read name the line (lineName); formats also carries the package facts and pallet fit get_order embeds. */
+    skus: OrderLineSku;
   }[];
   /** order_deposit_lines, one per returnable keg line. */
   deposits?: { order_line_id: string; description: string; qty_ordered: number; unit_price_cents: number; amount_cents: number }[];
@@ -256,6 +263,12 @@ function emailStatusLine(statuses: NonNullable<OrderSnapshot["emailStatuses"]>):
   return [...counts].map(([text, count]) => `${count} × ${text}`).join(" · ");
 }
 
+/** "White Lion · Animal #33 · Case", as Confirm and Pick name a line; a SKU read without brand and format keeps its own name. */
+function lineName(sku: BrandedSku): Pick<OrderLineView, "name" | "aliased"> {
+  const { group, name } = brandLabel(sku);
+  return { name: group ? `${group} · ${name}` : name, aliased: aliasParts(sku) };
+}
+
 /** Map a get_order payload onto OrderView's model. Inventory frames pass a
  *  fixture snapshot through this same function. */
 export function toOrderViewProps({ order, lines, events, atp, locations, deliveryOutcome, invoice, backHref, timeZone, cogs, deposits, actorNames, emailStatuses }: OrderSnapshot): OrderViewModel {
@@ -301,7 +314,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, deliver
       const qtyAtp = atpMap.get(l.sku_id);
       return {
         key: l.id,
-        name: l.skus?.name ?? "Line",
+        ...lineName(l.skus),
         ordered: qtyText(ordered),
         picked: qtyText(picked),
         shipped: qtyText(shipped),

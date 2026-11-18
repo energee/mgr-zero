@@ -57,9 +57,9 @@ export const orderPickedRestock: OrderSnapshot = {
   },
   // Each SKU's format with its pallet fit, as get_order embeds it: 8 half kegs or 20 sixtels a pallet, 10 cases a layer.
   lines: [
-    withFit(line("l-hazy", SKU_HAZY, 4, 4), { package_type: "keg", keg_size: "half_bbl", units_per_case: null, pallet_fit: 8 }),
-    withFit(line("l-pils", SKU_PILS, 7, 10), { package_type: "can", keg_size: null, units_per_case: 24, pallet_fit: 10 }),
-    { ...withFit(line("l-stout", SKU_STOUT, 2, 2), { package_type: "keg", keg_size: "sixth_bbl", units_per_case: null, pallet_fit: 20 }), one_way_fee_cents: 800 },
+    withFit(line("l-hazy", SKU_HAZY, 4, 4), { name: "½ bbl keg", package_type: "keg", keg_size: "half_bbl", units_per_case: null, pallet_fit: 8 }),
+    withFit(line("l-pils", SKU_PILS, 7, 10), { name: "16 oz case", package_type: "can", keg_size: null, units_per_case: 24, pallet_fit: 10 }),
+    { ...withFit(line("l-stout", SKU_STOUT, 2, 2), { name: "⅙ bbl keg", package_type: "keg", keg_size: "sixth_bbl", units_per_case: null, pallet_fit: 20 }), one_way_fee_cents: 800 },
   ],
   deposits: [{ order_line_id: "l-hazy", description: "Returnable keg deposit", qty_ordered: 4, unit_price_cents: 3000, amount_cents: 12000 }],
   events: [

@@ -9,6 +9,14 @@ export function brandLabel(sku: BrandedSku): { group?: string; name: string } {
   return sku?.brands && sku.formats ? { group: nameWithAlias(sku.brands), name: sku.formats.name } : { name: sku?.name ?? "Line" };
 }
 
+/** A SKU's brand, the brand's staff alias, and its format, kept apart so a view can show the alias muted. */
+export type AliasParts = { brand: string; alias: string; format: string };
+
+/** The SKU's AliasParts, or undefined when its brand has no alias or the read lacks brand and format. */
+export function aliasParts(sku: BrandedSku): AliasParts | undefined {
+  return sku?.brands?.alias && sku.formats ? { brand: sku.brands.name, alias: sku.brands.alias, format: sku.formats.name } : undefined;
+}
+
 /** True when line i is the first of its brand, where the brand is named. */
 export function startsGroup(lines: { group?: string }[], i: number): boolean {
   return Boolean(lines[i].group) && lines[i].group !== lines[i - 1]?.group;

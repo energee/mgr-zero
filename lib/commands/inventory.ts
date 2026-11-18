@@ -247,7 +247,7 @@ defineQuery({
     const unmapped = i.unmapped ? await qboUnmappedFilter(ctx, "qbo_item_id") : null;
     const rows = await completeRows("SKU list", async (_, after?: { id: string }) => {
       let query = ctx.db.from("skus")
-        .select(`id, name, active, brand_id, format_id, qbo_item_id, qbo_realm_id, brands(name), ${formats}(name, bbl_per_unit, package_type), format_volume:format_volumes(bbl_per_unit)`)
+        .select(`id, name, active, brand_id, format_id, qbo_item_id, qbo_realm_id, brands(name, alias), ${formats}(name, bbl_per_unit, package_type), format_volume:format_volumes(bbl_per_unit)`)
         .eq("brewery_id", ctx.breweryId).order("id").limit(PAGE_SIZE);
       if (after) query = query.gt("id", after.id);
       let count = ctx.db.from("skus").select(i.packageType ? "id, formats!inner(package_type)" : "id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId);

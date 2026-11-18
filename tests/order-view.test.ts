@@ -14,7 +14,7 @@ import { orderLineCents, toOrderViewProps, type OrderSnapshot } from "../lib/mgr
 const PAGE = "app/(app)/orders/[id]/order-detail.tsx";
 
 describe("Order pallet fit", () => {
-  const sixtel = { package_type: "keg", keg_size: "sixth_bbl", units_per_case: null, pallet_fit: 20 };
+  const sixtel = { name: "⅙ bbl keg", package_type: "keg", keg_size: "sixth_bbl", units_per_case: null, pallet_fit: 20 };
   const withFits: OrderSnapshot = { ...orderConfirmedWholesale, lines: orderConfirmedWholesale.lines.map((l, i) => ({ ...l, skus: { name: l.skus!.name, formats: i < 2 ? sixtel : null } })) };
 
   it("adds every line's package into pallet units while the order can still change, and draws the block", () => {
@@ -558,5 +558,21 @@ describe("order header channel", () => {
 
   it("falls back to Wholesale when the read carries no channel", () => {
     expect(toOrderViewProps(orderConfirmedWholesale).kind).toBe("Wholesale");
+  });
+});
+
+describe("ordered line names", () => {
+  it("names a line by its brand, the brand's staff alias, then its format", () => {
+    const [first, ...rest] = orderConfirmedWholesale.lines;
+    const lines = [{ ...first, skus: { name: "Animal #33 · Case", brands: { name: "White Lion", alias: "Animal #33" }, formats: { name: "Case" } } }, ...rest];
+    const model = toOrderViewProps({ ...orderConfirmedWholesale, lines });
+    expect(model.lines[0].name).toBe("White Lion · Animal #33 · Case");
+    // The staff alias sits muted on its own line under the brand and format.
+    expect(renderToStaticMarkup(createElement(OrderView, { model }))).toContain('<span class="flex flex-col"><span>White Lion · Case</span><span class="text-xs font-normal text-muted-foreground">Animal #33</span></span>');
+  });
+
+  it("keeps the SKU name when the read carries no brand and format", () => {
+    const [first] = orderConfirmedWholesale.lines;
+    expect(toOrderViewProps(orderConfirmedWholesale).lines.find(l => l.key === first.id)?.name).toBe(first.skus?.name);
   });
 });

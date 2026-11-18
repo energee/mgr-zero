@@ -29,6 +29,7 @@ import { CancelOrderControl } from "./cancel-order";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { OrderLineView, OrderViewModel } from "@/lib/mgr/order-view";
+import { BrandedName } from "@/components/mgr/views/branded-name";
 import { cn } from "@/lib/utils";
 
 /** Adding and removing lines in place. An added line's quantity lives in OrderView's `quantities`, by its key. */
@@ -177,34 +178,34 @@ export function OrderView({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="pl-0 text-xs">SKU</TableHead>
+                <TableHead className="text-xs">SKU</TableHead>
                 {model.columns.map(([label]) => <TableHead key={label} className="text-right text-xs">{label}</TableHead>)}
-                <TableHead className={cn("text-right text-xs", !lineEdit && "pr-0")}>Line amount</TableHead>
-                {lineEdit ? <TableHead className="pr-0"><span className="sr-only">Remove</span></TableHead> : null}
+                <TableHead className="text-right text-xs">Line amount</TableHead>
+                {lineEdit ? <TableHead><span className="sr-only">Remove</span></TableHead> : null}
               </TableRow>
             </TableHeader>
             <TableBody>
               {model.lines.map((line) => (
                 <TableRow key={line.key}>
-                  <TableCell className="py-3.5 pl-0 whitespace-normal">
-                    <span className="font-medium">{line.name}</span>
+                  <TableCell className="py-3.5 whitespace-normal">
+                    <span className="font-medium"><BrandedName name={line.name} aliased={line.aliased} /></span>
                     <LineNotes line={line} />
                   </TableCell>
                   {model.columns.map(([label, field]) => (
                     <TableCell key={label} className={cn("text-right tabular-nums", (line[field] === "Not supplied" || line[field] === "Not recorded") && "text-xs text-muted-foreground")}>{field === "ordered" ? orderedField(line) : line[field]}</TableCell>
                   ))}
-                  <TableCell className={cn("text-right font-semibold tabular-nums", !lineEdit && "pr-0")}>{line.amount}</TableCell>
-                  {lineEdit ? <TableCell className="pr-0 text-right">{remove(line.key, line.name)}</TableCell> : null}
+                  <TableCell className="text-right font-semibold tabular-nums">{line.amount}</TableCell>
+                  {lineEdit ? <TableCell className="text-right">{remove(line.key, line.name)}</TableCell> : null}
                 </TableRow>
               ))}
               {added.map((line, index) => (
                 <TableRow key={line.key}>
-                  <TableCell className="py-3.5 pl-0 whitespace-normal">{skuPicker(line, index)}</TableCell>
+                  <TableCell className="py-3.5 whitespace-normal">{skuPicker(line, index)}</TableCell>
                   {model.columns.map(([label, field]) => (
                     <TableCell key={label} className="text-right tabular-nums">{field === "ordered" ? orderedField({ key: line.key, name: addedName(index) }) : null}</TableCell>
                   ))}
                   <TableCell />
-                  <TableCell className="pr-0 text-right">{remove(line.key, addedName(index))}</TableCell>
+                  <TableCell className="text-right">{remove(line.key, addedName(index))}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -213,7 +214,7 @@ export function OrderView({
         <ul className="mt-1 divide-y md:hidden">
           {model.lines.map((line) => (
             <li key={line.key} className="py-4">
-              <p className="text-sm font-semibold">{line.name}</p>
+              <p className="text-sm font-semibold"><BrandedName name={line.name} aliased={line.aliased} /></p>
               <LineNotes line={line} />
               <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3">
                 {[...model.columns, ["Line amount", "amount"] as const].map(([label, field]) => (

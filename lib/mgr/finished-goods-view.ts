@@ -1,4 +1,5 @@
 // lib/mgr/finished-goods-view.ts — Finished goods stock and authorized get_inventory_value totals.
+import { aliasParts, type AliasParts } from "./brand-lines";
 import type { EmptyState } from "./empty-state";
 import { money } from "./money";
 import type { InventoryValue } from "@/lib/commands/inventory";
@@ -9,6 +10,8 @@ import { bblExact } from "@/lib/volume";
 export type FinishedGoodsRowView = {
   key: string;
   name: string;
+  /** Set when the brand has a staff alias, so the row shows it muted under brand and format. */
+  aliased?: AliasParts;
   onHand: string;
   allocated: string;
   atp: string;
@@ -37,7 +40,8 @@ export type FinishedGoodsMovements = {
 export type FinishedGoodsSku = {
   id: string;
   name: string;
-  brands?: { name: string } | null;
+  brands?: { name: string; alias?: string | null } | null;
+  formats?: { name: string } | null;
   /** list_skus' flag; false withholds the row's Record movement. */
   active?: boolean;
   on_hand: number;
@@ -99,6 +103,7 @@ export function toFinishedGoodsViewProps({ skus, backHref, value }: FinishedGood
       return {
         key: s.id,
         name: skuLabel(s),
+        aliased: aliasParts(s),
         onHand: String(s.on_hand),
         allocated: String(round2(s.on_hand - s.atp)),
         atp: short ? `−${Math.abs(s.atp)}` : String(s.atp),

@@ -10,6 +10,7 @@ import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { RECORD_LINK, RecordTable } from "@/components/mgr/views/record-table";
+import { BrandedName } from "@/components/mgr/views/branded-name";
 import type { FinishedGoodsMovements, FinishedGoodsRowView, FinishedGoodsViewModel } from "@/lib/mgr/finished-goods-view";
 
 /** The Available figure. Negative stock is red and also says Shortfall in
@@ -69,7 +70,7 @@ export function FinishedGoodsView({
         rows={model.rows.map((row) => ({
           key: row.key,
           cells: [
-            row.name, row.onHand, row.allocated, <Available key="available" row={row} shortfallHref={to(row.shortfallHref)} />,
+            <BrandedName key="name" name={row.name} aliased={row.aliased} />, row.onHand, row.allocated, <Available key="available" row={row} shortfallHref={to(row.shortfallHref)} />,
             // Rows offer Record movement whenever the header does.
             ...(record ? [row.movementHref && <Fragment key="action">{E.act("Record movement", "primary", linkRows ? row.movementHref : undefined)}</Fragment>] : []),
           ],
