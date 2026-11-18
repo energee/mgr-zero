@@ -197,8 +197,9 @@ describe("Shop offers (portal releases)", () => {
 
   it("draws the offer picker only for a row with more than one offer", () => {
     const html = htmlOf(createElement(ShopView, { model: toShopViewProps({ ...base, catalog: [{ ...both, qty: 2, offer: "r1" }, releaseOnly] }) }));
-    // Stout has stock and a release: a picker showing the chosen release.
-    expect(html).toMatch(/⅙ bbl keg · order from/);
+    // Stout has stock and a release: an inline picker beside the price, named for a screen reader, not a full-width field.
+    expect(html).toMatch(/aria-label="⅙ bbl keg · order from"/);
+    expect(html).not.toMatch(/<label[^>]*>⅙ bbl keg · order from/);
     expect(html).toMatch(/From Dec 4, 2026 · order by Nov 27, 2026/);
     // Saison has one offer: it reads beside the price, with no picker.
     expect(html).toMatch(/\$40\.00 · From Dec 11, 2026 · few left/);

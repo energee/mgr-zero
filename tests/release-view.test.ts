@@ -2,7 +2,10 @@
 // docs/plans/portal-release-windows.md): batch prefill from the packaging
 // projection, the stock form, the release_sku payload and its withheld
 // reason, and how a release row reads.
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { ReleaseView } from "../components/mgr/views/release";
 import { batchReleaseForms, releaseCommand, releaseDetail, skuReleaseForms, updateReleaseCommand, type ReleaseBatchRow, type ReleaseRow } from "../lib/mgr/release-view";
 
 const batchRow = (skuId: string, name: string, units: number): ReleaseBatchRow => ({
@@ -68,6 +71,9 @@ describe("release forms skip what is already released", () => {
     const [partly] = batchReleaseForms(rows, [release]);
     expect(partly.released).toBe(false);
     expect(partly.lines.map((l) => l.skuId)).toEqual(["s-case"]);
+    expect(partly.detail).toBe("ready Dec 4, 2026 · 2 packages · 1 released");
+    // A batch form with one package left still names it on the quantity.
+    expect(renderToStaticMarkup(createElement(ReleaseView, { form: partly }))).toMatch(/Stout · case · quantity/);
     const [all] = batchReleaseForms(rows, [release, { ...release, id: "r2", sku_id: "s-case" }]);
     expect(all.released).toBe(true);
   });

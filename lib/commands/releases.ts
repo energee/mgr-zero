@@ -71,11 +71,16 @@ defineQuery({
   input: z.object({ skuIds: z.array(z.string().uuid()).optional().describe("Only these SKUs' projected units") }),
   handler: async (ctx, i) => {
     const rows = await completeRows("Release batches", (start) => {
-      let q = ctx.db.from("projected_batch_packaging_units").select("batch_id, batch_no, sku_id, units, needed_by, skus(name, brands(name))", { count: "exact" })
+      let q = ctx.db.from("projected_batch_packaging_units").select("batch_id, batch_no, sku_id, units, needed_by", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).order("needed_by").order("batch_no").order("sku_id");
       if (i.skuIds) q = q.in("sku_id", i.skuIds);
       return q.range(start, start + PAGE_SIZE - 1);
     });
-    return rows.map((r) => ({ ...r, units: Number(r.units) }));
+    // PostgREST cannot embed through the view, so the SKU and brand names are a second read.
+    const skuIds = [...new Set(rows.map((r) => r.sku_id as string))];
+    const skus = skuIds.length ? await completeRows("Release batch SKUs", (start) => ctx.db.from("skus")
+      .select("id, name, brands(name)", { count: "exact" }).eq("brewery_id", ctx.breweryId).in("id", skuIds).order("id").range(start, start + PAGE_SIZE - 1)) : [];
+    const names = new Map(skus.map((s) => [s.id, { name: s.name, brands: s.brands }]));
+    return rows.map((r) => ({ ...r, units: Number(r.units), skus: names.get(r.sku_id as string) ?? null }));
   },
 });

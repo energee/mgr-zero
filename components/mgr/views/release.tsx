@@ -28,6 +28,8 @@ export function ReleaseView({ form, sources, controls = {}, messages, footer }: 
   footer?: ReactNode;
 }) {
   const several = form.lines.length > 1;
+  // A batch form names each package on its quantity, even when one is left.
+  const named = several || Boolean(form.batchId);
   return <>
     {sources && sources.length > 1
       ? E.pick("Release from", form.key, sources.map((s) => ({ value: s.key, label: s.source })), { onChange: controls.source })
@@ -35,7 +37,7 @@ export function ReleaseView({ form, sources, controls = {}, messages, footer }: 
     {form.lines.map((line, index) => <Fragment key={line.skuId}>
       {/* A batch releases every projected SKU; untick one to leave it out. */}
       {several ? E.row(line.name, line.include ? "released" : "left out", E.sw(line.include, `Release ${line.name}`, controls.include && ((on) => controls.include?.(index, on)))) : null}
-      {line.include ? E.edit(several ? `${line.name} · quantity` : "Quantity", line.qty, "number", undefined, { onChange: controls.qty && ((value) => controls.qty?.(index, value)), min: 1, step: 1, required: true }) : null}
+      {line.include ? E.edit(named ? `${line.name} · quantity` : "Quantity", line.qty, "number", undefined, { onChange: controls.qty && ((value) => controls.qty?.(index, value)), min: 1, step: 1, required: true }) : null}
     </Fragment>)}
     {E.edit("Ships from", form.shipsFrom, "date", undefined, { onChange: controls.shipsFrom, required: true })}
     {E.edit("Order by (optional)", form.ordersCloseOn, "date", undefined, { onChange: controls.ordersCloseOn })}

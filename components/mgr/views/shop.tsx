@@ -29,10 +29,12 @@ export function ShopView({ model, footer, comingUp, controls = {}, quantities, l
     <fieldset disabled={locked} className="contents">
       {model.empty ? E.blank(model.empty) : model.groups.map(group => <Fragment key={group.product}>
         {E.ttl(group.product, brandAnchor(group.product))}
-        {/* A lone release reads beside the price (stock alone needs no words); a SKU with several offers picks one. */}
+        {/* Beside the price: a lone release reads as text (stock alone needs no words); several offers are an inline pick. */}
         {group.items.map(item => <Fragment key={item.key}>
-          {E.row(item.name, item.offers.length === 1 && item.offer ? `${item.price} · ${item.offers[0].label}` : item.price, <OrderQuantity label={item.name} value={quantities?.[item.key] ?? item.qty} step="1" onChange={controls.quantity && (value => controls.quantity?.(item.key, value))} />)}
-          {item.offers.length > 1 ? E.pick(`${item.name} · order from`, item.offer, item.offers, { onChange: controls.offer && (value => controls.offer?.(item.key, value)) }) : null}
+          {E.row(item.name, item.offers.length > 1
+            ? <>{item.price} · {E.pick(`${item.name} · order from`, item.offer, item.offers, { inline: true, onChange: controls.offer && (value => controls.offer?.(item.key, value)) })}</>
+            : item.offers.length === 1 && item.offer ? `${item.price} · ${item.offers[0].label}` : item.price,
+          <OrderQuantity label={item.name} value={quantities?.[item.key] ?? item.qty} step="1" onChange={controls.quantity && (value => controls.quantity?.(item.key, value))} />)}
         </Fragment>)}
       </Fragment>)}
     </fieldset>

@@ -116,6 +116,13 @@ describe("release commands", () => {
     await expect(runCommand("update_release", { releaseId: release.id, qty: 8, ordersCloseOn: null }, salesCtx)).rejects.toThrow(/withdrawn/);
   });
 
+  it("lists the planned batches a release can draw on, with each SKU's projected units and names", async () => {
+    await admin.from("skus").update({ batch_share: 0.5 }).eq("id", cat.skuId);
+    const rows = await runCommand("list_release_batches", { skuIds: [cat.skuId] }, brewerCtx) as { batch_id: string; sku_id: string; units: number; needed_by: string; skus: { name: string; brands: { name: string } | null } | null }[];
+    // 10 bbl × 50% ÷ 0.0645 bbl per case, rounded down.
+    expect(rows.find((r) => r.batch_id === batchId)).toMatchObject({ sku_id: cat.skuId, units: 77, needed_by: "2030-01-16", skus: { name: "Release Lager case", brands: { name: "Release Lager" } } });
+  });
+
   it("releases a planned batch only for its own brand, and lists it with the batch's ready date", async () => {
     const stranger = await seedCatalog(breweryId, { product: "Stranger", sku: "Stranger case" });
     await expect(runCommand("release_sku", { batchId, shipsFrom: "2030-01-16", lines: [{ skuId: stranger.skuId, qty: 5 }] }, salesCtx)).rejects.toThrow(/brand/);
