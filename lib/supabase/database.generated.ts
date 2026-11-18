@@ -4836,7 +4836,7 @@ isOneToOne: false
 { Args: { "p_actor": string,"p_display_label": string,"p_external_enterprise_id": string,"p_external_installation_id": string,"p_granted_capabilities": Json,"p_installation": string,"p_redirect_uri": string,"p_state_hash": string,"p_token_store_key": string }; Returns: Json
                            },
 "adjust_order_lines":
-{ Args: { "p_lines": Json,"p_order": string,"p_reason": string,"p_request_id": string }; Returns: Json
+{ Args: { "p_lines": Json,"p_order": string,"p_reason": string,"p_reason_code"?: string,"p_request_id": string }; Returns: Json
                            },
 "advance_square_catalog_sync":
 { Args: { "p_actor": string,"p_brewery": string,"p_connection": string,"p_expected_version": number,"p_next_version": number,"p_request_id": string }; Returns: boolean
@@ -5473,6 +5473,11 @@ isOneToOne: false
 "my_staff_brewery_ids":
 { Args: { "p_roles": (Database["public"]['Enums']["staff_role"])[] }; Returns: string[]
                            },
+"order_change_rows":
+{ Args: { "p_actor"?: string,"p_brewery": string,"p_customer"?: string,"p_reason_code"?: string }; Returns: {
+              "actor": string,"changes": Json,"created_at": string,"customer_id": string,"customer_name": string,"id": string,"kind": string,"note": string,"order_id": string,"order_no": number,"reason_code": string
+            }[]
+                           },
 "order_packaging_shortfall_rows":
 { Args: Record<PropertyKey, never>; Returns: {
               "brewery_id": string,"needed_by": string,"sku_id": string,"units": number
@@ -5507,6 +5512,11 @@ isOneToOne: false
 "portal_keg_deposit_rows":
 { Args: Record<PropertyKey, never>; Returns: {
               "customer_id": string,"deposit_cents": number,"keg_size": Database["public"]['Enums']["keg_size"],"kegs_on_deposit": number
+            }[]
+                           },
+"portal_order_change_rows":
+{ Args: { "p_order": string }; Returns: {
+              "changes": Json,"created_at": string,"id": string,"reason_code": string
             }[]
                            },
 "portal_order_event_rows":

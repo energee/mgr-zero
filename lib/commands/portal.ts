@@ -187,7 +187,7 @@ defineQuery({
 });
 
 defineQuery({
-  name: "portal_order", description: "Portal: one order with lines, its event history, and its shipment with that shipment's invoice once billed",
+  name: "portal_order", description: "Portal: one order with lines, its event history, its changes after confirm (reason code and each line's change), and its shipment with that shipment's invoice once billed",
   roles: "customer",
   input: z.object({ orderId: z.string().uuid() }),
   handler: async (ctx, i) => {
@@ -197,14 +197,16 @@ defineQuery({
     // not_found on another customer's id, so the row is never null.
     const row = await unwrap(ctx.db.rpc("portal_order_rows", { p_order: i.orderId }).select(`${ORDER_ROW}, ship_tos, order_lines`).eq("customer_id", customerId).single()) as Omit<PortalOrderRow, "brewery_id">;
     const { order_lines: ln, ...order } = row;
-    const [events, shipment] = await Promise.all([
+    const [events, changes, shipment] = await Promise.all([
       unwrap(ctx.db.from("portal_order_events").select("id, event, created_at").eq("order_id", i.orderId).order("created_at")),
+      // Changes after confirm, with their reason code; never the actor or staff note.
+      unwrap(ctx.db.rpc("portal_order_change_rows", { p_order: i.orderId }).order("created_at")),
       unwrap(ctx.db.from("portal_shipments").select("id, invoice_timing").eq("order_id", i.orderId).maybeSingle()),
     ]);
     // A view has no foreign key to embed through, so the shipment's invoice
     // (at most one: invoices.shipment_id is unique) is a second read.
     const invoices = shipment ? await unwrap(ctx.db.from("portal_invoices").select(`${INVOICE_ROW}, invoice_lines`).eq("shipment_id", shipment.id!)) : [];
-    return { order, lines: ln, events, shipment: shipment && { ...shipment, invoices } };
+    return { order, lines: ln, events, changes, shipment: shipment && { ...shipment, invoices } };
   },
 });
 

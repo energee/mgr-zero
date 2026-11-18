@@ -11,7 +11,7 @@ describe("portal order deposit adjustments", () => {
     const orderId = await submitted(f);
     expect((await admin.from("keg_pools").update({ deposit_cents: 3100 }).eq("id", f.poolId)).error).toBeNull();
     const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
-    await runCommand("adjust_order_lines", { orderId, reason: "buyer changed quantities", lines: [
+    await runCommand("adjust_order_lines", { orderId, reasonCode: "customer_request", reason: "buyer changed quantities", lines: [
       { skuId: f.first.skuId, qty: 3 }, { skuId: f.second.skuId, qty: 1 },
     ] }, f.adminCtx, execution);
     const adjustedDeposits = await deposits(orderId);
@@ -21,12 +21,12 @@ describe("portal order deposit adjustments", () => {
     ]));
     expect(adjustedDeposits).toHaveLength(2);
 
-    await runCommand("adjust_order_lines", { orderId, reason: "buyer changed quantities", lines: [
+    await runCommand("adjust_order_lines", { orderId, reasonCode: "customer_request", reason: "buyer changed quantities", lines: [
       { skuId: f.first.skuId, qty: 3 }, { skuId: f.second.skuId, qty: 1 },
     ] }, f.adminCtx, execution);
     expect(await deposits(orderId)).toHaveLength(2);
 
-    await runCommand("adjust_order_lines", { orderId, reason: "remove second keg", lines: [
+    await runCommand("adjust_order_lines", { orderId, reasonCode: "customer_request", reason: "remove second keg", lines: [
       { skuId: f.first.skuId, qty: 2 },
     ] }, f.adminCtx);
     expect(await deposits(orderId)).toEqual([
@@ -44,7 +44,7 @@ describe("portal order deposit adjustments", () => {
     await runCommand("confirm_order", { orderId }, f.adminCtx);
     expect(await deposits(orderId)).toEqual([]);
     const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
-    const adjustment = { orderId, reason: "increase no-charge returnables", lines: [{ skuId: f.zeroDeposit.skuId, qty: 3 }] };
+    const adjustment = { orderId, reasonCode: "customer_request" as const, reason: "increase no-charge returnables", lines: [{ skuId: f.zeroDeposit.skuId, qty: 3 }] };
     await runCommand("adjust_order_lines", adjustment, f.adminCtx, execution);
     await runCommand("adjust_order_lines", adjustment, f.adminCtx, execution);
     expect(await deposits(orderId)).toEqual([]);
@@ -59,7 +59,7 @@ describe("portal order deposit adjustments", () => {
     const beforeLines = await admin.from("order_lines").select("sku_id,qty_ordered,unit_price_cents").eq("order_id", orderId).order("sku_id");
     const beforeDeposits = await deposits(orderId);
     const beforeEvents = await admin.from("order_events").select("id").eq("order_id", orderId);
-    const adjustment = { orderId, reason: "invalid deposit", lines: [
+    const adjustment = { orderId, reasonCode: "customer_request" as const, reason: "invalid deposit", lines: [
       { skuId: f.first.skuId, qty: 2 }, { skuId: f.missingFormat.skuId, qty: 1 },
     ] };
     const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
@@ -100,7 +100,7 @@ describe("portal order deposit adjustments", () => {
     await runCommand("submit_order", { orderId: order.order_id }, f.adminCtx);
     await runCommand("confirm_order", { orderId: order.order_id }, f.adminCtx);
     expect((await admin.from("keg_pools").update({ deposit_cents: 3100 }).eq("id", f.poolId)).error).toBeNull();
-    await runCommand("adjust_order_lines", { orderId: order.order_id, reason: "add a keg", lines: [
+    await runCommand("adjust_order_lines", { orderId: order.order_id, reasonCode: "customer_request", reason: "add a keg", lines: [
       { skuId: f.first.skuId, qty: 1 }, { skuId: f.second.skuId, qty: 2 },
     ] }, f.adminCtx);
     const rows = await deposits(order.order_id);
@@ -114,7 +114,7 @@ describe("portal order deposit adjustments", () => {
   it.each(["now", "on_delivery"] as const)("invoices every adjusted returnable-keg line with %s timing", async (timing) => {
     const orderId = await submitted(f);
     expect((await admin.from("keg_pools").update({ deposit_cents: 3100 }).eq("id", f.poolId)).error).toBeNull();
-    await runCommand("adjust_order_lines", { orderId, reason: "add another keg", lines: [
+    await runCommand("adjust_order_lines", { orderId, reasonCode: "customer_request", reason: "add another keg", lines: [
       { skuId: f.first.skuId, qty: 2 }, { skuId: f.second.skuId, qty: 1 },
     ] }, f.adminCtx);
     expect((await admin.from("keg_pools").update({ deposit_cents: 4100 }).eq("id", f.poolId)).error).toBeNull();

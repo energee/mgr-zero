@@ -239,7 +239,7 @@ describe("order lines reprice from orders.sale_channel_id", () => {
     await cell(rDtc, 2500);
     const adjusted = await rctx.db.rpc("adjust_order_lines", {
       p_order: created.order_id, p_lines: [{ sku_id: a.skuId, qty: 1 }, { sku_id: bb.skuId, qty: 2 }],
-      p_reason: "customer added a brand", p_request_id: crypto.randomUUID(),
+      p_reason_code: "customer_request", p_reason: "customer added a brand", p_request_id: crypto.randomUUID(),
     });
     expect(adjusted.error).toBeNull();
     const lines = await admin.from("order_lines").select("sku_id, unit_price_cents").eq("order_id", created.order_id);
