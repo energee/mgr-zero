@@ -19,6 +19,12 @@ describe("portal continuity", () => {
     expect(reconcilePortalOrder(saved, [{ skuId: id }], [{ id }], false).fields.poNumber).toBe("old");
     expect(() => reconcilePortalOrder({ ...saved, order: { ...saved.order, status: "submitted" } }, [], [], false)).toThrow(/draft/);
   });
+  it("keeps a draft line's release, and a reorder starts from the current offers", () => {
+    const release = "22222222-2222-4222-8222-222222222222";
+    const saved = { order: { id, status: "draft", ship_to_id: id, po_number: null, note: null, requested_ship_date: null }, lines: [{ sku_id: id, qty_ordered: 2, release_id: release }] };
+    expect(reconcilePortalOrder(saved, [{ skuId: id }], [{ id }], false).fields.lines).toEqual([{ skuId: id, qty: 2, releaseId: release }]);
+    expect(reconcilePortalOrder(saved, [{ skuId: id }], [{ id }], true).fields.lines).toEqual([{ skuId: id, qty: 2 }]);
+  });
   it("restores only a validated exact attempt in the same actor/customer/brewery scope", () => {
     expect(restorePortalAttempt(JSON.stringify(attempt), scope)).toEqual(attempt);
     expect(() => restorePortalAttempt(JSON.stringify(attempt), { ...scope, actorId: "other" })).toThrow();

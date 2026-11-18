@@ -4,14 +4,24 @@ import type { EmptyState } from "./empty-state";
 import { formatDate } from "@/lib/date-format";
 import { money } from "./money";
 
+/** One open release of a SKU, as portal_catalog returns it. */
+export type ShopRelease = { releaseId: string; shipsFrom: string; ordersCloseOn: string | null; badge: string };
+
 export type ShopCatalogItem = {
   skuId: string;
   name: string;
   product: string;
   unitPriceCents: number;
-  badge?: string;
+  /** The packaged-stock offer's in/low/out badge; null when the SKU is not
+   *  orderable from stock (portal_catalog). */
+  badge?: string | null;
+  /** Open release offers (portal_catalog); absent reads as none. */
+  releases?: ShopRelease[];
   /** Cart quantity for this SKU; not a portal_catalog field. */
   qty: number;
+  /** Cart state: the chosen release id, or "" for stock. Absent picks the
+   *  default offer (stock when offered, else the first release). */
+  offer?: string;
 };
 
 export type ShopShipTo = {
@@ -41,6 +51,9 @@ export type ShopItemView = {
   name: string;
   price: string;
   qty: number;
+  /** Where this line orders from: "" is packaged stock, else a release id. */
+  offers: { value: string; label: string }[];
+  offer: string;
 };
 
 export type ShopGroupView = {
@@ -62,6 +75,8 @@ export type ShopViewModel = {
   po: string;
   note: string;
   subtotal: string;
+  /** "This order ships from Dec 4, 2026." when a release line sets the date. */
+  shipsFromNote?: string;
 };
 
 /** Package label under a brand title: strip a duplicated `Brand · ` prefix. */
@@ -78,6 +93,40 @@ export function shopCartTotals(catalog: ShopCatalogItem[], depositCentsPerKeg = 
   const kegs = catalog.reduce((n, i) => n + (/keg/i.test(i.name) ? i.qty : 0), 0);
   const depositCents = kegs * depositCentsPerKeg;
   return { merchandiseCents, kegs, depositCents, totalCents: merchandiseCents + depositCents };
+}
+
+// The Shop shows no stock badge (tests/mgr-screens.test.ts); a release says
+// when it ships and whether little or nothing is left.
+const RELEASE_BADGE: Record<string, string> = { low: " · few left", out: " · sold out" };
+
+/** A line's offers: "From stock" (value "") when the SKU is orderable from
+ *  stock, then each open release. */
+function offersOf(item: ShopCatalogItem) {
+  const stock = item.badge == null ? [] : [{ value: "", label: "From stock" }];
+  return [...stock, ...(item.releases ?? []).map((r) => ({
+    value: r.releaseId,
+    label: `From ${formatDate(r.shipsFrom)}${r.ordersCloseOn ? ` · order by ${formatDate(r.ordersCloseOn)}` : ""}${RELEASE_BADGE[r.badge] ?? ""}`,
+  }))];
+}
+
+/** The offer a line orders from: the cart's choice while it is still offered,
+ *  else stock when offered, else the first release. */
+export function chosenOffer(item: ShopCatalogItem): string {
+  const values = offersOf(item).map((o) => o.value);
+  return item.offer !== undefined && values.includes(item.offer) ? item.offer : values[0] ?? "";
+}
+
+/** The latest ships-from date among the cart's release lines, or "" for none. */
+function shipsFromFloor(catalog: ShopCatalogItem[]): string {
+  return catalog.filter((i) => i.qty > 0).map((i) => i.releases?.find((r) => r.releaseId === chosenOffer(i))?.shipsFrom ?? "")
+    .reduce((a, b) => (b > a ? b : a), "");
+}
+
+/** The requested date the order carries: the buyer's date, but never before
+ *  the latest ships-from among its release lines (ISO dates compare as text). */
+export function effectiveRequestedDate(requested: string, catalog: ShopCatalogItem[]): string {
+  const floor = shipsFromFloor(catalog);
+  return floor > requested ? floor : requested;
 }
 
 /** Map portal_catalog + get_portal_account plus cart qty onto ShopView. */
@@ -98,12 +147,15 @@ export function toShopViewProps({
       name: packageName(item.product, item.name),
       price: money(item.unitPriceCents),
       qty: item.qty,
+      offers: offersOf(item),
+      offer: chosenOffer(item),
     };
     const group = groups.find((g) => g.product === item.product);
     if (group) group.items.push(row);
     else groups.push({ product: item.product, items: [row] });
   }
   const shipTo = shipTos.find((s) => s.id === shipToId);
+  const floor = shipsFromFloor(catalog);
   const { merchandiseCents } = shopCartTotals(catalog, depositCentsPerKeg);
   return {
     groups,
@@ -118,5 +170,6 @@ export function toShopViewProps({
     po: poNumber ?? "",
     note: note ?? "",
     subtotal: money(merchandiseCents),
+    shipsFromNote: floor ? `This order ships from ${formatDate(floor)}.` : undefined,
   };
 }

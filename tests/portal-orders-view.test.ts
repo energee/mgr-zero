@@ -223,3 +223,16 @@ it("prices on-delivery refusal lines at accepted quantities while invoice-now ke
   expect(toPortalOrderViewProps({ ...onDelivery, lines: lines.map(l => ({ ...l, qty_refused: 4 })) }).lines[0].amount).toBe("$0.00");
   expect(toPortalOrderViewProps({ ...onDelivery, shipment: { ...onDelivery.shipment, invoice_timing: "now" } }).lines[0].amount).toBe("$40.00");
 });
+
+describe("Order history pre-orders (portal releases)", () => {
+  const order = (status: string, releaseId: string | null) => ({
+    id: `o-${status}-${releaseId ?? "stock"}`, order_no: 300, status, requested_ship_date: "2026-12-04",
+    order_lines: [{ id: "l1", qty_ordered: 2, qty_shipped: null, unit_price_cents: 1000, release_id: releaseId, skus: { name: "Stout · ⅙ bbl keg" } }],
+  });
+  it("labels a submitted order with a release line a pre-order, and nothing else", () => {
+    const model = toPortalOrdersViewProps({ breweryName: "Demo Brewing", orders: [order("submitted", "r1"), order("submitted", null), order("confirmed", "r1")] });
+    expect(model.rows[0]?.detail).toMatch(/^Pre-order — may change until the brewery confirms · ships Dec 4, 2026/);
+    expect(model.rows[1]?.detail).not.toMatch(/Pre-order/);
+    expect(model.rows[2]?.detail).not.toMatch(/Pre-order/);
+  });
+});

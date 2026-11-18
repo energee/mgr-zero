@@ -32,7 +32,7 @@ import { z } from "zod";
 import { defaultShipToId } from "@/lib/order-form-rules";
 
 const scopeSchema = z.object({ actorId: z.string().uuid(), customerId: z.string().uuid(), breweryId: z.string().uuid() }).strict();
-const fieldsSchema = z.object({ shipToId: z.string().uuid(), poNumber: z.string(), note: z.string(), requestedShipDate: isoDate.nullable(), lines: z.array(z.object({ skuId: z.string().uuid(), qty: z.number().int().positive() }).strict()).min(1) }).strict();
+const fieldsSchema = z.object({ shipToId: z.string().uuid(), poNumber: z.string(), note: z.string(), requestedShipDate: isoDate.nullable(), lines: z.array(z.object({ skuId: z.string().uuid(), qty: z.number().int().positive(), releaseId: z.string().uuid().optional() }).strict()).min(1) }).strict();
 const identitySchema = z.object({ actorId: z.string().uuid(), customerId: z.string().uuid() }).strict();
 const createInputSchema = fieldsSchema.extend({ expectedIdentity: identitySchema });
 const submitInputSchema = z.object({ orderId: z.string().uuid(), expectedIdentity: identitySchema }).strict();
@@ -82,11 +82,12 @@ const workingCartSchema = z.object({
   savedAt: z.number(),
   fields: z.object({ shipToId: z.string(), poNumber: z.string(), note: z.string(), requestedShipDate: z.string().nullable() }),
   // The name is kept so a package later removed from the catalog can still be named in the notice.
-  lines: z.array(z.object({ skuId: z.string(), name: z.string(), qty: z.string() })),
+  // offer is the chosen release id ("" or absent: packaged stock).
+  lines: z.array(z.object({ skuId: z.string(), name: z.string(), qty: z.string(), offer: z.string().optional() })),
 });
-export function saveWorkingCart(storage: CartStorage, scope: PortalScope, cart: { fields: WorkingFields; qty: Record<string, string> }, items: { skuId: string; name: string }[], now = Date.now()) {
+export function saveWorkingCart(storage: CartStorage, scope: PortalScope, cart: { fields: WorkingFields; qty: Record<string, string>; offers?: Record<string, string> }, items: { skuId: string; name: string }[], now = Date.now()) {
   const { shipToId, poNumber, note, requestedShipDate } = cart.fields;
-  const lines = Object.entries(cart.qty).filter(([, qty]) => qty.trim()).map(([skuId, qty]) => ({ skuId, qty, name: items.find(i => i.skuId === skuId)?.name ?? skuId }));
+  const lines = Object.entries(cart.qty).filter(([, qty]) => qty.trim()).map(([skuId, qty]) => ({ skuId, qty, name: items.find(i => i.skuId === skuId)?.name ?? skuId, ...(cart.offers?.[skuId] ? { offer: cart.offers[skuId] } : {}) }));
   try { storage().setItem(workingCartKey(scope), JSON.stringify({ savedAt: now, fields: { shipToId, poNumber, note, requestedShipDate }, lines })); }
   catch { /* Full, blocked or missing storage: the cart stays in memory only. */ }
 }
@@ -112,6 +113,7 @@ export function restoreWorkingCart(storage: CartStorage, scope: PortalScope, ite
   return {
     fields: { ...saved.fields, shipToId: shipTos.some(s => s.id === saved.fields.shipToId) ? saved.fields.shipToId : defaultShipToId(shipTos) },
     qty: Object.fromEntries(kept.map(l => [l.skuId, l.qty])),
+    offers: Object.fromEntries(kept.flatMap(l => l.offer ? [[l.skuId, l.offer]] : [])),
     removed: saved.lines.filter(l => !available.has(l.skuId)).map(l => l.name),
   };
 }
@@ -127,7 +129,7 @@ export function cartLines(qty: Record<string, string>) {
 }
 export type PortalSavedOrder = {
   order: { id: string; status: string; ship_to_id: string | null; po_number: string | null; note: string | null; requested_ship_date: string | null };
-  lines: { sku_id: string; qty_ordered: number; skus?: { name: string } | null }[];
+  lines: { sku_id: string; qty_ordered: number; release_id?: string | null; skus?: { name: string } | null }[];
 };
 export function reconcilePortalOrder(saved: PortalSavedOrder, items: { skuId: string }[], shipTos: { id: string }[], reorder: boolean) {
   if (!reorder && saved.order.status !== "draft") throw new Error("Only draft orders can be edited. View the order status.");
@@ -139,7 +141,8 @@ export function reconcilePortalOrder(saved: PortalSavedOrder, items: { skuId: st
       shipToId: shipTos.some(s => s.id === saved.order.ship_to_id) ? saved.order.ship_to_id! : "",
       poNumber: reorder ? "" : saved.order.po_number ?? "", note: reorder ? "" : saved.order.note ?? "",
       requestedShipDate: reorder ? null : saved.order.requested_ship_date,
-      lines: saved.lines.filter(l => available.has(l.sku_id)).map(l => ({ skuId: l.sku_id, qty: Number(l.qty_ordered) })),
+      // A reorder starts from the current offers; a draft keeps the release it named.
+      lines: saved.lines.filter(l => available.has(l.sku_id)).map(l => ({ skuId: l.sku_id, qty: Number(l.qty_ordered), ...(!reorder && l.release_id ? { releaseId: l.release_id } : {}) })),
     },
   };
 }
