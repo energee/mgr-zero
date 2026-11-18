@@ -24,9 +24,9 @@ const pick = (
   change?: (value: string) => void,
   placeholder?: string,
   /** Kind only: its id, and the kind suggested from the name. */
-  suggested?: { id: string; suggestion?: { value: string; label: string } },
+  kindControls?: { id: string; suggestion?: { value: string; label: string } },
 ) => (
-  <Fragment key={label}>{E.pick(label, value, options, { onChange: change, placeholder, ...suggested })}</Fragment>
+  <Fragment key={label}>{E.pick(label, value, options, { onChange: change, placeholder, ...kindControls })}</Fragment>
 );
 
 /** Kinds whose extract feeds the recipe OG/FG/ABV prediction (#430). */
