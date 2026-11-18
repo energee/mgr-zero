@@ -3462,7 +3462,7 @@ export const SCREENS: Screen[] = [
     step: 8, slice: "chat", surface: "entry", venue: { name: "Slack", shell: "msg", ctx: "MGR", who: "Direct message", at: "8:43 AM" },
     name: "Personal DM",
     job: "Notify once when linked work becomes assigned, due or overdue",
-    reads: "get_notification_occurrence [design] · owning Today query revalidation",
+    reads: "get_notification_occurrence [view; design] · owning Today query revalidation",
     writes: "snooze_notification · set_notification_preference [integration state only]",
     states: [["quiet hours", "queued until personal window opens"], ["resolved", "same message updates to Resolved"], ["retry", "same semantic delivery; no second message"], ["unauthorized", "suppress and unlink if membership ended", 1]],
     spec: "The provider message is a projection. Deleting it does not change MGR. Deep links contain no trusted actor or tenant claims.",
