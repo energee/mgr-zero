@@ -1,14 +1,13 @@
-// scripts/experiment-material-category.ts — runs the synthetic material kind cases against a Gateway decision model
+// scripts/experiment-material-category.ts — runs the synthetic material kind cases against a decision model (TypeSafe or Gateway)
 // in both criteria orders and prints accuracy, hop recall, order flips, latency and threshold coverage/precision.
 // Synthetic cases only: it never reads a database or real brewery data. --dry-run sends nothing.
 import { readFile } from "node:fs/promises";
 import { experimental_decide } from "ai";
 import { z } from "zod";
-import { isChatConfigured } from "../lib/env/server-parser";
 import { MATERIAL_CATEGORIES } from "../lib/mgr/enums";
-import { materialCategoryQuestion, SUGGESTION_MODEL } from "../lib/mgr/material-category-suggestion";
+import { isDecisionModelConfigured, materialCategoryQuestion, resolveDecisionModel, SUGGESTION_MODEL } from "../lib/mgr/material-category-suggestion";
 
-const USAGE = "Usage: bun scripts/experiment-material-category.ts --dry-run|--live [--model <gateway decision model id>]";
+const USAGE = "Usage: bun scripts/experiment-material-category.ts --dry-run|--live [--model <typesafe:model or gateway decision model id>]";
 const THRESHOLDS = [0.6, 0.7, 0.8, 0.9];
 const caseSchema = z.object({ id: z.string().min(1), name: z.string().min(1), expected: z.enum(MATERIAL_CATEGORIES) });
 type Case = z.infer<typeof caseSchema>;
@@ -65,7 +64,7 @@ async function main(): Promise<void> {
   const { live, model } = parseArgs(process.argv.slice(2));
   const cases = z.array(caseSchema).min(1).parse(JSON.parse(await readFile(new URL("./material-category-cases.json", import.meta.url), "utf8")));
   if (new Set(cases.map(item => item.id)).size !== cases.length) throw new Error("Duplicate case IDs");
-  if (live && !isChatConfigured()) throw new Error("Live experiment requires AI Gateway credentials. No requests were sent.");
+  if (live && !isDecisionModelConfigured(model)) throw new Error(`Live experiment requires credentials for ${model}. No requests were sent.`);
   print({ type: "run", mode: live ? "live" : "dry_run", model, cases: cases.length, requests: cases.length * 2, syntheticOnly: true });
   const results: Result[] = [];
   for (const item of cases) {
@@ -75,7 +74,7 @@ async function main(): Promise<void> {
       print({ type: "request", caseId: item.id, order, request });
       if (!live) continue;
       const started = performance.now();
-      const { answers } = await experimental_decide({ ...request, maxRetries: 0, abortSignal: AbortSignal.timeout(30_000) });
+      const { answers } = await experimental_decide({ ...request, model: resolveDecisionModel(model), maxRetries: 0, abortSignal: AbortSignal.timeout(30_000) });
       const answer = answers.category;
       const result: Result = {
         caseId: item.id, order, expected: item.expected, choice: answer.choice,

@@ -10,7 +10,7 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 function runExperiment(...args: string[]) {
   return spawnSync("bun", ["scripts/experiment-material-category.ts", ...args], {
     cwd: root,
-    env: { ...process.env, AI_GATEWAY_API_KEY: "", VERCEL_OIDC_TOKEN: "", VERCEL: "" },
+    env: { ...process.env, AI_GATEWAY_API_KEY: "", VERCEL_OIDC_TOKEN: "", VERCEL: "", TYPESAFE_API_KEY: "" },
     encoding: "utf8",
     timeout: 10_000,
   });
@@ -24,10 +24,10 @@ describe("material kind experiment CLI safety", () => {
     expect(result.stdout).toBe("");
   });
 
-  it("refuses live inference without Gateway credentials before emitting requests", () => {
+  it("refuses live inference without the model's credentials before emitting requests", () => {
     const result = runExperiment("--live");
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("Live experiment requires AI Gateway credentials. No requests were sent.");
+    expect(result.stderr).toContain("Live experiment requires credentials for typesafe:jev-1.14.0. No requests were sent.");
     expect(result.stdout).toBe("");
   });
 

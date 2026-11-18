@@ -8,11 +8,12 @@ import {
   confidentChoice,
   MATERIAL_CATEGORY_MIN_PROBABILITY,
   materialCategoryQuestion,
+  resolveDecisionModel,
   SUGGESTION_MODEL,
 } from "@/lib/mgr/material-category-suggestion";
 
 /** The suggested kind, or null when no kind reached the threshold. Errors (refusal, timeout, Gateway down) throw. */
-export async function suggestMaterialCategory(name: string, model: Experimental_DecisionModel = SUGGESTION_MODEL) {
+export async function suggestMaterialCategory(name: string, model: Experimental_DecisionModel = resolveDecisionModel(SUGGESTION_MODEL)) {
   const result = await experimental_decide({
     model,
     state: { materialName: name },

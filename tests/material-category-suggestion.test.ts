@@ -5,8 +5,10 @@ import { describe, expect, it } from "vitest";
 import { MATERIAL_CATEGORIES } from "@/lib/mgr/enums";
 import {
   confidentChoice,
+  isDecisionModelConfigured,
   MATERIAL_CATEGORY_CRITERIA,
   materialCategoryQuestion,
+  resolveDecisionModel,
 } from "@/lib/mgr/material-category-suggestion";
 import { suggestMaterialCategory } from "@/lib/suggest-material-category";
 
@@ -34,6 +36,24 @@ describe("confidentChoice", () => {
 
   it("returns null without probabilities", () => {
     expect(confidentChoice({ choice: "hop" }, 0.8)).toBeNull();
+  });
+});
+
+describe("decision model IDs", () => {
+  it("sends a typesafe: ID straight to TypeSafe with TYPESAFE_API_KEY", () => {
+    const model = resolveDecisionModel("typesafe:jev-1.14.0", { TYPESAFE_API_KEY: "k" });
+    expect(typeof model === "object" && [model.provider, model.modelId]).toEqual([expect.stringContaining("typesafe"), "jev-1.14.0"]);
+  });
+
+  it("passes any other ID through as a Gateway model string", () => {
+    expect(resolveDecisionModel("typesafe-ai/jev-1.14.0", {})).toBe("typesafe-ai/jev-1.14.0");
+  });
+
+  it("is configured only when that ID's own credentials are set", () => {
+    expect(isDecisionModelConfigured("typesafe:jev-1.14.0", { TYPESAFE_API_KEY: "k" })).toBe(true);
+    expect(isDecisionModelConfigured("typesafe:jev-1.14.0", { AI_GATEWAY_API_KEY: "g" })).toBe(false);
+    expect(isDecisionModelConfigured("typesafe-ai/jev-1.14.0", { AI_GATEWAY_API_KEY: "g" })).toBe(true);
+    expect(isDecisionModelConfigured("typesafe-ai/jev-1.14.0", { TYPESAFE_API_KEY: "k" })).toBe(false);
   });
 });
 
