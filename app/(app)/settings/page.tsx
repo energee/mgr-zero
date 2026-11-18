@@ -6,7 +6,6 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { redirect } from "next/navigation";
 import { deniedHref } from "@/lib/mgr/denied";
 import { plural } from "@/lib/mgr/plural";
-import { dollarsInput } from "@/lib/mgr/money";
 import "@/lib/commands/all";
 import { PortalFulfillmentForm } from "./portal-fulfillment-form";
 import { SettingsForm, type BrewerySettings } from "./settings-form";
@@ -53,7 +52,6 @@ export default async function SettingsPage() {
         booksOpenedOn: row.books_opened_on ?? "",
         hasFiledReports,
         basisCorrections,
-        oneWayKegFee: dollarsInput(row.one_way_keg_fee_cents),
         aiModel: ai.model,
         aiModels,
         agentsEnabled: row.agents_enabled,

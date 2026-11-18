@@ -39,7 +39,8 @@ export type OrderViewModel = {
   title: string;
   /** The customer's name, or "Taproom transfer". */
   customer: string;
-  kind: "Wholesale" | "Taproom transfer";
+  /** A wholesale order's sale channel name ("Wholesale" without one), or "Taproom transfer". */
+  kind: string;
   currentState: string;
   stateTone: "ok" | "w" | "";
   next: string;
@@ -87,6 +88,8 @@ export type OrderSnapshot = {
     repick_since?: string | null;
     from_location_id?: string;
     customers: { name: string } | null;
+    /** The order's sale channel; it sets prices and the one-way keg fee. */
+    sale_channels?: { name: string } | null;
     ship_tos: { label: string; country: string; city: string | null; state: string | null } | null;
   };
   locations?: { id: string; name: string }[];
@@ -186,7 +189,7 @@ function orderSummary(
     return {
       rows: [{ label: "Keg deposits and fees", value: "Not finalized until submission" }],
       total: { label: "Items estimate", value: items },
-      note: "Saved lines at their captured prices. Keg deposits and one-way fees are set when the order is submitted.",
+      note: "Saved lines at their captured prices. Keg deposits are set when the order is submitted; a one-way keg fee is set from the sale channel when its line is added.",
     };
   }
   if (!deposits || lines.some((l) => l.one_way_fee_cents === undefined)) {
@@ -261,7 +264,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, deliver
     backHref,
     title: docNo("ORD", order.order_no, "Order"),
     customer: order.customers?.name ?? "Taproom transfer",
-    kind: order.kind === "taproom_transfer" ? "Taproom transfer" : "Wholesale",
+    kind: order.kind === "taproom_transfer" ? "Taproom transfer" : order.sale_channels?.name ?? "Wholesale",
     currentState: `${state.label}${order.needs_restock ? " · restock pending" : ""}`,
     stateTone: order.needs_restock ? "w" : order.status === "cancelled" ? "" : "ok",
     next: `Next: ${state.next}`,

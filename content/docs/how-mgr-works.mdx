@@ -134,7 +134,7 @@ An empty cell means unpriced, and an order for that SKU is refused. Zero is a va
 
 A keg pool is a group of returnable kegs counted together: owned, leased or pay per fill. MGR counts kegs by pool, size and bin, not by serial number. A customer's kegs out are shipped less returned less lost. This shows who to chase for empties.
 
-Shipping keg beer records the shells leaving. Full kegs returned with their beer record the shells coming back. One-way kegs are packaging materials, not a pool. They carry a one-way keg fee instead of a deposit.
+Shipping keg beer records the shells leaving. Full kegs returned with their beer record the shells coming back. One-way kegs are packaging materials, not a pool. They carry their sale channel's one-way keg fee instead of a deposit.
 
 **Common mistake:** treating the deposit and the shell as one thing. They are separate records, so a refund without a check-in can leave them disagreeing, and MGR flags the mismatch. Beer still ships when the shell count is short. MGR warns instead of refusing.
 
@@ -174,7 +174,7 @@ Admin can take every step below that Sales, Warehouse or Brewer can.
 
 | Step | What moves it |
 | --- | --- |
-| To submitted | Sales or the buyer submits. Keg deposits and one-way fees are set here. |
+| To submitted | Sales or the buyer submits. Keg deposits are set here; a one-way keg fee was already set from the sale channel when its line was added. |
 | To confirmed | Sales confirms, which reserves stock. |
 | To picked | Warehouse has counted every line. |
 | Back to confirmed | Sales adds or raises a line on a picked order, so it needs another pick. |

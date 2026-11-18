@@ -26,9 +26,10 @@ beforeAll(async () => {
   whId = (await seedLocation(breweryId)).id;
   ({ skuId } = await seedCatalog(breweryId, { product: "Old IPA", sku: "Old IPA case" }));
   ({ skuId: keg } = await seedCatalog(breweryId, { product: "Old Pils", sku: "Old Pils half", packageType: "keg", bblPerUnit: 0.5 }));
-  ({ customerId, shipToId } = await seedCustomer(breweryId, { name: "Cedar Distribution" }));
+  let saleChannelId: string;
+  ({ customerId, shipToId, saleChannelId } = await seedCustomer(breweryId, { name: "Cedar Distribution" }));
   ({ shipToId: otherShipToId } = await seedCustomer(breweryId, { name: "River" }));
-  await runCommand("set_one_way_keg_fee", { feeCents: 1000 }, owner);
+  await runCommand("upsert_sale_channel", { id: saleChannelId, name: "Wholesale", taxTreatment: "taxable", oneWayKegFeeCents: 1000 }, owner);
   await runCommand("set_books_opened_on", { booksOpenedOn: "2026-10-01" }, owner);
 });
 
@@ -43,7 +44,8 @@ describe("record_historical_order", () => {
       .eq("order_id", r.order_id).order("unit_price_cents").throwOnError()).data!;
     expect(lines).toEqual([
       { sku_id: skuId, qty_ordered: 3, qty_picked: 3, qty_shipped: 3, unit_price_cents: 4500, one_way_fee_cents: null },
-      { sku_id: keg, qty_ordered: 2, qty_picked: 2, qty_shipped: 2, unit_price_cents: 16000, one_way_fee_cents: null },
+      // A historical one-way keg line takes its channel fee, like any added line.
+      { sku_id: keg, qty_ordered: 2, qty_picked: 2, qty_shipped: 2, unit_price_cents: 16000, one_way_fee_cents: 1000 },
     ]);
     const shipment = (await admin.from("shipments").select("id, invoice_timing, shipped_at").eq("order_id", r.order_id).single().throwOnError()).data!;
     expect(shipment).toMatchObject({ invoice_timing: "now", shipped_at: order.shipped_at });

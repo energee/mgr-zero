@@ -1,11 +1,10 @@
 // tests/settings-view.test.ts — the Settings brewery form's books-opened field
 // (docs/plans/lolev-history.md task 4): the form saves it through its own
 // command, and only when it changed, so a refused date never blocks the rest.
-// The one-way keg fee field saves the same way (docs/plans/lolev-orders.md task 6).
 import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { booksOpenedChange, oneWayKegFeeChange, oneWayKegFeeError, toBrewerySettingsValues, breweryOperatingDefaultsCommand, brewerySettingsReason, refreshBrewerySettingsValues } from "@/lib/mgr/settings-view";
+import { booksOpenedChange, toBrewerySettingsValues, breweryOperatingDefaultsCommand, brewerySettingsReason, refreshBrewerySettingsValues } from "@/lib/mgr/settings-view";
 import { BrewerySettingsFormView } from "@/components/mgr/views/brewery-settings-form";
 import { E } from "@/components/mgr/e";
 import { SettingsView } from "@/components/mgr/views/settings";
@@ -21,7 +20,7 @@ vi.mock("@/lib/commands/use-command-form", () => ({ useCommandAction: () => acti
 const brewery = {
   name: settingsDemo.name, timezone: settingsDemo.timezone, ttb_registry_no: settingsDemo.ttb,
   customer_phone: settingsDemo.phone,
-  fermentation_reading_due_hours: 24, days_to_package: 14, books_opened_on: null, one_way_keg_fee_cents: 1000,
+  fermentation_reading_due_hours: 24, days_to_package: 14, books_opened_on: null,
 };
 
 describe("Settings save readiness (#1316)", () => {
@@ -195,33 +194,6 @@ describe("booksOpenedChange", () => {
   });
 });
 
-describe("oneWayKegFeeChange", () => {
-  it("is nothing when the fee did not change", () => {
-    expect(oneWayKegFeeChange(1000, "10.00")).toBeUndefined();
-    expect(oneWayKegFeeChange(0, "")).toBeUndefined();
-  });
-
-  it("sends the new fee in cents, and a cleared field as no fee", () => {
-    expect(oneWayKegFeeChange(1000, "12.50")).toEqual({ feeCents: 1250 });
-    expect(oneWayKegFeeChange(1000, "")).toEqual({ feeCents: 0 });
-  });
-});
-
-describe("one-way fee readiness before sequential settings writes", () => {
-  it.each(["1.234", "-1", "1e2", "21474836.48"])("blocks invalid fee %s before any settings command", oneWayKegFee => {
-    action.run.mockReset();
-    const live = SettingsForm({ brewery });
-    live.props.onSave({ ...live.props.initial, name: "Changed brewery", oneWayKegFee });
-    expect(action.run).not.toHaveBeenCalled();
-  });
-  it.each(["1.234", "-1", "1e2", "1E2", "Infinity", "NaN", "0x10", "21474836.48"])("refuses %s without silently rounding or converting notation", value => {
-    expect(oneWayKegFeeError(value)).toEqual(expect.any(String));
-  });
-  it.each(["", "0", "0.00", "1.23", "1.2300", ".50", "21474836.47"])("accepts the existing whole-cent value %s", value => {
-    expect(oneWayKegFeeError(value)).toBeUndefined();
-  });
-});
-
 describe("Settings sections (#1025)", () => {
   const html = renderToStaticMarkup(createElement(SettingsView, { model: settingsDemo }));
   const forms = html.split("<form").slice(1).map((chunk) => chunk.slice(0, chunk.indexOf("</form>")));
@@ -235,9 +207,9 @@ describe("Settings sections (#1025)", () => {
     for (const field of ["AI model", "Portal fulfillment warehouse"]) expect(html, field).toContain(field);
   });
 
-  it("explains missing versus zero on the one-way fee and the reading hours", () => {
+  it("explains missing versus zero on the reading hours", () => {
     const brewery = forms.find((form) => form.includes("Brewery details"))!;
-    for (const [field, help] of [["oneWayKegFee", /blank.*no fee|no fee.*blank/i], ["hours", /required.*1 to 168|1 to 168.*cannot be blank/i]] as const) {
+    for (const [field, help] of [["hours", /required.*1 to 168|1 to 168.*cannot be blank/i]] as const) {
       const id = new RegExp(`id="([^"]*-${field})"`).exec(brewery)?.[1];
       expect(id, field).toBeDefined();
       const described = new RegExp(`id="${id}"[^>]*aria-describedby="([^"]+)"|aria-describedby="([^"]+)"[^>]*id="${id}"`).exec(brewery);

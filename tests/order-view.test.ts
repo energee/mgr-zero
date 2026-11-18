@@ -514,3 +514,14 @@ describe("#1517 order ↔ invoice", () => {
     expect(readFileSync(PAGE, "utf8")).toMatch(/invoice: shipment\?\.invoices\[0\] \?\? null/);
   });
 });
+
+describe("order header channel", () => {
+  it("names a wholesale order's sale channel, since the channel sets prices and the one-way keg fee", () => {
+    const snap = { ...orderConfirmedWholesale, order: { ...orderConfirmedWholesale.order, sale_channels: { name: "Export" } } };
+    expect(toOrderViewProps(snap).kind).toBe("Export");
+  });
+
+  it("falls back to Wholesale when the read carries no channel", () => {
+    expect(toOrderViewProps(orderConfirmedWholesale).kind).toBe("Wholesale");
+  });
+});

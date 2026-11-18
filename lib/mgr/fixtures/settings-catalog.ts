@@ -14,10 +14,10 @@ const CH_EXPORT = "00000000-0000-4000-8000-0000000000h4";
  *  so every one is in use. */
 export const saleChannelsList: SaleChannelsSnapshot = {
   channels: [
-    { id: CH_WHOLESALE, name: "Wholesale", tax_treatment: "taxable", in_use: true, system_code: null, movements: 118 },
-    { id: CH_TAPROOM, name: "Taproom", tax_treatment: "taxable", in_use: true, system_code: "taproom", movements: 402 },
-    { id: CH_DTC, name: "DTC", tax_treatment: "taxable", in_use: true, system_code: null, movements: 34 },
-    { id: CH_EXPORT, name: "Export", tax_treatment: "export", in_use: true, system_code: null, movements: 6 },
+    { id: CH_WHOLESALE, name: "Wholesale", tax_treatment: "taxable", in_use: true, system_code: null, one_way_keg_fee_cents: 0, movements: 118 },
+    { id: CH_TAPROOM, name: "Taproom", tax_treatment: "taxable", in_use: true, system_code: "taproom", one_way_keg_fee_cents: 0, movements: 402 },
+    { id: CH_DTC, name: "DTC", tax_treatment: "taxable", in_use: true, system_code: null, one_way_keg_fee_cents: 0, movements: 34 },
+    { id: CH_EXPORT, name: "Export", tax_treatment: "export", in_use: true, system_code: null, one_way_keg_fee_cents: 1000, movements: 6 },
   ],
 };
 
@@ -26,6 +26,7 @@ export const channelExport: ChannelSnapshot = {
   id: CH_EXPORT,
   name: "Export",
   tax_treatment: "export",
+  one_way_keg_fee_cents: 1000,
 };
 
 /** Brewery default Plato, no personal override — inventory Units. */
