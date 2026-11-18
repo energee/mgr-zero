@@ -113,7 +113,7 @@ Ranked by value over risk, then by how much already exists.
 ### 3. Receipt and PO notes (use case 3)
 
 - **Experiment:** 20 synthetic receipt notes (damaged, short, substituted,
-  routine, negated). Same CLI shape and pass bar as order notes.
+  routine, negated). Same CLI shape as order notes.
 - **Pass bar:** as order notes.
 - **Integration:** one query over receipts; the flag shows on the receipt and
   the vendor detail page. Receiving, costs and the Bill do not change.
