@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { expect, it } from "vitest";
-import { breweryDate, formatDate, formatDateTime, formatDayHeader, dateTimeInput, dateTimeInputInstant } from "@/lib/date-format";
+import { breweryDate, formatAgo, formatDate, formatDateTime, formatDayHeader, dateTimeInput, dateTimeInputInstant } from "@/lib/date-format";
 import { formatTime } from "@/lib/time-window";
 
 it("uses consistent user-facing date formats without timestamp seconds", () => {
@@ -86,4 +86,15 @@ it("never hands formatDate a timestamp field without the brewery's zone (#442)",
   const offenders = files.flatMap(file => [...readFileSync(new URL(file, root), "utf8")
     .matchAll(/formatDate\(\s*[\w.?!]*(?:_at|\.at|At)!?\s*\)/g)].map(match => `${file}: ${match[0]}`));
   expect(offenders).toEqual([]);
+});
+
+it("formatAgo prints a reading's age briefly: now, minutes, hours, then days", () => {
+  const now = new Date("2026-11-17T12:00:00Z");
+  expect(formatAgo("2026-11-17T11:59:40Z", now)).toBe("just now");
+  expect(formatAgo("2026-11-17T11:40:00Z", now)).toBe("20m ago");
+  expect(formatAgo("2026-11-17T09:00:00Z", now)).toBe("3h ago");
+  expect(formatAgo("2026-11-16T11:00:00Z", now)).toBe("1d ago");
+  expect(formatAgo("2026-11-07T12:00:00Z", now)).toBe("10d ago");
+  // A clock a little ahead of the server is not "in the future".
+  expect(formatAgo("2026-11-17T12:01:00Z", now)).toBe("just now");
 });
