@@ -15,6 +15,7 @@ export function PlanningView({ model, groupAction, releaseAction }: {
   /** Live: the Release for ordering form for one batch. The inventory draws an inert button. */
   releaseAction?: (batch: PlanningReleaseView) => ReactNode;
 }) {
+  // Released reads as text; otherwise admin and sales get the verb (inert in the inventory).
   const release = (batch: PlanningReleaseView) =>
     batch.released ? <span className="text-sm text-muted-foreground">Released</span>
       : batch.canRelease ? releaseAction?.(batch) ?? E.btn("Release for ordering", "g") : null;

@@ -257,7 +257,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     set_personal_quiet_hours: [B,"22:00","07:00","America/New_York",R()], snooze_notification: [B,delivery,new Date(Date.now()+3600000).toISOString(),R()],
     generate_compliance_report: [B,"TTB",day,day], get_chat_integration_health: [B], list_chat_user_links: [B],
     get_square_connected: [B], list_compliance_active_months: [B,day,day],
-    update_bin: [B,emptyBin,name,R()], update_location: [B,W,name,["warehouse"],R()], update_sku: [B,SKU,true,null,R(),null,false,0.5,false], raise_invoice_question: [B,f.invoice.id,"Fixture question",R()],
+    update_bin: [B,emptyBin,name,R()], update_location: [B,W,name,["warehouse"],R()], update_sku: [B,SKU,true,null,R(),null,false,0.5,false,null], release_sku: [B,null,null,null,[{sku_id:SKU,qty:1}],R()], update_release: [B,R(),1,null,null,R()], withdraw_release: [B,R(),R()], raise_invoice_question: [B,f.invoice.id,"Fixture question",R()],
     update_packaging_run: [B,readyRun.id,f.occupancy.id,[{sku_id:SKU,qty_planned:1}],now,R()], upsert_material: [B,MAT,"Malt","malt","lb","lb",1,false,VENDOR,0,true,null,null,R(),null],
     upsert_material_contract: [B,contract,VENDOR,MAT,100,100,day,null,name,R()], upsert_vendor: [B,VENDOR,"Vendor",null,null,1,"net30",true,R()], upsert_vessel: [B,emptyVessel.id,name,"fermenter",10,R()], delete_vessel: [B,emptyVessel.id,R()],
     upsert_water_profile: [B,null,name,1,1,1,1,1,1,null,null,null,R()],
@@ -280,6 +280,8 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   readNames.push("get_saved_cola_image_permit");
   // Every staff role reads its brewery's copies of saved COLA labels; store_cola_label_image is service-only.
   readNames.push("get_stored_cola_label_image");
+  // Portal releases: staff counts (Taproom refused) and a buyer's own open releases.
+  readNames.push("release_rows", "portal_releases");
   // Existing-account consent is authenticated own-identity work, covered by existing-account-invites.test.ts.
   const ownNames = ["leave_agent_note","record_agent_step","begin_agent_proposal","create_agent_proposal","decline_agent_proposal","finish_agent_proposal","accept_account_invitation","set_my_gravity_unit","consume_chat_link_proof","unlink_chat_user","set_notification_preference","set_personal_notification_destination","create_chat_conversation","append_chat_message"];
   const existing = [...readFileSync(new URL("./rls-command-boundary.test.ts", import.meta.url), "utf8").matchAll(/rpc: "(\w+)"/g)].map(m => m[1]);
@@ -299,6 +301,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   readSignatures.push("get_staff_chat_installation(uuid)");
   readSignatures.push("get_saved_cola_image_permit(uuid,text,text)");
   readSignatures.push("get_stored_cola_label_image(uuid,text,text)");
+  readSignatures.push("release_rows(uuid,uuid[],uuid[],uuid[])", "portal_releases(uuid)");
   const ownSignatures = ["leave_agent_note(uuid,text,text)","record_agent_step(uuid,text,text,integer,uuid,text,text,text,text,uuid)","begin_agent_proposal(uuid,uuid)","create_agent_proposal(uuid,text,jsonb)","decline_agent_proposal(uuid)","finish_agent_proposal(uuid,text,text)","accept_account_invitation(uuid,uuid)","set_my_gravity_unit(uuid,text,uuid)","consume_chat_link_proof(uuid,text,uuid)","unlink_chat_user(uuid,uuid,uuid)","set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text,boolean,uuid)","set_personal_notification_destination(uuid,text,uuid,uuid)","create_chat_conversation(uuid,text,uuid)","append_chat_message(uuid,uuid,text,text,uuid)"];
   expect(catalog.filter(c => readNames.includes(c.name)).map(c => c.signature).sort()).toEqual(readSignatures.sort());
   expect(catalog.filter(c => ownNames.includes(c.name)).map(c => c.signature).sort()).toEqual([...ownSignatures].sort());

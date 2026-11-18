@@ -5,7 +5,7 @@
 // role reads. Counts and open/closed come from the database
 // (private.release_state through release_rows), never from the page.
 import { z } from "zod";
-import { defineCommand, defineQuery, isoDate, unwrap } from "./registry";
+import { completeRows, defineCommand, defineQuery, isoDate, PAGE_SIZE, unwrap } from "./registry";
 
 const READ_ROLES = ["admin", "sales", "warehouse", "brewer"] as const;
 const WRITE_ROLES = ["admin", "sales"] as const;
@@ -71,9 +71,12 @@ defineQuery({
   roles: [...READ_ROLES],
   input: z.object({ skuIds: z.array(z.string().uuid()).optional().describe("Only these SKUs' projected units") }),
   handler: async (ctx, i) => {
-    let q = ctx.db.from("projected_batch_packaging_units").select("batch_id, batch_no, sku_id, units, needed_by, skus(name, brands(name))")
-      .eq("brewery_id", ctx.breweryId).order("needed_by").order("batch_no");
-    if (i.skuIds) q = q.in("sku_id", i.skuIds);
-    return ((await unwrap(q)) ?? []).map((r) => ({ ...r, units: Number(r.units) }));
+    const rows = await completeRows("Release batches", (start) => {
+      let q = ctx.db.from("projected_batch_packaging_units").select("batch_id, batch_no, sku_id, units, needed_by, skus(name, brands(name))", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).order("needed_by").order("batch_no").order("sku_id");
+      if (i.skuIds) q = q.in("sku_id", i.skuIds);
+      return q.range(start, start + PAGE_SIZE - 1);
+    });
+    return rows.map((r) => ({ ...r, units: Number(r.units) }));
   },
 });

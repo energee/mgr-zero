@@ -43,7 +43,7 @@ create unique index releases_batch_sku_uidx on public.releases (batch_id, sku_id
   where batch_id is not null and withdrawn_at is null;
 create index releases_brewery_sku_idx on public.releases (brewery_id, sku_id);
 alter table public.releases enable row level security;
-create policy releases_staff_read on public.releases for select to authenticated
+create policy staff_read on public.releases for select to authenticated
   using (brewery_id in (select public.my_staff_brewery_ids(array['admin','sales','warehouse','brewer']::public.staff_role[])));
 -- Writes go through release_sku, update_release and withdraw_release (admin/sales).
 revoke all on public.releases from anon, authenticated;
