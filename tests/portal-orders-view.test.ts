@@ -231,7 +231,7 @@ describe("Order history pre-orders (portal releases)", () => {
   });
   it("labels a submitted order with a release line a pre-order, and nothing else", () => {
     const model = toPortalOrdersViewProps({ breweryName: "Demo Brewing", orders: [order("submitted", "r1"), order("submitted", null), order("confirmed", "r1")] });
-    expect(model.rows[0]?.detail).toMatch(/^Pre-order — may change until the brewery confirms · ships Dec 4, 2026/);
+    expect(model.rows[0]?.detail).toMatch(/^Pre-order: may change until the brewery confirms · ships Dec 4, 2026/);
     expect(model.rows[1]?.detail).not.toMatch(/Pre-order/);
     expect(model.rows[2]?.detail).not.toMatch(/Pre-order/);
   });

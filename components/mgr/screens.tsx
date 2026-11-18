@@ -137,6 +137,7 @@ import { ReplenishmentView } from "@/components/mgr/views/replenishment";
 import { PickView } from "@/components/mgr/views/pick";
 import { PickSheetView } from "@/components/mgr/views/pick-sheet";
 import { PlanningView } from "@/components/mgr/views/planning";
+import { EditReleaseView, ReleaseView } from "@/components/mgr/views/release";
 import { DisconnectSquareView, PointOfSaleView, PosItemView, PosMenuView, PosSaleDetailView, PosSyncActions, SquareLocationsView } from "@/components/mgr/views/pos";
 import { PortalAccountView } from "@/components/mgr/views/portal-account";
 import { PortalInvoiceView } from "@/components/mgr/views/portal-invoice";
@@ -193,7 +194,7 @@ import { CellarMapView } from "@/components/mgr/views/cellar-map";
 import { cellarMapBrewer } from "@/lib/mgr/fixtures/production";
 import { OHIO_STOUT_NOTE, LOC_TAPROOM, LOC_WAREHOUSE } from "@/lib/mgr/fixtures/demo";
 import { beerOverview } from "@/lib/mgr/fixtures/beer";
-import { brandHazy, catalogBrands, formatCan, formatsInventory, packageBomCase, skuHazyHalf, skuListHazy, waterProfiles } from "@/lib/mgr/fixtures/catalog";
+import { brandHazy, catalogBrands, formatCan, formatsInventory, packageBomCase, skuHazyHalf, waterProfiles } from "@/lib/mgr/fixtures/catalog";
 import { customerRidgeline, customersList, customersMissingEmail, shipToMain } from "@/lib/mgr/fixtures/customers";
 import { deniedInvoices } from "@/lib/mgr/fixtures/denied";
 import { expiredInvite, expiredReset, noMembership, portalForgotPassword, portalSetPassword, portalSignIn, portalStaffOnly, resetPassword, setPassword, signIn } from "@/lib/mgr/fixtures/entry";
@@ -231,6 +232,8 @@ import {
 import { kegBalanceRidgeline, kegFleet, kegHistoryLedger, kegReportOwned } from "@/lib/mgr/fixtures/kegs";
 import { packagingReady, packagingRuns, repackCase, schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
 import { planningDemo } from "@/lib/mgr/fixtures/planning";
+import { releaseBatches, releaseHazyKeg, skuListReleased } from "@/lib/mgr/fixtures/releases";
+import { batchReleaseForms } from "@/lib/mgr/release-view";
 import { monthlyComplianceAmended, monthlyComplianceAugust, monthlyComplianceSeptember, monthlyComplianceUnbalanced } from "@/lib/mgr/fixtures/monthly-compliance";
 import { confirmDeliveryStop1, driverRouteA, returnRouteA, routeAPlan, routesDriver } from "@/lib/mgr/fixtures/delivery";
 import {
@@ -1063,10 +1066,10 @@ export const SCREENS: Screen[] = [
     tab: "Work",
     name: "Confirm order",
     job: "Confirm a submitted order in two taps from Today",
-    reads: "get_order · get_atp",
+    reads: "get_order · get_atp · list_releases [lines ordering from a portal release]",
     writes: "confirm_order · adjust_order_lines [submitted: replaces lines; allocations wait for confirm] · cancel_order",
-    states: [["loading", "order-shaped skeleton"], ["stale", "line changed · refresh", 1], ["permission", "sales or admin required", 1], ["cancelled", "staged quantities become restock work · Put back clears it"], ["Available below zero", "confirmed anyway: Order confirmed · Available is below zero for … · quantities read-only · Back to order"]],
-    spec: "2 taps from Today: Confirm → Confirm order, only when no blocking review exists. Lines sit under their brand, each named by its format, with the quantity as a number field: editing one asks for a Reason and swaps the verbs for Save lines and Discard changes. Confirm order stays at the bottom of the phone screen; Cancel order is the order page's quiet trigger below it. The registration warning is the same one the Order screen shows; it links to the brand’s compliance rows and never blocks.",
+    states: [["loading", "order-shaped skeleton"], ["slipped", "a release line whose batch is now ready after the requested date · Slipped: batch ready …", 1], ["over release", "a pre-order above a release lowered since · Over release: N ordered of M", 1], ["stale", "line changed · refresh", 1], ["permission", "sales or admin required", 1], ["cancelled", "staged quantities become restock work · Put back clears it"], ["Available below zero", "confirmed anyway: Order confirmed · Available is below zero for … · quantities read-only · Back to order"]],
+    spec: "2 taps from Today: Confirm → Confirm order, only when no blocking review exists. Lines sit under their brand, each named by its format, with the quantity as a number field: editing one asks for a Reason and swaps the verbs for Save lines and Discard changes. Confirm order stays at the bottom of the phone screen; Cancel order is the order page's quiet trigger below it. The registration warning is the same one the Order screen shows; it links to the brand’s compliance rows and never blocks. A line ordered from a portal release is flagged Slipped when its batch is now ready after the requested date, and Over release when staff lowered the release below what is confirmed and pre-ordered on it; staff trim the line or confirm knowingly.",
     to: { "16 oz case": "SKU detail" },
     body: <ConfirmOrderView model={toConfirmOrderViewProps(orderSubmittedRidgeline)} fulfillmentOptions={[LOC_WAREHOUSE.name, LOC_TAPROOM.name]} complianceNote={OHIO_STOUT_NOTE} />,
   },
@@ -1655,8 +1658,8 @@ export const SCREENS: Screen[] = [
     job: "Edit a packaged SKU opened from its brand's Sells as",
     reads: "list_formats · list_keg_pools",
     writes: "update_sku",
-    states: [["permission", "sales or admin required", 1], ["active", "available to price and sell"], ["inactive", "history remains", 1], ["in use", "format cannot change; create another SKU", 1], ["keg pool", "keg formats only · None charges no deposit"], ["no pool", "warning on SKU list · no deposit", 1], ["batch share", "optional percentage on an existing SKU · brand total at most 100%"]],
-    spec: "A SKU is one brand in one packaged format, and holds stock. The Brand page's Sells as switch creates it, turns it off and back on; Edit SKU there opens this sheet. A pour is not a SKU: it is added on its price group. It owns active state, optional UPC, and provider mappings. Edit SKU also sets its default batch package share as a percentage; blank projects nothing, and all shares of one brand total at most 100%. Create first, then edit to set the share. A keg SKU selects a Keg pool or None; the pool kind derives container source. Out-of-service pools cannot be newly linked; existing links survive retirement. Price lives on the grid cell (sale channel × price group × format), never as a SKU exception. Group-shared barcodes are a follow-on table; until then a SKU may carry its own UPC. Name, volume and packaging derive from the Format. A different physical package is a different Format. Corrections affect future calculations and open plans; recorded movement volumes and closed packaging yield stay frozen.",
+    states: [["permission", "sales or admin required", 1], ["active", "available to price and sell"], ["inactive", "history remains", 1], ["orderable from stock", "on by default · off hides the portal stock offer; staff ordering and releases are unchanged"], ["in use", "format cannot change; create another SKU", 1], ["keg pool", "keg formats only · None charges no deposit"], ["no pool", "warning on SKU list · no deposit", 1], ["batch share", "optional percentage on an existing SKU · brand total at most 100%"]],
+    spec: "A SKU is one brand in one packaged format, and holds stock. The Brand page's Sells as switch creates it, turns it off and back on; Edit SKU there opens this sheet. A pour is not a SKU: it is added on its price group. It owns active state, optional UPC, and provider mappings. Orderable from stock says whether portal buyers can order it from packaged stock; off keeps it out of the portal unless a release offers it. Edit SKU also sets its default batch package share as a percentage; blank projects nothing, and all shares of one brand total at most 100%. Create first, then edit to set the share. A keg SKU selects a Keg pool or None; the pool kind derives container source. Out-of-service pools cannot be newly linked; existing links survive retirement. Price lives on the grid cell (sale channel × price group × format), never as a SKU exception. Group-shared barcodes are a follow-on table; until then a SKU may carry its own UPC. Name, volume and packaging derive from the Format. A different physical package is a different Format. Corrections affect future calculations and open plans; recorded movement volumes and closed packaging yield stay frozen.",
     body: <SkuView model={toSkuViewProps(skuHazyHalf)} />,
   },
   {
@@ -1664,13 +1667,41 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "SKU list",
-    to: { Edit: "SKU", Pint: "SKU" },
-    job: "See a brand's packaged SKUs and its price group's pours, from an old link",
-    reads: "list_skus",
-    writes: "none [editing happens on SKU detail]",
-    states: [["permission", "sales or admin required", 1], ["active", "available to price and sell"], ["inactive", "history remains", 1], ["empty", "points to Sells as on the Brand page"]],
-    spec: "Kept for old links. Packages are switched on under the Brand page's Sells as, so there is no New SKU here; Brand goes back to that section. Pours (servings from the tap) are added on the price group.",
-    body: <SkuListView model={toSkuListViewProps(skuListHazy)} createAction={null} />,
+    to: { Edit: "SKU", Pint: "SKU", "Release for ordering": "Release for ordering", "Release · Batch 41": "Edit release" },
+    job: "See a brand's packaged SKUs and its price group's pours, and release a SKU for portal ordering",
+    reads: "list_skus · list_releases · list_release_batches",
+    writes: "release_sku · update_release · withdraw_release [editing a SKU happens on SKU detail]",
+    states: [["permission", "sales or admin required", 1], ["active", "available to price and sell"], ["inactive", "history remains", 1], ["not orderable from stock", "named on the row · the portal offers it only through a release"], ["release", "an open release is its own row under the SKU · left of total, confirmed, pre-ordered, dates · Edit and Withdraw"], ["empty", "points to Sells as on the Brand page"]],
+    spec: "Kept for old links. Packages are switched on under the Brand page's Sells as, so there is no New SKU here; Brand goes back to that section. Pours (servings from the tap) are added on the price group. Admin and sales release an active SKU for portal ordering here, from packaged stock or a planned batch; each open release sits under its SKU with Edit (quantity, order-by date) and Withdraw.",
+    body: <SkuListView model={toSkuListViewProps(skuListReleased)} createAction={null} />,
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "More",
+    surface: "sheet",
+    name: "Release for ordering",
+    to: { "Release for ordering": "SKU list" },
+    job: "Offer a planned batch or packaged stock to portal buyers, up to a quantity, from a date",
+    reads: "list_release_batches",
+    writes: "release_sku",
+    states: [["permission", "sales or admin required", 1], ["from a batch", "every projected package ticked at its projected units · ships from the batch's ready date"], ["from stock", "quantity typed · ships from today · refused above what is free to promise", 1], ["one SKU", "from the SKU list: pick packaged stock or a planned batch of its brand"], ["already released", "one open release per batch and package; edit it instead", 1]],
+    spec: "Opened from a planned batch on Planning or from a SKU on the SKU list. Untick a package to leave it out, or lower its quantity. Order by is optional; buyers order until that day. Saving writes one release per package. Remaining is the quantity less what submitted and confirmed orders hold; drafts do not count.",
+    body: <ReleaseView form={batchReleaseForms(releaseBatches)[0]} />,
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "More",
+    surface: "sheet",
+    name: "Edit release",
+    to: { "Save release": "SKU list" },
+    job: "Change an open release's quantity or order-by date",
+    reads: "list_releases",
+    writes: "update_release · withdraw_release",
+    states: [["permission", "sales or admin required", 1], ["below confirmed", "refused: never below what is confirmed", 1], ["below pre-orders", "allowed · Confirm order flags the pre-orders above it as Over release"], ["withdrawn", "buyers can no longer order · submitted orders stay"]],
+    spec: "Opened by Edit on an open release's row on the SKU list; Withdraw sits beside it. A stock release can grow only within what is free to promise.",
+    body: <EditReleaseView qty={String(releaseHazyKeg.qty)} ordersCloseOn={releaseHazyKeg.orders_close_on ?? ""} confirmed={releaseHazyKeg.confirmed} />,
   },
   {
     step: 6,
@@ -1681,8 +1712,8 @@ export const SCREENS: Screen[] = [
     job: "A buyer catalog: listed packages by brand, quantity, Place order",
     reads: "portal_catalog · get_portal_account · portal_order",
     writes: "portal_quote_order · portal_create_order · portal_update_draft_order · portal_submit_quote",
-    states: [["empty catalog", "call brewery; nothing orderable"], ["missing price", "item cannot enter cart", 1], ["no ship-to", "contact brewery; choose an existing ship-to", 1], ["no source", "Review stays off until the brewery sets where orders ship from", 1], ["unlisted package", "a format not on the wholesale list is absent", 1], ["quote changed", "return to Shop and review current details", 1], ["receipt", "ORD number after commit"]],
-    spec: "Grouped by brand; each row is a package the brewery listed for wholesale (½ keg, ⅙ keg, case, bottle). The list is the offer, not warehouse ATP: no in/low/out badges, no counts. Unlisted packages are absent, not greyed. Schedule packaging run is where staff designate the list. Drawn with a fulfillment source already set; the no-source state keeps Review off and never silently chooses Warehouse. Stepper − and + each ship as 48×48 targets. On a phone, Save draft and Review order (which carries the subtotal) stay pinned to the foot of the scroll. No staff vocabulary (ATP, gates, fulfillment engineering) anywhere in the portal. No persistent cart: leaving the page keeps nothing. Reorder on a shipped order still prefills Review.",
+    states: [["empty catalog", "call brewery; nothing orderable"], ["release offer", "a released package reads From Dec 4 · order by Nov 27 · few left or sold out when little or none is left"], ["stock or release", "a package offered both ways picks From stock or the release"], ["ships from", "a release line moves the requested date to its ships-from date · This order ships from …"], ["missing price", "item cannot enter cart", 1], ["no ship-to", "contact brewery; choose an existing ship-to", 1], ["no source", "Review stays off until the brewery sets where orders ship from", 1], ["unlisted package", "a format not on the wholesale list is absent", 1], ["quote changed", "return to Shop and review current details", 1], ["receipt", "ORD number after commit"]],
+    spec: "Grouped by brand; each row is a package the brewery listed for wholesale (½ keg, ⅙ keg, case, bottle). The list is the offer, not warehouse ATP: no stock badges, no counts. A package staff turned off for stock appears only while a release offers it; a release says when it ships and the order-by date, and only few left or sold out. Mixed carts are allowed: the order's requested date moves to the latest ships-from date among its release lines. Unlisted packages are absent, not greyed. Schedule packaging run is where staff designate the list. Drawn with a fulfillment source already set; the no-source state keeps Review off and never silently chooses Warehouse. Stepper − and + each ship as 48×48 targets. On a phone, Save draft and Review order (which carries the subtotal) stay pinned to the foot of the scroll. No staff vocabulary (ATP, gates, fulfillment engineering) anywhere in the portal. No persistent cart: leaving the page keeps nothing. Reorder on a shipped order still prefills Review.",
     body: <ShopView model={toShopViewProps(ridgelineShop)} />,
   },
   {
@@ -2878,12 +2909,12 @@ export const SCREENS: Screen[] = [
     slice: 8,
     group: "Desk",
     name: "Planning",
-    to: { "Can labels": "Edit material", "Quadpack carriers": "Edit material", "Hazy ATP negative Sep 9, 2026": "Pars and allocation", "Create purchase order": "New PO", "Set vendor": "Materials on hand", "Hop bags": "Edit material", "Fictional Packaging Supply": "Vendor", "Fictional Label Works": "Vendor" },
+    to: { "Release for ordering": "Release for ordering", "Can labels": "Edit material", "Quadpack carriers": "Edit material", "Hazy ATP negative Sep 9, 2026": "Pars and allocation", "Create purchase order": "New PO", "Set vendor": "Materials on hand", "Hop bags": "Edit material", "Fictional Packaging Supply": "Vendor", "Fictional Label Works": "Vendor" },
     job: "See demand gaps by vendor and create each vendor's purchase order, without priority state",
-    reads: "get_material_requirements",
-    writes: "draft_purchase_order_from_requirements [one RPC: one draft PO per resolved vendor + lines; the buy-by date is needed-by less the vendor's lead time]",
-    states: [["gap", "demand exceeds supply in that week · the only actionable row"], ["projected", "includes N projected · uncovered orders and batch package shares"], ["covered", "supply meets demand · shown so the horizon reads continuously"], ["by vendor", "rows group under the vendor they resolve to, A to Z · each group ends with its own Create purchase order"], ["partly unbuyable", "a row already past its buy-by date is drawn out of reach · the rest of its group still drafts", 1], ["no vendor", "no contract and no default supplier · grouped last under No vendor · each row offers Set vendor, which opens Materials at that material", 1], ["empty", "No material shortages · shortage-only, so it never claims work is scheduled · links to Batches, Packaging, and Materials · drawn as Planning empty"]],
-    spec: "Material demand combines unbrewed recipe ingredients, open packaging runs, and projected packaging from uncovered orders and active batches with SKU package shares. Batch units are rounded down from planned barrels times the SKU share divided by format volume; needed-by is brew date (planned until brewed) plus Days to package. Any non-cancelled run linked directly or through its source tank replaces the whole batch projection, including after it closes. An unlinked tankless run does not identify a batch and cannot replace that batch's projection. Order projection is the smaller of negative ATP and open order allocations, less open runs and projected batch units of that SKU, so stock and planned supply are never counted twice. Standing allocations hold stock ahead of orders but never project alone. Order needed-by is the earliest requested ship date, or today without one. Packaging units flow through the format's material quantities once, rounding each-count materials up. One row per material includes the projected portion and reads includes N projected. On-hand material and unreceived purchase orders reduce the gap. Resolution is an active contract, then the material's default vendor; missing vendor and past buy-by rows cannot draft. Buy-by is needed-by less vendor lead time. Projected and firm shortfalls draft identically, one purchase order per vendor group, rounded to whole purchase units. Nothing here ranks or prioritises.",
+    reads: "get_material_requirements · list_release_batches · list_releases",
+    writes: "draft_purchase_order_from_requirements [one RPC: one draft PO per resolved vendor + lines; the buy-by date is needed-by less the vendor's lead time] · release_sku",
+    states: [["gap", "demand exceeds supply in that week · the only actionable row"], ["projected", "includes N projected · uncovered orders and batch package shares"], ["covered", "supply meets demand · shown so the horizon reads continuously"], ["by vendor", "rows group under the vendor they resolve to, A to Z · each group ends with its own Create purchase order"], ["partly unbuyable", "a row already past its buy-by date is drawn out of reach · the rest of its group still drafts", 1], ["no vendor", "no contract and no default supplier · grouped last under No vendor · each row offers Set vendor, which opens Materials at that material", 1], ["empty", "No material shortages · shortage-only, so it never claims work is scheduled · links to Batches, Packaging, and Materials · drawn as Planning empty"], ["planned batch", "Released once a portal release of it is open · else Release for ordering, admin and sales only"]],
+    spec: "Planned batches list every unpackaged batch with projected packages; Release for ordering opens the release form prefilled from the projection. Material demand combines unbrewed recipe ingredients, open packaging runs, and projected packaging from uncovered orders and active batches with SKU package shares. Batch units are rounded down from planned barrels times the SKU share divided by format volume; needed-by is brew date (planned until brewed) plus Days to package. Any non-cancelled run linked directly or through its source tank replaces the whole batch projection, including after it closes. An unlinked tankless run does not identify a batch and cannot replace that batch's projection. Order projection is the smaller of negative ATP and open order allocations, less open runs and projected batch units of that SKU, so stock and planned supply are never counted twice. Standing allocations hold stock ahead of orders but never project alone. Order needed-by is the earliest requested ship date, or today without one. Packaging units flow through the format's material quantities once, rounding each-count materials up. One row per material includes the projected portion and reads includes N projected. On-hand material and unreceived purchase orders reduce the gap. Resolution is an active contract, then the material's default vendor; missing vendor and past buy-by rows cannot draft. Buy-by is needed-by less vendor lead time. Projected and firm shortfalls draft identically, one purchase order per vendor group, rounded to whole purchase units. Nothing here ranks or prioritises.",
     body: <PlanningView model={toPlanningViewProps(planningDemo)} />,
   },
   {

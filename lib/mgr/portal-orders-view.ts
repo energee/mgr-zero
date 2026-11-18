@@ -67,7 +67,7 @@ export function toPortalOrdersViewProps({ breweryName, orders }: PortalOrdersSna
       const adjusted = shortCopy(o.order_lines);
       // A submitted order ordering from a release is a pre-order until the brewery confirms it.
       const preOrder = o.status === "submitted" && o.order_lines.some((l) => l.release_id);
-      const status = adjusted ?? (preOrder ? `Pre-order — may change until the brewery confirms${o.requested_ship_date ? ` · ships ${formatDate(o.requested_ship_date)}` : ""}` : buyerStatus(o.status, o.requested_ship_date));
+      const status = adjusted ?? (preOrder ? `Pre-order: may change until the brewery confirms${o.requested_ship_date ? ` · ships ${formatDate(o.requested_ship_date)}` : ""}` : buyerStatus(o.status, o.requested_ship_date));
       const total = lineTotal(o.order_lines);
       const reorder = o.status === "shipped";
       return {

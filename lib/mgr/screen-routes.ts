@@ -162,6 +162,8 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Water profiles empty", file: "app/(app)/catalog/water-profiles/page.tsx" },
   { name: "Water profile", file: "app/(app)/catalog/water-profiles/water-profile-form.tsx" },
   { name: "SKU list", file: "app/(app)/catalog/brands/[id]/skus/page.tsx" },
+  { name: "Release for ordering", file: "app/(app)/catalog/brands/[id]/skus/page.tsx", additionalFiles: ["app/(app)/planning/page.tsx"] },
+  { name: "Edit release", file: "app/(app)/catalog/brands/[id]/skus/page.tsx" },
   { name: "Shop", file: "app/(portal)/portal/page.tsx" },
   { name: "Coming up", file: "app/(portal)/portal/coming-up/page.tsx" },
   { name: "Review order", file: "app/(portal)/portal/cart.tsx" },

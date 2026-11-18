@@ -14,6 +14,7 @@ import { FormatFixture } from "../components/mgr/fixture-adapters";
 import { FormatsView } from "../components/mgr/views/formats";
 import { ListControls } from "../components/mgr/list-controls";
 import { PackageBomView } from "../components/mgr/views/package-bom";
+import { skuListReleased } from "../lib/mgr/fixtures/releases";
 import { SkuListView } from "../components/mgr/views/sku-list";
 import { SkuView } from "../components/mgr/views/sku";
 import {
@@ -756,7 +757,7 @@ describe("SKU list view", () => {
     const body = screen("SKU list").body as { type: unknown; props: { model: unknown; createAction: unknown } };
     expect(body.type).toBe(SkuListView);
     expect(body.props.createAction).toBeNull();
-    expect(body.props.model).toEqual(toSkuListViewProps(skuListHazy));
+    expect(body.props.model).toEqual(toSkuListViewProps(skuListReleased));
   });
 });
 

@@ -17,7 +17,7 @@ export function PlanningView({ model, groupAction, releaseAction }: {
 }) {
   const release = (batch: PlanningReleaseView) =>
     batch.released ? <span className="text-sm text-muted-foreground">Released</span>
-      : batch.canRelease ? releaseAction?.(batch) ?? E.btn("Release for ordering") : null;
+      : batch.canRelease ? releaseAction?.(batch) ?? E.btn("Release for ordering", "g") : null;
   const action = (group: PlanningGroupView) =>
     groupAction !== undefined ? groupAction?.(group) : group.draftIds.length > 0 ? E.btn("Create purchase order") : null;
   return <>
