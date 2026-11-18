@@ -4,7 +4,7 @@ import type { CommandContextExpectation } from "./registry";
 
 export type QueryScope = CommandContextExpectation & { roles?: readonly string[] };
 // Only registered reads belong here. Never cache/retry a mutation as a query.
-type CachedQuery = "list_orders" | "list_customers" | "list_locations" | "list_skus" | "get_brewery" | "get_packaging_material_plan" | "get_cola_image";
+type CachedQuery = "list_orders" | "list_customers" | "list_locations" | "list_skus" | "get_brewery" | "get_packaging_material_plan" | "get_cola_image" | "suggest_material_category";
 
 export function createQueryClient() {
   return new QueryClient({ defaultOptions: { queries: {
@@ -17,15 +17,18 @@ export function createQueryClient() {
 export function commandQueryOptions<T = unknown>(scope: QueryScope, name: CachedQuery, input: unknown) {
   const { roles, ...expectedContext } = scope;
   const refreshInterval = name === "list_orders" ? 5_000 : 30_000;
-  const labelImage = name === "get_cola_image";
+  // Read once per input: a label image is large, and a kind suggestion is a paid model call.
+  const once = name === "get_cola_image" || name === "suggest_material_category";
   return queryOptions({
+    // A failed suggestion shows none (docs/plans/jev-suggestions.md); asking again would only add a model call.
+    ...(name === "suggest_material_category" ? { retry: false } : {}),
     queryKey: ["command", expectedContext, roles ? roles.toSorted().join(",") : null, name, input] as const,
     queryFn: ({ signal }) => command(scope.breweryId ?? "", name, input, undefined, expectedContext, undefined, signal) as Promise<T>,
-    staleTime: labelImage ? 5 * 60_000 : refreshInterval,
-    refetchInterval: labelImage ? false : refreshInterval,
+    staleTime: once ? 5 * 60_000 : refreshInterval,
+    refetchInterval: once ? false : refreshInterval,
     refetchIntervalInBackground: false,
-    refetchOnWindowFocus: labelImage ? false : "always",
-    refetchOnReconnect: labelImage ? false : "always",
+    refetchOnWindowFocus: once ? false : "always",
+    refetchOnReconnect: once ? false : "always",
   });
 }
 

@@ -11,14 +11,18 @@
 // units, so a material already in recipes or in stock can still take its pack.
 // Turning lot tracking on is refused while stock without a lot is on hand
 // (#452). The command's message names what blocks a refused change.
+// On Add material, leaving the name asks suggest_material_category once per name;
+// a confident kind shows on the empty Kind pick and Tab accepts it. It is never
+// saved unless accepted (docs/plans/jev-suggestions.md).
 "use client";
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
+import { useCommandQuery } from "@/components/mgr/query-provider";
 import { MaterialView, ALPHA_KINDS, EXTRACT_KINDS } from "@/components/mgr/views/material";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import type { PackName } from "@/lib/mgr/enums";
+import { MATERIAL_CATEGORIES, type PackName } from "@/lib/mgr/enums";
 export type Material = {
   id: string; name: string; category: string; base_uom: string; purchase_uom: string; purchase_uom_factor: number;
   lot_tracked: boolean; default_vendor_id: string | null; reorder_point: number | null; active: boolean;
@@ -26,7 +30,6 @@ export type Material = {
 };
 type Option = { id: string; name: string };
 
-const KINDS = ["malt", "hop", "yeast", "adjunct", "chemical", "packaging", "other"];
 const UOMS = ["lb", "kg", "oz", "g", "each", "l", "gal", "ml"];
 
 export function MaterialForm({ material, vendors }: { material?: Material; vendors: Option[] }) {
@@ -41,6 +44,12 @@ export function MaterialForm({ material, vendors }: { material?: Material; vendo
   const [extract, setExtract] = useState(material?.extract_potential != null ? String(material.extract_potential) : "");
   const [alpha, setAlpha] = useState(material?.alpha_acid != null ? String(material.alpha_acid) : "");
   const [packName, setPackName] = useState<string>(material?.pack_name ?? "");
+  // The name last left on Add material; the suggestion is asked for it.
+  const [askedName, setAskedName] = useState("");
+  const suggestion = useCommandQuery<{ category: string | null }>(
+    "suggest_material_category", { name: askedName },
+    !material && askedName !== "" && category === "",
+  );
   const form = useCommandForm("upsert_material", {
     build: () => ({
       id: material?.id, name, category, baseUom, purchaseUom, purchaseUomFactor: Number(factor) || 1, lotTracked,
@@ -58,6 +67,7 @@ export function MaterialForm({ material, vendors }: { material?: Material; vendo
       setExtract(material?.extract_potential != null ? String(material.extract_potential) : "");
       setAlpha(material?.alpha_acid != null ? String(material.alpha_acid) : "");
       setPackName(material?.pack_name ?? "");
+      setAskedName("");
     },
   });
   const ready = name.trim() && category && Number(factor) > 0;
@@ -66,8 +76,8 @@ export function MaterialForm({ material, vendors }: { material?: Material; vendo
     <CommandForm open={form.open} onOpenChange={form.setOpen} title={material ? "Edit material" : "Add material"} trigger={trigger}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <MaterialView
-          model={{ name, kind: category, kindOptions: KINDS, baseUnits: factor, purchaseUnit: purchaseUom, purchaseUnitOptions: UOMS, soldBy: packName, soldBySaved: Boolean(material?.pack_name), unit: baseUom, unitOptions: UOMS, defaultVendorId: vendorId, defaultVendorOptions: vendors.map(({ id, name: label }) => ({ id, label })), extractPotential: extract, alphaAcid: alpha, lotTracked, active }}
-          controls={{ name: setName, kind: setCategory, baseUnits: setFactor, purchaseUnit: setPurchaseUom, soldBy: setPackName, unit: setBaseUom, defaultVendorId: setVendorId, extractPotential: setExtract, alphaAcid: setAlpha, lotTracked: setLotTracked, active: setActive }}
+          model={{ name, kind: category, kindOptions: MATERIAL_CATEGORIES, kindSuggestion: category === "" ? suggestion.data?.category ?? undefined : undefined, baseUnits: factor, purchaseUnit: purchaseUom, purchaseUnitOptions: UOMS, soldBy: packName, soldBySaved: Boolean(material?.pack_name), unit: baseUom, unitOptions: UOMS, defaultVendorId: vendorId, defaultVendorOptions: vendors.map(({ id, name: label }) => ({ id, label })), extractPotential: extract, alphaAcid: alpha, lotTracked, active }}
+          controls={{ name: setName, kind: setCategory, baseUnits: setFactor, purchaseUnit: setPurchaseUom, soldBy: setPackName, unit: setBaseUom, defaultVendorId: setVendorId, extractPotential: setExtract, alphaAcid: setAlpha, lotTracked: setLotTracked, active: setActive, nameBlur: material ? undefined : () => setAskedName(name.trim()) }}
           messages={<CommandFormMessage error={form.error} />}
           footer={<CommandFormFooter><Button type="submit" disabled={form.submitting || !ready}>{form.submitting ? "Saving…" : "Save material"}</Button></CommandFormFooter>}
         />

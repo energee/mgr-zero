@@ -468,6 +468,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_qbo_vendor_mapping", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "vendorId": "00000000-0000-0000-0000-000000000000", "qboVendorId": "string" } }'
 ```
 
+## suggest_material_category [#suggest_material_category]
+
+`query` · admin, warehouse, brewer
+
+Suggest a kind for a new material from its name, or none; read-only, never saves, off unless MGR_SUGGESTIONS is on
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `name` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "suggest_material_category", "input": { "name": "string" } }'
+```
+
 ## update_purchase_order [#update_purchase_order]
 
 `command` · admin, warehouse

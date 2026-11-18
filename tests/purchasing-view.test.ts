@@ -512,6 +512,44 @@ describe("Materials", () => {
     expect(html).toMatch(/Default vendor/);
   });
 
+  // docs/plans/jev-suggestions.md Task 8: a suggested kind shows on the empty Kind pick; Tab accepts it.
+  it("the Kind suggested inventory record shows the suggestion on the empty Kind pick", () => {
+    const suggested = screen("Kind suggested");
+    expect(suggested.surface).toBe("sheet");
+    if (!isValidElement<{ model: typeof materialCitra }>(suggested.body)) throw new Error("Kind suggested must mount MaterialView");
+    expect(suggested.body.type).toBe(MaterialView);
+    expect(suggested.body.props.model).toMatchObject({ name: "Citra T-90", kind: "", kindSuggestion: "hop" });
+    const html = htmlOf(suggested.body);
+    expect(html).toContain('id="material-kind-suggestion"');
+    expect(html).toContain("Suggested: Hop. Press Tab to accept.");
+  });
+
+  it("MaterialView shows no suggestion without one, or once a kind is picked", () => {
+    for (const model of [{ ...materialCitra, kind: "" }, { ...materialCitra, kind: "malt", kindSuggestion: "hop" }]) {
+      const html = htmlOf(createElement(MaterialView, { model }));
+      expect(html).toContain('id="material-kind"');
+      expect(html).not.toContain("Suggested:");
+    }
+  });
+
+  it("MaterialView passes the name blur to the Material name field", () => {
+    const edit = vi.spyOn(E, "edit");
+    const nameBlur = vi.fn();
+    htmlOf(createElement(MaterialView, { model: materialCitra, controls: { nameBlur } }));
+    expect(edit).toHaveBeenCalledWith("Material name", materialCitra.name, "text", undefined, expect.objectContaining({ onBlur: nameBlur }));
+    edit.mockRestore();
+  });
+
+  it("the live material form asks for a kind only on Add material, after the name is left, while Kind is empty", () => {
+    const form = src("app/(app)/materials/material-form.tsx");
+    expect(form).toMatch(/kindOptions: MATERIAL_CATEGORIES/);
+    expect(form).not.toMatch(/const KINDS\b/);
+    expect(form).toMatch(/useCommandQuery<\{ category: string \| null \}>\(\s*"suggest_material_category", \{ name: askedName \},\s*!material && askedName !== "" && category === "",?\s*\)/);
+    expect(form).toMatch(/nameBlur: material \? undefined : \(\) => setAskedName\(name\.trim\(\)\)/);
+    expect(form).toMatch(/kindSuggestion: category === "" \? suggestion\.data\?\.category \?\? undefined : undefined/);
+    expect(form).toMatch(/setAskedName\(""\)/);
+  });
+
   // #1112: each unit field says what it holds, and the help is a brewer's example, not schema talk.
   it("MaterialView names each unit field and explains them in plain words", () => {
     const pick = vi.spyOn(E, "pick");
