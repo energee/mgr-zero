@@ -2,7 +2,10 @@
 export type MaterialViewModel = {
   name: string;
   kind: string;
-  kindOptions: string[];
+  kindOptions: readonly string[];
+  /** A kind suggested from the name ("hop"), shown on the Kind pick while `kind` is empty; Tab accepts it.
+   * Never saved unless accepted (docs/plans/jev-suggestions.md). */
+  kindSuggestion?: string;
   /** Base units in one purchase unit, the "Base units per purchase unit"
    * field: "44" for a 44 lb hop box. Not the base unit itself; that is `unit`. */
   baseUnits: string;

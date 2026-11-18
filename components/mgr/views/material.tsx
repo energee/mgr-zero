@@ -13,6 +13,8 @@ import { Fragment } from "react";
 type Controls = Partial<Record<"name" | "kind" | "baseUnits" | "purchaseUnit" | "soldBy" | "unit" | "defaultVendorId" | "extractPotential" | "alphaAcid", (value: string) => void>> & {
   lotTracked?: (value: boolean) => void;
   active?: (value: boolean) => void;
+  /** Leaving Material name; Add material asks for a suggested kind then. */
+  nameBlur?: () => void;
 };
 
 const pick = (
@@ -21,8 +23,10 @@ const pick = (
   options: { value: string; label: string }[],
   change?: (value: string) => void,
   placeholder?: string,
+  /** Kind only: its id, and the kind suggested from the name. */
+  suggested?: { id: string; suggestion?: { value: string; label: string } },
 ) => (
-  <Fragment key={label}>{E.pick(label, value, options, { onChange: change, placeholder })}</Fragment>
+  <Fragment key={label}>{E.pick(label, value, options, { onChange: change, placeholder, ...suggested })}</Fragment>
 );
 
 /** Kinds whose extract feeds the recipe OG/FG/ABV prediction (#430). */
@@ -68,8 +72,11 @@ export function MaterialView({ model, controls = {}, messages, footer }: {
 
   return (
     <>
-      {E.edit("Material name", model.name, "text", undefined, { onChange: controls.name, required: Boolean(controls.name) })}
-      {pick("Kind", model.kind, kindOptions, controls.kind, "Select kind")}
+      {E.edit("Material name", model.name, "text", undefined, { onChange: controls.name, required: Boolean(controls.name), onBlur: controls.nameBlur })}
+      {pick("Kind", model.kind, kindOptions, controls.kind, "Select kind", {
+        id: "material-kind",
+        suggestion: model.kindSuggestion ? { value: model.kindSuggestion, label: sentenceCase(model.kindSuggestion) } : undefined,
+      })}
       {E.inline(
         pick("Base unit", model.unit, unitOptions, controls.unit),
         pick("Purchase unit", model.purchaseUnit, purchaseUnitOptions, controls.purchaseUnit),

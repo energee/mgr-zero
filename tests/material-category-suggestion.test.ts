@@ -4,6 +4,7 @@ import { Experimental_DecisionMockModelV4 } from "ai/test";
 import { describe, expect, it } from "vitest";
 import { MATERIAL_CATEGORIES } from "@/lib/mgr/enums";
 import {
+  areSuggestionsEnabled,
   confidentChoice,
   isDecisionModelConfigured,
   MATERIAL_CATEGORY_CRITERIA,
@@ -55,6 +56,16 @@ describe("decision model IDs", () => {
     expect(isDecisionModelConfigured("typesafe-ai/jev-1.14.0", { AI_GATEWAY_API_KEY: "g" })).toBe(true);
     expect(isDecisionModelConfigured("typesafe-ai/jev-1.14.0", { TYPESAFE_API_KEY: "k" })).toBe(false);
   });
+});
+
+describe("areSuggestionsEnabled", () => {
+  it("is off with no variables", () => expect(areSuggestionsEnabled({})).toBe(false));
+  it("is off with the switch but no TypeSafe key", () => expect(areSuggestionsEnabled({ MGR_SUGGESTIONS: "on" })).toBe(false));
+  it("is off with only Gateway credentials, which cannot reach the chosen model", () =>
+    expect(areSuggestionsEnabled({ MGR_SUGGESTIONS: "on", AI_GATEWAY_API_KEY: "g" })).toBe(false));
+  it("is on with the switch and the TypeSafe key", () =>
+    expect(areSuggestionsEnabled({ MGR_SUGGESTIONS: "on", TYPESAFE_API_KEY: "k" })).toBe(true));
+  it("reads only the exact word on", () => expect(areSuggestionsEnabled({ MGR_SUGGESTIONS: "true", TYPESAFE_API_KEY: "k" })).toBe(false));
 });
 
 // The provider types, read off the mock so the test needs no direct @ai-sdk/provider dependency.

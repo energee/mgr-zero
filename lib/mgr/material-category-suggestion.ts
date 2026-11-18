@@ -42,6 +42,14 @@ export function isDecisionModelConfigured(id: string, env: Record<string, string
   return id.startsWith(TYPESAFE) ? Boolean(env.TYPESAFE_API_KEY) : isChatConfigured(env);
 }
 
+/** Jev suggestions send brewery text (material names) to the suggestion model's provider.
+ *  Off unless MGR_SUGGESTIONS is "on" and SUGGESTION_MODEL's credentials are set
+ *  (owner decision 5 in docs/plans/jev-use-cases.md). It lives here, not in lib/env/server-parser.ts,
+ *  because this module already imports that one. */
+export function areSuggestionsEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  return env.MGR_SUGGESTIONS === "on" && isDecisionModelConfigured(SUGGESTION_MODEL, env);
+}
+
 /** The choice question for `experimental_decide`. `reversed` flips the criteria order, the experiment's order control. */
 export function materialCategoryQuestion(reversed = false) {
   const entries = Object.entries(MATERIAL_CATEGORY_CRITERIA) as [MaterialCategory, string][];

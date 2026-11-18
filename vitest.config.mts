@@ -13,6 +13,7 @@ const pureTests = [
   "tests/production-attention-experiment.test.ts",
   "tests/material-category-experiment.test.ts",
   "tests/material-category-suggestion.test.ts",
+  "tests/suggest-material-category-query.test.ts",
   "tests/agent-eval-score.test.ts",
   "tests/agent-evals-cli.test.ts",
   "tests/dependency-tooling.test.ts",
