@@ -644,7 +644,7 @@ The pending restock note (naming what to put back) and the **changed after pick*
 
 Each line amount is the ordered quantity times the captured unit price, rounded to the cent. The ordered-items subtotal is the sum of those rounded line amounts. A one-way keg fee is charged per keg, so it is multiplied by the line's quantity. A deposit uses the amount saved on the order.
 
-The one-way fee is captured when a line is added, including a zero fee, from the order's sale channel. Raising the channel's fee later does not add a fee to that existing line when its quantity is adjusted. Newly added lines capture the fee in effect when they are added.
+The one-way fee is captured when a line is added, including a zero fee, from the order's sale channel. Once the order is submitted, raising the channel's fee later does not add a fee to that existing line when its quantity is adjusted. A draft re-reads the channel's fee each time it is saved, and newly added lines take the fee in effect when they are added.
 
 The order's header names a wholesale order's sale channel, for example **Export · Next: confirm**. A taproom transfer reads **Taproom transfer**.
 
@@ -1445,7 +1445,7 @@ If the email service refuses an invitation, MGR explains whether the address is 
 
 <Screen name="Settings" />
 
-**Brewery details**, **Ask MGR**, **Agents** and **Wholesale fulfillment** save independently. **Save brewery** never saves edits in the other sections; the AI model and fulfillment warehouse save when selected. On desktop, Brewery details sits beside the other two. **Customer-facing phone** and **One-way keg fee ($)** sit together, with **Books opened on** and its explanation on a full-width row below the other brewery fields. **Gravity unit**, below Brewery details, is the brewery default; it saves when you select it, not with **Save brewery**. **Connections** (Accounting, Point of sale, and Chat) opens the page, above Brewery details, so a phone reaches them without scrolling past the forms. **People and places** (Team, Locations, Water profiles, Sale channels, and Import) follows the forms. On phones these sections stack. Use the shared **− / +** count control or type a whole number from 1 to 168 for **Reading overdue after (hours)**, then **Save brewery**.
+**Brewery details**, **Ask MGR**, **Agents** and **Wholesale fulfillment** save independently. **Save brewery** never saves edits in the other sections; the AI model and fulfillment warehouse save when selected. On desktop, Brewery details sits beside the other two. **Customer-facing phone** sits with **Books opened on** and its explanation on a full-width row below the other brewery fields. **Gravity unit**, below Brewery details, is the brewery default; it saves when you select it, not with **Save brewery**. **Connections** (Accounting, Point of sale, and Chat) opens the page, above Brewery details, so a phone reaches them without scrolling past the forms. **People and places** (Team, Locations, Water profiles, Sale channels, and Import) follows the forms. On phones these sections stack. Use the shared **− / +** count control or type a whole number from 1 to 168 for **Reading overdue after (hours)**, then **Save brewery**.
 
 The **Customer-facing phone** field explains that the portal prints this number when online payment is unavailable. Leave it empty if you do not want a phone number shown.
 
