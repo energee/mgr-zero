@@ -86,6 +86,7 @@ export const STAFF_NAV: readonly NavItem[] = [
     about: "Open setup and office pages",
     children: [
       { label: "Invoices", href: "/invoices", roles: ["sales"], group: "Sales", about: "See what customers owe and open an invoice" },
+      { label: "Changes after confirm", href: "/orders/changes", roles: ["sales"], group: "Sales", about: "See what changed on confirmed orders, and why" },
       { label: "Catalog", href: "/catalog", roles: ["sales"], group: "Sales", about: "Define brands, formats and SKUs" },
       { label: "Menu", href: "/menu", roles: ["warehouse"], group: "Menu", about: "Choose what Square sells, where and for how much" },
       { label: "Customers", href: "/customers", roles: ["sales"], group: "Sales", about: "Manage accounts, ship-tos and portal users" },

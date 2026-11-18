@@ -150,7 +150,7 @@ describe("get_today (registered reader)", () => {
       p_order: id, p_picks: [{ line_id: line!.id, qty_picked: 1 }], p_request_id: crypto.randomUUID(),
     });
     await adminCtx.db.rpc("adjust_order_lines", {
-      p_order: id, p_lines: [{ sku_id: skuId, qty: 1 }], p_reason: "cut", p_request_id: crypto.randomUUID(),
+      p_order: id, p_lines: [{ sku_id: skuId, qty: 1 }], p_reason_code: "customer_request", p_reason: "cut", p_request_id: crypto.randomUUID(),
     });
     // adjust after pick sets needs_restock; cancel must keep it
     await adminCtx.db.rpc("cancel_order", { p_order: id, p_reason: "customer dropped", p_request_id: crypto.randomUUID() });
@@ -168,7 +168,7 @@ describe("get_today (registered reader)", () => {
     const id = await createOrder("2026-09-07", true, true);
     const { data: line } = await admin.from("order_lines").select("id").eq("order_id", id).single();
     await adminCtx.db.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line!.id, qty_picked: 1 }], p_request_id: crypto.randomUUID() });
-    const adjusted = await adminCtx.db.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 3 }], p_reason: "raise", p_request_id: crypto.randomUUID() });
+    const adjusted = await adminCtx.db.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 3 }], p_reason_code: "customer_request", p_reason: "raise", p_request_id: crypto.randomUUID() });
     expect(adjusted.error).toBeNull();
     const rows = (await today(warehouse, "2026-09-07T12:00:00Z")).filter((i) => i.subjectId === id);
     expect(rows.map((i) => i.reason)).toEqual(["pick_due"]);
@@ -180,7 +180,7 @@ describe("get_today (registered reader)", () => {
     const { data: line } = await admin.from("order_lines").select("id").eq("order_id", id).single();
     const pick = (qty: number) => adminCtx.db.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line!.id, qty_picked: qty }], p_request_id: crypto.randomUUID() });
     await pick(1);
-    const adjusted = await adminCtx.db.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 3 }], p_reason: "raise", p_request_id: crypto.randomUUID() });
+    const adjusted = await adminCtx.db.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 3 }], p_reason_code: "customer_request", p_reason: "raise", p_request_id: crypto.randomUUID() });
     expect(adjusted.error).toBeNull();
     const rows = async () => (await today(warehouse, "2026-09-07T12:00:00Z")).filter((i) => i.reason === "pick_due");
     expect((await rows()).find((i) => i.subjectId === id)?.detail).toBe("pick due · ships Sep 7, 2026 · changed after pick");
@@ -275,7 +275,7 @@ describe("today candidates (shared projection) and internal scan", () => {
     const restocked = await createOrder("2026-09-05", true, true);
     const { data: line } = await admin.from("order_lines").select("id").eq("order_id", restocked).single();
     await adminCtx.db.rpc("record_pick", { p_order: restocked, p_picks: [{ line_id: line!.id, qty_picked: 1 }], p_request_id: crypto.randomUUID() });
-    await adminCtx.db.rpc("adjust_order_lines", { p_order: restocked, p_lines: [{ sku_id: skuId, qty: 1 }], p_reason: "cut", p_request_id: crypto.randomUUID() });  // restock_due
+    await adminCtx.db.rpc("adjust_order_lines", { p_order: restocked, p_lines: [{ sku_id: skuId, qty: 1 }], p_reason_code: "customer_request", p_reason: "cut", p_request_id: crypto.randomUUID() });  // restock_due
     const picked = await createOrder("2026-09-05", true, true);
     const { data: pickedLine } = await admin.from("order_lines").select("id").eq("order_id", picked).single();
     await adminCtx.db.rpc("record_pick", { p_order: picked, p_picks: [{ line_id: pickedLine!.id, qty_picked: 1 }], p_request_id: crypto.randomUUID() });  // ship_due

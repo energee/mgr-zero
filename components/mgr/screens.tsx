@@ -108,6 +108,7 @@ import { KegBalanceView } from "@/components/mgr/views/keg-balance";
 import { KegFleetView } from "@/components/mgr/views/keg-fleet";
 import { KegReportView } from "@/components/mgr/views/keg-report";
 import { KegHistoryView } from "@/components/mgr/views/keg-history";
+import { OrderChangesView } from "@/components/mgr/views/order-changes";
 import { LocationBinsView } from "@/components/mgr/views/location-bins";
 import { LicenseView } from "@/components/mgr/views/license";
 import { LocationView } from "@/components/mgr/views/location";
@@ -259,6 +260,8 @@ import { toKegBalanceViewProps } from "@/lib/mgr/keg-balance-view";
 import { toKegFleetViewProps } from "@/lib/mgr/keg-fleet-view";
 import { toKegReportViewProps } from "@/lib/mgr/keg-report-view";
 import { toKegHistoryViewProps } from "@/lib/mgr/keg-history-view";
+import { toOrderChangesViewProps } from "@/lib/mgr/order-changes-view";
+import { orderChangesReport } from "@/lib/mgr/fixtures/order-changes";
 import { toLocationBinsViewProps } from "@/lib/mgr/location-bins-view";
 import { toLocationViewProps } from "@/lib/mgr/location-view";
 import { toLotTraceViewProps } from "@/lib/mgr/lot-trace-view";
@@ -1501,6 +1504,19 @@ export const SCREENS: Screen[] = [
     states: [["customer", "a customer filter from Open balance adds a Customer line with Clear; Show keeps the customer"], ["overdue", "outstanding invoice due before brewery-local today", 1], ["connection health", "QuickBooks · token healthy · company 9341"], ["not turned on", "disabled Connect before navigation with the same reason as Accounting", 1], ["never connected", "no stale-payment or reconnect warning"], ["expired", "Reconnect before mapping, push or sync; Sync QuickBooks is hidden, Admin sees Connect, Sales sees Admin must connect", 1], ["live", "the ordinary case; no badge at all"], ["edited there", "SyncToken changed since MGR pushed", 1], ["voided", "amounts zeroed; this is not payment", 1], ["deleted", "the id points at nothing; sync gets a 404", 1], ["not sent", "pushed but never delivered; only a fault if MGR is not the channel"], ["paid", "payment status is confirmed by QuickBooks Online sync, or paid in full by payments recorded in MGR"], ["needs mapping", "a failed push Admin or Sales can fix; the drill-in resolves each mapping", 1]],
     spec: <>QuickBooks has no read-only invoice. Once pushed, the accountant can edit, void or delete it from the Sales transactions sidebar and no API setting prevents that, so MGR detects rather than prevents. QuickBooks hands us the detector free: SyncToken increments on every modification and already rides the response the manual sync reads for balance, so drift costs one column and no extra call. The rule this frame protects: <b>a voided invoice is not a paid invoice.</b> Voiding zeroes the amounts, so any logic inferring paid from a QuickBooks balance of zero books cancelled revenue as collected; collected revenue is a read-side rule, remote state live and balance zero, expressed once in the reporting view; no CHECK refuses a historical payment-confirmation marker, because paid-then-voided is a real history the row must be able to hold. MGR surfaces drift and stops: no re-push that overwrites an accountant’s correction, no field-level merge UI. The one exception is the deleted invoice, where the remote id points at nothing: dedupe on the original requestId would return the first result and create nothing, so that push carries a new requestId and produces a second QuickBooks invoice under the same MGR number. Ordinary retries keep the old requestId and stay protected. ASSUMPTION: a drifted invoice stays in AR at QuickBooks’ numbers, because QuickBooks owns the invoice after push. Drift is not a place, it is what some of these rows are doing, which is why it lives in the states of one list rather than a second one. An outstanding invoice is overdue only when its due date is before brewery-local today, not on the due day itself. Credit memos, invoices whose balance is unknown (push result unknown, pushed to a previous company, or not yet synced), and settled, paid, written-off, voided or deleted invoices are never marked overdue. Inventory pins its clock. Rows also carry the due date, push failure and credit-memo status; payments come back through manual sync and are read-only, except on an invoice QuickBooks never received, which takes Record payment. A failed row opens the drill-in, where connection, each mapping and push are four independent commands, and push persists its exact payload and deterministic requestId before the remote POST. Creating a credit memo stays Return shipment.</>,
     body: <InvoicesView rows={invoiceList} connection={{ connected: true, detail: "Connected · company 9341", canConnect: true }} sync={<QboSyncView status={invoicesSync} />} />,
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "More",
+    name: "Changes after confirm",
+    to: { "ORD-0231 · Ridgeline Tap Room": "Order", "ORD-0228 · Al’s Bar": "Order", "ORD-0225 · Ridgeline Tap Room": "Order" },
+    job: "See every change made to an order after the brewery confirmed it, and why",
+    reads: "list_order_changes · list_team_members · list_customers",
+    writes: "none",
+    states: [["permission", "admin or sales required", 1], ["all", "newest first · reason, lines, who, when and note"], ["filtered", "reason, staff and customer picks combine · each has All · the URL keeps them"], ["empty", "no changes after confirm, or none matching"]],
+    spec: "A confirmed or picked order can still change when beer is short or damaged, so what ships matches what the buyer sees. Each such change names one reason: Short, Damaged, Customer request, Brewery error or Other (Other needs a note). This list keeps those changes rare and visible. A pre-order change, made before confirm, is not listed. A row opens its order.",
+    body: <OrderChangesView model={toOrderChangesViewProps(orderChangesReport)} />,
   },
   {
     step: 5, slice: 1, tab: "More",

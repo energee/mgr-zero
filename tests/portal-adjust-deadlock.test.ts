@@ -57,7 +57,7 @@ describe("portal submit racing a wholesale line raise (#1075)", { concurrent: fa
     submit.catch(() => {});
     await expect.poll(() => waiting(portalPid), { timeout: 5000 }).toBe(true);
     let staffDone = false;
-    const raise = staff.query("select public.adjust_order_lines($1,$2,'raise',$3) result",
+    const raise = staff.query("select public.adjust_order_lines($1,$2,'raise',$3,'customer_request') result",
       [orderId, JSON.stringify([{ sku_id: skuId, qty: 3 }]), crypto.randomUUID()]).finally(() => { staffDone = true; });
     raise.catch(() => {});
     await expect.poll(() => waiting(staffPid), { timeout: 5000 }).toBe(true);

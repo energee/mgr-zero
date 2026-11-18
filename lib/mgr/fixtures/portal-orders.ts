@@ -92,3 +92,16 @@ export const portalOrderShipped: PortalOrderSnapshot = {
     }],
   },
 };
+
+/** A shipped order the brewery changed after confirm: two Hazy kegs arrived damaged. */
+export const portalOrderChangedAfterConfirm: PortalOrderSnapshot = {
+  ...portalOrderShipped,
+  events: [
+    { id: "e-adjust", event: "lines_adjusted", created_at: "2026-08-26T15:00:00.000Z" },
+    ...portalOrderShipped.events,
+  ],
+  changes: [{
+    id: "e-adjust", created_at: "2026-08-26T15:00:00.000Z", reason_code: "damaged",
+    changes: [{ sku_id: SKU_HAZY.sku_id, name: SKU_HAZY.name, delta: -2 }],
+  }],
+};

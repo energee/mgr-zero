@@ -2,11 +2,14 @@
 // Database values are snake_case (or already spaced, as the record-movement
 // fixtures are); operators see sentence case. Issue #333.
 import type { ImportKind } from "@/lib/import-csv";
-import { COUNTRY_CODES, COUNTRY_NAMES, CUSTOMER_TYPES, LOCATION_USES, STAFF_ROLES, type BrandSort, type CountryCode, type PaymentMethod, type PaymentTerm } from "@/lib/mgr/enums";
+import { COUNTRY_CODES, COUNTRY_NAMES, CUSTOMER_TYPES, LOCATION_USES, ORDER_CHANGE_REASONS, STAFF_ROLES, type BrandSort, type CountryCode, type PaymentMethod, type PaymentTerm } from "@/lib/mgr/enums";
 
 /** "opening_balance" / "opening balance" → "Opening balance". */
 export const sentenceCase = (value: string) =>
   value.replace(/_/g, " ").replace(/^./, (letter) => letter.toUpperCase());
+
+/** Why a confirmed order changed, as a picker's options ("brewery_error" → "Brewery error"). */
+export const ORDER_CHANGE_REASON_OPTIONS = ORDER_CHANGE_REASONS.map((value) => ({ value, label: sentenceCase(value) }));
 
 /** A member's roles as staff read them, in STAFF_ROLES order: ["warehouse", "admin"] → "Admin, Warehouse". */
 export const staffRolesLabel = (roles: readonly string[]) =>

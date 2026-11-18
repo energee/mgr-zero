@@ -34,6 +34,7 @@ export function PortalOrderView({
         </Fragment>
       ))}
       {model.adjusted ? E.info(model.adjusted) : null}
+      {model.changes.map((change, index) => <Fragment key={index}>{E.info(change)}</Fragment>)}
       {model.shortageExplanation ? E.info(model.shortageExplanation) : null}
       {model.invoice
         ? E.nav(

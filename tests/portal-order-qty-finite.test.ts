@@ -134,7 +134,7 @@ describe("shared staff and transfer order quantity boundary", () => {
     expect((await staff.db.rpc("submit_order", { p_order: orderId, p_request_id: crypto.randomUUID() })).error).toBeNull();
     expect((await staff.db.rpc("confirm_order", { p_order: orderId, p_request_id: crypto.randomUUID() })).error).toBeNull();
     const adjust = await staff.db.rpc("adjust_order_lines", {
-      p_order: orderId, p_lines: lines(2.5), p_reason: "fractional staff order", p_request_id: crypto.randomUUID(),
+      p_order: orderId, p_lines: lines(2.5), p_reason_code: "customer_request", p_reason: "fractional staff order", p_request_id: crypto.randomUUID(),
     });
     expect(adjust.error).toBeNull();
     expect(sql(`select qty_ordered::text from public.order_lines where order_id='${orderId}'`, true)).toEqual(["2.50"]);
@@ -156,7 +156,7 @@ describe("shared staff and transfer order quantity boundary", () => {
         p_lines: lines(qty), p_request_id: crypto.randomUUID(),
       })).error).not.toBeNull();
       expect((await staff.db.rpc("adjust_order_lines", {
-        p_order: orderId, p_lines: lines(qty), p_reason: "invalid quantity", p_request_id: crypto.randomUUID(),
+        p_order: orderId, p_lines: lines(qty), p_reason_code: "customer_request", p_reason: "invalid quantity", p_request_id: crypto.randomUUID(),
       })).error).not.toBeNull();
       expect(persistedState()).toEqual(before);
     }

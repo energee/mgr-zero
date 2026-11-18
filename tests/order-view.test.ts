@@ -91,6 +91,14 @@ describe("Order view loop", () => {
     expect(edit).toContain("SAVE");
   });
 
+  it("asks for a reason code and a note when a confirmed order's lines change", () => {
+    const model = toOrderViewProps(orderConfirmedWholesale);
+    const edit = renderToStaticMarkup(createElement(OrderView, { model, quantities: {}, onQuantity: () => {}, reason: "", onReason: () => {}, reasonCode: "damaged", onReasonCode: () => {} }));
+    expect(edit).toMatch(/>Reason</);
+    expect(edit).toMatch(/>Damaged</);
+    expect(edit).toMatch(/>Note</);
+  });
+
   it("adds and removes lines in place: ✕ on each line, Add line, and an added line's SKU picker (#1503)", () => {
     const model = toOrderViewProps(orderConfirmedWholesale);
     const lineEdit = { skus: [{ id: "new-sku", label: "Pils · case" }], added: [{ key: "n1", skuId: "" }] };
@@ -170,6 +178,13 @@ describe("Order view loop", () => {
       ? { ...event, payload: { ...event.payload, reason: " \tcustomer cut\n " } } : event);
     expect(toOrderViewProps({ ...orderPickedRestock, events }).events.at(-1)?.detail)
       .toBe("Pils · 16 oz case 10 to Pils · 16 oz case 7 (customer cut)");
+  });
+
+  it("names a change after confirm by its reason code, then its note", () => {
+    const detail = (payload: Record<string, unknown>) => toOrderViewProps({ ...orderPickedRestock, events: orderPickedRestock.events.map(event => event.event === "lines_adjusted"
+      ? { ...event, payload: { ...event.payload, ...payload } } : event) }).events.at(-1)?.detail;
+    expect(detail({ reason_code: "damaged", reason: null })).toBe("Pils · 16 oz case 10 to Pils · 16 oz case 7 (Damaged)");
+    expect(detail({ reason_code: "other", reason: "Forklift" })).toBe("Pils · 16 oz case 10 to Pils · 16 oz case 7 (Other: Forklift)");
   });
 
   it("preserves negative availability and flags the line", () => {
