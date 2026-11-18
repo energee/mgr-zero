@@ -64,7 +64,7 @@ export type OrderViewModel = {
   /** The columns with something to say (#1506): Picked and Shipped once a line
    *  records them, Available while the order still waits on stock. */
   columns: OrderLineColumn[];
-  /** Keg deposits and one-way keg fees, frozen on the order at submit, each named with its line. */
+  /** Keg deposits and one-way keg fees captured on the order, each named with its line. */
   kegCharges: { key: string; name: string; detail: string; amount: string }[];
   /** `by` names the actor when the page passed actorNames. */
   events: { key: string; at: string; event: string; by?: string; detail: string }[];
@@ -106,7 +106,7 @@ export type OrderSnapshot = {
     qty_refused?: number;
     unit_price_cents: number;
     short_reason?: string | null;
-    /** Set at submit on a one-way keg line (order_lines.one_way_fee_cents). */
+    /** A one-way keg line's channel fee, set when the line is saved and fixed once the order is submitted (order_lines.one_way_fee_cents). */
     one_way_fee_cents?: number | null;
     skus: { name: string } | null;
   }[];
@@ -189,7 +189,7 @@ function orderSummary(
     return {
       rows: [{ label: "Keg deposits and fees", value: "Not finalized until submission" }],
       total: { label: "Items estimate", value: items },
-      note: "Saved lines at their captured prices. Keg deposits are set when the order is submitted; a one-way keg fee is set from the sale channel when its line is added.",
+      note: "Saved lines at their captured prices. Keg deposits are set when the order is submitted; one-way keg fees follow the sale channel until then.",
     };
   }
   if (!deposits || lines.some((l) => l.one_way_fee_cents === undefined)) {

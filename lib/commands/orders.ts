@@ -270,7 +270,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "record_historical_order", description: "Admin only: record an order picked up before the books opened as shipped, picked up and paid at the given prices; writes no stock, deposits or fees, and its invoice is never sent to QuickBooks",
+  name: "record_historical_order", description: "Admin only: record an order picked up before the books opened as shipped, picked up and paid at the given prices; writes no stock or deposits, records each one-way keg line's sale channel fee on the line but bills no fee line, and its invoice is never sent to QuickBooks",
   compensation: "Cannot be undone; a historical order cannot be cancelled or returned.",
   roles: ["admin"],
   input: z.object({
