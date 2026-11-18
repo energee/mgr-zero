@@ -27,7 +27,7 @@ import { ApprovalForm, RegistrationForm } from "./compliance-forms";
 import { ColaImage } from "../../cola-image";
 
 /** A list_brands SKU, with the facts SkuEditForm edits. */
-type BrandSku = BrandSnapshot["brand"]["skus"][number] & { name: string; keg_pool_id: string | null; batch_share: number | string | null };
+type BrandSku = BrandSnapshot["brand"]["skus"][number] & { name: string; keg_pool_id: string | null; batch_share: number | string | null; portal_from_stock: boolean };
 export type BrandRow = Omit<BrandSnapshot["brand"], "skus"> & { skus: BrandSku[] };
 /** The Sells as reads; a format's package_type tells SkuEditForm whether it takes a keg pool. */
 export type SellsReads = Omit<NonNullable<BrandSnapshot["sells"]>, "formats"> & { formats: (NonNullable<BrandSnapshot["sells"]>["formats"][number] & { package_type: string | null })[] };

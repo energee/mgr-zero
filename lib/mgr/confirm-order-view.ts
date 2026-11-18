@@ -2,6 +2,7 @@
 import { formatDate } from "@/lib/date-format";
 import { brandLabel, byBrand, type BrandedSku } from "./brand-lines";
 import { docNo } from "./doc-no";
+import type { ReleaseRow } from "./release-view";
 
 export type ConfirmOrderLineView = {
   key: string;
@@ -14,6 +15,10 @@ export type ConfirmOrderLineView = {
   /** Stock at the source and brewery ATP for this line. */
   detail: string;
   tone?: "" | "w" | "ok";
+  /** Portal release problems to settle before confirming: "Slipped: …" when
+   *  the batch is now ready after the requested date, "Over release: …" when
+   *  the release was lowered below what is confirmed and pre-ordered on it. */
+  flags: string[];
 };
 
 export type ConfirmOrderViewModel = {
@@ -37,11 +42,23 @@ export type ConfirmOrderSnapshot = {
     from_location_id: string;
     customers: { name: string } | null;
   };
-  lines: { id: string; sku_id: string; qty_ordered: number; skus: BrandedSku }[];
+  lines: { id: string; sku_id: string; qty_ordered: number; release_id?: string | null; skus: BrandedSku }[];
   atp: { sku_id: string; qty: number }[];
   sourceOnHand?: { sku_id: string; qty: number }[];
   locations: { id: string; name: string }[];
+  /** list_releases for the releases the lines order from. */
+  releases?: ReleaseRow[];
 };
+
+/** Why a release line needs a look before confirming (see ConfirmOrderLineView.flags). */
+function releaseFlags(release: ReleaseRow | undefined, requested: string | null): string[] {
+  if (!release) return [];
+  const ordered = release.confirmed + release.preordered;
+  return [
+    release.ready_on && requested && release.ready_on > requested ? `Slipped: batch ready ${formatDate(release.ready_on)}` : "",
+    ordered > release.qty ? `Over release: ${ordered} ordered of ${release.qty}` : "",
+  ].filter(Boolean);
+}
 
 /**
  * `atp` is brewery ATP before this order: a submitted order is not allocated
@@ -51,7 +68,7 @@ export type ConfirmOrderSnapshot = {
  * once, under the source shortage; the per-line `w` tone marks every short line.
  * Lines come grouped by brand, each named by its format (brand-lines.ts).
  */
-export function toConfirmOrderViewProps({ order, lines, atp, sourceOnHand, locations, backHref }: ConfirmOrderSnapshot): ConfirmOrderViewModel {
+export function toConfirmOrderViewProps({ order, lines, atp, sourceOnHand, locations, releases = [], backHref }: ConfirmOrderSnapshot): ConfirmOrderViewModel {
   const atpMap = new Map(atp.map((a) => [a.sku_id, Number(a.qty)]));
   const sourceMap = new Map(sourceOnHand?.map((row) => [row.sku_id, Number(row.qty)]));
   const sourceName = locations.find((l) => l.id === order.from_location_id)?.name ?? "source";
@@ -67,13 +84,17 @@ export function toConfirmOrderViewProps({ order, lines, atp, sourceOnHand, locat
     where: order.customers?.name ?? "Taproom transfer",
     state: `Submitted${ships}`,
     fulfillmentSource: sourceName,
-    lines: judged.map(({ l, sourceQty, qtyAtp, short, oversold }) => ({
-      key: l.id,
-      ...brandLabel(l.skus),
-      qty: Number(l.qty_ordered),
-      detail: [sourceQty === undefined ? "" : `${sourceQty} at ${sourceName}`, qtyAtp === undefined ? "" : `${qtyAtp} available`, oversold ? `leaves ${formatSigned(qtyAtp! - l.qty_ordered)}` : ""].filter(Boolean).join(" · "),
-      tone: short || oversold ? "w" : "",
-    })),
+    lines: judged.map(({ l, sourceQty, qtyAtp, short, oversold }) => {
+      const flags = releaseFlags(releases.find((r) => r.id === l.release_id), order.requested_ship_date);
+      return {
+        key: l.id,
+        ...brandLabel(l.skus),
+        qty: Number(l.qty_ordered),
+        detail: [sourceQty === undefined ? "" : `${sourceQty} at ${sourceName}`, qtyAtp === undefined ? "" : `${qtyAtp} available`, oversold ? `leaves ${formatSigned(qtyAtp! - l.qty_ordered)}` : "", ...flags].filter(Boolean).join(" · "),
+        tone: short || oversold || flags.length ? "w" : "",
+        flags,
+      };
+    }),
     shortageNote: shortageNote(judged, sourceName),
   };
 }

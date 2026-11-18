@@ -3,14 +3,21 @@
 // Create purchase order; a row with no vendor offers Set vendor. Live passes
 // groupAction (DraftButton, or null for a role that cannot draft); the
 // inventory leaves it out and draws an inert Create purchase order.
+// Planned batches follow, each offering Release for ordering (portal releases)
+// to admin and sales, or reading Released; live passes releaseAction (the form).
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import type { PlanningGroupView, PlanningViewModel } from "@/lib/mgr/planning-view";
+import type { PlanningGroupView, PlanningReleaseView, PlanningViewModel } from "@/lib/mgr/planning-view";
 
-export function PlanningView({ model, groupAction }: {
+export function PlanningView({ model, groupAction, releaseAction }: {
   model: PlanningViewModel;
   groupAction?: ((group: PlanningGroupView) => ReactNode) | null;
+  /** Live: the Release for ordering form for one batch. The inventory draws an inert button. */
+  releaseAction?: (batch: PlanningReleaseView) => ReactNode;
 }) {
+  const release = (batch: PlanningReleaseView) =>
+    batch.released ? <span className="text-sm text-muted-foreground">Released</span>
+      : batch.canRelease ? releaseAction?.(batch) ?? E.btn("Release for ordering") : null;
   const action = (group: PlanningGroupView) =>
     groupAction !== undefined ? groupAction?.(group) : group.draftIds.length > 0 ? E.btn("Create purchase order") : null;
   return <>
@@ -31,6 +38,10 @@ export function PlanningView({ model, groupAction }: {
         row.warning ? "w" : "")}</Fragment>)}
       {action(group)}
     </section>)}
+    {model.releaseBatches?.length ? <section aria-label="Planned batches" className="flex flex-col gap-1">
+      {E.ttl("Planned batches")}
+      {model.releaseBatches.map((batch) => <Fragment key={batch.key}>{E.row(batch.title, batch.detail, release(batch))}</Fragment>)}
+    </section> : null}
     {model.drafts?.length ? <>{E.ttl("Drafts this creates")}{model.drafts.map((row) => <Fragment key={row.key}>{E.row(row.title, row.detail, row.quantity, row.warning ? "w" : "")}</Fragment>)}</> : null}
     {model.info ? E.info(model.info) : null}
   </>;

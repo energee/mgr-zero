@@ -11,6 +11,8 @@ export type SkuViewModel = {
   format: string;
   formatOptions: string[];
   active: boolean;
+  /** Portal buyers can order this SKU from packaged stock (update_sku portalFromStock). */
+  portalFromStock: boolean;
   upc: string;
   /** Percentage text for existing packaged SKUs; undefined on creation. Blank clears the share. */
   batchSharePercent?: string;
@@ -32,6 +34,7 @@ export type SkuSnapshot = {
     format_id: string;
     keg_pool_id?: string | null;
     batch_share?: number | string | null;
+    portal_from_stock?: boolean;
     formats: { name: string; package_type?: string | null } | null;
   };
   /** Packaged formats from list_formats for the Format pick. */
@@ -50,6 +53,7 @@ export function toSkuViewProps({ sku, formats, pools = [] }: SkuSnapshot): SkuVi
     format: fromJoin ?? fromList ?? formats[0]?.name ?? "",
     formatOptions: formats.map((f) => f.name),
     active: sku?.active ?? true,
+    portalFromStock: sku?.portal_from_stock ?? true,
     upc: sku?.upc ?? "",
     batchSharePercent: sku ? (sku.batch_share == null ? "" : percent(sku.batch_share, 15)) : undefined,
     volumeInfo: VOLUME_INFO,
@@ -73,11 +77,15 @@ export function batchShareError(percent: string): string | undefined {
 
 /** An edit saves one command; `reason` (submitReason) withholds Save SKU while the UPC or share is invalid.
  *  Creation deliberately leaves the optional share unset. */
-export function skuUpdateCommand(fields: { skuId: string; active: boolean; upc: string; batchSharePercent: string; kegPoolId?: string | null }) {
+export function skuUpdateCommand(fields: { skuId: string; active: boolean; upc: string; batchSharePercent: string; kegPoolId?: string | null; portalFromStock?: boolean }) {
   const batchShare = fields.batchSharePercent.trim() === "" ? null : Number(fields.batchSharePercent) / 100;
   return {
     name: "update_sku",
-    input: { skuId: fields.skuId, active: fields.active, upc: fields.upc, batchShare, ...(fields.kegPoolId === undefined ? {} : { kegPoolId: fields.kegPoolId }) },
+    input: {
+      skuId: fields.skuId, active: fields.active, upc: fields.upc, batchShare,
+      ...(fields.kegPoolId === undefined ? {} : { kegPoolId: fields.kegPoolId }),
+      ...(fields.portalFromStock === undefined ? {} : { portalFromStock: fields.portalFromStock }),
+    },
     reason: submitReason([
       ...(upcError(fields.upc) ? [UPC_NEED] : []),
       ...(batchShareError(fields.batchSharePercent) ? ["a batch package share above 0% and at most 100%"] : []),

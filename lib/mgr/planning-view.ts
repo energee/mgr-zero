@@ -2,6 +2,8 @@ import { formatDate } from "@/lib/date-format";
 import type { StaffRole } from "@/lib/commands/registry";
 import type { EmptyState } from "./empty-state";
 import { canOpen } from "./nav";
+import { batchReleaseForms, type ReleaseBatchRow, type ReleaseForm, type ReleaseRow } from "./release-view";
+import { hasAnyRole } from "./roles";
 
 export type MaterialRequirementSnapshot = {
   material_id: string;
@@ -35,7 +37,15 @@ export type PlanningSnapshot = {
   /** The viewer's roles, live only: the empty state links only pages they can
    *  open. The inventory omits them and draws every link row, inert. */
   roles?: readonly StaffRole[];
+  /** list_release_batches: planned batches a release can draw on. */
+  batches?: ReleaseBatchRow[];
+  /** list_releases for those batches, to mark a batch Released. */
+  releases?: ReleaseRow[];
 };
+
+/** A planned batch's release row: Released once any of its releases is open,
+ *  and Release for ordering (prefilled `form`) for admin and sales. */
+export type PlanningReleaseView = { key: string; title: string; detail: string; released: boolean; canRelease: boolean; form: ReleaseForm };
 
 /** The empty list's words, plus the pages where the demand it counts is set up
  *  (`href` only on the live page). */
@@ -61,6 +71,7 @@ export type PlanningViewModel = {
   info?: string;
   backHref?: string;
   empty?: PlanningEmpty;
+  releaseBatches?: PlanningReleaseView[];
 };
 
 /** The live page asks only for short materials, so an empty list says nothing
@@ -117,8 +128,15 @@ export function toPlanningViewProps(snapshot: PlanningSnapshot): PlanningViewMod
   const links = roles
     ? SETUP_LINKS.filter((link) => canOpen(roles, link.href))
     : SETUP_LINKS.map((link) => ({ title: link.title, detail: link.detail }));
+  // The inventory (no roles) draws the verb, inert; live, only admin and sales release.
+  const canRelease = !roles || hasAnyRole(roles, ["admin", "sales"]);
+  const openBatches = new Set((snapshot.releases ?? []).filter((r) => r.open && r.batch_id).map((r) => r.batch_id));
+  const releaseBatches = snapshot.batches && batchReleaseForms(snapshot.batches).map(({ title, detail, ...form }) => ({
+    key: form.key, title, detail, released: openBatches.has(form.key), canRelease, form,
+  }));
   return {
     groups,
+    releaseBatches,
     horizon: snapshot.horizon,
     reviews: snapshot.reviews,
     drafts: snapshot.drafts,
