@@ -53,7 +53,7 @@ deterministic; **If wrong** is the cost of a false alarm (FA) or a miss.
 | 1 | Production follow-ups | Production manager | Fermentation and packaging notes (`fermentation_readings.note`, `packaging_runs.note`) | Open / resolved / no action / uncertain, with the supporting note | Blockers, missing inputs, readings, eligibility | FA: one dismiss. Miss: same as today, where staff read the notes. | H | L |
 | 2 | Order notes | Sales, Admin confirming an order | `orders.note` (staff or portal buyer), with the order's line names as context | "Note may ask for something the lines don't show", with the quote | Lines, quantities, prices, ATP, confirm | FA: one dismiss. Miss: same as today. | H | L |
 | 3 | Receipt and PO notes | Purchasing | `receipts.note`, `purchase_orders.note` | "Note may report damage, a short or a substitution", with the quote | Received quantities, lots, costs, QuickBooks Bill | FA: one dismiss. Miss: a vendor credit goes unasked, as today. | M | L |
-| 4 | Release allocation notes (**depends on the unmerged plan** below) | Sales, Admin setting allocations | That customer's recent order notes | "Possible closure", "Asks for more of a brand", with the quote, beside the customer's allocation row | Every allocation number, the 90-day same-format share, rounding, the pool, any ordering drop-off | FA: one dismiss. Miss: same as today. | M | L |
+| 4 | Release allocation notes (**depends on the unmerged plan** below) | Sales, Admin setting allocations | That customer's recent order notes and delivery refusal notes | "Possible closure", "Asks for more of a brand", with the quote, beside the customer's allocation row | Every allocation number, the 90-day same-format share, rounding, the pool, any ordering drop-off | FA: one dismiss. Miss: same as today. | M | L |
 | 5 | Cellar loss notes | Cellar, Admin | `volume_adjustments.note` beside its chosen `reason` | "Note may not match the chosen reason", with the quote | Barrels, reason, removal class, tax treatment, TTB report | FA: one dismiss. Miss: a wrong category stays, as today. | M | M |
 | 6 | Invoice questions | Admin, Sales | `invoice_questions.body` (buyer, from the portal) | One fixed topic: pricing, short or missing item, keg deposit, payment, other | Invoice totals, payments, `resolve_invoice_question` | FA or miss: a question sorts under the wrong topic; it is still listed. | L–M | L |
 | 7 | Refused delivery notes | Warehouse, Production manager | The refusal note on `confirm_delivery` (reason is already a fixed enum) | "Note may describe a quality problem", with the quote | Refused quantities, reorder draft, stock | FA: one dismiss. Miss: same as today. | M | L |
@@ -120,6 +120,8 @@ Ranked by value over risk, then by how much already exists.
 
 ### 4. Cellar loss notes (use case 5)
 
+- **Deferred** (owner decision 3): waits until two other use cases pass.
+
 - **Experiment:** 20 synthetic adjustment notes, each paired with its chosen
   reason. Half the pairs disagree.
 - **Pass bar:** stricter than the others, because it sits next to TTB data. No
@@ -168,14 +170,27 @@ What is missing:
 - **Permission to send real text.** Every case here needs owner approval and a
   look at TypeSafe's data terms before real notes are sent.
 
+## Owner decisions (2026-11-18)
+
+1. **Choose the provider first.** Before any new experiment, run the same
+   synthetic cases on Jev and on a model behind the AI Gateway, which Ask MGR
+   already uses. Also read TypeSafe's data terms. A second vendor needs a
+   measured reason.
+2. **Production attention goes first.** Its brewer-reviewed holdout is the
+   next experiment. Order notes come second.
+3. **Cellar loss notes wait.** Use case 5 is deferred until two other use
+   cases pass their experiments, because it sits next to TTB data. The
+   shortlist is now: production follow-ups, order notes, receipt and PO
+   notes, release allocation notes.
+4. **Allocation flags read two kinds of note:** order notes and delivery
+   refusal notes (use case 4).
+5. **Synthetic cases only for now.** No real brewery text goes to any
+   provider until #329 (model credits) and the provider's data terms are
+   settled.
+
 ## Open questions for the owner
 
-1. Is production attention still first, with order notes second?
-2. May minimized real notes go to TypeSafe for a holdout, and which areas?
-3. Should open and uncertain show as one "needs a look" state, as
+1. Should open and uncertain show as one "needs a look" state, as
    `production-attention.md` suggests?
-4. For use case 4: should allocation flags read only order notes, or also
-   refusal notes?
-5. Is use case 5 worth the risk of sitting next to TTB data, or should it wait?
-6. Who pays for live runs, and is it the same decision as the model credits in
-   #329?
+2. Who pays for live runs, and is that the same decision as the model credits
+   in #329?
