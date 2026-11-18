@@ -221,6 +221,35 @@ describe("adjustment reasons", () => {
     await runCommand("adjust_order_lines", { orderId, reason: "Low stock", lines: [{ skuId, qty: 2 }] }, adminCtx);
   });
 
+  it("needs a reason or a reason code before any write, naming the reason field", async () => {
+    const orderId = await orderAt("submitted");
+    const requestId = crypto.randomUUID();
+    await expect(runCommand("adjust_order_lines", { orderId, lines: [{ skuId, qty: 2 }] }, adminCtx, { requestId, correlationId: requestId }))
+      .rejects.toMatchObject({ code: "invalid_input", issues: [expect.objectContaining({ path: ["reason"] })] });
+    expect(sql(`select count(*) from private.command_requests where request_id='${requestId}'`)).toEqual(["0"]);
+  });
+
+  it("refuses the same SKU twice in one adjustment, through the command and the RPC, before any write", async () => {
+    const orderId = await orderAt("confirmed");
+    const before = snapshot(orderId);
+    await expect(runCommand("adjust_order_lines", { orderId, reasonCode: "short", lines: [{ skuId, qty: 2 }, { skuId, qty: 1 }] }, adminCtx))
+      .rejects.toMatchObject({ code: "invalid_input" });
+    const rpc = await adminCtx.db.rpc("adjust_order_lines", {
+      p_order: orderId, p_lines: [{ sku_id: skuId, qty: 2 }, { sku_id: skuId, qty: 1 }], p_reason: null, p_reason_code: "short", p_request_id: crypto.randomUUID(),
+    } as never);
+    expect(rpc.error?.message).toMatch(/same SKU twice/);
+    expect(snapshot(orderId)).toEqual(before);
+  });
+
+  it("words a change in stored quantities, so a three-place quantity reads as its two-place line", async () => {
+    const orderId = await orderAt("confirmed");
+    await runCommand("adjust_order_lines", { orderId, reasonCode: "damaged", lines: [{ skuId, qty: 2.555 }] }, adminCtx);
+    // Re-sending the same 2.555 changes nothing, so it is not listed as a -0.005 change.
+    await runCommand("adjust_order_lines", { orderId, reasonCode: "damaged", lines: [{ skuId, qty: 2.555 }] }, adminCtx);
+    const { rows } = await runCommand("list_order_changes", {}, adminCtx) as { rows: { order_id: string; changes: { delta: number }[] }[] };
+    expect(rows.filter(r => r.order_id === orderId).map(r => r.changes.map(c => c.delta))).toEqual([[], [-2.44]]);
+  });
+
   it("replays a historical code-less change on a confirmed order unchanged", async () => {
     const orderId = await orderAt("confirmed");
     const requestId = crypto.randomUUID();

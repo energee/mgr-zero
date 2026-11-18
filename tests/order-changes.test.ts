@@ -10,7 +10,7 @@ import "../lib/commands/all";
 
 let adminCtx: Ctx, salesCtx: Ctx, warehouseCtx: Ctx, buyerCtx: Ctx;
 let first: { customerId: string; shipToId: string }, second: { customerId: string; shipToId: string };
-let whId: string, skuId: string, otherSkuId: string;
+let whId: string, tapId: string, skuId: string, otherSkuId: string;
 let changedId: string, preOrderId: string, otherCustomerOrderId: string;
 
 async function confirmedOrder(customer: { customerId: string; shipToId: string }) {
@@ -29,6 +29,7 @@ beforeAll(async () => {
   salesCtx = await makeStaffCtx(b.id, "sales");
   warehouseCtx = await makeStaffCtx(b.id, "warehouse");
   whId = (await seedLocation(b.id)).id;
+  tapId = (await seedLocation(b.id, { name: "Tap room", uses: ["taproom"] })).id;
   const cat = await seedCatalog(b.id);
   const other = await seedCatalog(b.id, { product: "Pils", sku: "Pils case" });
   skuId = cat.skuId; otherSkuId = other.skuId;
@@ -97,9 +98,30 @@ describe("list_order_changes (staff report)", () => {
     expect((await list({ limit: 2, cursor: page.nextCursor! })).rows.map(r => r.reason_code)).toEqual(["damaged"]);
   });
 
+  it("never reads another brewery's changes", async () => {
+    const other = await makeStaffCtx((await makeBrewery()).id, "admin");
+    expect((await other.db.rpc("order_change_rows", { p_brewery: adminCtx.breweryId })).data).toEqual([]);
+    expect((await list({}, other as Ctx)).rows).toEqual([]);
+  });
+
   it("is Admin and Sales only", async () => {
     await expect(list({}, warehouseCtx)).rejects.toMatchObject({ status: 403 });
     expect((await salesCtx.db.rpc("order_change_rows", { p_brewery: adminCtx.breweryId })).data).toHaveLength(3);
     expect((await warehouseCtx.db.rpc("order_change_rows", { p_brewery: adminCtx.breweryId })).data).toEqual([]);
+  });
+});
+
+describe("a taproom transfer changed after confirm", () => {
+  it("needs a reason code and is listed as a taproom transfer, with no customer", async () => {
+    const { order_id: orderId } = await runCommand("create_order", {
+      kind: "taproom_transfer", fromLocationId: whId, toLocationId: tapId, lines: [{ skuId, qty: 4 }],
+    }, adminCtx) as { order_id: string };
+    await runCommand("submit_order", { orderId }, adminCtx);
+    await runCommand("confirm_order", { orderId }, adminCtx);
+    await expect(runCommand("adjust_order_lines", { orderId, reason: "Tap room full", lines: [{ skuId, qty: 3 }] }, adminCtx))
+      .rejects.toThrow(/reason code is required/);
+    await runCommand("adjust_order_lines", { orderId, reasonCode: "brewery_error", lines: [{ skuId, qty: 3 }] }, adminCtx);
+    const { rows } = await runCommand("list_order_changes", { reasonCode: "brewery_error" }, adminCtx) as { rows: Record<string, unknown>[] };
+    expect(rows).toEqual([expect.objectContaining({ order_id: orderId, kind: "taproom_transfer", customer_id: null, customer_name: null })]);
   });
 });

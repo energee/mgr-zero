@@ -9,7 +9,7 @@ import { formatDateTime } from "@/lib/date-format";
 import { docNo } from "./doc-no";
 import type { EmptyState } from "./empty-state";
 import { ORDER_CHANGE_REASONS } from "./enums";
-import { sentenceCase } from "./labels";
+import { ORDER_CHANGE_REASON_OPTIONS, sentenceCase } from "./labels";
 import { listParams } from "./list-params";
 
 /** One SKU's change: the new quantity minus the old one (negative: fewer units). */
@@ -34,6 +34,7 @@ export type OrderChangeRow = {
   created_at: string;
   order_id: string;
   order_no: number | null;
+  kind: "wholesale" | "taproom_transfer";
   customer_id: string | null;
   customer_name: string | null;
   actor: string | null;
@@ -79,7 +80,8 @@ export function toOrderChangesViewProps(s: OrderChangesSnapshot): OrderChangesVi
   const filtered = reason !== "all" || staff !== "all" || customer !== "all";
   const rows = s.rows.map((r) => ({
     key: r.id,
-    title: `${docNo("ORD", r.order_no, "Order")} · ${r.customer_name ?? "Customer"}`,
+    // A taproom transfer has no customer; Order reads it the same way (order-view.ts).
+    title: `${docNo("ORD", r.order_no, "Order")} · ${r.customer_name ?? "Taproom transfer"}`,
     detail: [
       sentenceCase(r.reason_code),
       lineChangesText(r.changes),
@@ -120,7 +122,7 @@ export function orderChangesScope(searchParams: Record<string, string | string[]
     ...params,
     reasonOptions: (): ScopeOption[] => [
       { value: "all", label: "All reasons", href: hrefWith(path, { reason: undefined }) },
-      ...ORDER_CHANGE_REASONS.map((value) => ({ value, label: sentenceCase(value), href: hrefWith(path, { reason: value }) })),
+      ...ORDER_CHANGE_REASON_OPTIONS.map((o) => ({ ...o, href: hrefWith(path, { reason: o.value }) })),
     ],
     staffOptions: (team: Named[]): ScopeOption[] => [
       { value: "all", label: "All staff", href: hrefWith(path, { staff: undefined }) },

@@ -16,19 +16,19 @@ export const orderChangesReport: OrderChangesSnapshot = {
   rows: [
     {
       id: "00000000-0000-4000-8000-0000000000c3", created_at: "2026-09-03T14:20:00.000Z",
-      order_id: "00000000-0000-4000-8000-000000000231", order_no: 231, customer_id: RIDGELINE_ID, customer_name: RIDGELINE.name,
+      order_id: "00000000-0000-4000-8000-000000000231", order_no: 231, kind: "wholesale", customer_id: RIDGELINE_ID, customer_name: RIDGELINE.name,
       actor: MARIA, reason_code: "customer_request", note: null,
       changes: [{ sku_id: SKU_PILS.sku_id, name: SKU_PILS.name, delta: 2 }],
     },
     {
       id: "00000000-0000-4000-8000-0000000000c2", created_at: "2026-09-02T17:15:00.000Z",
-      order_id: "00000000-0000-4000-8000-000000000228", order_no: 228, customer_id: ALS_ID, customer_name: ALS.name,
+      order_id: "00000000-0000-4000-8000-000000000228", order_no: 228, kind: "wholesale", customer_id: ALS_ID, customer_name: ALS.name,
       actor: DAVE, reason_code: "damaged", note: "Two kegs dented on the dock",
       changes: [{ sku_id: SKU_HAZY.sku_id, name: SKU_HAZY.name, delta: -2 }],
     },
     {
       id: "00000000-0000-4000-8000-0000000000c1", created_at: "2026-09-01T15:40:00.000Z",
-      order_id: "00000000-0000-4000-8000-000000000225", order_no: 225, customer_id: RIDGELINE_ID, customer_name: RIDGELINE.name,
+      order_id: "00000000-0000-4000-8000-000000000225", order_no: 225, kind: "wholesale", customer_id: RIDGELINE_ID, customer_name: RIDGELINE.name,
       actor: MARIA, reason_code: "short", note: null,
       changes: [{ sku_id: SKU_HAZY.sku_id, name: SKU_HAZY.name, delta: -1 }],
     },

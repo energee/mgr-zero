@@ -43,6 +43,11 @@ begin
   end if;
   p_reason := nullif(p_reason, '');
   perform private.assert_order_lines(p_lines);
+  -- One line per SKU: the upsert below would keep the last, and the change
+  -- report would count both. Checked here only, not in assert_order_lines.
+  if (select count(*) <> count(distinct e->>'sku_id') from jsonb_array_elements(p_lines) e) then
+    raise exception 'an adjustment lists the same SKU twice; give each SKU one line';
+  end if;
   o := private.lock_order(p_order, array['submitted','confirmed','picked']::public.order_status[]);
   -- A pre-order (submitted) change keeps free text; once the brewery has
   -- confirmed, every change names why with a reason code.
@@ -195,14 +200,15 @@ grant execute on function public.adjust_order_lines(uuid, jsonb, text, uuid, tex
 
 -- One change's lines as [{sku_id, name, delta}]: the new quantity minus the
 -- one before, for each SKU whose quantity moved (a dropped line is negative,
--- an added one positive), by name. before is the event's {sku_id: qty} map;
--- lines is the [{sku_id, qty}] array that replaced it.
+-- an added one positive), by name. before is the event's {sku_id: qty} map of
+-- stored quantities; lines is the [{sku_id, qty}] array as sent, rounded here
+-- to the two places order_lines stores, so re-sending 2.555 is no change.
 create function private.order_line_changes(p_brewery uuid, p_before jsonb, p_lines jsonb) returns jsonb
 language sql stable set search_path = '' as $$
   select coalesce(jsonb_agg(jsonb_build_object('sku_id', d.sku_id, 'name', s.name, 'delta', d.delta) order by s.name, d.sku_id), '[]'::jsonb)
   from (
     select coalesce(n.sku_id, b.sku_id) sku_id, coalesce(n.qty, 0) - coalesce(b.qty, 0) delta
-    from (select (e->>'sku_id')::uuid sku_id, (e->>'qty')::numeric qty from jsonb_array_elements(p_lines) e) n
+    from (select (e->>'sku_id')::uuid sku_id, round((e->>'qty')::numeric, 2) qty from jsonb_array_elements(p_lines) e) n
     full join (select key::uuid sku_id, (value #>> '{}')::numeric qty from jsonb_each(coalesce(p_before, '{}'::jsonb))) b
       on b.sku_id = n.sku_id
   ) d
@@ -212,15 +218,18 @@ $$;
 revoke all on function private.order_line_changes(uuid, jsonb, jsonb) from public, anon, authenticated, service_role;
 
 -- security-definer: justified — it calls the private line-change helper.
--- Admin and Sales only, as adjust_order_lines; filters are arguments so they
--- apply before rows are built (a definer function is never inlined).
+-- Admin and Sales only, as adjust_order_lines. A definer function is never
+-- inlined, so the reason, staff and customer filters are arguments and apply
+-- inside it; the caller's cursor and limit do not, so every matching change's
+-- deltas are built before paging. Changes after confirm are rare; if they grow,
+-- pass the cursor and limit as arguments too.
 create function public.order_change_rows(
   p_brewery uuid, p_reason_code text default null, p_actor uuid default null, p_customer uuid default null
 ) returns table (
-  id uuid, created_at timestamptz, order_id uuid, order_no bigint, customer_id uuid, customer_name text,
+  id uuid, created_at timestamptz, order_id uuid, order_no bigint, kind text, customer_id uuid, customer_name text,
   actor uuid, reason_code text, note text, changes jsonb
 ) language sql stable security definer set search_path = '' as $$
-  select e.id, e.created_at, o.id, o.order_no, o.customer_id, c.name, e.actor,
+  select e.id, e.created_at, o.id, o.order_no, o.kind::text, o.customer_id, c.name, e.actor,
     e.payload->>'reason_code', e.payload->>'reason',
     private.order_line_changes(e.brewery_id, e.payload->'before', e.payload->'lines')
   from public.order_events e

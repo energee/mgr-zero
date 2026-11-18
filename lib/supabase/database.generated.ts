@@ -5475,7 +5475,7 @@ isOneToOne: false
                            },
 "order_change_rows":
 { Args: { "p_actor"?: string,"p_brewery": string,"p_customer"?: string,"p_reason_code"?: string }; Returns: {
-              "actor": string,"changes": Json,"created_at": string,"customer_id": string,"customer_name": string,"id": string,"note": string,"order_id": string,"order_no": number,"reason_code": string
+              "actor": string,"changes": Json,"created_at": string,"customer_id": string,"customer_name": string,"id": string,"kind": string,"note": string,"order_id": string,"order_no": number,"reason_code": string
             }[]
                            },
 "order_packaging_shortfall_rows":
