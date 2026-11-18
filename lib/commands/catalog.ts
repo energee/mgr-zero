@@ -57,13 +57,17 @@ defineCommand({
 });
 
 defineCommand({
-  name: "update_sku", description: "Edit a SKU's active state, optional UPC, keg pool and default batch share (fraction over 0 through 1; brand shares total at most 1; omit to keep, null to clear); brand, format, provider mappings and history stay unchanged",
+  name: "update_sku", description: "Edit a SKU's active state, optional UPC, keg pool, default batch share (fraction over 0 through 1; brand shares total at most 1; omit to keep, null to clear) and whether portal buyers can order it from packaged stock (omit to keep); brand, format, provider mappings and history stay unchanged",
   compensation: "Reverse with update_sku and the previous values.",
-  input: z.object({ skuId: z.string().uuid(), active: z.boolean(), upc: upc.optional(), kegPoolId: z.string().uuid().nullable().optional(), batchShare: z.number().positive().max(1).nullable().optional().describe("Fraction of a planned batch's volume for this SKU; omit to keep, null to clear") }),
+  input: z.object({
+    skuId: z.string().uuid(), active: z.boolean(), upc: upc.optional(), kegPoolId: z.string().uuid().nullable().optional(),
+    batchShare: z.number().positive().max(1).nullable().optional().describe("Fraction of a planned batch's volume for this SKU; omit to keep, null to clear"),
+    portalFromStock: z.boolean().optional().describe("Whether portal buyers can order this SKU from packaged stock; staff ordering is unchanged. Omit to keep"),
+  }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_sku", {
     p_brewery: ctx.breweryId, p_id: i.skuId, p_active: i.active, p_upc: i.upc || null, p_request_id: execution.requestId, p_keg_pool: i.kegPoolId ?? null, p_clear_keg_pool: i.kegPoolId === null,
-    p_batch_share: i.batchShare ?? null, p_clear_batch_share: i.batchShare === null,
+    p_batch_share: i.batchShare ?? null, p_clear_batch_share: i.batchShare === null, p_portal_from_stock: i.portalFromStock ?? null,
   })),
 });
 
@@ -367,7 +371,7 @@ defineQuery({
     category: z.string().trim().optional().describe("Only brands in this category; empty means every category"),
   }), roles: STAFF_ROLES,
   handler: async (ctx, i) => {
-    let brands = ctx.db.from("brands").select("*, styles(name), price_groups(name), skus(id, name, format_id, active, upc, keg_pool_id, container_source, batch_share), colas:brand_approvals(id, ttb_id, approved_on, image_url)")
+    let brands = ctx.db.from("brands").select("*, styles(name), price_groups(name), skus(id, name, format_id, active, upc, keg_pool_id, container_source, batch_share, portal_from_stock), colas:brand_approvals(id, ttb_id, approved_on, image_url)")
       .eq("brewery_id", ctx.breweryId).eq("colas.kind", "cola");
     if (i.q) {
       const pattern = quotedSearchPattern(i.q);

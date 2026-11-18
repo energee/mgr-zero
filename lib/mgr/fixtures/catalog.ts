@@ -10,6 +10,7 @@ import type { FormatsSnapshot } from "@/lib/mgr/formats-view";
 import type { PackageBomSnapshot } from "@/lib/mgr/package-bom-view";
 import type { SkuListSnapshot } from "@/lib/mgr/sku-list-view";
 import type { SkuSnapshot } from "@/lib/mgr/sku-view";
+import { releaseHazyKeg } from "./releases";
 
 const HAZY = SKU_HAZY.name.split(" · ")[0];
 const PILS = SKU_PILS.name.split(" · ")[0];
@@ -125,6 +126,8 @@ export const brandHazy: BrandSnapshot = {
       { sale_channel_id: CH_WHOLESALE, price_group_id: PG_3, format_id: FMT_SIXTH, unit_price_cents: 14000 },
       { sale_channel_id: CH_TAPROOM, price_group_id: PG_3, format_id: FMT_PINT, unit_price_cents: 800 },
     ],
+    // The ½ bbl keg is released for portal ordering from a planned batch.
+    releases: [releaseHazyKeg],
   },
   styles: [HAZY, "IPA", PILS, "Add “Cold IPA”"],
   priceGroups,

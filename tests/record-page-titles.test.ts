@@ -15,6 +15,7 @@ import { periodLabel, periodRange } from "@/lib/compliance-period";
 import { recipePageTitle } from "@/lib/mgr/recipe-view";
 import { noMembershipModel, portalStaffOnlyModel } from "@/lib/mgr/entry-view";
 import { historyPage, pageCursor } from "@/lib/mgr/history-page";
+import { breweryDate } from "@/lib/date-format";
 
 const ROOT = join(__dirname, "..");
 const MISSING = "afffffff-ffff-4fff-8fff-ffffffffffff";
@@ -51,7 +52,7 @@ function requestBindings() {
   };
   const ctx = { roles: ["admin"], userId: "actor", breweryId: "brewery" };
   const bindings: Record<string, unknown> = {
-    cache, notFound, redirect, orNotFound, orNull, isUuid, navTitle, periodLabel, periodRange, recipePageTitle, historyPage, pageCursor,
+    cache, notFound, redirect, orNotFound, orNull, isUuid, navTitle, periodLabel, periodRange, recipePageTitle, historyPage, pageCursor, breweryDate,
     getActiveBrewery: async () => ({ id: "brewery", roles: ["admin"], timeZone: "UTC" }),
     buildContext: async () => ctx,
     getPortalContext: async () => ({ customer: { customerId: "customer" }, ctx }),
@@ -166,7 +167,8 @@ describe("successful record metadata", () => {
   ])("distinguishes creation and saved records at %s", async (route, primary, creationTitle, savedTitle) => {
     const { bindings } = requestBindings();
     const query = bindings.runCommand as (name: string) => Promise<unknown>;
-    const read = async (name: string) => name === primary ? [{ id: MISSING, name: "Saved record" }] : query(name);
+    // A list_brands row carries its SKUs, which the brand page reads for its releases.
+    const read = async (name: string) => name === primary ? [{ id: MISSING, name: "Saved record", skus: [] }] : query(name);
     const reading = { ...bindings, runCommand: read, runPageQuery: read };
     const body = route in DETAIL_BODY ? DETAIL_BODY[route] : undefined;
     const page = loadPage(`app/(app)/${route}/page.tsx`, body ? { ...reading, ...loadPage(`app/(app)/${body[0]}`, reading) } : reading);

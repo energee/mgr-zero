@@ -4,7 +4,7 @@
 // kegs + 6 Pils cases = $828.00 merchandise; 4 × $30.00 = $120.00 deposit.
 import type { ComingUpSnapshot } from "@/lib/mgr/coming-up-view";
 import { LOC_WAREHOUSE, SKU_HAZY, SKU_PILS, SKU_STOUT } from "./demo";
-import type { ShopSnapshot } from "@/lib/mgr/shop-view";
+import type { ShopRelease, ShopSnapshot } from "@/lib/mgr/shop-view";
 import type { ReviewOrderSnapshot } from "@/lib/mgr/review-order-view";
 
 const SHIP_MAIN = "00000000-0000-4000-8000-0000000000d1";
@@ -18,8 +18,9 @@ const item = (
   product: string,
   unitPriceCents: number,
   qty: number,
+  releases: ShopRelease[] = [],
 ): ShopSnapshot["catalog"][number] => ({
-  skuId, name, product, unitPriceCents, badge: "in", qty,
+  skuId, name, product, unitPriceCents, badge: "in", releases, qty,
 });
 
 /** Ridgeline Shop cart: 4 Hazy ½ bbl + 6 Pils cases, Main · 2026-09-09. */
@@ -36,7 +37,8 @@ export const ridgelineShop: ShopSnapshot = {
     item(SKU_HAZY_CASE, "case · 24×16 oz", "Hazy IPA", 4200, 0),
     item(SKU_PILS.sku_id, "case · 24×16 oz", "Pils", SKU_PILS.unit_price_cents, 6),
     item(SKU_PILS_BOTTLE, "12 oz bottle", "Pils", 1800, 0),
-    item(SKU_STOUT.sku_id, "⅙ bbl keg", "Stout", 6200, 0),
+    // Stout is in stock and also released from a planned batch: the row offers both.
+    item(SKU_STOUT.sku_id, "⅙ bbl keg", "Stout", 6200, 0, [{ releaseId: "00000000-0000-4000-8000-0000000000e1", shipsFrom: "2026-10-02", ordersCloseOn: "2026-09-25", badge: "in" }]),
   ],
   depositCentsPerKeg: 3000,
 };

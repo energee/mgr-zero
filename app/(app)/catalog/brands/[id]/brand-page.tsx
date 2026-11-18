@@ -6,6 +6,8 @@
 // active flag) through reconcileBooleanChange, which shows the flip at once
 // and puts it back if the command fails; a row with a SKU slots SkuEditForm.
 // A role without create_sku gets disabled switches and no SKU sheet.
+// An active SKU also gets Release (release-form.tsx, portal releases), and each
+// open release under it Edit and Withdraw.
 // The brand form is always writable: page.tsx admits Admin and Sales only.
 "use client";
 
@@ -23,18 +25,24 @@ import { reconcileBooleanChange } from "@/lib/mgr/pos-view";
 import type { KegPoolOption } from "@/lib/mgr/sku-view";
 import { brandAbvError } from "@/lib/mgr/brand-abv";
 import { SkuEditForm } from "../../sku-form";
+import { EditReleaseForm, ReleaseForm, WithdrawRelease } from "../../release-form";
+import { skuReleaseForms, type ReleaseBatchRow, type ReleaseRow } from "@/lib/mgr/release-view";
 import { ApprovalForm, RegistrationForm } from "./compliance-forms";
 import { ColaImage } from "../../cola-image";
 
 /** A list_brands SKU, with the facts SkuEditForm edits. */
-type BrandSku = BrandSnapshot["brand"]["skus"][number] & { name: string; keg_pool_id: string | null; batch_share: number | string | null };
+type BrandSku = BrandSnapshot["brand"]["skus"][number] & { name: string; keg_pool_id: string | null; batch_share: number | string | null; portal_from_stock: boolean };
 export type BrandRow = Omit<BrandSnapshot["brand"], "skus"> & { skus: BrandSku[] };
 /** The Sells as reads; a format's package_type tells SkuEditForm whether it takes a keg pool. */
 export type SellsReads = Omit<NonNullable<BrandSnapshot["sells"]>, "formats"> & { formats: (NonNullable<BrandSnapshot["sells"]>["formats"][number] & { package_type: string | null })[] };
 
-export function BrandPage({ brand, styles, categories, priceGroups, compliance, cost, sells, pools, canSell, canManageFormats, canPrice }: {
+export function BrandPage({ brand, styles, categories, priceGroups, compliance, cost, sells, pools, canSell, canManageFormats, canPrice, releaseBatches = [], today }: {
   brand: BrandRow | null; styles: string[]; categories: string[]; priceGroups: BrandSnapshot["priceGroups"]; compliance: BrandSnapshot["compliance"]; cost: BrandSnapshot["cost"];
   sells?: SellsReads; pools: KegPoolOption[]; canSell: boolean; canManageFormats: boolean; canPrice: boolean;
+  /** list_release_batches for the brand's SKUs: the planned batches a release can draw on. */
+  releaseBatches?: ReleaseBatchRow[];
+  /** The brewery's day; a stock release ships from it. */
+  today: string;
 }) {
   const router = useRouter();
   const { busy, error, fieldErrors, run } = useCommandAction(undefined, ["name"]);
@@ -79,7 +87,15 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
     if (!canSell) return null;
     const sku = brand!.skus.find((s) => s.id === row.skuId)!;
     const format = sells?.formats.find((f) => f.id === row.formatId);
-    return <SkuEditForm sku={sku} formatName={row.name} packageType={format?.package_type} pools={pools} />;
+    const releases = sells?.releases ?? [];
+    return <>
+      <SkuEditForm sku={sku} formatName={row.name} packageType={format?.package_type} pools={pools} />
+      {row.on ? <ReleaseForm title={`Release for ordering · ${sku.name}`} triggerLabel="Release" forms={skuReleaseForms(sku, releaseBatches, today, releases)} /> : null}
+    </>;
+  }
+  function releaseActions(key: string) {
+    const release = sells?.releases?.find((r: ReleaseRow) => r.id === key);
+    return release && canSell ? <><EditReleaseForm release={release} /><WithdrawRelease release={release} /></> : null;
   }
   const controls = {
     name: set("name"), alias: set("alias"), style: set("style"), abv: set("abv"), category: set("category"), description: set("description"), hops: set("hops"),
@@ -124,6 +140,7 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
         addCompliance={addCompliance}
         onSellsAs={onSellsAs}
         sellsDetails={skuSheet}
+        releaseActions={releaseActions}
         sellsDisabled={!canSell || sellsAction.busy}
         sellsMessages={<CommandFormMessage error={sellsAction.error} />}
       />

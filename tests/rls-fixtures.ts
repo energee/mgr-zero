@@ -18,7 +18,7 @@ export const matrix = {
   vessels: "deny", batches: "deny", vessel_occupancies: "deny", transfers: "deny", volume_adjustments: "deny", volume_adjustment_reclassifications: "deny",
   fermentation_readings: "deny", material_movements: "deny", batch_additions: "deny", brew_records: "deny", brew_pulls: "deny", packaging_runs: "deny",
   lots: "deny", packaging_run_outputs: "deny", packaging_run_consumptions: "deny", packaging_material_records: "deny", packaging_material_actuals: "deny", material_contracts: "deny",
-  packaging_output_corrections: "deny",
+  packaging_output_corrections: "deny", releases: "deny",
   purchase_orders: "deny", purchase_order_lines: "deny", receipts: "deny", receipt_lines: "deny",
   material_counts: "deny", material_count_lines: "deny", orders: "deny", order_lines: "deny", order_deposit_lines: "deny", order_events: "deny",
   shipments: "deny", invoices: "deny", invoice_questions: "deny", invoice_lines: "deny", invoice_payments: "deny", invoice_payment_voids: "deny", keg_events: "deny",
@@ -60,6 +60,7 @@ const privilegedRead: Partial<Record<Table, true>> = {
   cola_label_images: true,
   packaging_output_corrections: true,
   pos_location_mapping_history: true,
+  releases: true,
 };
 export const day = "2026-09-08";
 export const now = "2026-09-08T12:00:00Z";
@@ -114,6 +115,8 @@ export async function fixtures() {
   const vessel = await put("vessels", { name: "FV1", kind: "fermenter", capacity_bbl: 10 });
   const vessel2 = await put("vessels", { name: "FV2", kind: "fermenter", capacity_bbl: 10 });
   const batch = await put("batches", { planned_on: day, planned_bbl: 10, intended_brand_id: cat.brandId, created_by: owner.id });
+  // Releases are written only through release_sku; the fixture inserts one privileged row.
+  sql(`insert into public.releases (brewery_id, batch_id, sku_id, qty, ships_from, released_by) values ('${brewery.id}', '${batch.id}', '${cat.skuId}', 5, '${day}', '${owner.id}')`);
   const occupancy = await put("vessel_occupancies", { vessel_id: vessel.id, batch_id: batch.id, initial_bbl: 10 });
   await put("brew_records", { batch_id: batch.id, occupancy_id: occupancy.id, brewed_on: day, initial_bbl: 10, plan_snapshot: {}, process: {}, created_by: owner.id });
   const occupancy2 = await put("vessel_occupancies", { vessel_id: vessel2.id, batch_id: batch.id });

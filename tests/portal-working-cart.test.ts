@@ -20,7 +20,13 @@ describe("portal working cart (#710)", () => {
   it("round-trips fields and raw quantities", () => {
     const { storage } = memory();
     saveWorkingCart(storage, scope, { fields, qty: { "sku-ipa": "3", "sku-lager": "" } }, items, NOW);
-    expect(restoreWorkingCart(storage, scope, items, shipTos, NOW + 1000)).toEqual({ fields, qty: { "sku-ipa": "3" }, removed: [] });
+    expect(restoreWorkingCart(storage, scope, items, shipTos, NOW + 1000)).toEqual({ fields, qty: { "sku-ipa": "3" }, offers: {}, removed: [] });
+  });
+
+  it("keeps the release a line orders from; stock lines keep none", () => {
+    const { storage } = memory();
+    saveWorkingCart(storage, scope, { fields, qty: { "sku-ipa": "3", "sku-lager": "1" }, offers: { "sku-ipa": "release-1", "sku-lager": "" } }, items, NOW);
+    expect(restoreWorkingCart(storage, scope, items, shipTos, NOW)?.offers).toEqual({ "sku-ipa": "release-1" });
   });
 
   it("is scoped to buyer, customer account and brewery", () => {
@@ -51,7 +57,7 @@ describe("portal working cart (#710)", () => {
   it("drops packages no longer in the catalog and returns their names", () => {
     const { storage } = memory();
     saveWorkingCart(storage, scope, { fields, qty: { "sku-ipa": "3", "sku-lager": "2" } }, items, NOW);
-    expect(restoreWorkingCart(storage, scope, [items[0]], shipTos, NOW)).toEqual({ fields, qty: { "sku-ipa": "3" }, removed: ["Lager 1/6 bbl"] });
+    expect(restoreWorkingCart(storage, scope, [items[0]], shipTos, NOW)).toEqual({ fields, qty: { "sku-ipa": "3" }, offers: {}, removed: ["Lager 1/6 bbl"] });
   });
 
   it("falls back to the default ship-to when the saved one is gone", () => {

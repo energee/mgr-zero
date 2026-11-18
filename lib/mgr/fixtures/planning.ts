@@ -1,4 +1,5 @@
 import type { PlanningSnapshot } from "@/lib/mgr/planning-view";
+import { releaseBatches, releaseHazyKeg } from "./releases";
 
 export const planningDemo: PlanningSnapshot = {
   requirements: [{
@@ -31,4 +32,7 @@ export const planningDemo: PlanningSnapshot = {
     { key: "fictional-labels", title: "Fictional Label Works", detail: "labels · 7 day lead · past the buy-by date", quantity: "out of reach", warning: true },
   ],
   info: "Labels can no longer arrive for the week of Sep 7, 2026, so that line is left out. The three packaging-supply lines still draft.",
+  // Planned batches: Hazy is already released, Pils offers Release for ordering.
+  batches: releaseBatches,
+  releases: [releaseHazyKeg],
 };

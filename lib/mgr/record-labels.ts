@@ -62,6 +62,7 @@ export const RECORD_LABELS = {
   format: { table: "formats", select: "id, name", label: named },
   price_group: { table: "price_groups", select: "id, name", label: named },
   sale_channel: { table: "sale_channels", select: "id, name", label: named },
+  release: { table: "releases", select: "id, ships_from, skus(name)", label: row => `${name(row.skus)} release from ${date(row.ships_from)}` },
   brand_approval: { table: "brand_approvals", select: "id, kind, ttb_id, brands(name)", label: row => `${sentenceCase(row.kind as string)} ${row.ttb_id} · ${name(row.brands)}` },
   notification_destination: { table: "notification_destinations", select: "id, kind, external_destination_id", label: row => `${sentenceCase(row.kind as string)} · ${row.external_destination_id}` },
 

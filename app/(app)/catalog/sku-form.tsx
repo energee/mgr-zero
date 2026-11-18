@@ -12,14 +12,16 @@ import { useCommandForm } from "@/lib/commands/use-command-form";
 import { toSkuViewProps, skuUpdateCommand, type KegPoolOption } from "@/lib/mgr/sku-view";
 
 // Only mutable SKU facts are sent; changing its package means creating another SKU.
-export function SkuEditForm({ sku, formatName, packageType, pools = [] }: { sku: { id: string; name: string; active: boolean; upc: string | null; keg_pool_id?: string | null; batch_share: number | string | null }; formatName: string; packageType?: string | null; pools?: KegPoolOption[] }) {
+export function SkuEditForm({ sku, formatName, packageType, pools = [] }: { sku: { id: string; name: string; active: boolean; upc: string | null; keg_pool_id?: string | null; batch_share: number | string | null; portal_from_stock: boolean }; formatName: string; packageType?: string | null; pools?: KegPoolOption[] }) {
   const initial = toSkuViewProps({ formats: [], pools, sku: { ...sku, format_id: "", formats: { name: formatName, package_type: packageType } } });
   const [kegPool, setKegPool] = useState(sku.keg_pool_id ?? "");
   const [active, setActive] = useState(sku.active);
+  const [portalFromStock, setPortalFromStock] = useState(sku.portal_from_stock);
   const [upc, setUpc] = useState(sku.upc ?? "");
   const [batchSharePercent, setBatchSharePercent] = useState(initial.batchSharePercent ?? "");
-  const reset = () => { setActive(sku.active); setUpc(sku.upc ?? ""); setKegPool(sku.keg_pool_id ?? ""); setBatchSharePercent(initial.batchSharePercent ?? ""); };
-  const edit = skuUpdateCommand({ skuId: sku.id, active, upc, batchSharePercent, ...(packageType === "keg" && kegPool !== (sku.keg_pool_id ?? "") ? { kegPoolId: kegPool || null } : {}) });
+  const reset = () => { setActive(sku.active); setPortalFromStock(sku.portal_from_stock); setUpc(sku.upc ?? ""); setKegPool(sku.keg_pool_id ?? ""); setBatchSharePercent(initial.batchSharePercent ?? ""); };
+  // Like the keg pool, Orderable from stock is sent only when it changed.
+  const edit = skuUpdateCommand({ skuId: sku.id, active, upc, batchSharePercent, ...(portalFromStock !== sku.portal_from_stock ? { portalFromStock } : {}), ...(packageType === "keg" && kegPool !== (sku.keg_pool_id ?? "") ? { kegPoolId: kegPool || null } : {}) });
   const form = useCommandForm(edit.name, {
     build: () => edit.input, reset,
   });
@@ -28,8 +30,8 @@ export function SkuEditForm({ sku, formatName, packageType, pools = [] }: { sku:
       <form onSubmit={(event) => { if (edit.reason) { event.preventDefault(); return; } void form.submit(event); }} className="flex flex-col gap-4">
         <SkuView
           // A saved SKU keeps its format, so the picker has no options to offer.
-          model={{ ...initial, active, upc, kegPool, batchSharePercent }}
-          controls={{ active: setActive, upc: setUpc, kegPool: setKegPool, batchSharePercent: setBatchSharePercent }}
+          model={{ ...initial, active, portalFromStock, upc, kegPool, batchSharePercent }}
+          controls={{ active: setActive, portalFromStock: setPortalFromStock, upc: setUpc, kegPool: setKegPool, batchSharePercent: setBatchSharePercent }}
           locked
           messages={<>
             <p className="text-sm">Create another SKU to use a different format.{packageType === "keg" && " Changing the keg pool affects future orders only."}</p>

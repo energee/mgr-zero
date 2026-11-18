@@ -4,7 +4,9 @@
 // packaged format, the packages inside each switched-on format, and the
 // group's pours, each with its prices. sellsAsCommand turns a switch into
 // create_sku or update_sku; pours and prices are edited on /pricing.
+// list_releases({ open: true }) adds each SKU's open portal releases under its row.
 import { money } from "./money";
+import { releaseRowView, type ReleaseRow } from "./release-view";
 import { skuCreateCommand } from "./sku-view";
 
 export type SellsAsRow = {
@@ -17,6 +19,8 @@ export type SellsAsRow = {
   upc?: string;
   /** "DTC $22.00 · Wholesale $18.00", or "Unpriced". */
   prices: string;
+  /** The SKU's open portal releases, each a row under it; key is the release id. */
+  releases: { key: string; title: string; detail: string }[];
 };
 
 export type BrandSellsModel = {
@@ -42,9 +46,11 @@ export type BrandSellsSnapshot = {
   prices: { sale_channel_id: string; price_group_id: string; format_id: string; unit_price_cents: number }[];
   /** list_sale_channels, in display order. */
   channels: { id: string; name: string }[];
+  /** list_releases({ open: true }) for the brand's SKUs; absent for a role that cannot release. */
+  releases?: ReleaseRow[];
 };
 
-export function toBrandSellsModel({ brand, formats, prices, channels }: BrandSellsSnapshot): BrandSellsModel {
+export function toBrandSellsModel({ brand, formats, prices, channels, releases = [] }: BrandSellsSnapshot): BrandSellsModel {
   const group = brand.price_group_id;
   // One format's prices on the brand's group, channel by channel.
   const pricesOf = (formatId: string) => channels
@@ -61,7 +67,10 @@ export function toBrandSellsModel({ brand, formats, prices, channels }: BrandSel
   const packages = formats.flatMap((f): SellsAsRow[] => {
     const sku = brand.skus.find((s) => s.format_id === f.id);
     if (children.has(f.id) && !sku) return [];
-    return [{ formatId: f.id, name: f.name, on: sku?.active ?? false, skuId: sku?.id, upc: sku?.upc ?? undefined, prices: pricesOf(f.id) }];
+    return [{
+      formatId: f.id, name: f.name, on: sku?.active ?? false, skuId: sku?.id, upc: sku?.upc ?? undefined, prices: pricesOf(f.id),
+      releases: sku ? releases.filter((r) => r.sku_id === sku.id).map(releaseRowView) : [],
+    }];
   });
   const switchedOn = new Set(packages.filter((p) => p.on).map((p) => p.formatId));
   return {

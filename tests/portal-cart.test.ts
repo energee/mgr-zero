@@ -46,7 +46,7 @@ describe("portal cart disabled reason (#768)", () => {
 describe("portal cart messages (#904)", () => {
   const scope = { actorId: crypto.randomUUID(), customerId: crypto.randomUUID(), breweryId: crypto.randomUUID() };
   const shipTo = crypto.randomUUID();
-  const items = [{ skuId: crypto.randomUUID(), name: "Pils Keg", product: "Pils", unitPriceCents: 100 }];
+  const items = [{ skuId: crypto.randomUUID(), name: "Pils Keg", product: "Pils", unitPriceCents: 100, badge: "in", releases: [] }];
   const alerts = (html: string) => [...html.matchAll(/<div\b[^>]*role="alert"[^>]*>([\s\S]*?)<\/div>/g)].map(match => match[1].replace(/<[^>]+>/g, "")).join(" · ");
   function render(qty: string) {
     const saved = JSON.stringify({ savedAt: Date.now(), fields: { shipToId: shipTo, poNumber: "", note: "", requestedShipDate: null }, lines: [{ skuId: items[0].skuId, name: "Pils Keg", qty }, { skuId: "gone", name: "Old IPA", qty: "1" }] });

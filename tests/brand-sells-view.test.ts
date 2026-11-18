@@ -88,3 +88,15 @@ describe("sellsAsCommand", () => {
     expect(sellsAsCommand(caseRow, false, "b1")).toEqual({ name: "update_sku", input: { skuId: "s-case", active: false, upc: "012345678905" } });
   });
 });
+
+describe("Sells as releases (portal releases)", () => {
+  const open = { id: "r1", batch_id: null, batch_no: null, sku_id: "s-case", sku_name: "Case", qty: 10, ships_from: "2026-11-18", orders_close_on: null, withdrawn_at: null, ready_on: null, open: true, cancelled: false, confirmed: 2, preordered: 1, remaining: 7 };
+  it("lists each open release under its SKU's row", () => {
+    const model = toBrandSellsModel({ brand: brand(), formats, prices, channels, releases: [open, { ...open, id: "r2", batch_id: "b9", batch_no: 9 }] });
+    expect(model.packages.find((p) => p.skuId === "s-case")?.releases).toEqual([
+      { key: "r1", title: "Release · Packaged stock", detail: "7 of 10 left · 2 confirmed · 1 pre-ordered · ships Nov 18, 2026" },
+      { key: "r2", title: "Release · Batch 9", detail: "7 of 10 left · 2 confirmed · 1 pre-ordered · ships Nov 18, 2026" },
+    ]);
+    expect(model.packages.find((p) => p.formatId === "half")?.releases).toEqual([]);
+  });
+});
