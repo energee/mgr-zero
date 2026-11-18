@@ -8,7 +8,6 @@
 import { CellarMapView } from "@/components/mgr/views/cellar-map";
 import { cellarReadings, toCellarMapViewProps, type OrderedVessel } from "@/lib/mgr/cellar-map-view";
 import type { VesselReading } from "@/lib/mgr/vessel-detail-view";
-import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
@@ -38,14 +37,14 @@ type Batch = {
 export default async function CellarPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [occupancies, vessels, batches, unit, materials, lots, planned] = (await Promise.all([
-    runCommand("list_occupancies", {}, ctx), runCommand("list_vessels", {}, ctx), runCommand("list_batches", { readings: true, open: true }, ctx), runCommand("get_gravity_unit", {}, ctx), runCommand("list_materials", {}, ctx),
+  const [occupancies, vessels, batches, materials, lots, planned] = (await Promise.all([
+    runCommand("list_occupancies", {}, ctx), runCommand("list_vessels", {}, ctx), runCommand("list_batches", { readings: true, open: true }, ctx), runCommand("list_materials", {}, ctx),
     runCommand("list_material_lots", {}, ctx), runCommand("list_batches", { open: false }, ctx),
-  ])) as [Occupancy[], Vessel[], Batch[], { effective: GravityUnit }, AdditionMaterial[], (AdditionLot & { material_id: string })[], Parameters<typeof plannedBatchChoices>[0]];
+  ])) as [Occupancy[], Vessel[], Batch[], AdditionMaterial[], (AdditionLot & { material_id: string })[], Parameters<typeof plannedBatchChoices>[0]];
   const { materials: additionMaterials, lotsByMaterial } = additionChoices(materials, lots);
   const completionCandidates = batches.map((batch) => ({ id: batch.id, label: batchLabel(batch.batch_no, batch.brand_name) }));
 
-  const readings = cellarReadings(batches, unit.effective);
+  const readings = cellarReadings(batches);
   const model = toCellarMapViewProps(vessels, occupancies, readings, Object.fromEntries(vessels.map(vessel => [vessel.id, `/cellar/vessels/${vessel.id}`])), occupancyId => `/cellar/${occupancyId}/reading?from=/cellar`);
   model.backHref = "/beer"; model.addHref = canRun(ctx, "upsert_vessel") ? "/cellar/vessels/new" : null; model.brewHref = "/batches";
   return <CellarMapView model={model} transfer={<CellarTransferForm occupancies={occupancies} vessels={vessels} plannedBatches={plannedBatchChoices(planned)} addVesselHref={model.addHref} disabled={model.actionsOff} />} addition={<CellarAdditionForm occupancies={occupancies} materials={additionMaterials} lotsByMaterial={lotsByMaterial} disabled={model.actionsOff} />} complete={<BatchCompletionForm batches={completionCandidates} />} />;

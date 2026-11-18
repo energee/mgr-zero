@@ -251,6 +251,25 @@ describe("picking the tank", () => {
       { runId: run.id, startedAt: "2026-11-28T14:00:00Z" }, ctx)).rejects.toThrow(/occupancy is closed/);
   });
 
+  it("keeps a started run on its tank and its start time", async () => {
+    // The page offers no way to change either once started; the command must refuse it too,
+    // or an API caller or a stale second tab re-points the draw or rewrites the start.
+    const run = (await runCommand("schedule_packaging_run", {
+      brandId: stout.brandId, plannedOn: "2026-11-29", outputs: [],
+    }, ctx)) as { id: string };
+    const first = await brewInto("FV-STARTED-A", stout.brandId, 10, "2026-11-08");
+    const second = await brewInto("FV-STARTED-B", stout.brandId, 10, "2026-11-09");
+    await runCommand("update_packaging_run", { runId: run.id, occupancyId: first.occupancyId, startedAt: "2026-11-29T14:00:00Z" }, ctx);
+
+    await expect(runCommand("update_packaging_run", { runId: run.id, occupancyId: second.occupancyId }, ctx))
+      .rejects.toThrow(/already started/);
+    await expect(runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-11-30T09:00:00Z" }, ctx))
+      .rejects.toThrow(/already started/);
+    const kept = await admin.from("packaging_runs").select("occupancy_id, started_at").eq("id", run.id).single();
+    expect(kept.data?.occupancy_id).toBe(first.occupancyId);
+    expect(new Date(kept.data!.started_at!).toISOString()).toBe("2026-11-29T14:00:00.000Z");
+  });
+
   it("refuses a tank whose batch is promised to a different brand", async () => {
     const run = (await runCommand("schedule_packaging_run", {
       brandId: stout.brandId, plannedOn: "2026-11-24", outputs: [],

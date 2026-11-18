@@ -3431,7 +3431,7 @@ export const SCREENS: Screen[] = [
     name: "Link identity",
     job: "Link one Slack user to one current brewery staff membership",
     reads: "get_chat_link_status",
-    writes: "issue_chat_link_proof [design] · consume_chat_link_proof [single-use, authenticated MGR completion]",
+    writes: "issue_chat_link_proof [platform; the Slack App Home handler mints it with the service role] · consume_chat_link_proof [single-use, authenticated MGR completion]",
     states: [["expired", "link expired · create a new one", 1], ["not staff", "customer and removed membership rejected", 1], ["linked", "show personal queue"]],
     spec: "Slack profile email and display name are never identity. The deep link requires normal MGR authentication.",
     body: (<>
