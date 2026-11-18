@@ -2,7 +2,7 @@
 // its name and note (update_recipe, #1818), and which copy its scheduled
 // batches brew (create_recipe_version moves the unbrewed ones, #1817).
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, seedLocation, seedMaterial } from "./helpers";
+import { admin, closePgSessions, makeBrewery, makeStaffCtx, pgSession, seedLocation, seedMaterial, staffSession } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -102,5 +102,35 @@ describe("create_recipe_version moves scheduled batches", () => {
     expect(v3.moved_batches).toBe(2);
     const left = (await admin.from("brew_pulls").select("material_id").eq("batch_id", pulled.id).throwOnError()).data!;
     expect(left).toEqual([{ material_id: hop }]);
+  });
+
+  it("leaves a batch brewed while the recipe was being saved on the copy it was brewed from", async () => {
+    const owner = await makeStaffCtx(breweryId, "admin");
+    const malt = await seedMaterial(breweryId, { name: "Race malt", category: "malt" });
+    const recipe = await runCommand("create_recipe", { name: "Racing recipe" }, brewer) as Recipe;
+    const v1 = await runCommand("create_recipe_version", { recipeId: recipe.id, mashSchedule, brewhouseEfficiency: 0.75, yeastAttenuation: 0.8, ingredients: [{ materialId: malt, perBblQty: 40, stage: "mash" }] }, brewer) as { id: string };
+    const batch = await runCommand("schedule_batch", { plannedOn: "2026-12-01", plannedBbl: 10, recipeVersionId: v1.id }, brewer) as { id: string };
+    const vessel = await runCommand("upsert_vessel", { name: `Race FV ${crypto.randomUUID()}`, kind: "fermenter", capacityBbl: 100 }, owner) as { id: string };
+    try {
+      // The brew day has run but not committed when the save starts.
+      const brewing = await staffSession(brewer.userId);
+      await brewing.query("select public.record_brew_day(p_brewery => $1, p_batch => $2, p_vessel => $3, p_initial_bbl => 10, p_brewed_on => '2026-12-01', p_request_id => $4, p_actuals => '[]'::jsonb, p_confirm_empty => true)",
+        [breweryId, batch.id, vessel.id, crypto.randomUUID()]);
+      const saving = await staffSession(brewer.userId);
+      const pid = (await saving.query("select pg_backend_pid() pid")).rows[0].pid;
+      const saved = saving.query(`select public.create_recipe_version(p_brewery => $1, p_recipe => $2, p_mash_schedule => $3::jsonb, p_fermentation_schedule => '[]'::jsonb,
+        p_process => '{}'::jsonb, p_brewhouse_efficiency => 0.75, p_yeast_attenuation => 0.8, p_boil_minutes => null, p_target_ibu => null, p_note => null,
+        p_ingredients => $4::jsonb, p_request_id => $5) result`,
+        [breweryId, recipe.id, JSON.stringify(mashSchedule), JSON.stringify([{ material_id: malt, per_bbl_qty: 45, stage: "mash", timing_minutes: null }]), crypto.randomUUID()]);
+      saved.catch(() => {});
+      const observer = await pgSession();
+      await expect.poll(async () => (await observer.query("select wait_event_type from pg_stat_activity where pid=$1", [pid])).rows[0]?.wait_event_type, { timeout: 3000 }).toBe("Lock");
+      await brewing.query("commit");
+      expect((await saved).rows[0].result.moved_batches).toBe(0);
+      await saving.query("commit");
+      expect(await batchVersion(batch.id)).toBe(v1.id);
+    } finally {
+      await closePgSessions();
+    }
   });
 });

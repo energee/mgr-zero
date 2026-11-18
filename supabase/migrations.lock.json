@@ -264,5 +264,6 @@
   "20261117090000_split_batch_cost.sql": "0bcc9de7904c2d021fd0744a5a0572205e8c77dccd51ad1423f997551c169398",
   "20261117150000_cancel_flags_staged_beer.sql": "ed9764173ff4306746c14f8c0b5a3b716e07f39c5dae6735fe54516191a3fc3e",
   "20261117160000_started_run_keeps_its_tank.sql": "1d160d6c895ec0228d03bd8a4b5dff076eab60f46ce2d16e06f28cc0e1d429f7",
-  "20261117170000_transfer_cancel_respects_route.sql": "d429bbe881a08c3890f2566aaa107d437249ec496fcb8fd6aae0ea41bd123d7a"
+  "20261117170000_transfer_cancel_respects_route.sql": "d429bbe881a08c3890f2566aaa107d437249ec496fcb8fd6aae0ea41bd123d7a",
+  "20261117180000_recipe_save_waits_for_brew_day.sql": "c373b3a9891f8193cfcc922f276db4503c3c39db5e31c821b6676999e71e8f18"
 }
