@@ -80,7 +80,7 @@ function ledgerPaymentFact(inv: InvoiceListRecord, state: InvoiceCurrentState): 
 function paymentFact(inv: InvoiceListRecord, state: InvoiceCurrentState): string {
   if (inv.kind === "credit_memo") return "Credit memo";
   if (state === "written_off") return "Written off";
-  if (state === "voided") return "Not paid";
+  if (state === "voided") return "Voided";
   if (state === "deleted") return "Payment status unavailable";
   if (state === "paid" && inv.qbo_sync_status === "not_synced") return "Paid";
   if (invoiceLedgerOwnsBalance(inv)) return ledgerPaymentFact(inv, state);

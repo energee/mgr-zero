@@ -175,7 +175,8 @@ function invoiceState(snapshot: InvoiceSnapshot, totalCents: number): InvoiceVie
   const { invoice } = snapshot;
   if (invoice.kind === "credit_memo") return { label: "Credit memo", tone: "ok" };
   const state = invoiceCurrentState(invoice);
-  if (state === "written_off") return { label: "Written off", tone: "ok" };
+  // Neutral, not ok: a write-off closes the invoice without it being settled.
+  if (state === "written_off") return { label: "Written off", tone: "" };
   if (state === "voided") return { label: "Voided", tone: "w" };
   if (state === "deleted") return { label: "Deleted in QuickBooks", tone: "w" };
   const facts = toLedgerFacts(snapshot);

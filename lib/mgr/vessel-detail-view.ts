@@ -1,7 +1,7 @@
 // lib/mgr/vessel-detail-view.ts — view-model for Vessel detail (inventory and
 // live), its capacity field error, and what its Save vessel still needs.
 import { formatGravity, type GravityUnit } from "./gravity-unit";
-import { formatDateTime } from "@/lib/date-format";
+import { formatAgo } from "@/lib/date-format";
 import { submitReason } from "@/lib/mgr/submit-reason";
 import { vesselCapacity } from "@/lib/vessel-capacity";
 
@@ -11,10 +11,11 @@ export const VESSEL_TYPES = ["Fermenter", "Brite", "Barrel", "Kettle", "Other"];
 export function formatVesselReading(reading: VesselReading, unit: GravityUnit): string {
   return [reading.gravity_plato == null ? undefined : formatGravity(reading.gravity_plato, unit), reading.temp_f == null ? undefined : `${reading.temp_f} °F`, reading.ph == null ? undefined : `pH ${reading.ph}`, reading.note].filter(Boolean).join(" · ");
 }
-// One tank's newest reading with its time, as Cellar and Batches list it. The
-// note is left out: a list line stays short, and Vessel detail shows the note.
-export function formatLatestReading(reading: VesselReading | undefined | null, unit: GravityUnit, timeZone: string): string {
-  return reading ? `${formatVesselReading({ ...reading, note: null }, unit)} · ${formatDateTime(reading.at, timeZone)}` : "No readings yet";
+// One tank's newest reading and how long ago it was taken, as Batches lists it.
+// The note and exact time are left out: a list line stays short, and Vessel
+// detail shows both.
+export function formatLatestReading(reading: VesselReading | undefined | null, unit: GravityUnit, now: Date = new Date()): string {
+  return reading ? `${formatVesselReading({ ...reading, note: null }, unit)} · ${formatAgo(reading.at, now)}` : "No readings yet";
 }
 export type VesselDetailViewModel = {
   backHref?: string;
