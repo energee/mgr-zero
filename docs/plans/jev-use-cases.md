@@ -71,6 +71,65 @@ receives none (`docs/operations/order-email-worker.md`). It stores no vendor
 invoice documents and no customer-level notes. Reading those would first need
 an ingestion path, which this plan does not propose.
 
+### More candidates (second sweep, 2026-11-18)
+
+Jev answers only fixed-choice questions: code supplies the options, and Jev
+returns one option key with a probability for each. It writes no text. A
+"quote" is a stored note that code offered as an option and Jev picked.
+
+Rows 10–19 read stored notes and show a flag, like use cases 1–9. Rows 20–30
+suggest a value, shown as described in "Suggestions in forms" below.
+
+| # | Text Jev reads | Jev picks from | Shape | Value | Note |
+| --- | --- | --- | --- | --- | --- |
+| 10 | `deliveries.note`, `routes.note` | May change future deliveries: yes, no, uncertain | Flag | M | |
+| 11 | `keg_events.note` | May describe a lost or damaged keg: yes, no, uncertain | Flag | M | |
+| 12 | `batches.note`, `recipe_versions.note` | May describe an unrecorded recipe deviation: yes, no, uncertain | Flag | M | Affects batch cost |
+| 13 | `material_counts.note`, `material_movements.note` | May describe an unrecorded write-off: yes, no, uncertain | Flag | M | |
+| 14 | `stock_transfers.note`, `stock_transfer_lines.note` | May report a short or damage on arrival: yes, no, uncertain | Flag | L–M | |
+| 15 | Agent eval answers | The rubric's labels | Judge | H | Hook exists (`applyJudgement`); waits on #329 |
+| 16 | `agent_proposals` rationale and command | Agree, contradict, unclear | Flag | M | |
+| 17 | `content/docs` paragraph and the operation's description | Agree, contradict, unclear | CI | L–M | |
+| 18 | `brand_approvals.note`, `brewery_state_licenses.note` | May mention a deadline that has no date field: yes, no, uncertain | Flag | M | Compliance: defer like use case 5 |
+| 19 | `report_filings.note` | May describe an amendment: yes, no, uncertain | Flag | M | Compliance: defer like use case 5 |
+| 20 | Material name | `MATERIAL_CATEGORIES` | Suggest | H | `lib/recipe-ibu.ts` counts only `hop` lines, so a wrong category silently drops a hop from IBU |
+| 21 | Square item and variation name (`list_pos_variations`, `queued`) | The brewery's SKUs, poured formats, Ignore | Suggest | H | A wrong map skews taproom variance, not TTB; reversible |
+| 22 | CSV header and sample cells | The file's headers, No column | Suggest | M–H | Today only an exact header maps (`import-wizard.tsx`); preview and validation stay |
+| 23 | New customer, vendor, material or brand name | Close existing names, none | Suggest | M | The unique key is exact, so "Joe's Bar" and "Joes Bar" both save |
+| 24 | CSV cell for a fixed field ("Net 30 days") | `CUSTOMER_TYPES`, `PAYMENT_TERMS` | Suggest | M | Terms move due dates; staff confirm every value |
+| 25 | New brand style | Existing styles, new style | Suggest | L–M | |
+| 26 | Finished-goods movement note and its `type` | Match, mismatch, unclear | Flag | M | TTB-adjacent: defer like use case 5 |
+| 27 | Command palette query | Pages the user's roles already allow | Suggest | L–M | Jev ranks only destinations code allows |
+| 28 | PR body | Open `TODO.md` items, none | CI | L | Warns when the `TODO:` line was forgotten |
+| 29 | `agent_session_notes.body` (friction) | Operation names, other | Report | L | Lets the public report count by operation without note text |
+| 30 | Mash or fermentation step name | Step kinds | Suggest | L | The kind only changes display text |
+
+Blocked: QuickBooks customer and item mapping. `lib/qbo.ts` says "MGR never
+matches or preselects by name" (#1515). A suggestion is a preselect, so the
+owner would have to reverse that decision first. It is also money.
+
+### Suggestions in forms (owner decision, 2026-11-18)
+
+A suggestion is muted placeholder text that Tab accepts.
+
+- It shows only in an empty field, and only when one option's probability
+  clears a threshold set by that use case's experiment. Otherwise the field
+  stays blank, as today.
+- Tab fills the value. Typing replaces it. Escape dismisses it. With no
+  suggestion showing, Tab moves focus as usual.
+- The request goes out when the source field loses focus (for example the
+  material name), so the answer is ready when the user reaches the target
+  field. The form never waits for Jev.
+- Screen readers hear the suggestion and the Tab hint through
+  `aria-describedby`.
+- On a bulk screen (use cases 21 and 22), each row's picker shows its own
+  suggestion, and Tab accepts that row's.
+- A Jev failure shows no suggestion. The field then behaves as today and the
+  user fills it, so nothing deterministic is hidden.
+- It extends the existing controls (`SuggestInput` behind `E.edit`, and the
+  `E` select). It does not add a new control.
+- Latency is unmeasured. Each suggest use case times Jev before any build.
+
 ## Rejected, and why
 
 | Idea | Why not |
