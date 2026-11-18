@@ -17,8 +17,14 @@
 --   submit_order          20261017144000_staff_roles.sql
 --   portal_order_rows     20261016100900_portal_order_ship_to_country.sql
 --   update_sku, projected_batch_packaging_units 20261017143500_projected_packaging_demand.sql
+--   upsert_customer       20261024042813_customer_name_nonblank.sql
+--
+-- A customer's release_delay_days holds every release back from that buyer
+-- for that many days after it opens (early access tiers); stock is unaffected.
 
 alter table public.skus add column portal_from_stock boolean not null default true;
+alter table public.customers add column release_delay_days integer not null default 0
+  check (release_delay_days between 0 and 60);
 
 create table public.releases (
   id uuid primary key default private.new_uuid(),
@@ -109,15 +115,17 @@ revoke all on function private.batch_ready_on(date, date, integer) from public, 
 -- holds its quantity less what confirmed lines already allocated; a closed one
 -- holds its standing pre-orders; a packaged batch release holds its
 -- pre-orders, since that stock now exists; an unpackaged batch holds nothing.
+-- days_open is whole brewery days since release: a customer with a release
+-- delay sees the release once days_open reaches it.
 create function private.release_state(p_brewery uuid)
 returns table (
   id uuid, batch_id uuid, sku_id uuid, qty numeric, ships_from date, orders_close_on date,
   released_at timestamptz, withdrawn_at timestamptz, ready_on date, packaged boolean, cancelled boolean,
-  open boolean, confirmed numeric, preordered numeric, remaining numeric, stock_claim numeric
+  open boolean, confirmed numeric, preordered numeric, remaining numeric, stock_claim numeric, days_open integer
 )
 language sql stable set search_path = '' as $$
   with brewery as (
-    select (now() at time zone timezone)::date as today, days_to_package from public.breweries where id = p_brewery
+    select (now() at time zone timezone)::date as today, timezone, days_to_package from public.breweries where id = p_brewery
   ), counted as (
     select ol.release_id,
       coalesce(sum(case when o.status = 'shipped' then coalesce(ol.qty_shipped, ol.qty_ordered) else ol.qty_ordered end)
@@ -134,7 +142,8 @@ language sql stable set search_path = '' as $$
       r.batch_id is not null and private.batch_packaged(p_brewery, r.batch_id) as packaged,
       coalesce(b.cancelled_at is not null, false) as cancelled,
       r.withdrawn_at is null and (r.orders_close_on is null or r.orders_close_on >= br.today)
-        and (r.batch_id is null or (b.cancelled_at is null and b.closed_at is null)) as dated_open
+        and (r.batch_id is null or (b.cancelled_at is null and b.closed_at is null)) as dated_open,
+      br.today - (r.released_at at time zone br.timezone)::date as days_open
     from public.releases r
     cross join brewery br
     left join counted c on c.release_id = r.id
@@ -148,7 +157,8 @@ language sql stable set search_path = '' as $$
       when batch_id is not null then case when packaged then preordered else 0 end
       when dated_open then greatest(qty - confirmed, preordered)
       else preordered
-    end as stock_claim
+    end as stock_claim,
+    days_open
   from base;
 $$;
 revoke all on function private.release_state(uuid) from public, anon, authenticated, service_role;
@@ -166,12 +176,14 @@ revoke all on function private.release_stock_free(uuid, uuid, uuid) from public,
 -- What a buyer may order: a line with release_id must name an open release of
 -- its SKU with enough remaining, and the requested date must be on or after
 -- that release's ships-from date; a line without one needs a SKU orderable
--- from stock. Callers lock the named release rows first, so the remaining
+-- from stock. A release is not open to a customer until its release delay
+-- has passed. Callers lock the named release rows first, so the remaining
 -- check sees every committed order.
-create function private.assert_portal_offers(p_brewery uuid, p_requested date, p_lines jsonb) returns void
+create function private.assert_portal_offers(p_brewery uuid, p_customer uuid, p_requested date, p_lines jsonb) returns void
 language plpgsql stable set search_path = '' as $$
-declare l record;
+declare l record; v_delay integer;
 begin
+  select release_delay_days into v_delay from public.customers where id = p_customer and brewery_id = p_brewery;
   select s.name into l from jsonb_array_elements(p_lines) e
     join public.skus s on s.id = (e->>'sku_id')::uuid and s.brewery_id = p_brewery
     where e->>'release_id' is null and not s.portal_from_stock limit 1;
@@ -188,13 +200,14 @@ begin
     if l.cancelled then raise exception 'The release of % closed: its batch was cancelled', l.name; end if;
     if l.packaged then raise exception 'The release of % closed: its batch was packaged', l.name; end if;
     if not l.open then raise exception 'Orders for the release of % closed', l.name; end if;
+    if l.days_open < coalesce(v_delay, 0) then raise exception 'The release of % is not open to this account yet', l.name; end if;
     if l.want > l.remaining then raise exception 'Only % of % left in this release', l.remaining, l.name; end if;
     if p_requested is null or p_requested < l.ships_from then
       raise exception '% ships from %; choose a requested date on or after it', l.name, l.ships_from;
     end if;
   end loop;
 end $$;
-revoke all on function private.assert_portal_offers(uuid, date, jsonb) from public, anon, authenticated, service_role;
+revoke all on function private.assert_portal_offers(uuid, uuid, date, jsonb) from public, anon, authenticated, service_role;
 
 -- Staff read of releases with their counts. Brewers see quantities only, like
 -- order_packaging_shortfall_rows; no customer data leaves. p_open keeps only
@@ -353,12 +366,13 @@ revoke all on function public.withdraw_release(uuid, uuid, uuid) from public, an
 grant execute on function public.withdraw_release(uuid, uuid, uuid) to authenticated;
 
 -- A buyer's open releases: SKUs active and priced on the caller's channel,
--- scoped exactly like portal_availability, with a remaining badge only.
+-- scoped exactly like portal_availability, with a remaining badge only. A
+-- release appears once the customer's release delay has passed.
 create function public.portal_releases(p_customer uuid)
 returns table (release_id uuid, sku_id uuid, ships_from date, orders_close_on date, badge text)
 language sql stable security definer set search_path = '' as $$
   with caller as (
-    select c.brewery_id, c.sale_channel_id from public.customers c
+    select c.brewery_id, c.sale_channel_id, c.release_delay_days from public.customers c
     where c.id = p_customer and c.id in (select public.my_customer_ids())
   )
   select r.id, r.sku_id, r.ships_from, r.orders_close_on,
@@ -366,7 +380,7 @@ language sql stable security definer set search_path = '' as $$
   from private.release_state((select brewery_id from caller)) r
   join public.sku_prices p on p.sku_id = r.sku_id and p.active
   join caller c on c.brewery_id = p.brewery_id and c.sale_channel_id = p.sale_channel_id
-  where r.open
+  where r.open and r.days_open >= c.release_delay_days
   order by r.ships_from, r.id;
 $$;
 revoke all on function public.portal_releases(uuid) from public, anon, authenticated, service_role;
@@ -462,7 +476,7 @@ begin
   if coalesce(jsonb_array_length(v_lines),0)<>jsonb_array_length(p_lines) then
     raise exception 'sku is not active and priced for this customer';
   end if;
-  perform private.assert_portal_offers(p_brewery, p_requested, p_lines);
+  perform private.assert_portal_offers(p_brewery, p_customer, p_requested, p_lines);
 
   with requested as (
     select (e->>'sku_id')::uuid sku_id,(e->>'qty')::numeric qty from jsonb_array_elements(p_lines) e
@@ -729,6 +743,7 @@ begin
       select release_id from public.order_lines where order_id = p_order and release_id is not null
     ) order by r.id for update;
     perform private.assert_portal_offers(v_brewery,
+      (select customer_id from public.orders where id = p_order),
       (select requested_ship_date from public.orders where id = p_order),
       (select jsonb_agg(jsonb_strip_nulls(jsonb_build_object('sku_id', sku_id, 'qty', qty_ordered, 'release_id', release_id)))
        from public.order_lines where order_id = p_order));
@@ -807,3 +822,41 @@ begin
 end $$;
 revoke all on function public.update_sku(uuid,uuid,boolean,text,uuid,uuid,boolean,numeric,boolean,boolean) from public, anon, authenticated, service_role;
 grant execute on function public.update_sku(uuid,uuid,boolean,text,uuid,uuid,boolean,numeric,boolean,boolean) to authenticated;
+
+-- upsert_customer takes p_release_delay_days (null keeps it; a new customer
+-- starts at 0). The key joins the request payload only when set, so earlier
+-- requests keep their hash. Otherwise copied from its latest definition.
+drop function public.upsert_customer(uuid, uuid, text, public.customer_type, text, uuid, text, text, public.tax_treatment, uuid, text, text);
+create function public.upsert_customer(
+  p_brewery uuid, p_id uuid, p_name text, p_type public.customer_type, p_state text,
+  p_sale_channel uuid, p_license_no text, p_payment_terms text, p_tax_treatment public.tax_treatment, p_request_id uuid,
+  p_alias text default null, p_country text default 'US', p_release_delay_days integer default null
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_replay jsonb; v_row public.customers; v_terms text := nullif(btrim(p_payment_terms), ''); v_payload jsonb;
+  -- The whitespace characters removed by the command schema's String.trim().
+  v_name text := btrim(p_name, U&'\0009\000A\000B\000C\000D\0020\00A0\1680\2000\2001\2002\2003\2004\2005\2006\2007\2008\2009\200A\2028\2029\202F\205F\3000\FEFF');
+begin
+  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  v_payload := jsonb_build_object('brewery', p_brewery, 'id', p_id, 'name', p_name, 'type', p_type, 'state', p_state, 'sale_channel', p_sale_channel, 'license_no', p_license_no, 'payment_terms', p_payment_terms, 'tax_treatment', p_tax_treatment);
+  if p_alias is not null then v_payload := v_payload || jsonb_build_object('alias', p_alias); end if;
+  if p_country is distinct from 'US' then v_payload := v_payload || jsonb_build_object('country', p_country); end if;
+  if p_release_delay_days is not null then v_payload := v_payload || jsonb_build_object('release_delay_days', p_release_delay_days); end if;
+  v_replay := private.claim_command_request(p_brewery, 'upsert_customer', p_request_id, v_payload);
+  if v_replay is not null then return v_replay; end if;
+  if v_name is null or v_name = '' then raise exception 'a customer name is required' using errcode = '22023'; end if;
+  if p_sale_channel is null then raise exception 'customer needs a sale channel' using errcode = 'P0001'; end if;
+  if p_id is null then
+    insert into public.customers (brewery_id, name, type, state, sale_channel_id, license_no, payment_terms, tax_treatment, alias, country, release_delay_days)
+      values (p_brewery, v_name, p_type, p_state, p_sale_channel, p_license_no, coalesce(v_terms, 'net30'), p_tax_treatment, p_alias, p_country, coalesce(p_release_delay_days, 0)) returning * into v_row;
+  else
+    update public.customers set name = v_name, type = p_type, state = p_state, sale_channel_id = p_sale_channel,
+      license_no = p_license_no, payment_terms = coalesce(v_terms, payment_terms), tax_treatment = p_tax_treatment,
+      alias = p_alias, country = p_country, release_delay_days = coalesce(p_release_delay_days, release_delay_days)
+      where id = p_id and brewery_id = p_brewery returning * into v_row;
+    if not found then raise exception 'customer not found'; end if;
+  end if;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+revoke all on function public.upsert_customer(uuid, uuid, text, public.customer_type, text, uuid, text, text, public.tax_treatment, uuid, text, text, integer) from public, anon, authenticated, service_role;
+grant execute on function public.upsert_customer(uuid, uuid, text, public.customer_type, text, uuid, text, text, public.tax_treatment, uuid, text, text, integer) to authenticated;

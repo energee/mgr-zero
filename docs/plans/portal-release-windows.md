@@ -32,6 +32,10 @@ fairly between customers.
    pool is 0, customers with no allocation do not see the release.
 10. A release cannot drop below its confirmed quantity. Pre-orders above a
     lowered release are flagged for staff.
+11. (2026-11-18) Staff can deprioritize a customer with a **release delay**:
+    each customer has a number of days (0 to 60, default 0) after a release
+    opens before that customer sees it or can order from it. Stock offers are
+    unaffected. This replaces fairness between customers (Phase B is deferred).
 
 ## Phase A: orderability and releases (PR 1)
 
@@ -107,7 +111,19 @@ release orders were confirmed.
 - **Packaging** closes a batch release. That's the same signal the projection
   uses. Packaged units then follow **Orderable from stock**.
 
+### Release delay per customer (decision 11)
+
+**Release delay (days)** on Customer detail (Trading terms), 0 to 60, default
+0, saved by `upsert_customer.releaseDelayDays` (omit to keep). A release
+appears to a customer only once whole brewery days since it was released
+reach that customer's delay: `portal_releases` leaves it out until then, and
+submit refuses a line on it. Stock offers are unchanged.
+
 ## Phase B: per-customer allocations (PR 2)
+
+**Deferred: owner does not need fairness between customers (2026-11-18).**
+Decision 11's release delay covers deprioritizing a customer. The design below
+is kept for reference only.
 
 A release can be split into customer **allocations** plus an **open pool**.
 A release with no allocations is all open pool, first come, first served.
@@ -209,6 +225,9 @@ alter table public.order_lines add foreign key (release_id, brewery_id)
   references public.releases (id, brewery_id);
 create index order_lines_release_idx on public.order_lines (release_id)
   where release_id is not null;
+
+alter table public.customers add column release_delay_days integer not null default 0
+  check (release_delay_days between 0 and 60);
 ```
 
 Phase A also adds or changes these functions:
@@ -216,7 +235,9 @@ Phase A also adds or changes these functions:
 - `release_sku`, `update_release` and `withdraw_release` (new; admin/sales);
 - `portal_releases(p_customer)` (new; scoped like `portal_availability`);
 - `portal_availability` (changed: `portal_from_stock`, and release claims);
-- `portal_submit_quote` and the quote snapshot (changed: release checks).
+- `portal_submit_quote` and the quote snapshot (changed: release checks);
+- `upsert_customer` (changed: `p_release_delay_days`), with `portal_releases`
+  and the submit checks honoring the customer's delay.
 
 ### Phase B: `<ts>_release_allotments.sql`
 
@@ -268,6 +289,7 @@ tasks of its step.
 | A9 | Release form on Planning row and SKU page | `components/mgr/views/release.tsx` (new), `planning.tsx`, `sku.tsx` | — | `tests/planning-view.test.ts`: Released badge; admin/sales only | browse screenshot | A8 |
 | A10 (P) | Orderable-from-stock control | `components/mgr/views/sku.tsx`, `sku-list.tsx`, `lib/mgr/sku-view.ts`, `sku-list-view.ts` | `SkuViewModel.portalFromStock` | `tests/catalog-edit-controls.test.ts` | vitest | A3 |
 | A11 (P) | Confirm order flags: slipped, over release | `lib/mgr/confirm-order-view.ts`, `confirm-order.tsx` | `ConfirmLine.flags` | `tests/confirm-order-view.test.ts` (new) | vitest | A5 |
+| A13 | Release delay per customer (decision 11) | Phase A migration, `lib/commands/customers.ts`, `lib/mgr/customer-view.ts`, `components/mgr/views/customer.tsx` | `CustomerEditValues.releaseDelayDays` | `tests/portal-releases.test.ts`: delayed customer neither sees nor orders until the delay passes; `tests/customers-view.test.ts`: the field | vitest | A4, A5 |
 | A12 | Screens, guides, API docs, full proof | `components/mgr/screens.tsx`, `content/docs/staff-guide.mdx`, `portal-guide.mdx`, `bun run docs:api` | — | screen proof list, `tests/docs.test.ts`, `tests/api-docs.test.ts` | `bun run test && bunx tsc --noEmit && bun run lint` exit 0 | all A |
 
 ### Phase B (PR 2)

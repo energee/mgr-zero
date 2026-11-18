@@ -3,7 +3,7 @@
 // lower the stock badge by what they still claim, portal_releases is scoped like
 // portal_availability, and submit refuses every closed or oversold release.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, asUser, ins, makeBrewery, makeCustomerUser, makeStaffCtx, priceSku, seedCatalog, seedCustomer, seedLocation } from "./helpers";
+import { admin, asUser, ins, sql, makeBrewery, makeCustomerUser, makeStaffCtx, priceSku, seedCatalog, seedCustomer, seedLocation } from "./helpers";
 import { runCommand } from "../lib/commands/registry";
 import "../lib/commands/all";
 
@@ -117,6 +117,29 @@ describe("portal offers", () => {
     expect((await outsider.db.rpc("portal_releases", { p_customer: outsider.customerId })).data).toEqual([]);
     // Another brewery's buyer cannot ask about this brewery's customer.
     expect((await outsider.db.rpc("portal_releases", { p_customer: buyer.customerId })).data).toEqual([]);
+  });
+});
+
+describe("release delay per customer", () => {
+  it("hides a release from a delayed customer and refuses their order until the delay passes", async () => {
+    const sku = await pricedSku("Delayed Doppelbock");
+    const batchId = await planBatch(sku.brandId);
+    const r = await release({ batchId, shipsFrom: "2030-01-16", lines: [{ skuId: sku.skuId, qty: 30 }] });
+    const delayed = await seedCustomer(breweryId, { name: "Delayed bar", saleChannelId });
+    await runCommand("upsert_customer", { id: delayed.customerId, name: "Delayed bar", type: "retailer", country: "US", state: "PA", saleChannelId, releaseDelayDays: 3 }, salesCtx);
+    const late = await makeBuyer(delayed.customerId);
+    const seen = async (who: Buyer) => ((await who.db.rpc("portal_releases", { p_customer: who.customerId })).data as { release_id: string }[]).some((o) => o.release_id === r.id);
+    const order = (who: Buyer, ship: string) => runCommand("portal_quote_order", { shipToId: ship, requestedShipDate: "2030-02-01", lines: [{ skuId: sku.skuId, qty: 1, releaseId: r.id }] }, who);
+
+    expect(await seen(late)).toBe(false);
+    await expect(order(late, delayed.shipToId)).rejects.toThrow(/not open to this account yet/);
+    // A delay of 0 (the default) sees it at once.
+    expect(await seen(buyer)).toBe(true);
+
+    // Three days later the release opens to the delayed customer too.
+    sql(`update public.releases set released_at = released_at - interval '3 days' where id = '${r.id}'`);
+    expect(await seen(late)).toBe(true);
+    await expect(order(late, delayed.shipToId)).resolves.toBeTruthy();
   });
 });
 

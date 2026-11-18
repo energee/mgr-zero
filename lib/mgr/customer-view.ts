@@ -11,8 +11,18 @@ export function customerStateReason(values: Pick<CustomerEditValues, "country" |
 }
 
 /** The stored values the shared Customer detail form edits and saves. state is
- *  "" outside the US (the form draws it for a US customer only); alias "" is none. */
-export type CustomerEditValues = { name: string; alias: string; type: string; country: string; state: string; saleChannelId: string; licenseNumber: string; paymentTerms: string; taxTreatment: string };
+ *  "" outside the US (the form draws it for a US customer only); alias "" is none.
+ *  releaseDelayDays is the Release delay field's text; the create dialog has no
+ *  such field and leaves it undefined, so a new customer starts at 0. */
+export type CustomerEditValues = { name: string; alias: string; type: string; country: string; state: string; saleChannelId: string; licenseNumber: string; paymentTerms: string; taxTreatment: string; releaseDelayDays?: string };
+
+/** The note under Release delay (days). */
+export const RELEASE_DELAY_HELP = "Releases appear for this customer this many days after they open. 0 = right away.";
+
+/** Why a typed release delay cannot be saved: a whole number of days from 0 to 60, as the column allows. */
+export function releaseDelayError(text: string): string | undefined {
+  return /^\d+$/.test(text.trim()) && Number(text) <= 60 ? undefined : "Enter whole days from 0 to 60.";
+}
 
 /** The note under Alias on both customer forms: list_customers (Search
  *  customers) matches it, the list titles "name · alias", and no buyer surface
@@ -59,6 +69,7 @@ export type CustomerSnapshot = {
     sale_channel_id: string;
     sale_channels: { name: string } | null;
     tax_treatment?: string | null;
+    release_delay_days?: number;
   };
   shipTos: { label: string }[];
   /** list_sale_channels rows. */
@@ -96,6 +107,7 @@ export function toCustomerViewProps({
     editValues: {
       name: customer.name, alias: customer.alias ?? "", type: customer.type, country: customer.country, state: customer.state ?? "", saleChannelId: customer.sale_channel_id,
       licenseNumber: customer.license_no ?? "", paymentTerms: customer.payment_terms ?? "net30", taxTreatment: customer.tax_treatment ?? "",
+      releaseDelayDays: String(customer.release_delay_days ?? 0),
     },
     shipTos: shipTos.map((s) => s.label).join(" · ") || "none",
     portalUsers: (portalUsers ?? []).map((u) => ({ key: u.userId, email: u.email })),

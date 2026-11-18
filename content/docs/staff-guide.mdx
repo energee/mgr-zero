@@ -384,7 +384,7 @@ A **release** offers a quantity of one package to portal buyers, for delivery on
 
 **Order by** is optional; buyers can order until that day. **Release for ordering** saves one release per package. A planned batch can have one open release per package; edit that one instead. Planning marks a batch **Released** once every package it projects has an open release; until then its form offers only the packages not yet released.
 
-What remains is the release's quantity less what submitted and confirmed orders hold; drafts do not count. Buyers see when it ships, the order-by date, and **few left** or **sold out**, never counts. A release closes when it is withdrawn, its order-by date passes, or its batch is packaged or cancelled. Packaged units then follow **Orderable from stock**. While a stock release is open, the portal's stock offer for that SKU leaves out what it still holds; once a released batch is packaged, its unconfirmed pre-orders are held the same way.
+A customer with a **Release delay** on its page sees a release that many days after it opens. What remains is the release's quantity less what submitted and confirmed orders hold; drafts do not count. Buyers see when it ships, the order-by date, and **few left** or **sold out**, never counts. A release closes when it is withdrawn, its order-by date passes, or its batch is packaged or cancelled. Packaged units then follow **Orderable from stock**. While a stock release is open, the portal's stock offer for that SKU leaves out what it still holds; once a released batch is packaged, its unconfirmed pre-orders are held the same way.
 
 <Screen name="Edit release" />
 
@@ -503,6 +503,8 @@ Above the list, **Search customers** finds customers whose name or alias contain
 The customer form has no ship-to fields. Add ship-to addresses on the customer's page after you create the customer; **New customer** says so above **Create**. See **Create or edit a ship-to** below.
 
 The new-customer form and customer detail show **Tax treatment**. Choose **Inherit sale channel** to use the channel default, or select a customer override; editing another field preserves the selected treatment. **Export** tax treatment means shipment outside the US without payment of tax, rather than a pricing channel. Notes under both pickers explain the distinction. **Orders** opens only this customer’s orders, and status filters keep that customer selected. **Clear** returns to all customers.
+
+**Release delay (days)** under **Trading terms** on customer detail holds every [release](#releases) back from that customer: a release appears for them, and they can order from it, only that many days after it opens. **0** (the default) means right away; enter whole days from 0 to 60. Use it to give other customers early access. Ordering from stock is unaffected. A new customer starts at 0; set the delay on its page after you create it.
 
 On desktop, **Account details**, **Ship-tos**, and **Portal users** sit together, with **Trading terms** and **Customer activity** alongside them. Long customer names wrap in the page heading without shortening the saved name. **New ship-to** belongs to the Ship-tos section; **Delete customer** is separated below the account sections. The same sections stack on smaller screens.
 

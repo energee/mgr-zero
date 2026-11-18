@@ -763,14 +763,14 @@ isOneToOne: false
                   ]
                 },"customers": {
                   Row: {
-                    "alias": string | null,"bill_address1": string | null,"bill_address2": string | null,"bill_city": string | null,"bill_state": string | null,"bill_zip": string | null,"billing_email": string | null,"brewery_id": string,"country": string,"created_at": string,"id": string,"license_no": string | null,"name": string,"payment_terms": string,"phone": string | null,"qbo_customer_id": string | null,"qbo_realm_id": string | null,"qbo_sync_state": string | null,"qbo_sync_token": string | null,"sale_channel_id": string,"state": string | null,"tax_treatment": Database["public"]['Enums']["tax_treatment"] | null,"type": Database["public"]['Enums']["customer_type"]
+                    "alias": string | null,"bill_address1": string | null,"bill_address2": string | null,"bill_city": string | null,"bill_state": string | null,"bill_zip": string | null,"billing_email": string | null,"brewery_id": string,"country": string,"created_at": string,"id": string,"license_no": string | null,"name": string,"payment_terms": string,"phone": string | null,"qbo_customer_id": string | null,"qbo_realm_id": string | null,"qbo_sync_state": string | null,"qbo_sync_token": string | null,"release_delay_days": number,"sale_channel_id": string,"state": string | null,"tax_treatment": Database["public"]['Enums']["tax_treatment"] | null,"type": Database["public"]['Enums']["customer_type"]
                   }
                   ComputedFields: never
                   Insert: {
-                    "alias"?: string | null,"bill_address1"?: string | null,"bill_address2"?: string | null,"bill_city"?: string | null,"bill_state"?: string | null,"bill_zip"?: string | null,"billing_email"?: string | null,"brewery_id": string,"country"?: string,"created_at"?: string,"id"?: string,"license_no"?: string | null,"name": string,"payment_terms"?: string,"phone"?: string | null,"qbo_customer_id"?: string | null,"qbo_realm_id"?: string | null,"qbo_sync_state"?: string | null,"qbo_sync_token"?: string | null,"sale_channel_id": string,"state"?: string | null,"tax_treatment"?: Database["public"]['Enums']["tax_treatment"] | null,"type"?: Database["public"]['Enums']["customer_type"]
+                    "alias"?: string | null,"bill_address1"?: string | null,"bill_address2"?: string | null,"bill_city"?: string | null,"bill_state"?: string | null,"bill_zip"?: string | null,"billing_email"?: string | null,"brewery_id": string,"country"?: string,"created_at"?: string,"id"?: string,"license_no"?: string | null,"name": string,"payment_terms"?: string,"phone"?: string | null,"qbo_customer_id"?: string | null,"qbo_realm_id"?: string | null,"qbo_sync_state"?: string | null,"qbo_sync_token"?: string | null,"release_delay_days"?: number,"sale_channel_id": string,"state"?: string | null,"tax_treatment"?: Database["public"]['Enums']["tax_treatment"] | null,"type"?: Database["public"]['Enums']["customer_type"]
                   }
                   Update: {
-                    "alias"?: string | null,"bill_address1"?: string | null,"bill_address2"?: string | null,"bill_city"?: string | null,"bill_state"?: string | null,"bill_zip"?: string | null,"billing_email"?: string | null,"brewery_id"?: string,"country"?: string,"created_at"?: string,"id"?: string,"license_no"?: string | null,"name"?: string,"payment_terms"?: string,"phone"?: string | null,"qbo_customer_id"?: string | null,"qbo_realm_id"?: string | null,"qbo_sync_state"?: string | null,"qbo_sync_token"?: string | null,"sale_channel_id"?: string,"state"?: string | null,"tax_treatment"?: Database["public"]['Enums']["tax_treatment"] | null,"type"?: Database["public"]['Enums']["customer_type"]
+                    "alias"?: string | null,"bill_address1"?: string | null,"bill_address2"?: string | null,"bill_city"?: string | null,"bill_state"?: string | null,"bill_zip"?: string | null,"billing_email"?: string | null,"brewery_id"?: string,"country"?: string,"created_at"?: string,"id"?: string,"license_no"?: string | null,"name"?: string,"payment_terms"?: string,"phone"?: string | null,"qbo_customer_id"?: string | null,"qbo_realm_id"?: string | null,"qbo_sync_state"?: string | null,"qbo_sync_token"?: string | null,"release_delay_days"?: number,"sale_channel_id"?: string,"state"?: string | null,"tax_treatment"?: Database["public"]['Enums']["tax_treatment"] | null,"type"?: Database["public"]['Enums']["customer_type"]
                   }
                   Relationships: [
                     {
@@ -5224,6 +5224,7 @@ isOneToOne: false
 "qbo_realm_id": string | null,
 "qbo_sync_state": string | null,
 "qbo_sync_token": string | null,
+"release_delay_days": number,
 "sale_channel_id": string,
 "state": string | null,
 "tax_treatment": Database["public"]['Enums']["tax_treatment"] | null,
@@ -6074,7 +6075,7 @@ isOneToOne: false
 { Args: { "p_brewery": string,"p_clear"?: (string)[],"p_expires_on": string,"p_kind": string,"p_license_no": string,"p_note": string,"p_request_id": string,"p_state": string }; Returns: Json
                            },
 "upsert_customer":
-{ Args: { "p_alias"?: string,"p_brewery": string,"p_country"?: string,"p_id": string,"p_license_no": string,"p_name": string,"p_payment_terms": string,"p_request_id": string,"p_sale_channel": string,"p_state": string,"p_tax_treatment": Database["public"]['Enums']["tax_treatment"],"p_type": Database["public"]['Enums']["customer_type"] }; Returns: Json
+{ Args: { "p_alias"?: string,"p_brewery": string,"p_country"?: string,"p_id": string,"p_license_no": string,"p_name": string,"p_payment_terms": string,"p_release_delay_days"?: number,"p_request_id": string,"p_sale_channel": string,"p_state": string,"p_tax_treatment": Database["public"]['Enums']["tax_treatment"],"p_type": Database["public"]['Enums']["customer_type"] }; Returns: Json
                            },
 "upsert_format":
 { Args: { "p_basis": Database["public"]['Enums']["format_basis"],"p_bbl_per_unit": number,"p_brewery": string,"p_id": string,"p_keg_size": Database["public"]['Enums']["keg_size"],"p_name": string,"p_ounces"?: number,"p_package_type": Database["public"]['Enums']["package_type"],"p_price_group"?: string,"p_request_id": string,"p_units_per_case": number }; Returns: Json
