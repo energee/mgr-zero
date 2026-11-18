@@ -1,6 +1,6 @@
 import { isUuid } from "@/lib/uuid";
 import { qboCompanyName, toQboSyncViewProps, type QboHealth, type QboSyncStatus } from "@/lib/mgr/accounting-view";
-import { historyPage, pageCursor, type HistoryPage, type HistoryRow } from "@/lib/mgr/history-page";
+import { numberedHistoryPage, pageNumber, pageSize, type NumberedHistoryPage, type HistoryRow } from "@/lib/mgr/history-page";
 import { InvoicesView } from "@/components/mgr/views/invoices";
 import { invoicesHref, invoiceStatusOptions, toInvoiceListRow, type InvoiceFilter, type InvoiceListRecord } from "@/lib/mgr/invoices-view";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -17,9 +17,10 @@ import { RecordPaymentForm } from "./[id]/payment-form";
 
 export const metadata = { title: navTitle("/invoices") };
 
-export default async function InvoicesPage({ searchParams }: { searchParams: Promise<{ cursor?: string | string[]; status?: string | string[]; customerId?: string | string[] }> }) {
+export default async function InvoicesPage({ searchParams }: { searchParams: Promise<{ page?: string | string[]; limit?: string | string[]; status?: string | string[]; customerId?: string | string[] }> }) {
   const [params, brewery] = await Promise.all([searchParams, getActiveBrewery()]);
-  const cursor = pageCursor(params.cursor);
+  const currentPage = pageNumber(params.page);
+  const limit = pageSize(params.limit);
   // ?status=unpaid narrows list_invoices; any other value lists every invoice.
   const status: InvoiceFilter | undefined = params.status === "unpaid" ? "unpaid" : undefined;
   // ?customerId=<uuid> narrows list_invoices to one customer (#1585); a malformed one lists every customer.
@@ -27,13 +28,13 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   const ctx = await buildContext(brewery.id);
   const canManage = brewery.roles.includes("admin") || brewery.roles.includes("sales");
   const [records, health, syncStatus, customer] = await Promise.all([
-    runCommand("list_invoices", { cursor, status, customerId }, ctx) as Promise<HistoryPage<InvoiceListRecord & HistoryRow>>,
+    runCommand("list_invoices", { page: currentPage, limit, status, customerId }, ctx) as Promise<NumberedHistoryPage<InvoiceListRecord & HistoryRow>>,
     canManage ? runCommand("get_qbo_connection", {}, ctx) as Promise<QboHealth> : null,
     canManage ? runCommand("get_qbo_sync_status", {}, ctx) as Promise<QboSyncStatus> : null,
     // The filter names its customer even when no invoice matches, as Orders does.
     customerId ? optionalPageQuery<{ customer: { name: string } }>("get_customer", { customerId }, ctx) : undefined,
   ]);
-  const page = historyPage(records, "/invoices", cursor, { customerId, status });
+  const page = numberedHistoryPage(records, "/invoices", currentPage, limit, { customerId, status });
   const today = breweryDate(brewery.timeZone);
   return <InvoicesView pagination={page.pagination} backHref="/more" status={status} statusOptions={invoiceStatusOptions(true, customerId)}
     customer={customer && { name: customer.customer.name, clearHref: invoicesHref(undefined, status) }} recordPayment={canRun(ctx, "record_invoice_payment")

@@ -5,7 +5,7 @@ vi.mock("@/components/mgr/query-provider", () => ({ useCommandQuery: (name: stri
   state.calls.push([name, input]);
   const data = name === "list_customers" ? [{ id: "customer", name: "Buyer", shipTos: [{ id: "dock", label: "Dock", is_default: true }] }]
     : name === "list_skus" ? [{ id: "sku", name: "Keg", active: true, brands: { name: "Brand" } }, { id: "old", active: false }]
-    : name === "list_orders" ? { rows: [], nextCursor: null }
+    : name === "list_orders" ? { rows: [], nextCursor: null, total: 0 }
     : name === "get_brewery" ? { portal_fulfillment_location_id: "warehouse" } : [];
   return { data: state.pending ? undefined : data, error: state.error, isPending: state.pending, isFetching: state.fetching, isPaused: state.paused, dataUpdatedAt: state.pending ? 0 : Date.parse("2026-09-13T12:00:00Z"), refetch: vi.fn() };
 } }));
@@ -65,7 +65,7 @@ it("does not describe a cold cache as empty data or render skeletons", () => {
 
 it("preserves customer filters and read-only Warehouse controls", () => {
   const html = renderToStaticMarkup(OrdersClient({ roles: ["warehouse"], timeZone, status: "draft", customerId: "buyer" }));
-  expect(state.calls).toEqual([["list_orders", { status: "draft", customerId: "buyer", cursor: undefined }]]);
+  expect(state.calls).toEqual([["list_orders", { status: "draft", customerId: "buyer", page: 1, limit: 50 }]]);
   // The customer scope line's Clear keeps the status; each Status option keeps the customer (tests/orders-list-view.test.ts).
   expect(html).toContain("Customer: <strong");
   expect(html).toContain('href="/orders?status=draft"');

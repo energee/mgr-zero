@@ -1,14 +1,13 @@
 import { expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { historyPage, pageCursor } from "@/lib/mgr/history-page";
-import { HistoryNavigation } from "@/components/mgr/views/history-navigation";
+import { historyPage, numberedHistoryPage, pageCursor, pageNumber, pageSize } from "@/lib/mgr/history-page";
 import { OrdersView } from "@/components/mgr/views/orders-list";
 import { InvoicesView } from "@/components/mgr/views/invoices";
 import { PortalOrdersView } from "@/components/mgr/views/portal-orders";
 import { PortalInvoicesView } from "@/components/mgr/views/portal-invoices";
 
-it("offers More only with a next cursor and keeps filters and timestamp precision", () => {
+it("preserves movement history cursor precision and filters", () => {
   const rows = Array.from({ length: 50 }, (_, n) => ({ id: String(n), created_at: "2026-09-20T12:00:00.123456+00:00" }));
   const open = `${rows[0].created_at}~0b9f3c1e-7d1a-4c8e-9a51-2f6d8e4b7c10`;
   const nextCursor = `${rows[49].created_at}~49`;
@@ -20,20 +19,21 @@ it("offers More only with a next cursor and keeps filters and timestamp precisio
   expect(url.searchParams.get("customerId")).toBe("buyer");
   expect(page.pagination.firstHref).toBe("/orders?status=draft&customerId=buyer");
   expect(historyPage({ rows, nextCursor }, "/orders", undefined).pagination.firstHref).toBeUndefined();
-  for (const count of [0, 5, 50]) {
-    const last = historyPage({ rows: rows.slice(0, count), nextCursor: null }, "/orders", undefined);
-    expect(last.pagination.moreHref).toBeUndefined();
-    expect(renderToStaticMarkup(createElement(HistoryNavigation, last.pagination))).toBe("");
-  }
-  const html = renderToStaticMarkup(createElement(HistoryNavigation, page.pagination));
-  expect(html).toContain("History pages");
-  expect(html).toContain("Newest");
-  expect(html).toContain("More");
+});
+
+it("keeps batch groups independent and resets only the resized group's page", () => {
+  const { pagination } = numberedHistoryPage({ rows: [], nextCursor: null, total: 612 }, "/batches", 4, 25, { cancelledPage: "2" }, "completedPage");
+  expect(pagination.previousHref).toBe("/batches?cancelledPage=2&completedLimit=25&completedPage=3");
+  expect(pagination.sizeHrefs["10"]).toBe("/batches?cancelledPage=2&completedLimit=10&completedPage=1");
+  expect(pageNumber("3")).toBe(3);
+  for (const value of ["1.5", "0", "-2", ["2"], "1000001"]) expect(pageNumber(value)).toBe(1);
+  expect(pageSize("100")).toBe(100);
+  for (const value of [undefined, "0", ["10"], "201"]) expect(pageSize(value)).toBe(50);
 });
 
 
-it("all four inventory/live views mount the same continuation control", () => {
-  const pagination = { moreHref: "/next", firstHref: "/newest" };
+it("shows direct page links, ellipses and an accessible current page on staff and portal lists", () => {
+  const { pagination } = numberedHistoryPage({ rows: [], nextCursor: null, total: 451 }, "/list", 5, 50);
   const views = [
     createElement(OrdersView, { model: { rows: [], status: "all", statusOptions: [] }, pagination }),
     createElement(InvoicesView, { rows: [], pagination }),
@@ -43,20 +43,17 @@ it("all four inventory/live views mount the same continuation control", () => {
   for (const view of views) {
     const html = renderToStaticMarkup(view);
     expect(html).toContain('aria-label="History pages"');
-    expect(html).toContain('href="/next"');
-    expect(html).toContain('href="/newest"');
+    for (const page of [1, 4, 5, 6, 10]) expect(html).toContain(`href="/list?page=${page}"`);
+    expect(html).toContain('aria-current="page"');
+    expect(html).toContain('data-slot="pagination-ellipsis"');
+    expect(html).not.toContain('href="/list?page=8"');
   }
 });
 
-it("pages one batch group without discarding the other group's cursor", () => {
-  const completed = historyPage({ rows: [], nextCursor: "older-completed" }, "/batches", "current-completed", { cancelledCursor: "current-cancelled", recipe: "recipe" }, "completedCursor");
-  const more = new URL(completed.pagination.moreHref!, "http://localhost");
-  expect(more.searchParams.get("completedCursor")).toBe("older-completed");
-  expect(more.searchParams.get("cancelledCursor")).toBe("current-cancelled");
-  expect(more.searchParams.get("recipe")).toBe("recipe");
-  const newest = new URL(completed.pagination.firstHref!, "http://localhost");
-  expect(newest.searchParams.has("completedCursor")).toBe(false);
-  expect(newest.searchParams.get("cancelledCursor")).toBe("current-cancelled");
+it("does not offer an out-of-range Next or Previous", () => {
+  const result = { rows: [], nextCursor: null, total: 51 };
+  expect(numberedHistoryPage(result, "/orders", 1, 50).pagination.previousHref).toBeUndefined();
+  expect(numberedHistoryPage(result, "/orders", 2, 50).pagination.nextHref).toBeUndefined();
 });
 
 

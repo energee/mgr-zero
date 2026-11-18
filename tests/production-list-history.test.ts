@@ -1,7 +1,7 @@
 import { beforeAll, expect, it } from "vitest";
 import { admin, makeBrewery, makeStaffCtx, seedCatalog, seedMaterial } from "./helpers";
 import { runCommand, type Ctx } from "@/lib/commands/registry";
-import type { HistoryPage, HistoryRow } from "@/lib/commands/history";
+import type { HistoryPage, HistoryRow, NumberedHistoryPage } from "@/lib/commands/history";
 import "@/lib/commands/all";
 
 type Batch = HistoryRow & { brand_name: string | null; recipe_name: string | null; active_occupancies: { latest_reading?: { temp_f: number } | null }[] };
@@ -72,6 +72,7 @@ it("pages completed and cancelled batches independently without timestamp-tie ga
   for (const [status, ids] of [["completed", completedIds], ["cancelled", cancelledIds]] as const) {
     const first = await runCommand("list_batch_history", { status, limit: 50 }, ctx) as HistoryPage<Batch>;
     expect(first.rows.map(row => row.id)).toEqual(ids.slice(0, 50));
+    expect(first).not.toHaveProperty("total");
     expect(first.nextCursor).toBe(`${first.rows[49].created_at}~${first.rows[49].id}`);
     const next = await runCommand("list_batch_history", { status, limit: 50, cursor: first.nextCursor }, ctx) as HistoryPage<Batch>;
     expect(next.rows.map(row => row.id)).toEqual(ids.slice(50));
@@ -102,11 +103,53 @@ it("keeps every upcoming run visible while paging only finished runs with their 
   expect(foreignPage.rows.map(row => row.id)).toEqual([foreignClosedRunId, foreignCancelledRunId].sort().reverse());
   expect((await runCommand("list_packaging_history", {}, { ...ctx, breweryId: other.breweryId }) as HistoryPage<Run>).rows).toEqual([]);
   for (const [name, input] of [["list_batch_history", { status: "completed" }], ["list_packaging_history", {}]] as const) {
-    for (const invalid of [{ cursor: "bad),brewery_id.not.is.null" }, { limit: 0 }, { limit: 201 }]) {
+    for (const invalid of [
+      { cursor: "bad),brewery_id.not.is.null" }, { limit: 0 }, { limit: 201 },
+      { page: 0 }, { page: -1 }, { page: 1.5 }, { page: 1_000_001 },
+      { page: Number.MAX_SAFE_INTEGER }, { page: Infinity }, { page: "2" },
+      { page: 1, cursor: `2026-09-20T12:00:00.123456Z~${completedIds[0]}` },
+    ]) {
       await expect(runCommand(name, { ...input, ...invalid }, ctx)).rejects.toMatchObject({ code: "invalid_input" });
     }
     await expect(runCommand(name, input, { ...ctx, roles: ["sales"] })).rejects.toMatchObject({ code: "permission_denied" });
   }
+});
+
+it("reads completed and cancelled batch pages directly with independently scoped totals and enrichment", async () => {
+  for (const [status, ids] of [["completed", completedIds], ["cancelled", cancelledIds]] as const) {
+    const page = await runCommand("list_batch_history", { status, page: 3, limit: 20 }, ctx) as NumberedHistoryPage<Batch>;
+    expect(page.total).toBe(55);
+    expect(page.rows.map(row => row.id)).toEqual(ids.slice(40));
+    expect(page.nextCursor).toBeNull();
+    expect(page.rows[0]).toMatchObject(status === "completed"
+      ? { brand_name: "History pils", recipe_name: "History recipe", og_reading: null, fg_reading: null }
+      : { brand_name: null, recipe_name: null });
+    expect(await runCommand("list_batch_history", { status, page: 1_000_000 }, ctx))
+      .toEqual({ rows: [], nextCursor: null, total: 55 });
+    expect(await runCommand("list_batch_history", { status, page: 2 }, other))
+      .toEqual({ rows: [], nextCursor: null, total: 1 });
+    expect(await runCommand("list_batch_history", { status, page: 2 }, { ...ctx, breweryId: other.breweryId }))
+      .toEqual({ rows: [], nextCursor: null, total: 0 });
+  }
+});
+
+it("reads a numbered packaging page with its exact finished-run count and quantities", async () => {
+  const expected = [...closedRunIds, ...cancelledRunIds].sort().reverse();
+  const page = await runCommand("list_packaging_history", { page: 2, limit: 50 }, ctx) as NumberedHistoryPage<Run>;
+  expect(page.total).toBe(110);
+  expect(page.rows.map(row => row.id)).toEqual(expected.slice(50, 100));
+  expect(page.rows.every(row => (row.closed_at || row.cancelled_at) && row.brand_name === "History pils" && row.qty_planned === 12)).toBe(true);
+  expect(page.nextCursor).toBe(`${page.rows[49].created_at}~${page.rows[49].id}`);
+  const last = await runCommand("list_packaging_history", { page: 3, limit: 50 }, ctx) as NumberedHistoryPage<Run>;
+  expect(last.total).toBe(110);
+  expect(last.rows.map(row => row.id)).toEqual(expected.slice(100));
+  expect(last.nextCursor).toBeNull();
+  expect(await runCommand("list_packaging_history", { page: 1_000_000 }, ctx))
+    .toEqual({ rows: [], nextCursor: null, total: 110 });
+  expect(await runCommand("list_packaging_history", { page: 2 }, other))
+    .toEqual({ rows: [], nextCursor: null, total: 2 });
+  expect(await runCommand("list_packaging_history", { page: 2 }, { ...ctx, breweryId: other.breweryId }))
+    .toEqual({ rows: [], nextCursor: null, total: 0 });
 });
 
 it("preserves sub-millisecond boundaries when advancing batch and packaging history", async () => {

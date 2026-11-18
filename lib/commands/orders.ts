@@ -1,7 +1,7 @@
 // lib/commands/orders.ts — order lifecycle commands. Every mutation delegates
 // to one plpgsql function (00001_baseline.sql, iron rule 5); this layer does
 // zod validation, role gating, and camelCase→p_* argument mapping.
-import { historyInput, historyResult, newestFirst, type HistoryRow } from "./history";
+import { numberedHistorySchema, readHistory, type HistoryRow } from "./history";
 import { z } from "zod";
 import { qboStaffInvoiceLink, type QboInvoiceIdentity, type QboPushedIdentity, type QboStaffConnection } from "@/lib/mgr/qbo-ui";
 import type { Ctx } from "./registry";
@@ -289,15 +289,15 @@ defineCommand({
 defineQuery({
   name: "list_orders", description: "Orders newest-first with each one's delivery stop outcome, optionally by status (delivered: shipped orders whose stop closed delivered or partly delivered) and customer",
   roles: [...readRoles],
-  input: z.object({ customerId: z.string().uuid().optional(), status: z.enum(ORDER_FILTERS).optional().describe("Only orders in this status; delivered means shipped with the stop closed delivered or partly delivered"), ...historyInput }),
+  input: numberedHistorySchema({ customerId: z.string().uuid().optional(), status: z.enum(ORDER_FILTERS).optional().describe("Only orders in this status; delivered means shipped with the stop closed delivered or partly delivered") }),
   handler: async (ctx, i) => {
     // Delivered is not an orders.status; it is a shipped order whose stop closed delivered or partial (#1483).
-    let q = ctx.db.from("orders").select(i.status === "delivered" ? "*, customers(name), shipments!inner(deliveries!inner(outcome))" : "*, customers(name), shipments(deliveries(outcome))")
+    let q = ctx.db.from("orders").select(i.status === "delivered" ? "*, customers(name), shipments!inner(deliveries!inner(outcome))" : "*, customers(name), shipments(deliveries(outcome))", { count: i.page === undefined ? undefined : "exact" })
       .eq("brewery_id", ctx.breweryId).limit(i.limit + 1);
     if (i.status === "delivered") q = q.eq("status", "shipped").in("shipments.deliveries.outcome", ["delivered", "partial"]);
     else if (i.status) q = q.eq("status", i.status);
     if (i.customerId) q = q.eq("customer_id", i.customerId);
-    return historyResult(await unwrap(newestFirst(q, i.cursor)) as HistoryRow[], i.limit);
+    return readHistory(q, i);
   },
 });
 
@@ -451,18 +451,17 @@ async function invoicePushFacts(ctx: Ctx, invoiceIds: string[]) {
 defineQuery({
   name: "list_invoices", description: "Invoices and credit memos with current total plus frozen local subtotal and the sum of payments recorded in MGR, newest first; optionally only unpaid invoices",
   roles: [...readRoles],
-  input: z.object({
+  input: numberedHistorySchema({
     customerId: z.string().uuid().optional(),
     status: z.enum(["unpaid"]).optional().describe("unpaid: invoices still owing money — not written off, voided or deleted in QuickBooks, and either a positive QuickBooks balance or, with none, not marked paid"),
-    ...historyInput,
   }),
   handler: async (ctx, i) => {
-    let q = ctx.db.from("invoices").select("*, customers(name)").eq("brewery_id", ctx.breweryId).limit(i.limit + 1);
+    let q = ctx.db.from("invoices").select("*, customers(name)", { count: i.page === undefined ? undefined : "exact" }).eq("brewery_id", ctx.breweryId).limit(i.limit + 1);
     if (i.customerId) q = q.eq("customer_id", i.customerId);
     // invoiceCurrentState's "unpaid", less a QuickBooks balance of zero or below (settled or a credit).
     if (i.status === "unpaid") q = q.eq("kind", "invoice").is("written_off_at", null).eq("qbo_remote_state", "live")
       .or("qbo_balance_cents.gt.0,and(qbo_balance_cents.is.null,paid_at.is.null)");
-    const page = historyResult((await unwrap(newestFirst(q, i.cursor))) as (HistoryRow & QboInvoiceIdentity & { qbo_total_cents: number | null })[], i.limit);
+    const page = await readHistory<HistoryRow & QboInvoiceIdentity & { qbo_total_cents: number | null }>(q, i);
     const invoices = page.rows;
     const ids = invoices.map(inv => inv.id);
     const staffLinksPromise = invoiceStaffLinks(ctx, invoices);

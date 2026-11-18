@@ -827,8 +827,20 @@ on the last page. Otherwise pass it back as `cursor`, unchanged and with the sam
 filters, to read the next page. Keep its timestamp precision; do not convert it
 through a JavaScript `Date`. New records appear when restarting from the newest page.
 
+For numbered paging, `list_orders`, `list_invoices`, `list_batch_history`,
+`list_packaging_history`, `portal_orders`, and `portal_invoices` also accept
+`page`, an optional integer from **1** through **1000000**. Page **1** is the
+newest page. Send `page` and `limit` with the same filters for each request;
+`page` and `cursor` are mutually exclusive. Numbered mode returns
+`{ rows, nextCursor, total }`, where `total` is the number of matching records
+before pagination, not just the displayed rows. With neither `page` nor
+`cursor`, these queries keep the existing cursor-mode response without `total`.
+Numbered pages reflect the records currently matching the filters, so new
+records can shift page boundaries between requests. `list_movements` remains
+cursor-only.
+
 `list_batch_history` requires `status: "completed"` or `status: "cancelled"`;
-each status has its own cursor. Each completed batch carries `og_reading` and
+each status has its own page or cursor and limit. Each completed batch carries `og_reading` and
 `fg_reading`: its first and last gravity readings (`id`, `gravity_plato`),
 each `null` when the batch has none. A batch with one gravity reading has the
 same reading in both. Cancelled batches carry neither. `list_packaging_history` pages closed and

@@ -310,6 +310,7 @@ export const FIELD_VOCABULARY: Record<string, { meaning: string; unit?: string; 
   // Reads
   q: { meaning: "Text to search for." },
   limit: { meaning: "The most records to return on one page." },
+  page: { meaning: "The numbered history page, from 1 through 1000000; omit cursor when using it." },
   kinds: { meaning: "Limits the search to these record kinds." },
   now: { meaning: "The moment to work out Today for; it defaults to the current time." },
   note: { meaning: "Free text kept with the record." },

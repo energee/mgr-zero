@@ -11,7 +11,7 @@
 // `product_volume_requirements` (a view) reads these plans back as demand and
 // answers the brewhouse's question: what still has to be brewed?
 import { z } from "zod";
-import { historyInput, historyResult, newestFirst, type HistoryRow } from "./history";
+import { numberedHistorySchema, readHistory, type HistoryRow } from "./history";
 import { skuLabel } from "@/lib/mgr/finished-goods-view";
 import { completeRows, defineCommand, defineQuery, inChunks, isoDate, PAGE_SIZE, unwrap, CommandError, type Ctx } from "./registry";
 
@@ -432,12 +432,11 @@ defineQuery({
 
 defineQuery({
   name: "list_packaging_history", description: "One page of closed or cancelled packaging runs, newest created first, with brand, source tank and the plan by package unit (case, keg, or each) with its barrels. A closed run adds its actual output by the same units",
-  input: z.object(historyInput), roles: ["admin", "brewer", "warehouse"],
+  input: numberedHistorySchema({}), roles: ["admin", "brewer", "warehouse"],
   handler: async (ctx, i) => {
-    const q = ctx.db.from("packaging_runs").select(`${RUN_COLUMNS}, created_at`).eq("brewery_id", ctx.breweryId)
+    const q = ctx.db.from("packaging_runs").select(`${RUN_COLUMNS}, created_at`, { count: i.page === undefined ? undefined : "exact" }).eq("brewery_id", ctx.breweryId)
       .or("closed_at.not.is.null,cancelled_at.not.is.null").limit(i.limit + 1);
-    const fetched = (await unwrap(newestFirst(q, i.cursor))) ?? [];
-    const page = historyResult(fetched as unknown as (RunRow & HistoryRow)[], i.limit);
+    const page = await readHistory<RunRow & HistoryRow>(q, i);
     return { ...page, rows: await packagingListRows(ctx, page.rows) };
   },
 });

@@ -3,7 +3,7 @@
 // returns raw invoice_lines rather than a subtotal column (unlike staff's
 // list_invoices. The adapter uses the synchronized QuickBooks total when one
 // exists and otherwise sums frozen local lines. A row opens portal_invoice.
-import { historyPage, pageCursor, type HistoryPage, type HistoryRow } from "@/lib/mgr/history-page";
+import { numberedHistoryPage, pageNumber, pageSize, type NumberedHistoryPage, type HistoryRow } from "@/lib/mgr/history-page";
 import { PortalInvoicesView } from "@/components/mgr/views/portal-invoices";
 import { getPortalContext } from "@/lib/portal";
 import { runCommand } from "@/lib/commands/registry";
@@ -14,11 +14,13 @@ export const metadata = { title: "Invoices" };
 
 type Invoice = { id: string; invoice_no: number | null; kind: "invoice" | "credit_memo"; due_on: string | null; paid_at: string | null; qbo_remote_state: "live" | "voided" | "deleted"; qbo_total_cents: number | null; qbo_balance_cents: number | null; written_off_at: string | null; invoice_lines: { amount_cents: number }[] };
 
-export default async function PortalInvoicesPage({ searchParams }: { searchParams: Promise<{ cursor?: string | string[] }> }) {
-  const cursor = pageCursor((await searchParams).cursor);
+export default async function PortalInvoicesPage({ searchParams }: { searchParams: Promise<{ page?: string | string[]; limit?: string | string[] }> }) {
+  const params = await searchParams;
+  const currentPage = pageNumber(params.page);
+  const limit = pageSize(params.limit);
   const { ctx } = await getPortalContext();
-  const records = (await runCommand("portal_invoices", { cursor }, ctx)) as HistoryPage<Invoice & HistoryRow>;
-  const page = historyPage(records, "/portal/invoices", cursor);
+  const records = (await runCommand("portal_invoices", { page: currentPage, limit }, ctx)) as NumberedHistoryPage<Invoice & HistoryRow>;
+  const page = numberedHistoryPage(records, "/portal/invoices", currentPage, limit);
   return (
     <PortalInvoicesView
       model={toPortalInvoicesViewProps({ invoices: page.rows })}

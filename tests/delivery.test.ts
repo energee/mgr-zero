@@ -619,6 +619,10 @@ describe("route edges", () => {
     // A partly refused stop reads as delivered on the order page and in the Delivered filter (#1483).
     const delivered = await runCommand("list_orders", { status: "delivered" }, adminCtx) as { rows: { id: string; shipments: { deliveries: { outcome: string }[] }[] }[] };
     expect(delivered.rows.find((o) => o.id === line!.order_id)?.shipments[0].deliveries[0].outcome).toBe("partial");
+    const numbered = await runCommand("list_orders", { status: "delivered", page: delivered.rows.length, limit: 1 }, adminCtx) as { rows: typeof delivered.rows; total: number; nextCursor: string | null };
+    expect(numbered.total).toBe(delivered.rows.length);
+    expect(numbered.rows).toEqual(delivered.rows.slice(-1));
+    expect(numbered.nextCursor).toBeNull();
     expect((await runCommand("list_orders", { status: "shipped" }, adminCtx) as { rows: { id: string }[] }).rows.map((o) => o.id)).toContain(line!.order_id);
     expect((await runCommand("get_order", { orderId: line!.order_id }, adminCtx) as { shipment: { deliveries: { outcome: string }[] } }).shipment.deliveries[0].outcome).toBe("partial");
     const { data: source } = await admin.from("inventory_movements").select("id, lot_id").eq("ref", line!.order_id).eq("type", "sale_removal").single();

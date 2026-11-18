@@ -1,7 +1,7 @@
 // lib/commands/portal.ts — customer-portal commands. roles: ["customer"] only;
 // ctx.customerId scopes everything. Mutations call request-ledger-backed RPCs
 // that derive the caller's tenant and role inside the database.
-import { historyInput, historyResult, newestFirst, type HistoryRow } from "./history";
+import { numberedHistorySchema, readHistory } from "./history";
 import { z } from "zod";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
 import { integrationFailureCause } from "@/lib/integration-failure";
@@ -182,8 +182,8 @@ defineQuery({
 defineQuery({
   name: "portal_orders", description: "Portal: the caller's orders, newest first, one page at a time; use portal_order for one order's events and shipment",
   roles: "customer",
-  input: z.object(historyInput),
-  handler: async (ctx, i) => historyResult(await unwrap(newestFirst(ctx.db.from("portal_orders").select(`${ORDER_ROW}, order_lines`).eq("brewery_id", ctx.breweryId).eq("customer_id", requireCustomer(ctx)).limit(i.limit + 1), i.cursor)) as HistoryRow[], i.limit),
+  input: numberedHistorySchema({}),
+  handler: (ctx, i) => readHistory(ctx.db.from("portal_orders").select(`${ORDER_ROW}, order_lines`, { count: i.page === undefined ? undefined : "exact" }).eq("brewery_id", ctx.breweryId).eq("customer_id", requireCustomer(ctx)).limit(i.limit + 1), i),
 });
 
 defineQuery({
@@ -211,8 +211,8 @@ defineQuery({
 defineQuery({
   name: "portal_invoices", description: "Portal: the caller's invoices and credit memos",
   roles: "customer",
-  input: z.object(historyInput),
-  handler: async (ctx, i) => historyResult(await unwrap(newestFirst(ctx.db.from("portal_invoices").select(`${INVOICE_ROW}, customer_id, shipment_id, issued_on, due_on, qbo_tax_cents, created_at, invoice_lines`).eq("brewery_id", ctx.breweryId).eq("customer_id", requireCustomer(ctx)).limit(i.limit + 1), i.cursor)) as HistoryRow[], i.limit),
+  input: numberedHistorySchema({}),
+  handler: (ctx, i) => readHistory(ctx.db.from("portal_invoices").select(`${INVOICE_ROW}, customer_id, shipment_id, issued_on, due_on, qbo_tax_cents, created_at, invoice_lines`, { count: i.page === undefined ? undefined : "exact" }).eq("brewery_id", ctx.breweryId).eq("customer_id", requireCustomer(ctx)).limit(i.limit + 1), i),
 });
 
 defineQuery({
