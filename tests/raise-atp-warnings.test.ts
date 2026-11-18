@@ -41,9 +41,9 @@ async function openOrderQty(orderId: string, skuId: string) {
 describe("ATP warnings on raises and standing allocations (#1088)", () => {
   it("a line raise past ATP saves and warns; one within ATP does not", async () => {
     const f = await confirmedOrder();
-    const within = await runCommand("adjust_order_lines", { orderId: f.orderId, reason: "raise", lines: [{ skuId: f.skuId, qty: 10 }] }, f.ctx) as Result;
+    const within = await runCommand("adjust_order_lines", { orderId: f.orderId, reasonCode: "customer_request", reason: "raise", lines: [{ skuId: f.skuId, qty: 10 }] }, f.ctx) as Result;
     expect(within.warnings).toEqual([]);
-    const past = await runCommand("adjust_order_lines", { orderId: f.orderId, reason: "raise", lines: [{ skuId: f.skuId, qty: 12 }] }, f.ctx) as Result;
+    const past = await runCommand("adjust_order_lines", { orderId: f.orderId, reasonCode: "customer_request", reason: "raise", lines: [{ skuId: f.skuId, qty: 12 }] }, f.ctx) as Result;
     expect(past.warnings).toEqual([{ sku_id: f.skuId, atp: -2 }]);
     expect(await openOrderQty(f.orderId, f.skuId), "the warned raise is saved").toEqual({ ordered: 12, allocated: [12] });
   });
@@ -51,7 +51,7 @@ describe("ATP warnings on raises and standing allocations (#1088)", () => {
   it("warns only for the SKUs on the order that are below zero", async () => {
     const f = await confirmedOrder();
     const result = await runCommand("adjust_order_lines", {
-      orderId: f.orderId, reason: "raise", lines: [{ skuId: f.skuId, qty: 12 }, { skuId: f.otherSkuId, qty: 3 }],
+      orderId: f.orderId, reasonCode: "customer_request", reason: "raise", lines: [{ skuId: f.skuId, qty: 12 }, { skuId: f.otherSkuId, qty: 3 }],
     }, f.ctx) as Result;
     expect(result.warnings).toEqual([{ sku_id: f.skuId, atp: -2 }]);
   });
@@ -67,7 +67,7 @@ describe("ATP warnings on raises and standing allocations (#1088)", () => {
   // A release only raises ATP, so it never warns, even while the SKU stays below zero.
   it("releasing a standing allocation returns no warnings", async () => {
     const f = await confirmedOrder();
-    await runCommand("adjust_order_lines", { orderId: f.orderId, reason: "raise", lines: [{ skuId: f.skuId, qty: 12 }] }, f.ctx);
+    await runCommand("adjust_order_lines", { orderId: f.orderId, reasonCode: "customer_request", reason: "raise", lines: [{ skuId: f.skuId, qty: 12 }] }, f.ctx);
     await runCommand("set_standing_allocation", { locationId: f.taproomId, skuId: f.skuId, qty: 1 }, f.ctx);
     const released = await runCommand("set_standing_allocation", { locationId: f.taproomId, skuId: f.skuId, qty: 0 }, f.ctx) as Result & { status: string };
     expect(released).toMatchObject({ status: "released", warnings: [] });

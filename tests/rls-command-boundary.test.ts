@@ -565,8 +565,8 @@ describe("registered staff mutation role × RPC matrix", () => {
       input: async () => {
         const orderId = await confirmedOrder();
         return {
-          command: { orderId, reason: "matrix adjustment", lines: [{ skuId, qty: 1 }] },
-          rpc: { p_order: orderId, p_lines: [{ sku_id: skuId, qty: 1 }], p_reason: "matrix adjustment" },
+          command: { orderId, reasonCode: "customer_request", reason: "matrix adjustment", lines: [{ skuId, qty: 1 }] },
+          rpc: { p_order: orderId, p_lines: [{ sku_id: skuId, qty: 1 }], p_reason: "matrix adjustment", p_reason_code: "customer_request" },
         };
       },
     },
@@ -652,10 +652,10 @@ describe("registered staff mutation role × RPC matrix", () => {
         // a no-op adjust no longer flags), so raise to 2 and pick 2 before cutting to 1
         const orderId = await confirmedOrder();
         const db = contexts().admin.db;
-        await db.rpc("adjust_order_lines", { p_order: orderId, p_lines: [{ sku_id: skuId, qty: 2 }], p_reason: "raise", p_request_id: crypto.randomUUID() });
+        await db.rpc("adjust_order_lines", { p_order: orderId, p_lines: [{ sku_id: skuId, qty: 2 }], p_reason_code: "customer_request", p_reason: "raise", p_request_id: crypto.randomUUID() });
         const lineId = await orderLine(orderId);
         await db.rpc("record_pick", { p_order: orderId, p_picks: [{ line_id: lineId, qty_picked: 2 }], p_request_id: crypto.randomUUID() });
-        await db.rpc("adjust_order_lines", { p_order: orderId, p_lines: [{ sku_id: skuId, qty: 1 }], p_reason: "cut", p_request_id: crypto.randomUUID() });
+        await db.rpc("adjust_order_lines", { p_order: orderId, p_lines: [{ sku_id: skuId, qty: 1 }], p_reason_code: "customer_request", p_reason: "cut", p_request_id: crypto.randomUUID() });
         return { command: { orderId }, rpc: { p_order: orderId } };
       },
     },

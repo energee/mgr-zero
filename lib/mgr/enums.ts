@@ -32,6 +32,12 @@ export const KEG_EVENT_REASONS = ["acquired", "retired", "shipped", "returned", 
 // Customer rejection reasons; unattempted stops use leave_delivery_for_later.
 export const REFUSAL_REASONS = ["customer_refused", "damaged", "wrong_item", "other"] as const;
 
+// Why a confirmed or picked order's lines changed (adjust_order_lines, Phase C of
+// docs/plans/portal-release-windows.md). other needs a note; a submitted
+// (pre-order) change takes free text instead. Operators read sentenceCase.
+export const ORDER_CHANGE_REASONS = ["short", "damaged", "customer_request", "brewery_error", "other"] as const;
+export type OrderChangeReason = (typeof ORDER_CHANGE_REASONS)[number];
+
 // The process spec (recipe-builder spec D2, D6, D7), from lib/commands/production.ts:
 // ordered mash steps and fermentation stages, each with a type and a name, and
 // water additions carrying one stage.
