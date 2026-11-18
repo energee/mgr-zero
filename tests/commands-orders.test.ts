@@ -241,6 +241,19 @@ describe("adjustment reasons", () => {
     expect(snapshot(orderId)).toEqual(before);
   });
 
+  it("refuses the same SKU id in two letter cases, through the command and the RPC, before any write", async () => {
+    const orderId = await orderAt("confirmed");
+    const before = snapshot(orderId);
+    const upper = skuId.toUpperCase();
+    await expect(runCommand("adjust_order_lines", { orderId, reasonCode: "short", lines: [{ skuId, qty: 2 }, { skuId: upper, qty: 1 }] }, adminCtx))
+      .rejects.toMatchObject({ code: "invalid_input" });
+    const rpc = await adminCtx.db.rpc("adjust_order_lines", {
+      p_order: orderId, p_lines: [{ sku_id: skuId, qty: 2 }, { sku_id: upper, qty: 1 }], p_reason: null, p_reason_code: "short", p_request_id: crypto.randomUUID(),
+    } as never);
+    expect(rpc.error?.message).toMatch(/same SKU twice/);
+    expect(snapshot(orderId)).toEqual(before);
+  });
+
   it("words a change in stored quantities, so a three-place quantity reads as its two-place line", async () => {
     const orderId = await orderAt("confirmed");
     await runCommand("adjust_order_lines", { orderId, reasonCode: "damaged", lines: [{ skuId, qty: 2.555 }] }, adminCtx);

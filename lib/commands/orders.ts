@@ -84,7 +84,8 @@ defineCommand({
     orderId: z.string().uuid(),
     reasonCode: z.enum(ORDER_CHANGE_REASONS).optional().describe("Why a confirmed or picked order changed; required after confirm, refused before it"),
     reason: z.string().optional().describe("Why the lines changed; with reasonCode, an optional note (required for other)"),
-    lines: lines.refine(ls => new Set(ls.map(l => l.skuId)).size === ls.length, "Give each SKU one line"),
+    // A uuid in two letter cases is one SKU, as the RPC compares them.
+    lines: lines.refine(ls => new Set(ls.map(l => l.skuId.toLowerCase())).size === ls.length, "Give each SKU one line"),
   }).refine(i => i.reasonCode !== undefined || (i.reason ?? "").length > 0, { path: ["reason"], message: "Give a reason or a reason code" }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("adjust_order_lines", {
     p_order: i.orderId, p_lines: toLines(i.lines), p_reason: i.reason ?? null, p_request_id: execution.requestId, p_reason_code: i.reasonCode,

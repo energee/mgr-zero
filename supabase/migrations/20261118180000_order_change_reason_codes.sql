@@ -45,7 +45,8 @@ begin
   perform private.assert_order_lines(p_lines);
   -- One line per SKU: the upsert below would keep the last, and the change
   -- report would count both. Checked here only, not in assert_order_lines.
-  if (select count(*) <> count(distinct e->>'sku_id') from jsonb_array_elements(p_lines) e) then
+  -- Compared as uuids, so one id in two letter cases is still one SKU.
+  if (select count(*) <> count(distinct (e->>'sku_id')::uuid) from jsonb_array_elements(p_lines) e) then
     raise exception 'an adjustment lists the same SKU twice; give each SKU one line';
   end if;
   o := private.lock_order(p_order, array['submitted','confirmed','picked']::public.order_status[]);
