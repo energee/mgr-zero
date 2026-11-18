@@ -17,6 +17,8 @@ order beer that is planned but not yet packaged.
 2. **Admin and sales** can release, edit, and withdraw a release.
 3. Packaged stock stays orderable as today. Staff control portal
    orderability **per SKU**.
+4. A release can carry **per-customer allocations**, suggested from order
+   history and edited by staff.
 
 ## Design
 
@@ -51,6 +53,49 @@ release and whose order is `submitted`, `confirmed`, `picked` or `shipped`.
 Drafts do not count. The portal shows it as the existing in/low/out badge,
 never as a number.
 
+### Per-customer allocations, suggested from history
+
+A release can be split into customer **allocations** plus an **open pool**.
+A release with no allocations is entirely open pool, which is first come,
+first served.
+
+**Suggest.** The release sheet has an **Allocate** step. It lists the
+customers who can see the SKU (priced on their channel). For each customer it
+shows:
+
+- **History**: units shipped in the last 90 days of any SKU in the **same
+  format**, for example all 1/6 bbl kegs. Format, not brand, so a new beer
+  still has history to go on.
+- **Share**: that customer's history ÷ the total history of all listed
+  customers.
+- **Suggested**: `floor((release qty − held back) × share)`.
+
+**Held back** defaults to 20% of the release and goes to the open pool, so
+new and occasional customers can still order. Rounding leftovers also go to
+the pool.
+
+**Edit.** Staff change any number, clear a customer, or add one. Saving
+writes one `release_allotments` row per customer with a quantity above zero.
+The grid shows the running total against the release quantity, and the
+system refuses to save allocations that exceed it.
+
+**Hold until.** Allocations hold until an optional **Hold until** date, or
+until order-by when that's blank. After that date, whatever customers haven't
+used joins the open pool.
+
+**What the buyer sees.** The badge reflects what this buyer can still order:
+their allocation remaining plus the open pool remaining. The portal shows
+"Reserved for you" while they have an unused allocation.
+
+**Remaining, per customer.** For each customer, `used_c` is the units on that
+customer's counted order lines for the release (the same statuses as above).
+
+- Their allocation remaining is `allot_c − used_c`, floored at 0.
+- Units a customer orders beyond their allocation come out of the open pool,
+  which is `qty − Σ allot`.
+- Open pool remaining is `(qty − Σ allot) − Σ max(0, used_c − allot_c)`.
+- After the hold date: remaining is `qty − Σ used`.
+
 ### Ordering against a release
 
 An order line gains an optional `batch_release_id`. On submit,
@@ -59,7 +104,8 @@ when:
 
 - the release is withdrawn, past its order-by date, or its batch is packaged
   or cancelled;
-- the line exceeds the remaining quantity;
+- the line exceeds what this buyer can still order (allocation remaining
+  plus open pool remaining);
 - the order's requested date is before the release's ships-from date;
 - a line without a release is for a SKU that is not orderable from stock.
 
@@ -81,7 +127,9 @@ confirm release orders when the batch packages.
 
 ## Out of scope (ask before adding)
 
-- per-customer caps (allotments);
+- allocations on packaged stock (only releases get them);
+- history weighting beyond one 90-day, same-format share (recency weights,
+  seasonality);
 - rule-based automatic windows;
 - a brand-level toggle (bulk-toggling the brand's SKUs on the SKU list covers it);
 - buyer notifications when a batch is released.
@@ -104,6 +152,7 @@ create table public.batch_releases (
   released_at timestamptz not null default now(),
   released_by uuid not null default auth.uid(),
   withdrawn_at timestamptz,
+  allotments_hold_until date,            -- null: allocations hold until orders_close_on
   unique (id, brewery_id),
   unique (batch_id, sku_id),
   foreign key (batch_id, brewery_id) references public.batches (id, brewery_id),
@@ -113,6 +162,20 @@ alter table public.batch_releases enable row level security;
 create policy batch_releases_staff_read on public.batch_releases for select
   using (brewery_id in (select public.my_staff_brewery_ids(array['admin','sales','warehouse','brewer']::public.staff_role[])));
 -- Writes go through security-definer RPCs that check admin/sales.
+
+create table public.release_allotments (
+  brewery_id uuid not null references public.breweries(id),
+  release_id uuid not null,
+  customer_id uuid not null,
+  qty numeric(12,2) not null check (qty > 0),
+  primary key (release_id, customer_id),
+  foreign key (release_id, brewery_id) references public.batch_releases (id, brewery_id) on delete cascade,
+  foreign key (customer_id, brewery_id) references public.customers (id, brewery_id)
+);
+alter table public.release_allotments enable row level security;
+create policy release_allotments_staff_read on public.release_allotments for select
+  using (brewery_id in (select public.my_staff_brewery_ids(array['admin','sales']::public.staff_role[])));
+-- Buyers never read this table; portal_releases returns only their own badge.
 
 alter table public.order_lines add column batch_release_id uuid;
 alter table public.order_lines add foreign key (batch_release_id, brewery_id)
@@ -128,6 +191,10 @@ Plus these functions, written in the tasks below:
 - `portal_releases(p_customer)`, a definer that returns `sku_id`,
   `release_id`, `ships_from`, `orders_close_on` and `badge`, scoped like
   `portal_availability`;
+- `suggest_release_allotments(p_release, p_hold_back_pct)`, admin/sales,
+  which returns `customer_id`, `history_units`, `share` and `suggested`;
+- `set_release_allotments(p_release, p_lines, p_hold_until)`, which replaces
+  the set and refuses when `Σ qty > release qty`;
 - `portal_availability`, updated to skip SKUs with `portal_from_stock = false`;
 - `portal_submit_quote` and the quote snapshot, updated with the release checks.
 
@@ -151,9 +218,13 @@ in parallel with the other P tasks of the same step.
 | 9 | Release sheet + Planning row action + withdraw | `components/mgr/views/release-batch.tsx` (new), `components/mgr/views/planning.tsx`, `lib/mgr/planning-view.ts` | — | `tests/planning-view.test.ts`: released rows show a Released badge; action shown to admin/sales only | browse screenshot | 8 |
 | 10 (P) | Orderable-from-stock control on Edit SKU sheet + SKU list | `components/mgr/views/sku.tsx`, `lib/mgr/sku-view.ts`, `components/mgr/views/sku-list.tsx`, `lib/mgr/sku-list-view.ts` | `SkuViewModel.portalFromStock` | `tests/catalog-edit-controls.test.ts` | vitest green | 3 |
 | 11 (P) | Confirm order flags slipped release lines | `lib/mgr/confirm-order-view.ts`, `components/mgr/views/confirm-order.tsx` | `ConfirmLine.slipped` | `tests/confirm-order-atp-lock.test.ts` (or new `confirm-order-view` case) | vitest green | 5 |
-| 12 | Screen inventory entries | `components/mgr/screens.tsx` (Release batch, Shop with releases) | — | `tests/mgr-screens.test.ts`, `tests/screen-links.test.ts` | screen proof list green | 7, 9, 10, 11 |
-| 13 | Docs: staff + portal guides, API docs | `content/docs/staff-guide.mdx`, `content/docs/portal-guide.mdx`, `bun run docs:api` output | — | `tests/docs.test.ts`, `tests/api-docs.test.ts` | green | 2–6 |
-| 14 | Full proof | — | — | `bun run test && bunx tsc --noEmit && bun run lint` | exit 0 | all |
+| 12 | `suggest_release_allotments` + `set_release_allotments` RPCs and commands | same migration; the task-2 commands file | `ReleaseAllotmentInput` (zod) | `tests/release-allotments.test.ts`: share is by same-format shipped units in 90 days; held back and rounding go to the pool; Σ over qty refused; warehouse refused; buyer cannot read the table | vitest green | 2 |
+| 13 | Submit and portal badge use per-customer remaining (allocation + pool; pooled after hold-until) | same migration (`portal_releases`, `portal_submit_quote`) | — | `tests/release-allotments.test.ts`: A cannot use B's allocation; overflow draws pool; after hold-until all pooled; concurrent submits cannot exceed qty | vitest green | 5, 12 |
+| 14 (P) | Allocate step view-model: suggestion rows, edits, running total | `lib/mgr/release-allotments-view.ts` (new) | `ReleaseAllotmentsViewModel` | `tests/release-allotments-view.test.ts` | vitest green | 12 |
+| 15 | Allocate step in the release sheet; "Reserved for you" in Shop | `components/mgr/views/release-batch.tsx`, the task-7 shop component | — | logic in 14 and 6; render checked visually | browse screenshot | 9, 14 |
+| 16 | Screen inventory entries | `components/mgr/screens.tsx` (Release batch, Allocate, Shop with releases) | — | `tests/mgr-screens.test.ts`, `tests/screen-links.test.ts` | screen proof list green | 7, 9, 10, 11, 15 |
+| 17 | Docs: staff + portal guides, API docs | `content/docs/staff-guide.mdx`, `content/docs/portal-guide.mdx`, `bun run docs:api` output | — | `tests/docs.test.ts`, `tests/api-docs.test.ts` | green | 2–6, 12, 13 |
+| 18 | Full proof | — | — | `bun run test && bunx tsc --noEmit && bun run lint` | exit 0 | all |
 
-Order: 1 → (2, 3, 4 in parallel) → 5 → 6 → (7, 8, 10, 11 in parallel) → 9 →
-12 → 13 → 14.
+Order: 1 → (2, 3, 4 in parallel) → 5 → 6 → (7, 8, 10, 11, 12 in parallel) →
+9 → 13 → 14 → 15 → 16 → 17 → 18.
