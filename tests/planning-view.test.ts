@@ -6,6 +6,7 @@ import { SCREENS } from "../components/mgr/screens";
 import { PlanningView } from "../components/mgr/views/planning";
 import { planningDemo } from "../lib/mgr/fixtures/planning";
 import { toPlanningViewProps, type PlanningViewModel } from "../lib/mgr/planning-view";
+import type { ReleaseBatchRow, ReleaseRow } from "../lib/mgr/release-view";
 import { activeTab, STAFF_NAV } from "../lib/mgr/nav";
 import type { StaffRole } from "../lib/commands/registry";
 
@@ -170,3 +171,33 @@ describe("Planning view", () => {
   });
 });
 
+
+describe("Planning release rows (portal releases)", () => {
+  const batch = (batchId: string, batchNo: number): ReleaseBatchRow => ({ batch_id: batchId, batch_no: batchNo, sku_id: `${batchId}-keg`, units: 40, needed_by: "2026-12-04", skus: { name: "Stout · ⅙ bbl keg", brands: { name: "Stout" } } });
+  const released: ReleaseRow = { id: "r1", batch_id: "b1", batch_no: 12, sku_id: "b1-keg", sku_name: "Stout · ⅙ bbl keg", qty: 40, ships_from: "2026-12-04", orders_close_on: null, withdrawn_at: null, ready_on: "2026-12-04", open: true, cancelled: false, confirmed: 0, preordered: 0, remaining: 40 };
+  const snapshot = { requirements: [], batches: [batch("b1", 12), batch("b2", 13)], releases: [released] };
+
+  it("lists each planned batch once and marks one with an open release Released", () => {
+    const model = toPlanningViewProps(snapshot);
+    expect(model.releaseBatches?.map((b) => [b.title, b.released])).toEqual([["Batch 12 · Stout", true], ["Batch 13 · Stout", false]]);
+  });
+
+  it("keeps Release for ordering on a batch until every package it projects is released", () => {
+    const twoPackages = [batch("b1", 12), { ...batch("b1", 12), sku_id: "b1-case", skus: { name: "Stout · case", brands: { name: "Stout" } } }];
+    const [row] = toPlanningViewProps({ requirements: [], batches: twoPackages, releases: [released] }).releaseBatches!;
+    expect(row).toMatchObject({ released: false, canRelease: true });
+    expect(row.form.lines.map((l) => l.skuId)).toEqual(["b1-case"]);
+  });
+
+  it("offers Release for ordering to admin and sales only; the inventory draws it inert", () => {
+    const can = (roles?: StaffRole[]) => toPlanningViewProps({ ...snapshot, roles }).releaseBatches?.[1].canRelease;
+    expect(can(["admin"])).toBe(true);
+    expect(can(["sales"])).toBe(true);
+    expect(can(["warehouse", "brewer"])).toBe(false);
+    expect(can()).toBe(true);
+    const html = htmlOf(createElement(PlanningView, { model: toPlanningViewProps(snapshot) }));
+    expect(html).toMatch(/Released/);
+    expect(html).toMatch(/Release for ordering/);
+    expect(htmlOf(createElement(PlanningView, { model: toPlanningViewProps({ ...snapshot, roles: ["brewer"] }) }))).not.toMatch(/Release for ordering/);
+  });
+});

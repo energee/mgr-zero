@@ -1,8 +1,9 @@
 // app/(app)/orders/[id]/order-lines-form.tsx — the Order page with its lines
 // changed in place (#1503). Ordered is the shared number field, ✕ removes a
 // line, and Add line appends one that picks its SKU. Once anything differs from
-// the order, a required Reason, Save lines (adjust_order_lines with every kept
-// and added line) and Discard changes appear under the lines. A save remounts
+// the order, a required Reason (one of ORDER_CHANGE_REASONS: the order is
+// confirmed or picked) with its Note, Save lines (adjust_order_lines with every
+// kept and added line) and Discard changes appear under the lines. A save remounts
 // OrderLinesEditor (keyed on the saved lines) with fresh state, while
 // OrderLinesForm keeps that save's ATP warnings under the lines, after
 // "Lines saved." (#1088). useLineQuantities and SaveLinesActions are shared
@@ -24,17 +25,21 @@ type AddedLine = { key: string; skuId: string };
 const saved = (lines: Line[]) => Object.fromEntries(lines.map((l) => [l.id, String(Number(l.qty_ordered))]));
 
 /** The edited quantities, added and removed lines, and Reason; onSubmit sends
- *  adjust_order_lines with every kept and added line, then calls onSaved with its result. */
-export function useLineQuantities(orderId: string, lines: Line[], onSaved?: (data: unknown) => void) {
+ *  adjust_order_lines with every kept and added line, then calls onSaved with its result.
+ *  With `coded` (a confirmed or picked order) the reason is a code from ORDER_CHANGE_REASONS
+ *  and `reason` is its note, required only for other; without it (Confirm order's
+ *  submitted order) `reason` is the required free text. */
+export function useLineQuantities(orderId: string, lines: Line[], onSaved?: (data: unknown) => void, coded = false) {
   const action = useCommandAction();
   const [qtys, setQtys] = useState(() => saved(lines));
   const [reason, setReason] = useState("");
   const [added, setAdded] = useState<AddedLine[]>([]);
   const [removed, setRemoved] = useState<string[]>([]);
+  const [reasonCode, setReasonCode] = useState("");
   const kept = lines.filter((l) => !removed.includes(l.id));
   const changed = added.length > 0 || removed.length > 0 || kept.some((l) => qtys[l.id] !== String(Number(l.qty_ordered)));
   return {
-    action, qtys, reason, setReason, changed, added, removed,
+    action, qtys, reason, setReason, reasonCode, setReasonCode, changed, added, removed,
     setQty: (key: string, value: string) => setQtys((prev) => ({ ...prev, [key]: value })),
     addLine: () => setAdded((prev) => [...prev, { key: crypto.randomUUID(), skuId: "" }]),
     setSku: (key: string, skuId: string) => setAdded((prev) => prev.map((l) => (l.key === key ? { ...l, skuId } : l))),
@@ -42,7 +47,7 @@ export function useLineQuantities(orderId: string, lines: Line[], onSaved?: (dat
       if (added.some((l) => l.key === key)) setAdded((prev) => prev.filter((l) => l.key !== key));
       else setRemoved((prev) => [...prev, key]);
     },
-    discard: () => { setQtys(saved(lines)); setReason(""); setAdded([]); setRemoved([]); },
+    discard: () => { setQtys(saved(lines)); setReason(""); setReasonCode(""); setAdded([]); setRemoved([]); },
     onSubmit: (event: FormEvent<HTMLFormElement>) => {
       // A dialog form inside the page (Cancel order) bubbles its submit here
       // through the React tree; only this form's own submit saves lines.
@@ -50,11 +55,13 @@ export function useLineQuantities(orderId: string, lines: Line[], onSaved?: (dat
       event.preventDefault();
       if (!changed || action.busy) return;
       const trimmedReason = reason.trim();
-      if (!trimmedReason) { action.setError("Reason required"); return; }
+      if (coded && !reasonCode) { action.setError("Choose a reason"); return; }
+      if (coded && reasonCode === "other" && !trimmedReason) { action.setError("Add a note for Other"); return; }
+      if (!coded && !trimmedReason) { action.setError("Reason required"); return; }
       if (added.some((l) => !l.skuId)) { action.setError("Choose a SKU for each added line, or remove it."); return; }
       // A blank quantity is sent and refused, never dropped: adjust_order_lines
       // replaces every line, so dropping it would remove the SKU (#433).
-      void action.run("adjust_order_lines", { orderId, reason: trimmedReason, lines: [
+      void action.run("adjust_order_lines", { orderId, ...(coded ? { reasonCode } : {}), ...(trimmedReason ? { reason: trimmedReason } : {}), lines: [
         ...kept.map((l) => ({ skuId: l.sku_id, qty: Number(qtys[l.id]) })),
         ...added.map((l) => ({ skuId: l.skuId, qty: Number(qtys[l.key]) })),
       ] }, onSaved);
@@ -73,7 +80,7 @@ export function SaveLinesActions({ edit }: { edit: ReturnType<typeof useLineQuan
   </>;
 }
 
-type ViewProps = Omit<ComponentProps<typeof OrderView>, "quantities" | "onQuantity" | "reason" | "onReason" | "lineActions" | "lineEdit">;
+type ViewProps = Omit<ComponentProps<typeof OrderView>, "quantities" | "onQuantity" | "reason" | "onReason" | "reasonCode" | "onReasonCode" | "lineActions" | "lineEdit">;
 type FormProps = {
   orderId: string;
   lines: Line[];
@@ -89,7 +96,7 @@ export function OrderLinesEditor({ orderId, lines, editable, skus, warnings, onS
   warnings: AtpWarning[];
   onSaved: (data: unknown) => void;
 }) {
-  const edit = useLineQuantities(orderId, lines, onSaved);
+  const edit = useLineQuantities(orderId, lines, onSaved, true);
   const pickupAction = useCommandAction();
   // Held here and flipped on success: busy clears before the save's refresh
   // lands, and a click in that window must send the new value, not the old prop.
@@ -109,7 +116,8 @@ export function OrderLinesEditor({ orderId, lines, editable, skus, warnings, onS
         router.push(`/orders/${result.order_id}/edit`);
       })}
       lineEdit={editable ? { skus, added: edit.added, onAdd: edit.addLine, onSku: edit.setSku, onRemove: edit.removeLine } : undefined}
-      reason={edit.reason} onReason={edit.changed ? edit.setReason : undefined} lineActions={lineActions} />
+      reason={edit.reason} onReason={edit.changed ? edit.setReason : undefined}
+      reasonCode={edit.reasonCode} onReasonCode={edit.changed ? edit.setReasonCode : undefined} lineActions={lineActions} />
     <CommandFormMessage error={reorder.error} />
   </form>;
 }

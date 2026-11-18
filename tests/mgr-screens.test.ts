@@ -466,7 +466,7 @@ describe("SCREENS", () => {
       "Deliver", "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Edit SKU", "Find COLA", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Mark sent", "Open", "Open format",
       "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Reading", "Receive", "Record movement", "Record opening count", "Record return", "Release", "Reload", "Remove", "Reorder", "Re-push",
       "Resolve", "Resume", "Retry", "Return", "Return and credit", "Review", "Review history", "Review sales", "Schedule", "Select", "Send", "Send PO", "Set vendor", "Shortfall", "Skip", "Start", "Swap", "Switch", "Tap",
-      "Unlink", "Use", "Write off", "Fix registration", "Forgot password?", "Import CSV", "Invite staff", "Invite portal user",
+      "Unlink", "Use", "Withdraw", "Write off", "Fix registration", "Forgot password?", "Import CSV", "Invite staff", "Invite portal user",
     ]);
     for (const screen of SCREENS) {
       const html = renderToStaticMarkup(createElement("div", null, screen.body));
@@ -1130,7 +1130,7 @@ describe("order lifecycle labels", () => {
     // stop leaves the order shipped, drawn as the composite below.
     const { Constants } = await import("../lib/supabase/database.generated");
     const statuses = new Set<string>(Constants.public.Enums.order_status);
-    const notLifecycle = new Set(["stale", "permission", "adjusted", "changed after pick", "shipped · stop delivered"]);
+    const notLifecycle = new Set(["stale", "permission", "adjusted", "changed after pick", "changed after confirm", "shipped · stop delivered"]);
     for (const name of ["Order", "Order detail"]) {
       const labels = SCREENS.find((s) => s.name === name)!.states!.map(([label]) => label);
       const bad = labels.flatMap((label) => notLifecycle.has(label) ? [] : label.split(" / ").filter((part) => !statuses.has(part)));

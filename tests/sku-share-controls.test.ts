@@ -35,7 +35,7 @@ function assemble<T>(render: () => T, cursor = 0): T {
   state.cursor = cursor;
   try { return render(); } finally { state.active = false; }
 }
-const sku = { ...skuHazyHalf.sku!, batch_share: 0.375 };
+const sku = { ...skuHazyHalf.sku!, batch_share: 0.375, portal_from_stock: true };
 const edit = () => assemble(() => SkuEditForm({ sku, formatName: "½ bbl keg", packageType: "keg" }));
 function viewOf(sheet: Sheet) {
   return elements(sheet).find(node => node.type === SkuView)! as ReactElement<ComponentProps<typeof SkuView>>;

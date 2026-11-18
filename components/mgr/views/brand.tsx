@@ -11,6 +11,8 @@
 // are edited on the price group, which the section links to. The header
 // badges carry the state a reader scrolls for: no COLA on file (a jump link to Compliance), price group or Unpriced, category, SKU
 // count. Until its first save, a new brand's right column is one note.
+// A switched-on SKU also offers Release (portal releases), and each of its
+// open releases is a row under it with Edit and Withdraw.
 // Style is typed against the brewery's own styles as suggestions: an
 // unmatched entry is the Add path. The recipe cost suggests a price group
 // (lib/mgr/price-group-suggestion.ts); Use only fills the select, and Save
@@ -39,10 +41,10 @@ function nameAndFacts(name: ReactNode, facts: ReactNode): ReactNode {
   return facts ? <span>{name}<span className="font-normal text-muted-foreground"> · {facts}</span></span> : name;
 }
 
-/** A switched-on format's SKU sheet: the live slot, or the drawn verb; a format with no SKU has nothing to open. */
+/** A format's SKU verbs: the live slot, or the drawn Edit SKU and, while it sells, Release; a format with no SKU has nothing to open. */
 function sellsDetail(row: SellsAsRow, details?: (row: SellsAsRow) => ReactNode): ReactNode {
   if (!row.skuId) return null;
-  return details ? details(row) : E.act("Edit SKU");
+  return details ? details(row) : <>{E.act("Edit SKU")}{row.on ? E.act("Release") : null}</>;
 }
 
 /** Use fills the select from the live control; the inventory draws the verb. Only a banded suggestion has anything to use. */
@@ -68,6 +70,7 @@ export function BrandView({
   categoryAction,
   onSellsAs,
   sellsDetails,
+  releaseActions,
   sellsDisabled = false,
   sellsMessages,
   formatAction,
@@ -93,8 +96,10 @@ export function BrandView({
   categoryAction?: ReactNode;
   /** Live: a Sells as switch was flipped; without it the inventory draws uncontrolled switches. */
   onSellsAs?: (row: SellsAsRow, on: boolean) => void;
-  /** Live: the SKU sheet for a row that has a SKU; without it the inventory draws Edit SKU. */
+  /** Live: the SKU sheet (and Release) for a row that has a SKU; without it the inventory draws Edit SKU and Release. */
   sellsDetails?: (row: SellsAsRow) => ReactNode;
+  /** Live: Edit and Withdraw for one open release, by release id; without it the inventory draws both verbs. */
+  releaseActions?: (releaseKey: string) => ReactNode;
   /** Live: no permission to switch, or a switch is saving. */
   sellsDisabled?: boolean;
   /** Live: a failed switch's error, under the switches. */
@@ -172,7 +177,10 @@ export function BrandView({
                     {sellsDetail(row, sellsDetails)}
                     {E.sw(row.on, `Sells as ${row.name}`, onSellsAs && ((on) => onSellsAs(row, on)), sellsDisabled)}
                   </span>
-                ))}</div>
+                ))}
+                {row.releases.map((release) => <Fragment key={release.key}>{E.row(release.title, release.detail,
+                  releaseActions ? releaseActions(release.key) : <>{E.act("Edit")}{E.act("Withdraw")}</>)}</Fragment>)}
+                </div>
               ))}
               {sellsMessages}
               {model.sells.contents.map((line) => <div key={line.key}>{E.row(nameAndFacts(line.label, line.prices))}</div>)}

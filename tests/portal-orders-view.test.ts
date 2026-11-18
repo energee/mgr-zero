@@ -9,7 +9,7 @@ import { SCREENS } from "../components/mgr/screens";
 import { PortalOrderView } from "../components/mgr/views/portal-order";
 import { PortalOrdersView } from "../components/mgr/views/portal-orders";
 import { SKU_HAZY, SKU_PILS } from "../lib/mgr/fixtures/demo";
-import { portalOrderShipped, portalOrdersList } from "../lib/mgr/fixtures/portal-orders";
+import { portalOrderChangedAfterConfirm, portalOrderShipped, portalOrdersList } from "../lib/mgr/fixtures/portal-orders";
 import { toPortalOrderViewProps } from "../lib/mgr/portal-order-view";
 import { toPortalOrdersViewProps } from "../lib/mgr/portal-orders-view";
 import { money } from "../lib/mgr/money";
@@ -196,7 +196,7 @@ describe("inventory and live portal orders", () => {
   it("the Order detail inventory record is PortalOrderView", () => {
     const body = SCREENS.find((s) => s.name === "Order detail")!.body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(PortalOrderView);
-    expect(body.props.model).toEqual(toPortalOrderViewProps(portalOrderShipped));
+    expect(body.props.model).toEqual(toPortalOrderViewProps(portalOrderChangedAfterConfirm));
   });
 
   it("the live portal order pages mount the views with no second E.* tree", () => {
@@ -222,4 +222,17 @@ it("prices on-delivery refusal lines at accepted quantities while invoice-now ke
   expect(toPortalOrderViewProps(onDelivery).lines[0].amount).toBe("$20.00");
   expect(toPortalOrderViewProps({ ...onDelivery, lines: lines.map(l => ({ ...l, qty_refused: 4 })) }).lines[0].amount).toBe("$0.00");
   expect(toPortalOrderViewProps({ ...onDelivery, shipment: { ...onDelivery.shipment, invoice_timing: "now" } }).lines[0].amount).toBe("$40.00");
+});
+
+describe("Order history pre-orders (portal releases)", () => {
+  const order = (status: string, releaseId: string | null) => ({
+    id: `o-${status}-${releaseId ?? "stock"}`, order_no: 300, status, requested_ship_date: "2026-12-04",
+    order_lines: [{ id: "l1", qty_ordered: 2, qty_shipped: null, unit_price_cents: 1000, release_id: releaseId, skus: { name: "Stout · ⅙ bbl keg" } }],
+  });
+  it("labels a submitted order with a release line a pre-order, and nothing else", () => {
+    const model = toPortalOrdersViewProps({ breweryName: "Demo Brewing", orders: [order("submitted", "r1"), order("submitted", null), order("confirmed", "r1")] });
+    expect(model.rows[0]?.detail).toMatch(/^Pre-order: may change until the brewery confirms · ships Dec 4, 2026/);
+    expect(model.rows[1]?.detail).not.toMatch(/Pre-order/);
+    expect(model.rows[2]?.detail).not.toMatch(/Pre-order/);
+  });
 });
