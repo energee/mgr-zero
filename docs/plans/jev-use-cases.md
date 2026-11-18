@@ -115,8 +115,9 @@ A suggestion is muted placeholder text that Tab accepts.
 - It shows only in an empty field, and only when one option's probability
   clears a threshold set by that use case's experiment. Otherwise the field
   stays blank, as today.
-- Tab fills the value. Typing replaces it. Escape dismisses it. With no
-  suggestion showing, Tab moves focus as usual.
+- Tab fills the value. Typing or choosing another value replaces it. With no
+  suggestion showing, Tab moves focus as usual. Escape is left alone, because
+  Escape closes the sheet the form sits in.
 - The request goes out when the source field loses focus (for example the
   material name), so the answer is ready when the user reaches the target
   field. The form never waits for Jev.
@@ -129,6 +130,9 @@ A suggestion is muted placeholder text that Tab accepts.
 - It extends the existing controls (`SuggestInput` behind `E.edit`, and the
   `E` select). It does not add a new control.
 - Latency is unmeasured. Each suggest use case times Jev before any build.
+
+The build plan for the first case, material kind (use case 20), is
+`docs/plans/jev-suggestions.md`.
 
 ## Rejected, and why
 
@@ -216,9 +220,11 @@ What exists, reused first:
 
 What is missing:
 
-- **A shared Jev client.** The request and response schemas live inside one
-  script. The second experiment is the time to move them into one `lib` module
-  with two callers. Copying them would be a second copy (Negative 2).
+- **A shared Jev client: not needed.** The installed AI SDK has
+  `experimental_decide`, and the AI Gateway serves `typesafe-ai/jev-1.14.0`
+  and other decision models through Ask MGR's credentials. New work calls
+  that, not a copy of the experiment's `fetch`. See
+  `docs/plans/jev-suggestions.md`.
 - **A store for flags and dispositions.** `production-attention.md` describes
   it (key: brewery, subject, source version, reason; RLS; tenant-composite
   references). It is not built. Build it once, for production attention, and
