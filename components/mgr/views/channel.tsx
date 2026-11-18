@@ -42,7 +42,7 @@ export function ChannelView({
       {E.info("Customers may override this. Sales without a customer take the channel default. A change applies to new sales only; filed months stay as they were.")}
       <div className="flex min-w-0 flex-col gap-2">
         {E.edit("One-way keg fee ($)", model.oneWayKegFee, "number", undefined, { contextualLabels: true, onChange: controls.oneWayKegFee, id: feeId, min: 0, max: 21474836.47, step: 0.01, error: feeError, "aria-describedby": `${feeId}-help` })}
-        <FieldDescription id={`${feeId}-help`}>Charged for each one-way keg on this channel&apos;s wholesale orders. Blank or 0 means no fee. A change applies to lines added later.</FieldDescription>
+        <FieldDescription id={`${feeId}-help`}>Charged for each one-way keg on this channel&apos;s wholesale orders. Blank or 0 means no fee. A change applies to drafts and to lines added later.</FieldDescription>
       </div>
       {messages}
       {footer !== undefined ? footer?.(save) : save}

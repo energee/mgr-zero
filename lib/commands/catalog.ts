@@ -234,7 +234,7 @@ defineQuery({
 });
 
 defineCommand({
-  name: "upsert_sale_channel", description: "Create or edit a sale channel: its name, the tax treatment its removals are recorded under, and the one-way keg fee its wholesale orders charge. A one-way keg line takes the fee when it is added and keeps it; a fee change reaches only lines added later",
+  name: "upsert_sale_channel", description: "Create or edit a sale channel: its name, the tax treatment its removals are recorded under, and the one-way keg fee its wholesale orders charge. A one-way keg line takes the fee when it is saved and keeps it once its order is submitted; a fee change reaches only drafts and lines added later",
   compensation: "Reverse an edit with upsert_sale_channel and the previous values, or remove an unused new channel with delete_sale_channel.",
   input: z.object({ id: z.string().uuid().optional().describe("The sale channel to edit; omit to create one"), name: z.string().trim().min(1).describe("The sale channel's name"), taxTreatment: z.enum(TAX_TREATMENTS),
     oneWayKegFeeCents: z.number().int().min(0).max(2147483647).optional() }),

@@ -3126,8 +3126,8 @@ export const SCREENS: Screen[] = [
     job: "Create or edit one sale channel, its default tax treatment and its one-way keg fee",
     reads: "list_sale_channels",
     writes: "upsert_sale_channel",
-    states: [["permission", "admin required", 1], ["new", "titled Add channel · name and tax treatment required · fee starts at $0.00"], ["fee", "whole cents only; blank or 0 bills none; a change reaches only lines added later"], ["edit", "titled with the channel being edited"]],
-    spec: "Drawn editing the Export channel. The sheet has no Delete: removal and its in-use rule live on the Sale channels list. Every selected tax treatment shows its meaning under the chips, including the default Taxable choice. The one-way keg fee is frozen on each one-way keg line of the channel's wholesale orders when the line is added. The four removals without payment of tax (Export, Vessel supplies, Research, Transfer in bond) keep their approved TTB meanings.",
+    states: [["permission", "admin required", 1], ["new", "titled Add channel · name and tax treatment required · fee starts at $0.00"], ["fee", "whole cents only; blank or 0 bills none; a change reaches only drafts and lines added later"], ["edit", "titled with the channel being edited"]],
+    spec: "Drawn editing the Export channel. The sheet has no Delete: removal and its in-use rule live on the Sale channels list. Every selected tax treatment shows its meaning under the chips, including the default Taxable choice. The one-way keg fee is stamped on each one-way keg line of the channel's wholesale orders when the line is saved, and fixed once the order is submitted. The four removals without payment of tax (Export, Vessel supplies, Research, Transfer in bond) keep their approved TTB meanings.",
     body: <ChannelView model={toChannelViewProps(channelExport)} />,
   },
   {

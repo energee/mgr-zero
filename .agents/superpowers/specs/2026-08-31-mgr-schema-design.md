@@ -298,8 +298,9 @@ definer RPC resolves it server-side.
 `order_id → orders, sku_id → skus, qty_ordered numeric > 0, qty_picked numeric >= 0,
 qty_shipped numeric >= 0 check (<= qty_ordered), unit_price_cents int >= 0` (snapshot),
 `short_reason text`, `one_way_fee_cents int check (null or > 0)`: the order's
-channel one-way keg fee, frozen by an insert trigger when a one-way keg line is
-added (drafts included), null otherwise or at $0; both invoice writers read it,
+channel one-way keg fee, stamped by an insert trigger when a one-way keg line is
+saved (a draft save re-inserts its lines) and fixed once submitted, null
+otherwise or at $0; both invoice writers read it,
 so a later fee change does not move the line or the invoice
 (`20261117190000_channel_one_way_keg_fee.sql`).
 unique `(order_id, sku_id)`. idx `(sku_id)`. RLS: no
