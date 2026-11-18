@@ -26,6 +26,7 @@ export const FIELD_VOCABULARY: Record<string, { meaning: string; unit?: string; 
 
   // Catalog
   skuId: { meaning: "A SKU: one brand in one packaged format.", entity: "sku" },
+  releaseId: { meaning: "A release: a quantity of one SKU offered to portal buyers from a planned batch or packaged stock.", entity: "release" },
   parentSkuId: { meaning: "The composed SKU being broken down.", entity: "sku" },
   childSkuId: { meaning: "The component SKU it breaks down into.", entity: "sku" },
   parentQty: { meaning: "How many units of the composed SKU are broken down.", unit: "SKU units" },

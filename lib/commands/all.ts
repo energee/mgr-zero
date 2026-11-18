@@ -11,6 +11,7 @@ import "./invites";
 import "./orders";
 import "./customers";
 import "./portal";
+import "./releases";
 import "./chat";
 import "./today";
 import "./production";

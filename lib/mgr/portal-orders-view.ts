@@ -1,10 +1,12 @@
 // lib/mgr/portal-orders-view.ts — view-model for portal Order history.
 // portal_orders rows plus buyerStatus; drafts continue and shipped rows reorder.
+// A submitted order with a release line reads as a pre-order.
 import { plural } from "@/lib/mgr/plural";
 import type { EmptyState } from "./empty-state";
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { buyerStatus } from "./order-status";
+import { formatDate } from "@/lib/date-format";
 
 export type PortalOrdersRowView = {
   key: string;
@@ -27,6 +29,8 @@ export type PortalOrdersLineSnapshot = {
   qty_ordered: number;
   qty_shipped: number | null;
   unit_price_cents?: number | null;
+  /** The release this line orders from (portal releases); null or absent for stock. */
+  release_id?: string | null;
   skus?: { name: string } | null;
 };
 
@@ -61,7 +65,9 @@ export function toPortalOrdersViewProps({ breweryName, orders }: PortalOrdersSna
     info: `Need a change? Call ${breweryName}. Orders can’t be edited here after they’re placed.`,
     rows: orders.map((o) => {
       const adjusted = shortCopy(o.order_lines);
-      const status = adjusted ?? buyerStatus(o.status, o.requested_ship_date);
+      // A submitted order ordering from a release is a pre-order until the brewery confirms it.
+      const preOrder = o.status === "submitted" && o.order_lines.some((l) => l.release_id);
+      const status = adjusted ?? (preOrder ? `Pre-order: may change until the brewery confirms${o.requested_ship_date ? ` · ships ${formatDate(o.requested_ship_date)}` : ""}` : buyerStatus(o.status, o.requested_ship_date));
       const total = lineTotal(o.order_lines);
       const reorder = o.status === "shipped";
       return {

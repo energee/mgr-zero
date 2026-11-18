@@ -8,7 +8,8 @@
 // list_sale_channels and list_keg_pools (for the SKU sheet). brand-page.tsx
 // binds the shared BrandView to upsert_brand, the Sells as switches to
 // create_sku / update_sku (only for a role that may run create_sku), and
-// slots the compliance and SKU sheets.
+// slots the compliance and SKU sheets. A role that may release (Admin, Sales)
+// also reads the SKUs' open releases and the planned batches they can draw on.
 import { cache } from "react";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -20,6 +21,8 @@ import "@/lib/commands/all";
 import type { BrandSnapshot } from "@/lib/mgr/brand-view";
 import type { KegPoolOption } from "@/lib/mgr/sku-view";
 import { BrandPage, type BrandRow, type SellsReads } from "./brand-page";
+import type { ReleaseBatchRow, ReleaseRow } from "@/lib/mgr/release-view";
+import { breweryDate } from "@/lib/date-format";
 
 /** The brand's reads for the page, its metadata and the brand sheet within one request.
  *  Sends a role that may not save a brand to No access; null when a saved id matches no brand
@@ -47,7 +50,12 @@ export const findBrandPageData = cache(async function findBrandPageData(id: stri
   const brand = id === "new" ? null : brands.find((b) => b.id === id);
   if (brand === undefined) return null;
   const own = brand ? registry.brands.find((b) => b.id === brand.id) : undefined;
-  return { ctx, brands, groups, cost, categories, sells, brand, own };
+  const skuIds = brand?.skus.map((s) => s.id) ?? [];
+  const [releases, releaseBatches] = skuIds.length && canRun(ctx, "release_sku") ? await Promise.all([
+    runCommand("list_releases", { skuIds, open: true }, ctx) as Promise<ReleaseRow[]>,
+    runCommand("list_release_batches", { skuIds }, ctx) as Promise<ReleaseBatchRow[]>,
+  ]) : [[], []];
+  return { ctx, brands, groups, cost, categories, sells, brand, own, releases, releaseBatches, today: breweryDate(brewery.timeZone) };
 });
 
 /** findBrandPageData for the page: a saved id with no brand renders not-found.tsx. */
@@ -56,7 +64,7 @@ export const getBrandPageData = cache(async function getBrandPageData(id: string
 });
 
 export async function BrandDetail({ id }: { id: string }) {
-  const { ctx, brands, groups, cost, categories, sells, brand, own } = await getBrandPageData(id);
+  const { ctx, brands, groups, cost, categories, sells, brand, own, releases, releaseBatches, today } = await getBrandPageData(id);
   return (
     <BrandPage
       brand={brand}
@@ -65,7 +73,9 @@ export async function BrandDetail({ id }: { id: string }) {
       priceGroups={groups}
       cost={cost}
       compliance={own}
-      sells={sells && { formats: sells[0], prices: sells[1], channels: sells[2] }}
+      sells={sells && { formats: sells[0], prices: sells[1], channels: sells[2], releases }}
+      releaseBatches={releaseBatches}
+      today={today}
       pools={sells?.[3] ?? []}
       canSell={canRun(ctx, "create_sku")}
       canManageFormats={canRun(ctx, "upsert_format")}

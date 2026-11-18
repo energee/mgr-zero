@@ -3,6 +3,7 @@ import { beforeAll, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { admin, asUser, makeBrewery, makeCustomerUser, makeStaffCtx, priceSku, seedCatalog, seedCustomer, seedLocation, seedPriceGroup } from "./helpers";
 import { runCommand } from "../lib/commands/registry";
+import { skuUpdateCommand, toSkuViewProps } from "../lib/mgr/sku-view";
 import "../lib/commands/all";
 
 let ctx: Awaited<ReturnType<typeof makeStaffCtx>>;
@@ -106,3 +107,11 @@ it("gates catalog mutators and excludes inactive SKUs from New Order picker opti
   // additionally executes that adapter with active and inactive SKU payloads.
   expect(readFileSync("app/(app)/orders/new/new-order-client.tsx", "utf8")).toContain("skus.data.filter(sku => sku.active)");
 });
+
+it("edits Orderable from stock on the SKU sheet", () => {
+  const sku = { id: "s1", name: "Stout · case", upc: null, active: true, format_id: "f1", batch_share: null, portal_from_stock: false, formats: { name: "case" } };
+  expect(toSkuViewProps({ sku, formats: [] }).portalFromStock).toBe(false);
+  expect(toSkuViewProps({ sku: { ...sku, portal_from_stock: undefined }, formats: [] }).portalFromStock).toBe(true);
+  expect(skuUpdateCommand({ skuId: "s1", active: true, upc: "", batchSharePercent: "", portalFromStock: false }).input).toMatchObject({ portalFromStock: false });
+});
+

@@ -154,6 +154,12 @@ isOneToOne: false
       referencedRelation: "batches"
       referencedColumns: ["id","brewery_id"]
     },{
+      foreignKeyName: "batch_additions_batch_id_brewery_id_fkey"
+      columns: ["batch_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "projected_batch_packaging_units"
+      referencedColumns: ["batch_id","brewery_id"]
+    },{
       foreignKeyName: "batch_additions_brew_record_id_brewery_id_fkey"
       columns: ["brew_record_id","brewery_id"]
 isOneToOne: false
@@ -368,6 +374,12 @@ isOneToOne: false
       referencedRelation: "batches"
       referencedColumns: ["id","brewery_id"]
     },{
+      foreignKeyName: "brew_pulls_batch_id_brewery_id_fkey"
+      columns: ["batch_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "projected_batch_packaging_units"
+      referencedColumns: ["batch_id","brewery_id"]
+    },{
       foreignKeyName: "brew_pulls_bin_id_location_id_brewery_id_fkey"
       columns: ["bin_id","location_id","brewery_id"]
 isOneToOne: false
@@ -423,6 +435,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "batches"
       referencedColumns: ["id","brewery_id"]
+    },{
+      foreignKeyName: "brew_records_batch_id_brewery_id_fkey"
+      columns: ["batch_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "projected_batch_packaging_units"
+      referencedColumns: ["batch_id","brewery_id"]
     },{
       foreignKeyName: "brew_records_brewery_id_fkey"
       columns: ["brewery_id"]
@@ -745,14 +763,14 @@ isOneToOne: false
                   ]
                 },"customers": {
                   Row: {
-                    "alias": string | null,"bill_address1": string | null,"bill_address2": string | null,"bill_city": string | null,"bill_state": string | null,"bill_zip": string | null,"billing_email": string | null,"brewery_id": string,"country": string,"created_at": string,"id": string,"license_no": string | null,"name": string,"payment_terms": string,"phone": string | null,"qbo_customer_id": string | null,"qbo_realm_id": string | null,"qbo_sync_state": string | null,"qbo_sync_token": string | null,"sale_channel_id": string,"state": string | null,"tax_treatment": Database["public"]['Enums']["tax_treatment"] | null,"type": Database["public"]['Enums']["customer_type"]
+                    "alias": string | null,"bill_address1": string | null,"bill_address2": string | null,"bill_city": string | null,"bill_state": string | null,"bill_zip": string | null,"billing_email": string | null,"brewery_id": string,"country": string,"created_at": string,"id": string,"license_no": string | null,"name": string,"payment_terms": string,"phone": string | null,"qbo_customer_id": string | null,"qbo_realm_id": string | null,"qbo_sync_state": string | null,"qbo_sync_token": string | null,"release_delay_days": number,"sale_channel_id": string,"state": string | null,"tax_treatment": Database["public"]['Enums']["tax_treatment"] | null,"type": Database["public"]['Enums']["customer_type"]
                   }
                   ComputedFields: never
                   Insert: {
-                    "alias"?: string | null,"bill_address1"?: string | null,"bill_address2"?: string | null,"bill_city"?: string | null,"bill_state"?: string | null,"bill_zip"?: string | null,"billing_email"?: string | null,"brewery_id": string,"country"?: string,"created_at"?: string,"id"?: string,"license_no"?: string | null,"name": string,"payment_terms"?: string,"phone"?: string | null,"qbo_customer_id"?: string | null,"qbo_realm_id"?: string | null,"qbo_sync_state"?: string | null,"qbo_sync_token"?: string | null,"sale_channel_id": string,"state"?: string | null,"tax_treatment"?: Database["public"]['Enums']["tax_treatment"] | null,"type"?: Database["public"]['Enums']["customer_type"]
+                    "alias"?: string | null,"bill_address1"?: string | null,"bill_address2"?: string | null,"bill_city"?: string | null,"bill_state"?: string | null,"bill_zip"?: string | null,"billing_email"?: string | null,"brewery_id": string,"country"?: string,"created_at"?: string,"id"?: string,"license_no"?: string | null,"name": string,"payment_terms"?: string,"phone"?: string | null,"qbo_customer_id"?: string | null,"qbo_realm_id"?: string | null,"qbo_sync_state"?: string | null,"qbo_sync_token"?: string | null,"release_delay_days"?: number,"sale_channel_id": string,"state"?: string | null,"tax_treatment"?: Database["public"]['Enums']["tax_treatment"] | null,"type"?: Database["public"]['Enums']["customer_type"]
                   }
                   Update: {
-                    "alias"?: string | null,"bill_address1"?: string | null,"bill_address2"?: string | null,"bill_city"?: string | null,"bill_state"?: string | null,"bill_zip"?: string | null,"billing_email"?: string | null,"brewery_id"?: string,"country"?: string,"created_at"?: string,"id"?: string,"license_no"?: string | null,"name"?: string,"payment_terms"?: string,"phone"?: string | null,"qbo_customer_id"?: string | null,"qbo_realm_id"?: string | null,"qbo_sync_state"?: string | null,"qbo_sync_token"?: string | null,"sale_channel_id"?: string,"state"?: string | null,"tax_treatment"?: Database["public"]['Enums']["tax_treatment"] | null,"type"?: Database["public"]['Enums']["customer_type"]
+                    "alias"?: string | null,"bill_address1"?: string | null,"bill_address2"?: string | null,"bill_city"?: string | null,"bill_state"?: string | null,"bill_zip"?: string | null,"billing_email"?: string | null,"brewery_id"?: string,"country"?: string,"created_at"?: string,"id"?: string,"license_no"?: string | null,"name"?: string,"payment_terms"?: string,"phone"?: string | null,"qbo_customer_id"?: string | null,"qbo_realm_id"?: string | null,"qbo_sync_state"?: string | null,"qbo_sync_token"?: string | null,"release_delay_days"?: number,"sale_channel_id"?: string,"state"?: string | null,"tax_treatment"?: Database["public"]['Enums']["tax_treatment"] | null,"type"?: Database["public"]['Enums']["customer_type"]
                   }
                   Relationships: [
                     {
@@ -825,6 +843,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "batches"
       referencedColumns: ["id","brewery_id"]
+    },{
+      foreignKeyName: "fermentation_readings_batch_id_brewery_id_fkey"
+      columns: ["batch_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "projected_batch_packaging_units"
+      referencedColumns: ["batch_id","brewery_id"]
     },{
       foreignKeyName: "fermentation_readings_brewery_id_fkey"
       columns: ["brewery_id"]
@@ -1791,14 +1815,14 @@ isOneToOne: false
                   ]
                 },"order_lines": {
                   Row: {
-                    "brewery_id": string,"id": string,"one_way_fee_cents": number | null,"order_id": string,"qty_ordered": number,"qty_picked": number | null,"qty_refused": number,"qty_shipped": number | null,"short_reason": string | null,"sku_id": string,"unit_price_cents": number
+                    "brewery_id": string,"id": string,"one_way_fee_cents": number | null,"order_id": string,"qty_ordered": number,"qty_picked": number | null,"qty_refused": number,"qty_shipped": number | null,"release_id": string | null,"short_reason": string | null,"sku_id": string,"unit_price_cents": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "brewery_id": string,"id"?: string,"one_way_fee_cents"?: number | null,"order_id": string,"qty_ordered": number,"qty_picked"?: number | null,"qty_refused"?: number,"qty_shipped"?: number | null,"short_reason"?: string | null,"sku_id": string,"unit_price_cents": number
+                    "brewery_id": string,"id"?: string,"one_way_fee_cents"?: number | null,"order_id": string,"qty_ordered": number,"qty_picked"?: number | null,"qty_refused"?: number,"qty_shipped"?: number | null,"release_id"?: string | null,"short_reason"?: string | null,"sku_id": string,"unit_price_cents": number
                   }
                   Update: {
-                    "brewery_id"?: string,"id"?: string,"one_way_fee_cents"?: number | null,"order_id"?: string,"qty_ordered"?: number,"qty_picked"?: number | null,"qty_refused"?: number,"qty_shipped"?: number | null,"short_reason"?: string | null,"sku_id"?: string,"unit_price_cents"?: number
+                    "brewery_id"?: string,"id"?: string,"one_way_fee_cents"?: number | null,"order_id"?: string,"qty_ordered"?: number,"qty_picked"?: number | null,"qty_refused"?: number,"qty_shipped"?: number | null,"release_id"?: string | null,"short_reason"?: string | null,"sku_id"?: string,"unit_price_cents"?: number
                   }
                   Relationships: [
                     {
@@ -1813,6 +1837,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "orders"
       referencedColumns: ["id","brewery_id"]
+    },{
+      foreignKeyName: "order_lines_release_fkey"
+      columns: ["release_id","brewery_id","sku_id"]
+isOneToOne: false
+      referencedRelation: "releases"
+      referencedColumns: ["id","brewery_id","sku_id"]
     },{
       foreignKeyName: "order_lines_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
@@ -2163,6 +2193,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "batches"
       referencedColumns: ["id","brewery_id"]
+    },{
+      foreignKeyName: "packaging_runs_batch_id_brewery_id_fkey"
+      columns: ["batch_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "projected_batch_packaging_units"
+      referencedColumns: ["batch_id","brewery_id"]
     },{
       foreignKeyName: "packaging_runs_brand_id_brewery_id_fkey"
       columns: ["brand_id","brewery_id"]
@@ -3147,6 +3183,50 @@ isOneToOne: false
       referencedColumns: ["id","brewery_id"]
     }
                   ]
+                },"releases": {
+                  Row: {
+                    "batch_id": string | null,"brewery_id": string,"id": string,"orders_close_on": string | null,"qty": number,"released_at": string,"released_by": string,"ships_from": string,"sku_id": string,"withdrawn_at": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "batch_id"?: string | null,"brewery_id": string,"id"?: string,"orders_close_on"?: string | null,"qty": number,"released_at"?: string,"released_by"?: string,"ships_from": string,"sku_id": string,"withdrawn_at"?: string | null
+                  }
+                  Update: {
+                    "batch_id"?: string | null,"brewery_id"?: string,"id"?: string,"orders_close_on"?: string | null,"qty"?: number,"released_at"?: string,"released_by"?: string,"ships_from"?: string,"sku_id"?: string,"withdrawn_at"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "releases_batch_id_brewery_id_fkey"
+      columns: ["batch_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "batches"
+      referencedColumns: ["id","brewery_id"]
+    },{
+      foreignKeyName: "releases_batch_id_brewery_id_fkey"
+      columns: ["batch_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "projected_batch_packaging_units"
+      referencedColumns: ["batch_id","brewery_id"]
+    },{
+      foreignKeyName: "releases_brewery_id_fkey"
+      columns: ["brewery_id"]
+isOneToOne: false
+      referencedRelation: "breweries"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "releases_sku_id_brewery_id_fkey"
+      columns: ["sku_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "sku_prices"
+      referencedColumns: ["sku_id","brewery_id"]
+    },{
+      foreignKeyName: "releases_sku_id_brewery_id_fkey"
+      columns: ["sku_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "skus"
+      referencedColumns: ["id","brewery_id"]
+    }
+                  ]
                 },"report_basis_amendments": {
                   Row: {
                     "brewery_id": string,"correction_id": string,"filing_id": string,"new_figures": NonNullable<Json>,"old_figures": NonNullable<Json>
@@ -3313,14 +3393,14 @@ isOneToOne: false
                   ]
                 },"skus": {
                   Row: {
-                    "active": boolean,"batch_share": number | null,"brand_id": string,"brewery_id": string,"container_source": Database["public"]['Enums']["keg_container_source"] | null,"created_at": string,"format_id": string,"id": string,"keg_pool_id": string | null,"name": string,"qbo_item_id": string | null,"qbo_realm_id": string | null,"upc": string | null
+                    "active": boolean,"batch_share": number | null,"brand_id": string,"brewery_id": string,"container_source": Database["public"]['Enums']["keg_container_source"] | null,"created_at": string,"format_id": string,"id": string,"keg_pool_id": string | null,"name": string,"portal_from_stock": boolean,"qbo_item_id": string | null,"qbo_realm_id": string | null,"upc": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "active"?: boolean,"batch_share"?: number | null,"brand_id": string,"brewery_id": string,"container_source"?: Database["public"]['Enums']["keg_container_source"] | null,"created_at"?: string,"format_id": string,"id"?: string,"keg_pool_id"?: string | null,"name": string,"qbo_item_id"?: string | null,"qbo_realm_id"?: string | null,"upc"?: string | null
+                    "active"?: boolean,"batch_share"?: number | null,"brand_id": string,"brewery_id": string,"container_source"?: Database["public"]['Enums']["keg_container_source"] | null,"created_at"?: string,"format_id": string,"id"?: string,"keg_pool_id"?: string | null,"name": string,"portal_from_stock"?: boolean,"qbo_item_id"?: string | null,"qbo_realm_id"?: string | null,"upc"?: string | null
                   }
                   Update: {
-                    "active"?: boolean,"batch_share"?: number | null,"brand_id"?: string,"brewery_id"?: string,"container_source"?: Database["public"]['Enums']["keg_container_source"] | null,"created_at"?: string,"format_id"?: string,"id"?: string,"keg_pool_id"?: string | null,"name"?: string,"qbo_item_id"?: string | null,"qbo_realm_id"?: string | null,"upc"?: string | null
+                    "active"?: boolean,"batch_share"?: number | null,"brand_id"?: string,"brewery_id"?: string,"container_source"?: Database["public"]['Enums']["keg_container_source"] | null,"created_at"?: string,"format_id"?: string,"id"?: string,"keg_pool_id"?: string | null,"name"?: string,"portal_from_stock"?: boolean,"qbo_item_id"?: string | null,"qbo_realm_id"?: string | null,"upc"?: string | null
                   }
                   Relationships: [
                     {
@@ -3765,6 +3845,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "batches"
       referencedColumns: ["id","brewery_id"]
+    },{
+      foreignKeyName: "vessel_occupancies_batch_id_brewery_id_fkey"
+      columns: ["batch_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "projected_batch_packaging_units"
+      referencedColumns: ["batch_id","brewery_id"]
     },{
       foreignKeyName: "vessel_occupancies_brewery_id_fkey"
       columns: ["brewery_id"]
@@ -4407,6 +4493,12 @@ isOneToOne: false
       referencedRelation: "batches"
       referencedColumns: ["id","brewery_id"]
     },{
+      foreignKeyName: "vessel_occupancies_batch_id_brewery_id_fkey"
+      columns: ["batch_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "projected_batch_packaging_units"
+      referencedColumns: ["batch_id","brewery_id"]
+    },{
       foreignKeyName: "vessel_occupancies_brewery_id_fkey"
       columns: ["brewery_id"]
 isOneToOne: false
@@ -4634,7 +4726,7 @@ isOneToOne: false
                   ]
                 },"projected_batch_packaging_units": {
                   Row: {
-                    "brewery_id": string,"needed_by": string | null,"sku_id": string,"units": number | null
+                    "batch_id": string,"batch_no": number | null,"brewery_id": string,"needed_by": string | null,"sku_id": string,"units": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -5132,6 +5224,7 @@ isOneToOne: false
 "qbo_realm_id": string | null,
 "qbo_sync_state": string | null,
 "qbo_sync_token": string | null,
+"release_delay_days": number,
 "sale_channel_id": string,
 "state": string | null,
 "tax_treatment": Database["public"]['Enums']["tax_treatment"] | null,
@@ -5532,6 +5625,11 @@ isOneToOne: false
 "portal_quote_order":
 { Args: { "p_brewery": string,"p_customer": string,"p_lines": Json,"p_note": string,"p_po": string,"p_request_id": string,"p_requested": string,"p_ship_to": string }; Returns: Json
                            },
+"portal_releases":
+{ Args: { "p_customer": string }; Returns: {
+              "badge": string,"orders_close_on": string,"release_id": string,"ships_from": string,"sku_id": string
+            }[]
+                           },
 "portal_schedule_rows":
 { Args: Record<PropertyKey, never>; Returns: {
               "brand_id": string,"brand_name": string,"brewery_id": string,"listed": boolean,"planned_week": string
@@ -5690,6 +5788,14 @@ isOneToOne: false
                            },
 "release_qbo_token_refresh":
 { Args: { "p_brewery": string,"p_connection": string,"p_lease": string }; Returns: undefined
+                           },
+"release_rows":
+{ Args: { "p_batches"?: (string)[],"p_brewery": string,"p_ids"?: (string)[],"p_open"?: boolean,"p_skus"?: (string)[] }; Returns: {
+              "batch_id": string,"batch_no": number,"cancelled": boolean,"confirmed": number,"id": string,"open": boolean,"orders_close_on": string,"preordered": number,"qty": number,"ready_on": string,"released_at": string,"remaining": number,"ships_from": string,"sku_id": string,"sku_name": string,"withdrawn_at": string
+            }[]
+                           },
+"release_sku":
+{ Args: { "p_batch": string,"p_brewery": string,"p_lines": Json,"p_orders_close_on": string,"p_request_id": string,"p_ships_from": string }; Returns: Json
                            },
 "reorder_refused_delivery":
 { Args: { "p_order": string,"p_request_id": string }; Returns: Json
@@ -5960,8 +6066,11 @@ isOneToOne: false
 "update_recipe":
 { Args: { "p_brewery": string,"p_name": string,"p_note": string,"p_recipe": string,"p_request_id": string }; Returns: Json
                            },
+"update_release":
+{ Args: { "p_brewery": string,"p_orders_close_on": string,"p_qty": number,"p_release": string,"p_request_id": string }; Returns: Json
+                           },
 "update_sku":
-{ Args: { "p_active": boolean,"p_batch_share"?: number,"p_brewery": string,"p_clear_batch_share"?: boolean,"p_clear_keg_pool"?: boolean,"p_id": string,"p_keg_pool"?: string,"p_request_id": string,"p_upc": string }; Returns: Json
+{ Args: { "p_active": boolean,"p_batch_share"?: number,"p_brewery": string,"p_clear_batch_share"?: boolean,"p_clear_keg_pool"?: boolean,"p_id": string,"p_keg_pool"?: string,"p_portal_from_stock"?: boolean,"p_request_id": string,"p_upc": string }; Returns: Json
                            },
 "update_staff_role":
 { Args: { "p_brewery": string,"p_request_id": string,"p_roles": (Database["public"]['Enums']["staff_role"])[],"p_user": string }; Returns: Json
@@ -5976,7 +6085,7 @@ isOneToOne: false
 { Args: { "p_brewery": string,"p_clear"?: (string)[],"p_expires_on": string,"p_kind": string,"p_license_no": string,"p_note": string,"p_request_id": string,"p_state": string }; Returns: Json
                            },
 "upsert_customer":
-{ Args: { "p_alias"?: string,"p_brewery": string,"p_country"?: string,"p_id": string,"p_license_no": string,"p_name": string,"p_payment_terms": string,"p_request_id": string,"p_sale_channel": string,"p_state": string,"p_tax_treatment": Database["public"]['Enums']["tax_treatment"],"p_type": Database["public"]['Enums']["customer_type"] }; Returns: Json
+{ Args: { "p_alias"?: string,"p_brewery": string,"p_country"?: string,"p_id": string,"p_license_no": string,"p_name": string,"p_payment_terms": string,"p_release_delay_days"?: number,"p_request_id": string,"p_sale_channel": string,"p_state": string,"p_tax_treatment": Database["public"]['Enums']["tax_treatment"],"p_type": Database["public"]['Enums']["customer_type"] }; Returns: Json
                            },
 "upsert_format":
 { Args: { "p_basis": Database["public"]['Enums']["format_basis"],"p_bbl_per_unit": number,"p_brewery": string,"p_id": string,"p_keg_size": Database["public"]['Enums']["keg_size"],"p_name": string,"p_ounces"?: number,"p_package_type": Database["public"]['Enums']["package_type"],"p_price_group"?: string,"p_request_id": string,"p_units_per_case": number }; Returns: Json
@@ -6010,6 +6119,9 @@ isOneToOne: false
                            },
 "void_invoice_payment":
 { Args: { "p_brewery": string,"p_payment": string,"p_reason": string,"p_request_id": string }; Returns: Json
+                           },
+"withdraw_release":
+{ Args: { "p_brewery": string,"p_release": string,"p_request_id": string }; Returns: Json
                            },
 "write_off_invoice":
 { Args: { "p_brewery": string,"p_invoice": string,"p_reason": string,"p_request_id": string }; Returns: Json
