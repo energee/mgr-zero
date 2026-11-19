@@ -483,3 +483,101 @@ consent to send material names to TypeSafe, so it now carries Gate 1.
 `suggest_material_category` asks TypeSafe only while the switch is on and a
 key is saved, and it uses that brewery's key. `TYPESAFE_API_KEY` in the
 environment is read only by the experiment scripts.
+
+## Results on the messy holdout (2026-11-19)
+
+### What was added
+
+- `scripts/material-category-holdout-messy.json`: 207 made-up names in
+  purchasing-list style, with SKU noise, pack sizes, typos, capitals and
+  look-alikes such as "Citra IPA can label" (packaging). Each kind has 27
+  to 32 names. None appears in the kind descriptions or in the other two
+  case files; `tests/material-category-experiment.test.ts` checks both.
+- `scripts/material-category-keywords.ts`: a free keyword lookup that
+  returns a kind or nothing. It is the baseline Jev is compared with.
+  Product code does not import it.
+- The experiment summary now also prints recall per kind, coverage and
+  precision at 0.8, 0.9 and 0.95, every wrong answer shown at 0.9, and a
+  head-to-head with the keyword lookup at 0.9. Every run, `--dry-run`
+  included, first prints a `baseline` line with the keyword lookup's
+  coverage and precision; that needs no key.
+
+A separate agent wrote the messy names, without seeing the keyword lists.
+The keyword lists were written before the messy names existed and were not
+changed after the run. They were written after reading the first set and
+the clean holdout, so the keyword scores on those two files are
+optimistic.
+
+### Numbers
+
+Each name was asked in both criteria orders. Accuracy, recall and the
+threshold rows count both orders (414 and 80 decisions). The keyword rows
+and the head-to-head count names, in the product's order.
+
+| Measure | Messy holdout (207 names) | Clean holdout (40 names) |
+| --- | --- | --- |
+| Jev accuracy | 91.3% | 85% |
+| Shown at 0.8 / right when shown | 84.8% / 97.4% (9 wrong decisions) | 75% / 100% |
+| Shown at 0.9 / right when shown | 80.0% / 97.9% (7 wrong decisions) | 72.5% / 100% |
+| Shown at 0.95 / right when shown | 73.2% / 99.0% (3 wrong decisions) | 68.75% / 100% |
+| Recall: malt | 100% | 100% |
+| Recall: hop | 95% | 83% |
+| Recall: yeast | 83% | 33% |
+| Recall: adjunct | 93% | 100% |
+| Recall: chemical | 81% | 83% |
+| Recall: packaging | 100% | 100% |
+| Recall: other | 87% | 100% |
+| Order flips | 6 names, all below 0.6 | 0 |
+| Latency p50 / p95 | 82 / 144 ms | 76 / 126 ms |
+| Keyword lookup: answers / right when it answers | 84.5% / 97.1% (5 wrong names) | 97.5% / 100% |
+| Right at 0.9 by Jev only | 20 names | 0 |
+| Right by keyword lookup only | 27 names | 11 names |
+| Right by both | 143 names | 28 names |
+| Keyword lookup first, then Jev at 0.9 | 95.2% shown / 95.9% right (8 wrong names) | 97.5% / 100% |
+
+The runs made 494 model calls: 414 for the messy holdout and 80 for the
+clean one.
+
+### Wrong suggestions that would be shown at 0.9
+
+| Name | True kind | Suggested | Probability |
+| --- | --- | --- | --- |
+| Imperial A24 Dry Hop | yeast | hop | 1.00 (both orders) |
+| Escarpment Labs Foggy London Ale | yeast | other | 0.91 (both orders) |
+| Fermaid O 1kg | chemical | yeast | 0.96, reversed 0.94 |
+| Shaker pint glasses logo 24ct | other | packaging | 0.93, reversed 0.76 |
+
+Two of the four are near the kind descriptions' gaps. Yeast nutrients,
+enzymes and some finings are not named under chemical, and Jev sent most
+of them to other or yeast (chemical recall 81%). The yeast strain called
+"Dry Hop" fools both Jev and the keyword lookup. No threshold below 1.0
+hides it.
+
+### What the sample supports
+
+Rule of three: with no errors in n shown suggestions, the error rate can
+still be up to about 3/n at 95% confidence.
+
+- Clean holdout: 0 wrong of 29 names shown at 0.9, so up to about 10%.
+- Messy holdout: 4 wrong of 167 names shown at 0.9 (2.4%). The 95% range
+  is roughly 1% to 6%.
+
+So "no wrong suggestion is shown" is not met on messy names. The honest
+bar is about 2 to 3 wrong in every 100 shown. Moving the threshold to 0.95
+removes two of the four names but still shows one at 1.00.
+
+### Recommendation
+
+1. **Keep 0.9.** At 0.95, coverage falls by 7 points and wrong names fall
+   from 4 to 2, not to 0. At 0.8, wrong decisions rise from 7 to 9.
+2. **Do not put the keyword lookup in front of Jev.** It raises coverage
+   to 95% but more than doubles the shown errors (4 wrong names to 8),
+   because its own misses would be shown.
+3. **Owner decision:** restate the bar as "about 2–3% of shown
+   suggestions are wrong, and staff confirm with Tab". Separately, consider
+   adding nutrients and enzymes to the chemical description; that changes
+   the product question and needs its own run.
+4. **Note:** on these made-up names the free keyword lookup is about as
+   good as Jev (84.5% answered and 97.1% right, against 80.7% and 97.6%
+   in the product's order). Jev earns its place on names the keyword lists
+   cannot hold: typos, unfamiliar brands and new varieties.
