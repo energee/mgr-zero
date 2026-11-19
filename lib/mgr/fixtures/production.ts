@@ -16,14 +16,13 @@ import type { FermentationStage, IngredientStage, MashStep, RecipeMaterial, Wate
 import { waterProfiles } from "./catalog";
 
 export const cellarMapBrewer: CellarMapViewModel = {
-  readingHref: null,
   tiles: [
-    { name: "FV1", group: "Fermenters", detail: "Pils", volume: "12.8 / 15 bbl", reading: "5.1% ABV", fill: 85, readingHref: "" },
-    { name: "FV2", group: "Fermenters", detail: "Hazy", volume: "9.0 / 15 bbl", reading: "3.4% ABV", fill: 60, readingHref: "" },
-    { name: "FV3", group: "Fermenters", detail: "Stout", volume: "13.5 / 15 bbl", reading: "4.6% ABV", fill: 90, readingHref: "" },
-    { name: "BT1", group: "Brite tanks", detail: "Pils", volume: "7.0 / 10 bbl", fill: 70, readingHref: "" },
-    { name: "BT2", group: "Brite tanks", detail: "Empty · 10 bbl" },
-    { name: "FB1", group: "Barrels", detail: "Saison", volume: "0.4 / 1 bbl", reading: "No ABV yet", fill: 40, readingHref: "" },
+    { name: "FV1", group: "Fermenters", detail: "Pils", day: "Day 9", volume: "12.8 / 15 bbl", reading: "5.1% ABV", readToday: true, fill: 85, readingHref: "" },
+    { name: "FV2", group: "Fermenters", detail: "Hazy", day: "Day 4", volume: "9.0 / 15 bbl", reading: "3.4% ABV", fill: 60, readingHref: "" },
+    { name: "FV3", group: "Fermenters", detail: "Stout", day: "Day 7", volume: "13.5 / 15 bbl", reading: "4.6% ABV", fill: 90, readingHref: "" },
+    { name: "BT1", group: "Brite tanks", detail: "Pils", day: "Day 2", volume: "7.0 / 10 bbl", reading: "No readings yet", fill: 70, readingHref: "" },
+    { name: "BT2", group: "Brite tanks", detail: "10 bbl" },
+    { name: "FB1", group: "Barrels", detail: "Saison", day: "Day 41", volume: "0.4 / 1 bbl", reading: "No ABV yet", fill: 40, readingHref: "" },
   ],
   detail: { title: "FV3 · fermenter · 15 bbl", description: "occupancy, readings and vessel facts" },
 };
@@ -182,7 +181,6 @@ export const vesselFv3: VesselDetailViewModel = {
   title: "FV3",
   occupancy: { title: "Stout · BATCH-0168", detail: "13.5 / 15 bbl · 90% full", warning: true },
   readings: {
-    current: "5.2 °P · 68.2 °F · overdue 31 h",
     history: [
       { key: "r1", title: "Sep 2, 2026, 7:10 AM", detail: "5.2 °P · 68.2 °F", who: "Dana" },
       { key: "r2", title: "Sep 1, 2026, 7:04 AM", detail: "6.8 °P · 67.9 °F", who: "Ali" },

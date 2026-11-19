@@ -4,9 +4,11 @@
 // every tank (every open occupancy belongs to a brewed, uncompleted batch); Transfer is
 // cellar-transfer-form.tsx → record_cellar_transfer, which may start one of
 // the unstarted plans from list_batches({ open: false }); Addition is
-// cellar-addition-form.tsx → record_batch_addition.
+// cellar-addition-form.tsx → record_batch_addition. The Tiles / Rows choice
+// comes from the cellar_layout cookie that CellarLayout writes.
+import { cookies } from "next/headers";
 import { CellarMapView } from "@/components/mgr/views/cellar-map";
-import { cellarReadings, toCellarMapViewProps, type OrderedVessel } from "@/lib/mgr/cellar-map-view";
+import { CELLAR_LAYOUT_COOKIE, cellarReadings, toCellarMapViewProps, type OrderedVessel } from "@/lib/mgr/cellar-map-view";
 import type { VesselReading } from "@/lib/mgr/vessel-detail-view";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -45,7 +47,8 @@ export default async function CellarPage() {
   const completionCandidates = batches.map((batch) => ({ id: batch.id, label: batchLabel(batch.batch_no, batch.brand_name) }));
 
   const readings = cellarReadings(batches);
-  const model = toCellarMapViewProps(vessels, occupancies, readings, Object.fromEntries(vessels.map(vessel => [vessel.id, `/cellar/vessels/${vessel.id}`])), occupancyId => `/cellar/${occupancyId}/reading?from=/cellar`);
+  const model = toCellarMapViewProps(vessels, occupancies, readings, Object.fromEntries(vessels.map(vessel => [vessel.id, `/cellar/vessels/${vessel.id}`])), occupancyId => `/cellar/${occupancyId}/reading?from=/cellar`, brewery.timeZone);
   model.backHref = "/beer"; model.addHref = canRun(ctx, "upsert_vessel") ? "/cellar/vessels/new" : null; model.brewHref = "/batches";
+  model.layout = (await cookies()).get(CELLAR_LAYOUT_COOKIE)?.value === "Rows" ? "Rows" : "Tiles";
   return <CellarMapView model={model} transfer={<CellarTransferForm occupancies={occupancies} vessels={vessels} plannedBatches={plannedBatchChoices(planned)} addVesselHref={model.addHref} disabled={model.actionsOff} />} addition={<CellarAdditionForm occupancies={occupancies} materials={additionMaterials} lotsByMaterial={lotsByMaterial} disabled={model.actionsOff} />} complete={<BatchCompletionForm batches={completionCandidates} />} />;
 }

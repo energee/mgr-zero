@@ -25,7 +25,7 @@ export type VesselDetailViewModel = {
   readingHref?: string;
   /** Absent on New vessel: a vessel not saved yet has no occupancy or
    *  readings, so the view draws only its facts (#1116). */
-  readings?: { current: string; history: { key: string; title: string; detail: string; who?: string }[] };
+  readings?: { history: { key: string; title: string; detail: string; who?: string }[] };
   name: string;
   type: string;
   typeOptions: string[];

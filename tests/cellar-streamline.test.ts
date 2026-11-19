@@ -28,7 +28,7 @@ import { NewBatchForm } from "@/app/(app)/batches/new-batch-form";
 import { cellarAdditionCitra, cellarTransferPils } from "@/lib/mgr/fixtures/production";
 
 const vessels = [{ id: "v1", name: "FV1", capacity_bbl: 10, kind: "fermenter" as const }, { id: "v2", name: "FV2", capacity_bbl: 10, kind: "fermenter" as const }, { id: "v3", name: "FV3", capacity_bbl: 10, kind: "fermenter" as const }];
-const two = [{ vessel_id: "v1", occupancy_id: "o1", brand_name: null, bbl: 2 }, { vessel_id: "v2", occupancy_id: "o2", brand_name: null, bbl: 3 }];
+const two = [{ vessel_id: "v1", occupancy_id: "o1", brand_name: null, started_at: "2026-09-01T12:00:00Z", bbl: 2 }, { vessel_id: "v2", occupancy_id: "o2", brand_name: null, started_at: "2026-09-01T12:00:00Z", bbl: 3 }];
 const reading = (occupancyId: string) => `/cellar/${occupancyId}/reading?from=/cellar`;
 
 describe("item 1: Reading from each tile, back to where it opened", () => {
@@ -52,7 +52,7 @@ describe("item 1: Reading from each tile, back to where it opened", () => {
 
 describe("item 1: Save and next tank, in tile order", () => {
   it("names the next occupied tank after this one in the map's tile order, and none after the last", () => {
-    const three = [{ vessel_id: "v3", occupancy_id: "o3", brand_name: null, bbl: 1 }, ...two];
+    const three = [{ vessel_id: "v3", occupancy_id: "o3", brand_name: null, started_at: "2026-09-01T12:00:00Z", bbl: 1 }, ...two];
     expect(nextTankOccupancy(vessels, three, "o1")).toBe("o2");
     expect(nextTankOccupancy(vessels, three, "o2")).toBe("o3");
     expect(nextTankOccupancy(vessels, three, "o3")).toBeNull();
