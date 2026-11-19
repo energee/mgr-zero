@@ -5,6 +5,7 @@ import { WeeklyCountCorrectionView, WeeklyCountDraftView, WeeklyCountPrintAction
 import { weeklyCount } from "../lib/mgr/fixtures/taproom";
 import { readFileSync } from "node:fs";
 import { countDraftFromSnapshot, correctionStateFromReceipt, updateCountQuantity, beginCountAttempt, failCountAttempt } from "../lib/mgr/taproom-count-state";
+import type { StaffRole } from "@/lib/commands/registry";
 import type * as CommandFormModule from "@/components/mgr/command-form";
 
 // Portaled dialog bodies do not render on the server; expose an open body's real children.
@@ -50,8 +51,16 @@ it("#1382 labels count corrections by their saved lot code without displaying th
 it("a saved count in the history is a row link to that count, not an Open count verb (#1026)", () => {
   const history = [{ ...weeklyCount.history[0]!, href: "/taproom/count/sep1" }];
   const html = renderToStaticMarkup(createElement(WeeklyCountView, { model: { ...weeklyCount, history }, draft: null }));
-  expect(html).toMatch(/<a[^>]*href="\/taproom\/count\/sep1"[^>]*>(?:(?!<\/a>)[\s\S])*Weekly count · Sep 1, 2026/);
+  expect(html).toMatch(/<a[^>]*href="\/taproom\/count\/sep1"[^>]*>(?:(?!<\/a>)[\s\S])*<div[^>]*data-slot="item-title"[^>]*>Sep 1, 2026</);
+  expect(html).not.toContain("Weekly count · Sep 1, 2026");
   expect(html).not.toContain("Open count");
+});
+
+it("keeps the history free of notes a reader cannot act on", () => {
+  const render = (roles: StaffRole[]) => renderToStaticMarkup(createElement(WeeklyCountView, { model: { ...weeklyCount, roles }, draft: null }));
+  expect(render(["taproom"])).not.toContain("Admin only");
+  expect(render(["admin"])).toContain("Admin only: correct the latest count once");
+  expect(render(["admin"])).not.toContain("Newest 50");
 });
 
 it("the live draft, correction and print bindings delegate to shared controls", () => {
@@ -229,7 +238,10 @@ it("groups buckets by brand, names a differing bin on its row, and shows progres
   expect(html).not.toContain(">Hazy IPA · Case<");
   expect(html).toContain("Dry · recorded 6");
   expect(html).not.toContain("Every bucket is in");
-  expect(html).toContain("1 of 2 counted");
+  // The reason names what is left, and is the control that goes to the next uncounted bucket.
+  expect(html).toMatch(/<button type="button"[^>]*>Still needed: a count for 1 of 2 buckets\.<\/button>/);
+  expect(html).not.toContain("1 of 2 counted");
+  expect(html).toContain("Hide counted");
   expect(html).toContain('aria-label="2 short of recorded"');
 });
 

@@ -40,7 +40,7 @@ export const weeklyCount: WeeklyCountViewModel = {
   receipt: { date: "Sep 8, 2026", recorded: "Latest uncorrected count", canCorrect: true,
     correctionForm: correctionStateFromReceipt("saved-sep8", [{ id: "saved2", sku_name: "Hazy · ½ bbl keg", bin_name: "Cold", lot_id: "hazy-lot", lot_code: "L-260901-HZ", qty_before: 7, qty_counted: 2 }]),
     lines: [{ key: "saved2", name: "Hazy · ½ bbl keg", detail: "Lot L-260901-HZ", recorded: 7, counted: 2, result: "2.5 bbl depleted" }] },
-  history: [{ key: "sep1", date: "Sep 1, 2026", detail: "3 counted · 1 sold · corrected by Admin" }],
+  history: [{ key: "sep1", date: "Sep 1, 2026", detail: "4:05 PM · 3 counted · 1 sold · corrected by Admin" }],
 };
 
 export const taproomVariance: TaproomVarianceViewModel = {

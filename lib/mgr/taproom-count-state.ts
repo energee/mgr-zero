@@ -217,7 +217,10 @@ export function countSubmitReason(state: TaproomCountState): string | null {
   if (state.attempt.kind === "unknown") return null;
   if (state.attempt.kind === "submitting") return submitReason(["the current count to finish recording"]);
   if (state.attempt.kind === "stale" || !projectionMatchesCountDraft(state)) return submitReason(["a fresh recount"]);
-  return submitReason(state.draft.lines.some(line => countQuantityError(line)) ? ["a whole-package count within recorded stock for every bucket, including zero"] : []);
+  // Each row says what is wrong with its own entry, so the reason only counts the buckets left.
+  const lines = state.draft.lines;
+  const left = lines.filter(line => countQuantityError(line)).length;
+  return submitReason(left > 0 ? [`a count for ${left} of ${lines.length} buckets`] : []);
 }
 
 export function updateCountQuantity(state: TaproomCountState, key: string, quantity: string): TaproomCountState {

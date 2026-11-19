@@ -131,6 +131,15 @@ describe("live page exclusion decisions", () => {
     expect(recorded).not.toContain("· first count");
   });
 
+  it("a saved count loads without the draft worksheet it does not draw", async () => {
+    await TaproomPage({ searchParams: Promise.resolve({ location: "tap", count: "count" }) });
+    expect(pageState.calls).toContain("get_taproom_count");
+    for (const draftRead of ["get_taproom_count_snapshot", "get_taproom_print_labels", "get_taproom_draft_projection"]) expect(pageState.calls).not.toContain(draftRead);
+    pageState.calls = [];
+    await TaproomPage({ searchParams: Promise.resolve({ location: "tap" }) });
+    expect(pageState.calls).toContain("get_taproom_count_snapshot");
+  });
+
   it("reads invoice questions with the actual registry's union permission", async () => {
     pageState.roles = ["warehouse"];
     await InvoiceDetailPage({ params: Promise.resolve({ id: "invoice" }) });

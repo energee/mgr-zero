@@ -377,3 +377,14 @@ it("names a saved line by what tells it apart: its bin when bins differ, its lot
   expect(savedLineDetail(line, 2, { showBin: false, showLotCode: false })).toBe("Worksheet row 2");
   expect(savedLineDetail({ ...line, lot_id: null, lot_code: null }, 2, { showBin: false, showLotCode: true })).toBe("");
 });
+
+it("the submit reason counts the buckets still to enter, and clears when all are in", () => {
+  const line = (sku: string) => ({ bin_id: "cold", bin_name: "Cold", sku_id: sku, sku_name: sku, brand_id: "b", brand_name: "B", bbl_per_unit: 0.5, lot_id: null, qty_before: 3 });
+  let state = countDraftFromSnapshot({ location_id: "taproom", counted_on: "2026-09-12", prior_count: null, revision: "r", lines: [line("a"), line("b"), line("c")] }, null);
+  expect(countSubmitReason(state)).toBe("Still needed: a count for 3 of 3 buckets.");
+  state = updateCountQuantity(state, state.draft.lines[0].key, "3");
+  state = updateCountQuantity(state, state.draft.lines[1].key, "9");
+  expect(countSubmitReason(state)).toBe("Still needed: a count for 2 of 3 buckets.");
+  state = updateCountQuantity(updateCountQuantity(state, state.draft.lines[1].key, "0"), state.draft.lines[2].key, "1");
+  expect(countSubmitReason(state)).toBeNull();
+});

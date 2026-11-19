@@ -1,4 +1,4 @@
-import { formatDate, formatDateTime } from "@/lib/date-format";
+import { formatDate, formatDateTime, formatTimeOfDay } from "@/lib/date-format";
 import { WeeklyCountView } from "@/components/mgr/views/weekly-count";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -34,14 +34,17 @@ export default async function TaproomPage({ searchParams }: { searchParams: Prom
     const printLabels = await runCommand("get_taproom_print_labels", { locationId: location.id, revision: snapshot.revision }, ctx) as PrintLabel[];
     return { snapshot, printLabels };
   };
-  const [{ snapshot, printLabels }, projection, history, receipt] = await Promise.all([
-    snapshotWithLabels(),
-    runCommand("get_taproom_draft_projection", { locationId: location.id }, ctx) as Promise<DraftProjection>,
+  const loadDraft = () => Promise.all([snapshotWithLabels(), runCommand("get_taproom_draft_projection", { locationId: location.id }, ctx) as Promise<DraftProjection>]);
+  // A saved count draws no worksheet, so it skips the worksheet's three reads.
+  const [history, receipt, eagerDraft] = await Promise.all([
     runCommand("list_taproom_counts", { locationId: location.id }, ctx) as Promise<CountHeader[]>,
     selected.count ? runCommand("get_taproom_count", { countId: selected.count }, ctx) as Promise<Receipt> : null,
+    selected.count ? null : loadDraft(),
   ]);
   const shownReceipt = receipt?.location_id === location.id ? receipt : null;
-  const lotLabels = Object.fromEntries(printLabels.filter((row) => row.lot_id && row.lot_code).map((row) => [key(row.bin_id, row.sku_id, row.lot_id), row.lot_code!]));
+  // A count id from another taproom shows the worksheet instead, so it loads then.
+  const draft = shownReceipt ? null : eagerDraft ?? await loadDraft();
+  const lotLabels = Object.fromEntries((draft?.[0].printLabels ?? []).filter((row) => row.lot_id && row.lot_code).map((row) => [key(row.bin_id, row.sku_id, row.lot_id), row.lot_code!]));
 
   const roles = brewery.roles;
   // A saved line names its bin only when the count covered more than one.
@@ -62,12 +65,12 @@ export default async function TaproomPage({ searchParams }: { searchParams: Prom
           result: line.movement_id ? `${Math.abs(Number(line.bbl))} bbl ${disposition}` : "Matched" };
       }),
     } : undefined,
-    history: history.map(count => ({ key: count.id, date: formatDate(count.counted_on), detail: `${formatDateTime(count.created_at, brewery.timeZone)} · ${countOutcome(count)}${count.corrected_at ? ` · corrected ${formatDateTime(count.corrected_at, brewery.timeZone)} by Admin` : ""}`,
+    history: history.map(count => ({ key: count.id, date: formatDate(count.counted_on), detail: `${formatTimeOfDay(count.created_at, brewery.timeZone)} · ${countOutcome(count)}${count.corrected_at ? ` · corrected ${formatDateTime(count.corrected_at, brewery.timeZone)} by Admin` : ""}`,
       // The saved count draws above this list, so the link lands on it.
       href: `/taproom?location=${location.id}&count=${count.id}#saved-count` })),
   }}
-    draft={<TaproomCountForm key={`${location.id}:${snapshot.revision}`} breweryId={brewery.id} snapshot={snapshot} projection={projection} lotLabels={lotLabels} roles={roles} timeZone={brewery.timeZone}
-      print={<TaproomPrintWorksheet key={`${location.id}:${snapshot.revision}`} breweryId={brewery.id} locationId={location.id} locationName={location.name} revision={snapshot.revision} initialLabels={printLabels} />} />}
+    draft={draft && <TaproomCountForm key={`${location.id}:${draft[0].snapshot.revision}`} breweryId={brewery.id} snapshot={draft[0].snapshot} projection={draft[1]} lotLabels={lotLabels} roles={roles} timeZone={brewery.timeZone}
+      print={<TaproomPrintWorksheet key={`${location.id}:${draft[0].snapshot.revision}`} breweryId={brewery.id} locationId={location.id} locationName={location.name} revision={draft[0].snapshot.revision} initialLabels={draft[0].printLabels} />} />}
     correction={shownReceipt && hasAnyRole(roles, ["admin"]) && shownReceipt.correction_eligible ? <TaproomCountCorrection breweryId={brewery.id} locationId={location.id} countId={shownReceipt.root_id} lines={shownReceipt.lines} /> : null}
   />;
 }

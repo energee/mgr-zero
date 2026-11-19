@@ -4,6 +4,7 @@ import Link from "next/link";
 import { E } from "@/components/mgr/e";
 import { formatDate, formatDateTime } from "@/lib/date-format";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -59,9 +60,8 @@ export function WeeklyCountView({ model, draft, correction, onWorksheet }: { mod
           <Button variant="outline" className="self-start" asChild><Link href={model.worksheetHref ?? "#"} data-to="Weekly count" onClick={onWorksheet ? event => { event.preventDefault(); event.stopPropagation(); onWorksheet(); } : undefined}>Count worksheet</Link></Button>
         </section>}
         {E.ttl("Recent saved counts")}
-        <p className="text-sm text-muted-foreground">Newest 50 at this taproom.</p>
-        {model.history.length === 0 ? E.blank("No saved counts yet") : model.history.map(count => <div key={count.key}>{E.nav(`Weekly count · ${count.date}`, count.detail, "", undefined, count.href)}</div>)}
-        {E.info("Admin only: correct the latest count once, for sold quantities counted too low or too high. Corrections appear in history; the original stays in the audit trail.")}
+        {model.history.length === 0 ? E.blank("No saved counts yet") : model.history.map(count => <div key={count.key}>{E.nav(count.date, count.detail, "", undefined, count.href)}</div>)}
+        {hasAnyRole(model.roles, ["admin"]) && E.info("Admin only: correct the latest count once, for sold quantities counted too low or too high. Corrections appear in history; the original stays in the audit trail.")}
       </div>
     </>}
   </>;
@@ -91,7 +91,12 @@ export function WeeklyCountDraftView({ state: controlledState, roles, lotLabels,
   const lines = state.draft.lines;
   // One bin for every bucket is said once above the rows, not on each.
   const sharedBin = lines.length > 1 && lines.every(line => line.binName === lines[0].binName) ? lines[0].binName : null;
-  const counted = lines.filter(line => !countQuantityError(line)).length;
+  const groups = worksheetGroups(lines);
+  const reason = countSubmitReason(state);
+  const next = groups.flatMap(group => group.rows).find(({ line }) => countQuantityError(line));
+  // Hide counted leaves out the buckets counted when it was switched on; one counted after that stays
+  // in place, so a row never disappears under the hand typing in it.
+  const [hidden, setHidden] = useState<ReadonlySet<string> | null>(null);
   const expectation = <div className="contents print:hidden">
     {E.ttl("Expected consumption")}
     {prior && <p className="text-xs text-muted-foreground">Last count {priorHref ? <Link href={priorHref}>{formatDate(prior.counted_on)}</Link> : formatDate(prior.counted_on)}</p>}
@@ -108,7 +113,10 @@ export function WeeklyCountDraftView({ state: controlledState, roles, lotLabels,
     {!expectationBelow && expectation}
     <form noValidate onSubmit={event => { event.preventDefault(); if (!countSubmitReason(state)) onSubmit?.(event); }} className="flex flex-col gap-3" aria-label="Count every stock bucket">
       <div className="contents print:hidden">
-      {E.ttl("Count every stock bucket")}
+      <div className="flex items-end justify-between gap-3">
+        {E.ttl("Count every stock bucket")}
+        {lines.length > 1 && <label className="flex items-center gap-2 text-sm text-muted-foreground">Hide counted{E.sw(hidden !== null, "Hide counted", on => setHidden(on ? new Set(lines.filter(line => !countQuantityError(line)).map(line => line.key)) : null))}</label>}
+      </div>
       {E.info(`Count whole packages for ${formatDate(state.draft.countedOn)}; a partly full keg counts as one. Enter 0 for none.${sharedBin ? ` Every bucket is in ${sharedBin}.` : ""}`)}
       </div>
       {print !== undefined ? print : <WeeklyCountPrintAction empty={!state.draft.lines.some(line => line.qtyBefore > 0)} />}
@@ -116,12 +124,13 @@ export function WeeklyCountDraftView({ state: controlledState, roles, lotLabels,
       {state.draft.lines.some(line => line.lotId !== null) && onlyRoles(roles, ["taproom"]) && E.note("A worksheet row number matches a printed label. Print current stock labels before counting; do not guess.")}
       {state.draft.lines.length === 0 && E.blank("No stock is recorded at this taproom. Record count saves a count of zero for today. Your next count compares against it.")}
       <fieldset disabled={locked} className="contents">
-        {worksheetGroups(lines).map(group => <Fragment key={group.brandId}>{E.group(group.brandName)}{group.rows.map(({ line, row }) => {
+        {groups.map(group => ({ ...group, rows: group.rows.filter(({ line }) => !hidden?.has(line.key)) })).filter(group => group.rows.length > 0).map(group => <Fragment key={group.brandId}>{E.group(group.brandName)}{group.rows.map(({ line, row }) => {
           const where = savedLineDetail({ bin_name: line.binName, lot_id: line.lotId, lot_code: lotLabels[line.key] ?? null }, row, { showBin: !sharedBin, showLotCode: !onlyRoles(roles, ["taproom"]) });
           const error = touched.shown(row - 1) ? countQuantityError(line) : undefined;
           const short = isShortage(line) ? line.qtyBefore - Number(line.quantity) : 0;
           // On a phone the controls take their own line, so the name and its facts keep the full width.
-          return <div key={line.key} className="max-md:[&_[data-slot=item-actions]]:basis-full max-md:[&_[data-slot=item-actions]]:justify-end">
+          // A counted bucket's name goes quiet, so the ones still to count stand out.
+          return <div key={line.key} className={cn("max-md:[&_[data-slot=item-actions]]:basis-full max-md:[&_[data-slot=item-actions]]:justify-end", !countQuantityError(line) && "[&_[data-slot=item-title]]:font-normal [&_[data-slot=item-title]]:text-muted-foreground")}>
             {E.row(packageName(line), [where, `recorded ${line.qtyBefore}`].filter(Boolean).join(" · "), <div className="flex items-center gap-2">
               {short > 0 && <span aria-label={`${short} short of recorded`} className="text-sm tabular-nums text-muted-foreground">{`−${short}`}</span>}
               {/* Fills this one bucket on request, and shows the number it fills; quantities never start at the recorded stock. */}
@@ -141,13 +150,14 @@ export function WeeklyCountDraftView({ state: controlledState, roles, lotLabels,
       {state.attempt.kind === "unknown" && <CommandFormMessage tone="warning">No trustworthy response arrived. The request ID and every quantity are frozen. Retry this unchanged count to recover its original result.</CommandFormMessage>}
       {state.attempt.kind === "stale" && <CommandFormMessage error={state.attempt.message}>This count is out of date. Start a fresh recount; entered quantities will be cleared.</CommandFormMessage>}
       {state.attempt.kind === "error" && <CommandFormMessage error={state.attempt.message} />}
-      {/* Progress and Record count stay in view down a long worksheet. The shadow paints
+      {/* Record count stays in view down a long worksheet, beside what it still needs; that
+          sentence goes to the next uncounted bucket (as Prep's goes to its line). The shadow paints
           the page's bottom padding, so no row shows under the bar (as the Brand footer does);
           the margin keeps that shadow off whatever follows the worksheet. */}
       <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-x-4 gap-y-2 mb-8 border-t bg-background py-3 shadow-[0_2rem_0_var(--background)]">
-        {lines.length > 0 && <p className="mr-auto text-sm tabular-nums text-muted-foreground">{`${counted} of ${lines.length} counted`}</p>}
         {state.attempt.kind === "stale" && <Button type="button" variant="outline" onClick={onRefreshSnapshot}>Start fresh recount</Button>}
-        {E.submit(state.attempt.kind === "unknown" ? "Retry unchanged count" : state.attempt.kind === "submitting" ? "Recording…" : "Record count", { id: `${formId}-submit`, reason: countSubmitReason(state), submitting: state.attempt.kind === "submitting" })}
+        {E.submit(state.attempt.kind === "unknown" ? "Retry unchanged count" : state.attempt.kind === "submitting" ? "Recording…" : "Record count", { id: `${formId}-submit`, submitting: state.attempt.kind === "submitting",
+          reason: reason && next ? <button type="button" data-preview-action className="text-left underline underline-offset-2" onClick={() => { const field = document.getElementById(`${formId}-${next.row - 1}`); field?.scrollIntoView({ block: "center" }); field?.focus({ preventScroll: true }); }}>{reason}</button> : reason })}
       </div>
       </div>
     </form>
