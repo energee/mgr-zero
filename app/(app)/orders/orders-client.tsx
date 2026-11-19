@@ -10,12 +10,12 @@ import type { StaffRole } from "@/lib/commands/registry";
 import { toOrdersListViewProps, type OrdersListSnapshot } from "@/lib/mgr/orders-list-view";
 import { salesRoles, type OrderFilter } from "@/lib/mgr/order-status";
 import { hasAnyRole } from "@/lib/mgr/roles";
-import { historyPage, type HistoryPage, type HistoryRow } from "@/lib/mgr/history-page";
+import { numberedHistoryPage, type NumberedHistoryPage, type HistoryRow } from "@/lib/mgr/history-page";
 
 /** `sheet` is the order sheet the page opened from ?order= (app/(app)/orders/order-sheet.tsx), drawn over the list. */
-export function OrdersClient({ roles, timeZone, status, customerId, customerName, cursor, sheet }: { roles: readonly StaffRole[]; timeZone: string; status?: OrderFilter; customerId?: string; customerName?: string; cursor?: string; sheet?: React.ReactNode }) {
-  const result = useCommandQuery<HistoryPage<OrdersListSnapshot["orders"][number] & HistoryRow>>("list_orders", { status, customerId, cursor });
-  const page = historyPage(result.data ?? { rows: [], nextCursor: null }, "/orders", cursor, { status, customerId });
+export function OrdersClient({ roles, timeZone, status, customerId, customerName, page: currentPage = 1, limit = 50, sheet }: { roles: readonly StaffRole[]; timeZone: string; status?: OrderFilter; customerId?: string; customerName?: string; page?: number; limit?: number; sheet?: React.ReactNode }) {
+  const result = useCommandQuery<NumberedHistoryPage<OrdersListSnapshot["orders"][number] & HistoryRow>>("list_orders", { status, customerId, page: currentPage, limit });
+  const page = numberedHistoryPage(result.data ?? { rows: [], nextCursor: null, total: 0 }, "/orders", currentPage, limit, { status, customerId });
   // get_customer can fail (a stale or malformed link); say so rather than invent a name.
   const customer = customerId ? customerName ?? page.rows[0]?.customers?.name ?? "Customer unavailable" : undefined;
   const canWrite = hasAnyRole(roles, salesRoles); // create_order's roles

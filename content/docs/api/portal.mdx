@@ -16,7 +16,7 @@ Portal orders are wholesale orders shipped from the brewery's warehouse, and
 they move through the same lifecycle staff orders do. A portal user drafts,
 updates, and submits. Confirming, picking, and shipping stay with the brewery.
 
-Order and invoice history queries page with a cursor; see [History paging](/docs/api#history-paging).
+Order and invoice history queries support cursor or numbered paging; see [History paging](/docs/api#history-paging).
 
 Portal invoice results expose legacy `paid_at` only as a confirmation/state marker. Do not render it as a settlement date: older values may be invoice edit times, and new confirmations use sync time. Use current balance and remote state for payable status. Partial payments remain due, and credit-only closure is settled rather than paid. The portal supplies no actual payment date for one or multiple payments. For an invoice paid in full by payments the brewery recorded in MGR, `paid_at` is the brewery-local start of the day the last payment was received.
 
@@ -101,6 +101,7 @@ Portal: the caller's invoices and credit memos
 | --- | --- | --- |
 | `limit` | integer | no |
 | `cursor` | string | no |
+| `page` | integer | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -136,6 +137,7 @@ Portal: the caller's orders, newest first, one page at a time; use portal_order 
 | --- | --- | --- |
 | `limit` | integer | no |
 | `cursor` | string | no |
+| `page` | integer | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

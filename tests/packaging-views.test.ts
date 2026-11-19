@@ -72,6 +72,13 @@ describe("packaging views", () => {
     expect(toPackagingRunsViewProps(packagingRuns, DEMO_TIME_ZONE).empty).toBeUndefined();
   });
 
+  it("does not mistake an empty later history page for no packaging runs", () => {
+    const model = toPackagingRunsViewProps([], DEMO_TIME_ZONE);
+    const html = htmlOf(createElement(PackagingRunsView, { model, actions: null, pagination: { currentPage: 2 } }));
+    expect(html).not.toContain("No runs planned");
+    expect(html).toContain("Rows per page");
+  });
+
   it("separates planned facts and preserves zero without inventing a package unit", () => {
     const [upcoming] = toPackagingRunsViewProps([{
       id: "u", run_no: 8, planned_on: "2026-09-05", started_at: null, closed_at: null, cancelled_at: null,

@@ -23,7 +23,7 @@ vi.mock("@/lib/mgr/page-query", () => ({ runPageQuery: async (name: string) => {
     connected: false, connectionId: state.connectionId, state: "disconnected", realmLabel: null, merchantLabel: null, lastError: null,
   };
   if (name === "get_qbo_sync_status") return { latest: null, lastSuccess: null, latestFailure: null, retryRequestId: null };
-  if (name === "list_invoices") return { rows: [], nextCursor: null };
+  if (name === "list_invoices") return { rows: [], nextCursor: null, total: 0 };
   if (["list_pos_locations", "list_sale_channels", "list_pos_variations"].includes(name)) return [];
   if (name === "get_square_connected") return { connected: false };
   throw new Error(name);

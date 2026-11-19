@@ -165,6 +165,18 @@ describe("Batches view", () => {
     // The row link already opens the batch; no Brew button repeats it (#1512).
     expect(html).not.toMatch(/>Brew</);
   });
+  it("keeps empty later history pages visible so either batch group can navigate back", () => {
+    const model = toBatchesViewProps(batchesFromQuery([], []));
+    const html = htmlOf(createElement(BatchesView, {
+      model, createAction: null, cancelledOpen: true,
+      completedPagination: { currentPage: 3 },
+      cancelledPagination: { currentPage: 2 },
+    }));
+    expect(html).toContain('aria-label="Completed batches"');
+    expect(html).toMatch(/<details\b[^>]*\bopen=""/);
+    expect(html).toContain("Cancelled (0)");
+    expect(html).not.toContain('data-slot="empty"');
+  });
   it("marks a planned batch dated before the brewery's day overdue and links it to its open Change plan (#1582)", () => {
     const base: BatchListRow = { id: "late", batch_no: 3, planned_on: "2026-09-12", planned_bbl: 10, brewed_on: null, closed_at: null, cancelled_at: null, brand_name: null, recipe_name: null, vessel_name: null, active_occupancies: [] };
     const rows = [base, { ...base, id: "today", planned_on: "2026-10-28" }, { ...base, id: "brewed", brewed_on: "2026-09-12" }, { ...base, id: "gone", cancelled_at: "2026-09-13" }];
