@@ -818,8 +818,8 @@ describe("cellar map at a glance", () => {
     const html = htmlOf(createElement(CellarMapView, { model: toCellarMapViewProps(vessels, occupancies, {}, { v3: "/cellar/vessels/v3", v4: "/cellar/vessels/v4" }) }));
     // Only tanks holding beer are tiles.
     expect(html.match(/data-slot="item"/g)).toHaveLength(2);
-    expect(html).toMatch(/Empty<a[^>]*href="\/cellar\/vessels\/v3"[^>]*>FV3 · 5 bbl<\/a>/);
-    expect(html).toMatch(/Empty<a[^>]*href="\/cellar\/vessels\/v4"[^>]*>BT1 · 8 bbl<\/a>/);
+    expect(html).toMatch(/Empty<\/span><a[^>]*href="\/cellar\/vessels\/v3"[^>]*>FV3 · 5 bbl<\/a>/);
+    expect(html).toMatch(/Empty<\/span><a[^>]*href="\/cellar\/vessels\/v4"[^>]*>BT1 · 8 bbl<\/a>/);
     // Each Add reading names its tank to a screen reader, so eight tanks are not eight identical links.
     expect(htmlOf(createElement(CellarMapView, { model: toCellarMapViewProps(vessels, occupancies, {}, {}, id => `/cellar/${id}/reading`) }))).toContain('Add reading<span class="sr-only"> for FV1</span>');
     expect(html).toContain("Fermenters · 2 of 3 in use");
