@@ -5,6 +5,7 @@ import { WeeklyCountCorrectionView, WeeklyCountDraftView, WeeklyCountPrintAction
 import { weeklyCount } from "../lib/mgr/fixtures/taproom";
 import { readFileSync } from "node:fs";
 import { countDraftFromSnapshot, correctionStateFromReceipt, updateCountQuantity, beginCountAttempt, failCountAttempt } from "../lib/mgr/taproom-count-state";
+import type { StaffRole } from "@/lib/commands/registry";
 import type * as CommandFormModule from "@/components/mgr/command-form";
 
 // Portaled dialog bodies do not render on the server; expose an open body's real children.
@@ -41,7 +42,8 @@ it("#1382 labels count corrections by their saved lot code without displaying th
     lot_id: lotId, lot_code: "COUNTED-TO-ZERO", qty_before: 7, qty_counted: 0,
   }]);
   const html = renderToStaticMarkup(createElement(WeeklyCountCorrectionView, { state, open: true }));
-  expect(html).toContain("tracked lot COUNTED-TO-ZERO");
+  expect(html).toContain("Cold · Lot COUNTED-TO-ZERO · counted 0 of 7 recorded");
+  expect(html).not.toContain("saved row");
   expect(html).not.toContain(lotId);
   expect(html).not.toMatch(/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}/i);
 });
@@ -49,8 +51,16 @@ it("#1382 labels count corrections by their saved lot code without displaying th
 it("a saved count in the history is a row link to that count, not an Open count verb (#1026)", () => {
   const history = [{ ...weeklyCount.history[0]!, href: "/taproom/count/sep1" }];
   const html = renderToStaticMarkup(createElement(WeeklyCountView, { model: { ...weeklyCount, history }, draft: null }));
-  expect(html).toMatch(/<a[^>]*href="\/taproom\/count\/sep1"[^>]*>(?:(?!<\/a>)[\s\S])*Weekly count · Sep 1, 2026/);
+  expect(html).toMatch(/<a[^>]*href="\/taproom\/count\/sep1"[^>]*>(?:(?!<\/a>)[\s\S])*<div[^>]*data-slot="item-title"[^>]*>Sep 1, 2026</);
+  expect(html).not.toContain("Weekly count · Sep 1, 2026");
   expect(html).not.toContain("Open count");
+});
+
+it("keeps the history free of notes a reader cannot act on", () => {
+  const render = (roles: StaffRole[]) => renderToStaticMarkup(createElement(WeeklyCountView, { model: { ...weeklyCount, roles }, draft: null }));
+  expect(render(["taproom"])).not.toContain("Admin only");
+  expect(render(["admin"])).toContain("Admin only: correct the latest count once");
+  expect(render(["admin"])).not.toContain("Newest 50");
 });
 
 it("the live draft, correction and print bindings delegate to shared controls", () => {
@@ -182,7 +192,8 @@ it("#814 shows the shared shortage disposition picker and freezes it on uncertai
   let state = countDraftFromSnapshot({ location_id: "taproom", counted_on: "2026-09-12", prior_count: null, revision: "captured", lines: [{ bin_id: "cold", bin_name: "Cold", sku_id: "keg", sku_name: "Keg", brand_id: "brand", brand_name: "Brand", bbl_per_unit: .5, lot_id: null, qty_before: 3 }] }, null);
   state = updateCountQuantity(state, state.draft.lines[0].key, "2");
   const html = renderToStaticMarkup(createElement(WeeklyCountDraftView, { state, roles: ["taproom"], lotLabels: {}, timeZone: "America/New_York" }));
-  expect(html).toContain("Shortage disposition");
+  expect(html).toContain("Missing 1 · Keg");
+  expect(html).not.toContain("Shortage disposition");
   expect(html).toContain("Sold");
   const frozen = failCountAttempt(beginCountAttempt(state, "request"), "unknown", "No response");
   expect(renderToStaticMarkup(createElement(WeeklyCountDraftView, { state: frozen, roles: ["taproom"], lotLabels: {}, timeZone: "America/New_York" }))).toContain('data-disabled');
@@ -195,10 +206,15 @@ it("#1516 lists buckets alphabetically without repeating untracked worksheet row
   { prior_count: null, expected_bbl: null, reason: "no_pos_coverage", rows: [] });
   const html = renderToStaticMarkup(createElement(WeeklyCountDraftView, { state, roles: ["admin"], lotLabels: { [state.draft.lines[1].key]: "L-7" }, timeZone: "America/New_York" }));
   expect(html.indexOf("Hazy · ½ bbl keg")).toBeLessThan(html.indexOf("Pils · ½ bbl keg"));
-  expect(html).toContain("Cold · Lot L-7 · worksheet row 2 · recorded 4");
-  expect(html).toContain("Cold · recorded 4");
+  // Both buckets share the one bin, so it is named once above the rows, not on each.
+  // The lot code names a tracked bucket; its worksheet row shows only where the code may not.
+  expect(html).toContain("Lot L-7 · recorded 4");
+  expect(html).not.toContain("worksheet row 2 · recorded");
+  expect(html).toContain("Every bucket is in Cold.");
+  expect(html).not.toContain("Cold · ");
   expect(html).not.toContain("Untracked stock");
-  expect(html.match(/>Same as recorded</g)).toHaveLength(2);
+  // The fill button shows the number it fills.
+  expect(html.match(/>= 4<\/button>/g)).toHaveLength(2);
   expect(html).toContain('aria-label="Same as recorded · Pils · ½ bbl keg · worksheet row 1"');
   // Quantities still start empty: a count is entered on purpose.
   expect(html).not.toMatch(/value="4"/);
@@ -211,4 +227,38 @@ it("#1481 names the link to the count before this one in plain words", () => {
   const html = renderToStaticMarkup(createElement(WeeklyCountView, { model: { ...weeklyCount, receipt: { ...weeklyCount.receipt!, recorded: "Recorded by you at Sep 8, 2026, 4:00 PM", priorHref: "/taproom?count=sep1" } }, draft: null }));
   expect(html).toMatch(/Recorded by you at Sep 8, 2026, 4:00 PM\. <a[^>]*href="\/taproom\?count=sep1"[^>]*>Open the previous count<\/a>/);
   expect(html).not.toContain("prior count");
+});
+
+it("groups buckets by brand, names a differing bin on its row, and shows progress and each shortage", () => {
+  const line = (sku: string, bin: string, qty: number) => ({ bin_id: bin, bin_name: bin, sku_id: sku, sku_name: `Hazy IPA · ${sku}`, brand_id: "hazy", brand_name: "Hazy IPA", bbl_per_unit: 0.5, lot_id: null, qty_before: qty });
+  const initial = countDraftFromSnapshot({ location_id: "taproom", counted_on: "2026-09-12", prior_count: null, revision: "captured", lines: [line("Sixtel", "Cold", 3), line("Case", "Dry", 6)] }, null);
+  const state = updateCountQuantity(initial, initial.draft.lines[1].key, "4");
+  const html = renderToStaticMarkup(createElement(WeeklyCountDraftView, { state, roles: ["admin"], lotLabels: {}, timeZone: "America/New_York" }));
+  expect(html.match(/<h2[^>]*>Hazy IPA<\/h2>/g)).toHaveLength(1);
+  expect(html).not.toContain(">Hazy IPA · Case<");
+  expect(html).toContain("Dry · recorded 6");
+  expect(html).not.toContain("Every bucket is in");
+  // The reason names what is left, and is the control that goes to the next uncounted bucket.
+  expect(html).toMatch(/<button type="button"[^>]*>Still needed: a count for 1 of 2 buckets\.<\/button>/);
+  expect(html).not.toContain("1 of 2 counted");
+  expect(html).toContain("Hide counted");
+  expect(html).toContain('aria-label="2 short of recorded"');
+});
+
+it("draws saved lines in recorded and counted columns", () => {
+  const html = renderToStaticMarkup(createElement(WeeklyCountView, { model: weeklyCount, draft: null }));
+  for (const header of ["Stock", "Recorded", "Counted", "Result"]) expect(html).toMatch(new RegExp(`<th[^>]*>(<[^>]*>)*${header}`));
+  expect(html).toMatch(/<td[^>]*>7<\/td><td[^>]*>2<\/td>/);
+});
+
+it("names a lone taproom instead of offering a one-option pick, and keeps the taproom links in the header", () => {
+  const html = renderToStaticMarkup(createElement(WeeklyCountView, { model: { ...weeklyCount, locations: [weeklyCount.locations[0]], boardHref: "/taproom/board", varianceHref: "/taproom/variance" }, draft: null }));
+  expect(html).not.toMatch(/<label[^>]*>Location<\/label>/);
+  expect(html).toContain("Ridgeline Tap Room");
+  expect(html).toMatch(/<h1[^>]*>Weekly count<\/h1><\/div><div[^>]*><a[^>]*href="\/taproom\/board"/);
+});
+
+it("gives the saved count an anchor, so a history link lands on it and not on the list just clicked", () => {
+  const html = renderToStaticMarkup(createElement(WeeklyCountView, { model: weeklyCount, draft: null }));
+  expect(html).toMatch(/<section[^>]*id="saved-count"/);
 });

@@ -165,6 +165,38 @@ export function worksheetOrder<L extends Pick<CountDraftLine, "skuName" | "binNa
     .sort((a, b) => a.line.skuName.localeCompare(b.line.skuName) || a.line.binName.localeCompare(b.line.binName));
 }
 
+/** The worksheet under one heading per brand, brands by name. Rows keep worksheetOrder's order and printed numbers. */
+export function worksheetGroups<L extends Pick<CountDraftLine, "skuName" | "binName" | "brandId" | "brandName">>(lines: L[]) {
+  const groups = new Map<string, { brandId: string; brandName: string; rows: { line: L; row: number }[] }>();
+  for (const entry of worksheetOrder(lines)) {
+    const { brandId, brandName } = entry.line;
+    const group = groups.get(brandId) ?? { brandId, brandName, rows: [] };
+    group.rows.push(entry);
+    groups.set(brandId, group);
+  }
+  return [...groups.values()].sort((a, b) => a.brandName.localeCompare(b.brandName));
+}
+
+/** A bucket's name under its brand heading: "Hazy · Sixtel" reads "Sixtel". A SKU not named for its brand keeps its full name. */
+export function packageName(line: Pick<CountDraftLine, "skuName" | "brandName">) {
+  const prefix = `${line.brandName} · `;
+  return line.skuName.startsWith(prefix) ? line.skuName.slice(prefix.length) : line.skuName;
+}
+
+/** What a saved count found, for its history row: units sold and destroyed, or that everything matched. */
+export function countOutcome(count: { observations: number; depleted_units: number; destroyed_units: number }) {
+  const found = [count.depleted_units > 0 && `${count.depleted_units} sold`, count.destroyed_units > 0 && `${count.destroyed_units} destroyed`].filter(Boolean);
+  const outcome = found.length > 0 ? found : count.observations > 0 ? ["all matched"] : [];
+  return [`${count.observations} counted`, ...outcome].join(" · ");
+}
+
+/** What tells one saved line from another with the same SKU: its bin when bins differ, and its lot.
+ *  A reader who may not see lot codes (Taproom only) gets the worksheet row its printed label carries. */
+export function savedLineDetail(line: { bin_name: string | null; lot_id: string | null; lot_code: string | null }, row: number, show: { showBin: boolean; showLotCode: boolean }) {
+  const lot = line.lot_id ? (show.showLotCode && line.lot_code ? `Lot ${line.lot_code}` : `Worksheet row ${row}`) : null;
+  return [show.showBin && (line.bin_name ?? "Saved bin"), lot].filter(Boolean).join(" · ");
+}
+
 // A frozen or stale count accepts no edits until it is recovered or recounted.
 export function countLocked(state: TaproomCountState) {
   return state.attempt.kind === "unknown" || state.attempt.kind === "submitting" || state.attempt.kind === "stale";
@@ -185,7 +217,10 @@ export function countSubmitReason(state: TaproomCountState): string | null {
   if (state.attempt.kind === "unknown") return null;
   if (state.attempt.kind === "submitting") return submitReason(["the current count to finish recording"]);
   if (state.attempt.kind === "stale" || !projectionMatchesCountDraft(state)) return submitReason(["a fresh recount"]);
-  return submitReason(state.draft.lines.some(line => countQuantityError(line)) ? ["a whole-package count within recorded stock for every bucket, including zero"] : []);
+  // Each row says what is wrong with its own entry, so the reason only counts the buckets left.
+  const lines = state.draft.lines;
+  const left = lines.filter(line => countQuantityError(line)).length;
+  return submitReason(left > 0 ? [`a count for ${left} of ${lines.length} buckets`] : []);
 }
 
 export function updateCountQuantity(state: TaproomCountState, key: string, quantity: string): TaproomCountState {
