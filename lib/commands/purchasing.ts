@@ -85,23 +85,28 @@ defineCommand({
 // null unless an Admin saved a TypeSafe key and turned "Suggest kinds for new materials" on.
 defineQuery({
   name: "suggest_material_category", agentHidden: true,
-  description: "Suggest a kind for a new material from its name, or none; read-only, never saves, off unless an Admin saved the brewery's TypeSafe key and turned suggestions on",
+  description: "Suggest a kind for a new material from its name, or none; never saves a material, only counts the answer for the Settings outcome line; off unless an Admin saved the brewery's TypeSafe key and turned suggestions on",
   input: z.object({ name: z.string().trim().min(1).max(120).describe("The new material's name") }),
   roles: [...PURCHASING],
   handler: async (ctx, i) => {
-    const apiKey = await (await import("@/lib/supabase/integration-tokens")).readBreweryTypeSafeKey(ctx);
+    const tokens = await import("@/lib/supabase/integration-tokens");
+    const apiKey = await tokens.readBreweryTypeSafeKey(ctx);
     if (!apiKey) return { category: null, probability: null };
     const [{ resolveDecisionModel, SUGGESTION_MODEL }, { suggestMaterialCategory }] = await Promise.all([
       import("@/lib/mgr/material-category-suggestion"), import("@/lib/suggest-material-category"),
     ]);
+    let hit: Awaited<ReturnType<typeof suggestMaterialCategory>>;
     try {
-      const hit = await suggestMaterialCategory(i.name, resolveDecisionModel(SUGGESTION_MODEL, apiKey));
-      return { category: hit?.choice ?? null, probability: hit?.probability ?? null };
+      hit = await suggestMaterialCategory(i.name, resolveDecisionModel(SUGGESTION_MODEL, apiKey));
     } catch (error) {
       // runCommand does not log a CommandError, so the cause is logged here; the form shows no suggestion.
-      console.error("suggest_material_category_failed", error);
+      // Only the message: the provider's error object carries the request body, which holds the material name.
+      console.error("suggest_material_category_failed", error instanceof Error ? error.message : error);
       throw new CommandError("Kind suggestion is unavailable.", 502, "upstream_unavailable");
     }
+    // Not caught: a failed record fails the read, so a broken count is seen instead of drifting silently.
+    await tokens.recordMaterialKindSuggestion(ctx, i.name, hit);
+    return { category: hit?.choice ?? null, probability: hit?.probability ?? null };
   },
 });
 

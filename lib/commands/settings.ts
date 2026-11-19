@@ -8,7 +8,7 @@
 // override on their own brewery_users row, and null there means "follow the
 // brewery".
 import { z } from "zod";
-import { completeRows, isoDate, defineCommand, definePreTenantQuery, defineQuery, PAGE_SIZE, phone, unwrap, STAFF_ROLES } from "./registry";
+import { CommandError, completeRows, isoDate, defineCommand, definePreTenantQuery, defineQuery, PAGE_SIZE, phone, unwrap, STAFF_ROLES } from "./registry";
 import { GRAVITY_UNITS, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { chatModelFromSettings, DEFAULT_CHAT_MODEL, MODEL_ID } from "@/lib/chat/models";
 
@@ -46,19 +46,30 @@ defineCommand({
 // boundary is imported dynamically to keep the registry provider-free (tests/agent-hidden.test.ts).
 defineQuery({
   name: "get_brewery_suggestion_settings", agentHidden: true,
-  description: "Whether this brewery has a TypeSafe key saved (and its last four characters only) and whether kind suggestions for new materials are on",
+  description: "Whether this brewery has a TypeSafe key saved (and its last four characters only), whether kind suggestions for new materials are on, and the last 30 days of suggestion outcomes (asked, suggested, kept, changed)",
   input: z.object({}), roles: ["admin"],
-  handler: async (ctx) => (await import("@/lib/supabase/integration-tokens")).readBreweryTypeSafeKeyStatus(ctx),
+  handler: async (ctx) => {
+    const tokens = await import("@/lib/supabase/integration-tokens");
+    const [status, outcomes] = await Promise.all([tokens.readBreweryTypeSafeKeyStatus(ctx), tokens.readMaterialKindSuggestionOutcomes(ctx)]);
+    return { ...status, outcomes };
+  },
 });
 
 defineCommand({
   name: "set_brewery_typesafe_key", agentHidden: true,
-  description: "Save or replace this brewery's TypeSafe API key, or remove it with null; answers with the saved status and last four characters, never the key",
+  description: "Save or replace this brewery's TypeSafe API key, or remove it with null; a new key is checked with TypeSafe first and refused if TypeSafe does not accept it; answers with the saved status and last four characters, never the key",
   compensation: "Cannot be undone: a replaced or removed key is never readable. Paste the previous key again with set_brewery_typesafe_key.",
   input: z.object({ apiKey: z.string().trim().min(8).max(500).nullable().describe("The TypeSafe API key, or null to remove it") }),
   roles: ["admin"],
-  handler: async (ctx, i, execution) =>
-    (await import("@/lib/supabase/integration-tokens")).setBreweryTypeSafeKey(ctx, i.apiKey, execution.requestId),
+  handler: async (ctx, i, execution) => {
+    // Only an Admin may spend a model call on a pasted key; the database function rechecks before saving.
+    if (i.apiKey !== null) {
+      const check = await (await import("@/lib/suggest-material-category")).checkTypeSafeKey(i.apiKey);
+      if (check === "refused") throw new CommandError("TypeSafe did not accept this key. Check it and paste it again.");
+      if (check === "unreachable") throw new CommandError("TypeSafe could not be reached to check this key. Try again.", 502, "upstream_unavailable");
+    }
+    return (await import("@/lib/supabase/integration-tokens")).setBreweryTypeSafeKey(ctx, i.apiKey, execution.requestId);
+  },
 });
 
 defineCommand({

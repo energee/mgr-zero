@@ -386,6 +386,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     // The brewery's TypeSafe key: service-only, so a signed-in caller cannot set, read or see it.
     set_brewery_typesafe_key: [B,f.taproom.id,"fixture-key-1234",R()], get_brewery_typesafe_key_status: [B,f.taproom.id],
     read_brewery_typesafe_key: [B,f.taproom.id],
+    record_material_kind_suggestion: [B,f.taproom.id,"Fixture hop","hop",0.95], get_material_kind_suggestion_outcomes: [B,f.taproom.id],
   };
   if (existsSync(".env.test.local")) {
     // Admit only this reset's verified probe; every other service RPC still
