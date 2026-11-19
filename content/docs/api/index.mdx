@@ -830,7 +830,7 @@ omitted field and clear one only when you send it as `null`.
 ### History paging [#history-paging]
 
 `list_orders`, `list_invoices`, `list_movements`, `portal_orders`, `portal_invoices`,
-`list_batch_history`, and `list_packaging_history` return `{ rows, nextCursor }`,
+`list_batch_history`, `list_packaging_history`, and `list_order_changes` return `{ rows, nextCursor }`,
 with rows ordered by `created_at` and `id`, both descending. `nextCursor` is null
 on the last page. Otherwise pass it back as `cursor`, unchanged and with the same
 filters, to read the next page. Keep its timestamp precision; do not convert it
