@@ -181,6 +181,26 @@ defineQuery({
   },
 });
 
+// COLA labels (20261119020000_portal_cola_images.sql): only MGR's stored
+// copies, for brands priced on the buyer's channel; never a TTB fetch. The list
+// stays light, and each image loads on its own when Shop scrolls it into view.
+defineQuery({
+  name: "portal_cola_labels", description: "Portal: brands on the buyer's list whose COLA label image the brewery has on file, one label per brand (the earliest approval), as brand id, brand name and TTB id; load each image with portal_cola_label_image",
+  roles: "customer",
+  input: z.object({}),
+  handler: async (ctx) => {
+    const rows = await unwrap(ctx.db.rpc("portal_cola_labels", { p_customer: requireCustomer(ctx) })) as { brand_id: string; brand_name: string; ttb_id: string }[];
+    return rows.map(r => ({ brandId: r.brand_id, brand: r.brand_name, ttbId: r.ttb_id }));
+  },
+});
+
+defineQuery({
+  name: "portal_cola_label_image", description: "Portal: one brand's COLA label image on file as a data URL; dataUrl is null when the brand is not on the buyer's list or has no label on file",
+  roles: "customer",
+  input: z.object({ brandId: z.string().uuid() }),
+  handler: async (ctx, i) => ({ dataUrl: await unwrap(ctx.db.rpc("portal_cola_label_image", { p_customer: requireCustomer(ctx), p_brand: i.brandId })) as string | null }),
+});
+
 // Coming up: upcoming planned batches as brand + expected week (Monday), soonest
 // first, and whether the brand has a package on the buyer's list. The
 // portal_schedule view exposes nothing else about a batch.

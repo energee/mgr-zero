@@ -6,8 +6,9 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
 import { ShopView } from "@/components/mgr/views/shop";
+import { PortalColaLabel } from "./cola-label";
 import { ReviewOrderView } from "@/components/mgr/views/review-order";
-import { chosenOffer, effectiveRequestedDate, toShopViewProps, type ShopRelease } from "@/lib/mgr/shop-view";
+import { chosenOffer, effectiveRequestedDate, toShopViewProps, type ShopRelease, type ShopSnapshot } from "@/lib/mgr/shop-view";
 import { toQuotedReviewOrderViewProps, type PortalQuote } from "@/lib/mgr/review-order-view";
 import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 import { command, CommandResponseError } from "@/lib/commands/client";
@@ -28,7 +29,9 @@ export function submissionFailureMessage(message: string, draftId: string | null
 }
 
 type CartProps = {
-  items: CatalogItem[]; shipTos: ShipToOption[]; scope: PortalScope; fulfillmentSource: { id: string; name: string } | null;
+  items: CatalogItem[];
+  /** portal_cola_labels: brands whose COLA label is on file; Shop loads each beside its heading. */
+  labels?: ShopSnapshot["labels"]; shipTos: ShipToOption[]; scope: PortalScope; fulfillmentSource: { id: string; name: string } | null;
   /** A saved draft or reorder (reconcilePortalOrder); releasesClosed names lines whose release closed since. */
   initial?: { fields: PortalFields; draftId: string | null; removed: string[]; releasesClosed?: string[] };
 };
@@ -37,7 +40,7 @@ export function Cart(props: CartProps) {
   const hydrated = useSyncExternalStore(subscribe, () => true, () => false);
   return hydrated ? <ReadyCart {...props} /> : E.info("Loading order recovery…");
 }
-function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource }: CartProps) {
+function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource, labels }: CartProps) {
   const router = useRouter();
   const [recovery] = useState(() => {
     try { return { attempt: restorePortalAttempt(sessionStorage.getItem(portalAttemptKey(scope)), scope), error: null }; }
@@ -145,11 +148,11 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource }: CartPr
     shipTos, shipToId: fields.shipToId,
     requestedDate: requestedShipDate ?? "", poNumber: fields.poNumber, note: fields.note,
     source: { name: fulfillmentSource?.name ?? "Not configured" },
-    catalog,
+    catalog, labels,
   });
   shopModel.subtotal = unavailable.length ? "Unavailable for the pending request" : money(subtotal);
   return <>
-    <ShopView model={shopModel} quantities={qty} locked={locked} disabled={disabled} preparing={busy} comingUp={<Link href="/portal/coming-up">{E.nav("Coming up")}</Link>}
+    <ShopView model={shopModel} labelImage={(label, brand) => <PortalColaLabel label={label} brand={brand} scope={scope} />} quantities={qty} locked={locked} disabled={disabled} preparing={busy} comingUp={<Link href="/portal/coming-up">{E.nav("Coming up")}</Link>}
       controls={{
         quantity: (id, value) => setQty(prev => ({ ...prev, [id]: value })),
         offer: (id, value) => setOffers(prev => ({ ...prev, [id]: value })),

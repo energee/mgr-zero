@@ -287,3 +287,21 @@ describe("Shop brand alias", () => {
     expect(htmlOf(createElement(ReviewOrderView, { model: review, footer: null }))).toContain('<span>Masai Giraffe · Sixtel</span><span class="text-xs font-normal text-muted-foreground">Animal #31</span>');
   });
 });
+
+describe("Shop COLA labels", () => {
+  it("gives a brand heading its stored label, and nothing to a brand without one", () => {
+    const labels = [{ brandId: "b-hazy", brand: "Hazy IPA", ttbId: "26001001000001" }];
+    const groups = toShopViewProps({ ...ridgelineShop, labels }).groups;
+    expect(groups.map((g) => [g.product, g.label])).toEqual([
+      ["Hazy IPA", { brandId: "b-hazy", ttbId: "26001001000001" }], ["Pils", undefined], ["Stout", undefined],
+    ]);
+    expect(toShopViewProps(ridgelineShop).groups.every((g) => g.label === undefined)).toBe(true);
+  });
+
+  it("draws the label slot beside the heading only for a brand with a label", () => {
+    const labels = [{ brandId: "b-hazy", brand: "Hazy IPA", ttbId: "26001001000001" }];
+    const html = htmlOf(createElement(ShopView, { model: toShopViewProps({ ...ridgelineShop, labels }), footer: null, labelImage: (label) => createElement("i", null, `label ${label.ttbId}`) }));
+    expect(html.match(/<i>label /g)).toHaveLength(1);
+    expect(html).toMatch(/<i>label 26001001000001<\/i>(?:(?!<h2).)*<h2 id="brand-hazy-ipa"/);
+  });
+});

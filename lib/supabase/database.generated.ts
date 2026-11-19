@@ -5589,6 +5589,14 @@ isOneToOne: false
               "customer_phone": string,"id": string,"name": string,"portal_fulfillment_location_id": string,"timezone": string
             }[]
                            },
+"portal_cola_label_image":
+{ Args: { "p_brand": string,"p_customer": string }; Returns: string
+                           },
+"portal_cola_labels":
+{ Args: { "p_customer": string }; Returns: {
+              "brand_id": string,"brand_name": string,"ttb_id": string
+            }[]
+                           },
 "portal_create_order":
 { Args: { "p_brewery": string,"p_customer": string,"p_lines": Json,"p_note": string,"p_po": string,"p_request_id": string,"p_requested"?: string,"p_ship_to": string }; Returns: Json
                            },

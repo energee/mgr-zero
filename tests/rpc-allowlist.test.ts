@@ -149,6 +149,8 @@ const AUTHENTICATED_RPCS = [
   "my_staff_brewery_ids(staff_role[])",
   "my_customer_ids()",
   "portal_availability(uuid)",
+  "portal_cola_label_image(uuid,uuid)",
+  "portal_cola_labels(uuid)",
   "portal_releases(uuid)",
   "portal_brewery_rows()",
   "portal_customer_rows()",

@@ -52,6 +52,38 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "portal_catalog", "input": {} }'
 ```
 
+## portal_cola_label_image [#portal_cola_label_image]
+
+`query` · customer
+
+Portal: one brand's COLA label image on file as a data URL; dataUrl is null when the brand is not on the buyer's list or has no label on file
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `brandId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "portal_cola_label_image", "input": { "brandId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## portal_cola_labels [#portal_cola_labels]
+
+`query` · customer
+
+Portal: brands on the buyer's list whose COLA label image the brewery has on file, one label per brand (the earliest approval), as brand id, brand name and TTB id; load each image with portal_cola_label_image
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "portal_cola_labels", "input": {} }'
+```
+
 ## portal_create_order [#portal_create_order]
 
 `command` · customer
