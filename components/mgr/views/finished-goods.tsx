@@ -70,7 +70,7 @@ export function FinishedGoodsView({
         rows={model.rows.map((row) => ({
           key: row.key,
           cells: [
-            <BrandedName key="name" name={row.name} aliased={row.aliased} />, row.onHand, row.allocated, <Available key="available" row={row} shortfallHref={to(row.shortfallHref)} />,
+            <BrandedName key="name" name={row.name} alias={row.alias} />, row.onHand, row.allocated, <Available key="available" row={row} shortfallHref={to(row.shortfallHref)} />,
             // Rows offer Record movement whenever the header does.
             ...(record ? [row.movementHref && <Fragment key="action">{E.act("Record movement", "primary", linkRows ? row.movementHref : undefined)}</Fragment>] : []),
           ],

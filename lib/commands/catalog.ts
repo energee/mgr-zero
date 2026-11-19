@@ -31,7 +31,7 @@ defineCommand({
 // brewery's own styles list; description, category, price group and hops are
 // the optional Brand-screen facts.
 defineCommand({
-  name: "upsert_brand", description: "Create or edit a brand: name, style (added to the brewery's styles when new), ABV, and optional description, category, price group, hops, and a staff-only alias (an informal name such as a series number); every field is replaced, so omit the alias to clear it",
+  name: "upsert_brand", description: "Create or edit a brand: name, style (added to the brewery's styles when new), ABV, and optional description, category, price group, hops, and an alias (an informal name such as a series number, shown muted under the brand name on order screens and in the portal); every field is replaced, so omit the alias to clear it",
   compensation: "Reverse an edit with upsert_brand and the previous values; a new brand cannot be deleted.",
   input: z.object({
     id: z.string().uuid().optional().describe("The brand to edit; omit to create one"), name: z.string().trim().min(1).describe("The brand's name"), style: z.string().optional(), abv: z.number().min(BRAND_ABV.min, BRAND_ABV.message).max(BRAND_ABV.max, BRAND_ABV.message).optional(),

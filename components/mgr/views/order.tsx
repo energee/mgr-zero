@@ -188,7 +188,7 @@ export function OrderView({
               {model.lines.map((line) => (
                 <TableRow key={line.key}>
                   <TableCell className="py-3.5 whitespace-normal">
-                    <span className="font-medium"><BrandedName name={line.name} aliased={line.aliased} /></span>
+                    <span className="font-medium"><BrandedName name={line.name} alias={line.alias} /></span>
                     <LineNotes line={line} />
                   </TableCell>
                   {model.columns.map(([label, field]) => (
@@ -214,7 +214,7 @@ export function OrderView({
         <ul className="mt-1 divide-y md:hidden">
           {model.lines.map((line) => (
             <li key={line.key} className="py-4">
-              <p className="text-sm font-semibold"><BrandedName name={line.name} aliased={line.aliased} /></p>
+              <p className="text-sm font-semibold"><BrandedName name={line.name} alias={line.alias} /></p>
               <LineNotes line={line} />
               <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3">
                 {[...model.columns, ["Line amount", "amount"] as const].map(([label, field]) => (

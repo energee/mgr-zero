@@ -27,8 +27,10 @@ const item = (
   qty: number,
   pack: Pack,
   releases: ShopRelease[] = [],
+  brandAlias: string | null = null,
 ): ShopSnapshot["catalog"][number] => ({
-  skuId, name, product, unitPriceCents, badge: "in", releases, qty, ...pack,
+  // portal_catalog names the format apart from the SKU; these SKU names are the format names.
+  skuId, name, product, brandAlias, formatName: name, unitPriceCents, badge: "in", releases, qty, ...pack,
 });
 
 /** Ridgeline Shop cart: 4 Hazy ½ bbl + 6 Pils cases, Main · 2026-09-09. */
@@ -45,8 +47,8 @@ export const ridgelineShop: ShopSnapshot = {
     item(SKU_HAZY_CASE, "case · 24×16 oz", "Hazy IPA", 4200, 0, CASE),
     item(SKU_PILS.sku_id, "case · 24×16 oz", "Pils", SKU_PILS.unit_price_cents, 6, CASE),
     item(SKU_PILS_BOTTLE, "12 oz bottle", "Pils", 1800, 0, BOTTLE),
-    // Stout is in stock and also released from a planned batch: the row offers both.
-    item(SKU_STOUT.sku_id, "⅙ bbl keg", "Stout", 6200, 0, SIXTEL, [{ releaseId: "00000000-0000-4000-8000-0000000000e1", shipsFrom: "2026-10-02", ordersCloseOn: "2026-09-25", badge: "in" }]),
+    // Stout is in stock and also released from a planned batch: the row offers both. Its brand has an alias, shown under the brand.
+    item(SKU_STOUT.sku_id, "⅙ bbl keg", "Stout", 6200, 0, SIXTEL, [{ releaseId: "00000000-0000-4000-8000-0000000000e1", shipsFrom: "2026-10-02", ordersCloseOn: "2026-09-25", badge: "in" }], "Night Series #4"),
   ],
   depositCentsPerKeg: 3000,
 };

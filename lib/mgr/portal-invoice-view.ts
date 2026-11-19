@@ -3,12 +3,16 @@
 // Pay vs unavailable vs paid is a presentation prop on the view, not a mode.
 import { formatDate } from "@/lib/date-format";
 import { docNo } from "./doc-no";
+import { lineLabel, type BrandedSku } from "./brand-lines";
 import { money } from "./money";
 import { invoiceCurrentState, invoiceCurrentTotalCents, invoiceIsSettledWithoutPayment, type InvoiceCurrentState } from "./invoice-state";
 
 export type PortalInvoiceLineView = {
   key: string;
+  /** A SKU line's "Brand · Format" (lineLabel); otherwise its description or kind. */
   item: string;
+  /** The brand's alias, muted under the item. */
+  alias?: string;
   qty: string;
   amount: string;
 };
@@ -75,7 +79,8 @@ export type PortalInvoiceSnapshot = {
     qty: number;
     amount_cents: number;
     description: string | null;
-    skus: { name: string } | null;
+    /** portal_invoice_rows embeds the brand (with alias) and format names. */
+    skus: BrandedSku;
   }[];
   brewery: { name: string; customer_phone: string | null };
 };
@@ -100,7 +105,8 @@ export function toPortalInvoiceViewProps({ invoice, lines, brewery, backHref }: 
     breweryPhone: brewery.customer_phone,
     lines: lines.map((l) => ({
       key: l.id,
-      item: l.skus?.name ?? l.description ?? l.kind,
+      item: l.skus ? lineLabel(l.skus).name : l.description ?? l.kind,
+      alias: l.skus ? lineLabel(l.skus).alias : undefined,
       qty: String(Number(l.qty)),
       amount: money(l.amount_cents),
     })),

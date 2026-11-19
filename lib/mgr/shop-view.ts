@@ -6,6 +6,7 @@ import type { EmptyState } from "./empty-state";
 import { formatDate } from "@/lib/date-format";
 import { money } from "./money";
 import { palletFit, palletHint, type PalletFitGroup } from "./pallet-fit";
+import { lineLabel, type LineLabel } from "./brand-lines";
 import { plural } from "./plural";
 
 /** One open release of a SKU, as portal_catalog returns it. */
@@ -16,6 +17,10 @@ export type ShopCatalogItem = {
   name: string;
   product: string;
   unitPriceCents: number;
+  /** The brand's alias (portal_catalog brandAlias), shown muted under the brand; absent or null when it has none. */
+  brandAlias?: string | null;
+  /** The format's name (portal_catalog formatName); it names the row. Absent falls back to the SKU name. */
+  formatName?: string;
   /** The packaged-stock offer's in/low/out badge; null when the SKU is not
    *  orderable from stock (portal_catalog). */
   badge?: string | null;
@@ -65,8 +70,8 @@ export type ShopItemView = {
   offer: string;
 };
 
-/** One cart line in the order summary; `anchor` is its brand heading on Shop. */
-export type ShopSummaryLine = { key: string; name: string; detail: string; amount: string; anchor: string };
+/** One cart line in the order summary ("Brand · Format", the brand's alias apart); `anchor` is its brand heading on Shop. */
+export type ShopSummaryLine = LineLabel & { key: string; detail: string; amount: string; anchor: string };
 
 export type ShopSummary = {
   /** Only lines with a quantity. */
@@ -82,6 +87,8 @@ export type ShopSummary = {
 
 export type ShopGroupView = {
   product: string;
+  /** The brand's alias, muted under the brand heading. */
+  alias?: string;
   items: ShopItemView[];
 };
 
@@ -115,9 +122,17 @@ export function packageName(product: string, name: string): string {
   return name.startsWith(prefix) ? name.slice(prefix.length) : name;
 }
 
-/** A cart line named brand first ("Hazy IPA · ½ bbl keg"), as the summary and Review list it. */
+/** A cart line named brand first ("Hazy IPA · ½ bbl keg") from the SKU name, for a line with no format name. */
 export function cartLineName(product: string, name: string): string {
   return name.startsWith(product) ? name : `${product} · ${packageName(product, name)}`;
+}
+
+/** How the summary and Review name a catalog item: "Brand · Format" with the brand's alias apart (lineLabel),
+ *  since the SKU name may carry the alias in place of the brand; cartLineName when the format is not named. */
+export function cartLineLabel(item: Pick<ShopCatalogItem, "name" | "product" | "brandAlias" | "formatName">): LineLabel {
+  return item.formatName
+    ? lineLabel({ name: item.name, brands: { name: item.product, alias: item.brandAlias }, formats: { name: item.formatName } })
+    : { name: cartLineName(item.product, item.name) };
 }
 
 export function shopCartTotals(catalog: ShopCatalogItem[], depositCentsPerKeg = 0) {
@@ -175,7 +190,7 @@ function shopSummary(catalog: ShopCatalogItem[], floor: string): ShopSummary {
       const release = i.releases?.find((r) => r.releaseId === chosenOffer(i));
       return {
         key: i.skuId,
-        name: cartLineName(i.product, i.name),
+        ...cartLineLabel(i),
         detail: `${i.qty} × ${money(i.unitPriceCents)}${release ? ` · from the ${formatDate(release.shipsFrom)} release` : ""}`,
         amount: money(i.qty * i.unitPriceCents),
         anchor: brandAnchor(i.product),
@@ -203,7 +218,7 @@ export function toShopViewProps({
   for (const item of catalog) {
     const row: ShopItemView = {
       key: item.skuId,
-      name: packageName(item.product, item.name),
+      name: item.formatName ?? packageName(item.product, item.name),
       price: money(item.unitPriceCents),
       qty: item.qty,
       offers: offersOf(item),
@@ -211,7 +226,7 @@ export function toShopViewProps({
     };
     const group = groups.find((g) => g.product === item.product);
     if (group) group.items.push(row);
-    else groups.push({ product: item.product, items: [row] });
+    else groups.push({ product: item.product, ...(item.brandAlias ? { alias: item.brandAlias } : {}), items: [row] });
   }
   const shipTo = shipTos.find((s) => s.id === shipToId);
   const floor = shipsFromFloor(catalog);

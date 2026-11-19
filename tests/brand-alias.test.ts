@@ -1,6 +1,7 @@
-// tests/brand-alias.test.ts — a brand's staff-only alias (an informal name such
-// as a series number) and a recipe's brand that can change after creation
-// (docs/plans/brand-alias.md). The alias never reaches a portal customer.
+// tests/brand-alias.test.ts — a brand's alias (an informal name such as a
+// series number) and a recipe's brand that can change after creation
+// (docs/plans/brand-alias.md). Buyers read the alias only through the portal
+// projections (tests/portal-brand-alias.test.ts), never the brands table.
 import { beforeAll, describe, expect, it } from "vitest";
 import { admin, asUser, makeBrewery, makeCustomerUser, makeStaffCtx, seedCatalog, seedCustomer } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";

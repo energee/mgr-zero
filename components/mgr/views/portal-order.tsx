@@ -3,6 +3,7 @@
 // Live passes footer as the Reorder link; inventory draws the unlabeled button.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { BrandedName } from "@/components/mgr/views/branded-name";
 import type { PortalOrderViewModel } from "@/lib/mgr/portal-order-view";
 
 export function PortalOrderView({
@@ -30,7 +31,7 @@ export function PortalOrderView({
       {model.note ? E.fld("Note", model.note) : null}
       {model.lines.map((line) => (
         <Fragment key={line.key}>
-          {E.row(line.name, line.detail, line.amount, line.warning ? "w" : "")}
+          {E.row(<BrandedName name={line.name} alias={line.alias} />, line.detail, line.amount, line.warning ? "w" : "")}
         </Fragment>
       ))}
       {model.adjusted ? E.info(model.adjusted) : null}

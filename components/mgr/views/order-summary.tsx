@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm } from "@/components/mgr/command-form";
 import { DatePicker } from "@/components/mgr/date-picker";
 import { PalletFitBlock } from "./pallet-fit";
+import { BrandedName } from "./branded-name";
 import type { ShopViewModel } from "@/lib/mgr/shop-view";
 import type { ShopControls } from "./shop";
 
@@ -45,7 +46,7 @@ function SummaryBody({ model, controls, locked, onLine }: Omit<SummaryProps, "di
     {summary.lines.length ? <ul className="flex flex-col divide-y">
       {summary.lines.map(line => <li key={line.key}>
         <a href={`#${line.anchor}`} data-to="Shop" onClick={onLine} className="flex items-start justify-between gap-3 py-2 text-sm">
-          <span className="min-w-0"><span className="block font-medium">{line.name}</span><span className="block text-xs text-muted-foreground">{line.detail}</span></span>
+          <span className="min-w-0"><span className="block font-medium"><BrandedName name={line.name} alias={line.alias} /></span><span className="block text-xs text-muted-foreground">{line.detail}</span></span>
           <span className="shrink-0 tabular-nums">{line.amount}</span>
         </a>
       </li>)}

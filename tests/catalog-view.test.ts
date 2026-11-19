@@ -176,7 +176,7 @@ describe("Catalog view", () => {
     // What the alias is for stays visible while typing (#1131).
     expect(html).not.toContain('placeholder="Staff only"');
     expect(html).toMatch(/<input[^>]*aria-describedby="brand-alias-help"/);
-    expect(html).toMatch(/id="brand-alias-help"[^>]*>An informal name staff use, such as a series number\./);
+    expect(html).toMatch(/id="brand-alias-help"[^>]*>An informal name, such as a series number\. Search finds it; buyers see it under the brand name in the portal\./);
   });
 
   // #965: inventory and live draw the same Water profiles row, with no invented count.

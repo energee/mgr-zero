@@ -489,7 +489,7 @@ describe("portal commands", () => {
     await priceSku(otherBrewery.id, { saleChannelId: foreignCustomer.saleChannelId, brandId: foreignCatalog.brandId, formatId: foreignCatalog.formatId, cents: 7700 });
 
     const rows = await runCommand("portal_catalog", {}, custCtx) as { skuId: string; unitPriceCents: number }[];
-    expect(rows.filter(row => row.skuId === skuId)).toEqual([{ skuId, name: "IPA case", product: "IPA", unitPriceCents: 3600, badge: expect.any(String), releases: [], packageType: "can", kegSize: null, unitsPerCase: null, palletFit: null }]);
+    expect(rows.filter(row => row.skuId === skuId)).toEqual([{ skuId, name: "IPA case", product: "IPA", brandAlias: null, formatName: expect.any(String), unitPriceCents: 3600, badge: expect.any(String), releases: [], packageType: "can", kegSize: null, unitsPerCase: null, palletFit: null }]);
     expect(rows.some(row => row.skuId === foreignCatalog.skuId)).toBe(false);
   });
 

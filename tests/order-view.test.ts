@@ -562,12 +562,12 @@ describe("order header channel", () => {
 });
 
 describe("ordered line names", () => {
-  it("names a line by its brand, the brand's staff alias, then its format", () => {
+  it("names a line by its brand then its format, with the brand's alias apart", () => {
     const [first, ...rest] = orderConfirmedWholesale.lines;
     const lines = [{ ...first, skus: { name: "Animal #33 · Case", brands: { name: "White Lion", alias: "Animal #33" }, formats: { name: "Case" } } }, ...rest];
     const model = toOrderViewProps({ ...orderConfirmedWholesale, lines });
-    expect(model.lines[0].name).toBe("White Lion · Animal #33 · Case");
-    // The staff alias sits muted on its own line under the brand and format.
+    expect(model.lines[0]).toMatchObject({ name: "White Lion · Case", alias: "Animal #33" });
+    // The alias sits muted on its own line under the brand and format.
     expect(renderToStaticMarkup(createElement(OrderView, { model }))).toContain('<span class="flex flex-col"><span>White Lion · Case</span><span class="text-xs font-normal text-muted-foreground">Animal #33</span></span>');
   });
 

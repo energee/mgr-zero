@@ -19,7 +19,7 @@ import { canRetireCommandFailure } from "@/lib/commands/failure";
 /** A portal_catalog row: badge is the stock offer (null: not orderable from stock), releases the release offers;
  *  the package facts and pallet fit feed the summary's Pallet fit. */
 export type CatalogItem = {
-  skuId: string; name: string; product: string; unitPriceCents: number; badge: string | null; releases: ShopRelease[];
+  skuId: string; name: string; product: string; brandAlias?: string | null; formatName?: string; unitPriceCents: number; badge: string | null; releases: ShopRelease[];
   packageType?: string | null; kegSize?: string | null; unitsPerCase?: number | null; palletFit?: number | null;
 };
 export type ShipToOption = { id: string; label: string; country: string; is_default?: boolean };
@@ -169,7 +169,7 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource }: CartPr
         {feedback}
       </>} />
     <CommandForm open={review && quote !== null} onOpenChange={open => { setReview(open); if (!open) setQuote(null); }} title="Review order">
-      {quote && <ReviewOrderView model={{ ...toQuotedReviewOrderViewProps(quote, { ...fields, requestedShipDate }), palletFit: shopModel.summary.palletFit }} locked={locked} disabled={disabled} submitting={busy}
+      {quote && <ReviewOrderView model={{ ...toQuotedReviewOrderViewProps(quote, { ...fields, requestedShipDate }, catalog), palletFit: shopModel.summary.palletFit }} locked={locked} disabled={disabled} submitting={busy}
         onQuantity={(id, value) => { setQty(prev => ({ ...prev, [id]: value })); setReview(false); setQuote(null); }}
         onBack={() => { setReview(false); setQuote(null); }}
         onPlace={() => { void run("submit"); }} messages={feedback} />}

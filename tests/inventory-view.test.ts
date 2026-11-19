@@ -265,7 +265,7 @@ describe("finished goods brand alias", () => {
 
   it("names an aliased SKU's row by brand and format, with the alias muted under them", () => {
     const model = toFinishedGoodsViewProps({ skus: [aliased] });
-    expect(model.rows[0]).toMatchObject({ name: "White Lion · Animal #33 · Case", aliased: { brand: "White Lion", alias: "Animal #33", format: "Case" } });
+    expect(model.rows[0]).toMatchObject({ name: "White Lion · Case", alias: "Animal #33" });
     expect(htmlOf(createElement(FinishedGoodsView, { model, movements: { rows: [] } })))
       .toContain('<span class="flex flex-col"><span>White Lion · Case</span><span class="text-xs font-normal text-muted-foreground">Animal #33</span></span>');
   });
@@ -273,6 +273,6 @@ describe("finished goods brand alias", () => {
   it("keeps a SKU without an alias as skuLabel names it", () => {
     const model = toFinishedGoodsViewProps({ skus: [{ ...aliased, brands: { name: "Pils" }, name: "Case" }] });
     expect(model.rows[0].name).toBe("Pils · Case");
-    expect(model.rows[0].aliased).toBeUndefined();
+    expect(model.rows[0].alias).toBeUndefined();
   });
 });

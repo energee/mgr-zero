@@ -4684,7 +4684,7 @@ isOneToOne: false
                   ]
                 },"portal_sku_prices": {
                   Row: {
-                    "brand_name": string | null,"brewery_id": string | null,"keg_size": Database["public"]['Enums']["keg_size"] | null,"package_type": Database["public"]['Enums']["package_type"] | null,"pallet_fit": number | null,"sale_channel_id": string | null,"sku_id": string | null,"sku_name": string | null,"unit_price_cents": number | null,"units_per_case": number | null
+                    "brand_alias": string | null,"brand_name": string | null,"brewery_id": string | null,"format_name": string | null,"keg_size": Database["public"]['Enums']["keg_size"] | null,"package_type": Database["public"]['Enums']["package_type"] | null,"pallet_fit": number | null,"sale_channel_id": string | null,"sku_id": string | null,"sku_name": string | null,"unit_price_cents": number | null,"units_per_case": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -5642,7 +5642,7 @@ isOneToOne: false
                            },
 "portal_sku_price_rows":
 { Args: Record<PropertyKey, never>; Returns: {
-              "brand_name": string,"brewery_id": string,"keg_size": Database["public"]['Enums']["keg_size"],"package_type": Database["public"]['Enums']["package_type"],"pallet_fit": number,"sale_channel_id": string,"sku_id": string,"sku_name": string,"unit_price_cents": number,"units_per_case": number
+              "brand_alias": string,"brand_name": string,"brewery_id": string,"format_name": string,"keg_size": Database["public"]['Enums']["keg_size"],"package_type": Database["public"]['Enums']["package_type"],"pallet_fit": number,"sale_channel_id": string,"sku_id": string,"sku_name": string,"unit_price_cents": number,"units_per_case": number
             }[]
                            },
 "portal_submit_quote":

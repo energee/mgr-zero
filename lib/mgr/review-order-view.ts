@@ -1,7 +1,7 @@
 // Review uses authoritative quote amounts when available; unquoted amounts stay pending.
 import { money } from "./money";
 import { shipToLine } from "./ship-to-view";
-import { cartLineName, cartPalletFit, shopCartTotals, type ShopSnapshot } from "./shop-view";
+import { cartLineLabel, cartPalletFit, shopCartTotals, type ShopCatalogItem, type ShopSnapshot } from "./shop-view";
 import type { PalletFitGroup } from "./pallet-fit";
 
 export type ReviewOrderSnapshot = ShopSnapshot & {
@@ -23,7 +23,10 @@ export type PortalQuote = {
 
 export type ReviewOrderLineView = {
   key: string;
+  /** "Brand · Format" (cartLineLabel). */
   name: string;
+  /** The brand's alias, muted under the name. */
+  alias?: string;
   price: string;
   qty: number;
   qtyLabel: string;
@@ -62,7 +65,7 @@ export function toReviewOrderViewProps({
   note,
 }: ReviewOrderSnapshot): ReviewOrderViewModel {
   const palletFit = cartPalletFit(catalog);
-  if (quote) return { ...toQuotedReviewOrderViewProps(quote, { poNumber, requestedShipDate: requestedDate, note }), palletFit };
+  if (quote) return { ...toQuotedReviewOrderViewProps(quote, { poNumber, requestedShipDate: requestedDate, note }, catalog), palletFit };
   const { merchandiseCents } = shopCartTotals(catalog, depositCentsPerKeg);
   const shipTo = shipTos.find((s) => s.id === shipToId);
   const shipToLabel = shipTo
@@ -71,7 +74,7 @@ export function toReviewOrderViewProps({
   return {
     lines: catalog.filter((i) => i.qty > 0).map((i) => ({
       key: i.skuId,
-      name: cartLineName(i.product, i.name),
+      ...cartLineLabel(i),
       price: money(i.unitPriceCents),
       qty: i.qty,
       qtyLabel: `${i.product} quantity`,
@@ -90,12 +93,13 @@ export function toReviewOrderViewProps({
   };
 }
 
-/** Quote amounts and identities are server facts, never estimates from SKU names. */
-export function toQuotedReviewOrderViewProps(quote: PortalQuote, fields: { poNumber?: string; requestedShipDate?: string | null; note?: string }): ReviewOrderViewModel {
+/** Quote amounts and identities are server facts, never estimates from SKU names. A line is named from its
+ *  catalog item (brand, alias, format) when `catalog` holds it; the quote carries only the SKU and brand names. */
+export function toQuotedReviewOrderViewProps(quote: PortalQuote, fields: { poNumber?: string; requestedShipDate?: string | null; note?: string }, catalog: ShopCatalogItem[] = []): ReviewOrderViewModel {
   const calculated = quote.taxStatus === "calculated";
   return {
     lines: quote.lines.map(line => ({
-      key: line.skuId, name: cartLineName(line.product, line.name), price: `${money(line.unitPriceCents)} each · ${money(line.amountCents)}`,
+      key: line.skuId, ...cartLineLabel(catalog.find(i => i.skuId === line.skuId) ?? line), price: `${money(line.unitPriceCents)} each · ${money(line.amountCents)}`,
       qty: line.qty, qtyLabel: `${line.product} quantity`,
     })),
     deposits: quote.deposits.map((deposit, index) => ({ key: String(index), name: `${deposit.name} deposit`, detail: `Quantity ${deposit.qty} at ${money(deposit.unitPriceCents)}`, amount: money(deposit.amountCents) })),

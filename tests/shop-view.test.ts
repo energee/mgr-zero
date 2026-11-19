@@ -265,3 +265,25 @@ describe("Shop order summary", () => {
     expect(html).toMatch(/1 full \+ 5 · 15 to fill/);
   });
 });
+
+describe("Shop brand alias", () => {
+  // portal_catalog's SKU name can carry the alias in place of the brand; names come from brand and format.
+  const giraffe: ShopCatalogItem = { skuId: "g1", name: "Animal #31 · Sixtel", product: "Masai Giraffe", brandAlias: "Animal #31", formatName: "Sixtel", unitPriceCents: 6200, badge: "in", qty: 3 };
+  const pils: ShopCatalogItem = { skuId: "p1", name: "Pils · Case", product: "Pils", brandAlias: null, formatName: "Case", unitPriceCents: 4000, badge: "in", qty: 0 };
+  const shop = { ...ridgelineShop, catalog: [giraffe, pils] };
+
+  it("heads the brand with its alias apart, and names each row by its format", () => {
+    const model = toShopViewProps(shop);
+    expect(model.groups.map((g) => [g.product, g.alias, g.items.map((i) => i.name)])).toEqual([["Masai Giraffe", "Animal #31", ["Sixtel"]], ["Pils", undefined, ["Case"]]]);
+    const html = htmlOf(createElement(ShopView, { model, footer: null }));
+    expect(html).toMatch(/>Masai Giraffe<\/h2><p class="[^"]*text-muted-foreground[^"]*">Animal #31<\/p>/);
+  });
+
+  it("names summary and Review lines brand · format with the alias apart", () => {
+    expect(toShopViewProps(shop).summary.lines[0]).toMatchObject({ name: "Masai Giraffe · Sixtel", alias: "Animal #31" });
+    const quote = { ...ridgelineReviewOrder.quote!, lines: [{ skuId: "g1", name: "Animal #31 · Sixtel", product: "Masai Giraffe", qty: 3, unitPriceCents: 6200, amountCents: 18600 }] };
+    const review = toReviewOrderViewProps({ ...shop, quote });
+    expect(review.lines[0]).toMatchObject({ name: "Masai Giraffe · Sixtel", alias: "Animal #31" });
+    expect(htmlOf(createElement(ReviewOrderView, { model: review, footer: null }))).toContain('<span>Masai Giraffe · Sixtel</span><span class="text-xs font-normal text-muted-foreground">Animal #31</span>');
+  });
+});

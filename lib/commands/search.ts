@@ -74,7 +74,7 @@ async function byKind(ctx: Ctx, kind: SearchKind, q: string): Promise<SearchHit[
   const name = (embed: unknown) => (embed as { name: string } | null)?.name ?? "";
   switch (kind) {
     case "sku": {
-      // A SKU matches on its own name or its brand's staff-only alias ("Field Notes #14").
+      // A SKU matches on its own name or its brand's alias ("Field Notes #14").
       // PostgREST cannot `or` a column with an embedded one, so two prefix reads merge.
       const [byName, byAlias] = await Promise.all([
         unwrap(ctx.db.from(L.sku.table).select(L.sku.select).eq("brewery_id", b).regexIMatch("name", prefix).limit(LIMIT)),

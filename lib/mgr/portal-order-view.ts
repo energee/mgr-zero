@@ -2,6 +2,7 @@
 // portal_order (order, lines, events, changes after confirm, shipment.invoices) plus buyerStatus.
 import { plural } from "@/lib/mgr/plural";
 import { docNo } from "./doc-no";
+import { lineLabel, type BrandedSku } from "./brand-lines";
 import { money } from "./money";
 import { orderLineCents } from "./order-view";
 import { shipToLine } from "./ship-to-view";
@@ -12,7 +13,10 @@ import { changedAfterConfirmText, type OrderLineChange } from "./order-changes-v
 
 export type PortalOrderLineView = {
   key: string;
+  /** "Brand · Format" (lineLabel), or the SKU name. */
   name: string;
+  /** The brand's alias, muted under the name. */
+  alias?: string;
   detail: string;
   amount: string;
   warning?: boolean;
@@ -62,7 +66,8 @@ export type PortalOrderSnapshot = {
     qty_refused?: number;
     short_reason?: string | null;
     unit_price_cents: number;
-    skus: { name: string } | null;
+    /** portal_order_rows embeds the brand (with alias) and format names. */
+    skus: BrandedSku;
   }[];
   events: {
     id: string;
@@ -114,7 +119,7 @@ export function toPortalOrderViewProps({ order, lines, events, changes = [], shi
       const qty = shipped !== null && shipment?.invoice_timing === "on_delivery" ? shipped - Number(l.qty_refused ?? 0) : shipped ?? ordered;
       return {
         key: l.id,
-        name: l.skus?.name ?? "Item",
+        ...lineLabel(l.skus ?? { name: "Item" }),
         detail: shipped !== null ? `ordered ${ordered} · shipped ${shipped}${l.qty_refused ? ` · refused ${l.qty_refused} · accepted ${shipped - l.qty_refused}` : ""}` : `ordered ${ordered}`,
         amount: money(orderLineCents(qty, Number(l.unit_price_cents))),
         warning: Boolean(l.qty_refused) || (shipped !== null && shipped < ordered),

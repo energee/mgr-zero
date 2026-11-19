@@ -32,6 +32,7 @@ export function ShopView({ model, footer, comingUp, controls = {}, quantities, l
         <fieldset disabled={locked} className="contents" onFocusCapture={event => setTyping(event.target instanceof HTMLInputElement)} onBlurCapture={() => setTyping(false)}>
           {model.empty ? E.blank(model.empty) : model.groups.map(group => <Fragment key={group.product}>
             {E.ttl(group.product, brandAnchor(group.product))}
+            {group.alias ? <p className="-mt-1 text-xs text-muted-foreground">{group.alias}</p> : null}
             {/* Beside the price: a lone release reads as text (stock alone needs no words); several offers are an inline pick. */}
             {group.items.map(item => <Fragment key={item.key}>
               {E.row(item.name, item.offers.length > 1

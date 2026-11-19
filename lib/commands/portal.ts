@@ -152,7 +152,7 @@ defineCommand({
 });
 
 defineQuery({
-  name: "portal_catalog", description: "Portal: orderable SKUs with the caller's prices and their offers: badge is the packaged-stock availability (null when the SKU is not orderable from stock) and releases are the open releases, each with its ships-from and order-by dates and its own badge; packageType, kegSize, unitsPerCase and palletFit (advisory: how many fill one pallet unit) describe its package. A SKU with no open offer is left out",
+  name: "portal_catalog", description: "Portal: orderable SKUs with the caller's prices and their offers: badge is the packaged-stock availability (null when the SKU is not orderable from stock) and releases are the open releases, each with its ships-from and order-by dates and its own badge; packageType, kegSize, unitsPerCase and palletFit (advisory: how many fill one pallet unit) describe its package; product is the brand, brandAlias its alias (null when none) and formatName the format, which name the line. A SKU with no open offer is left out",
   roles: "customer",
   input: z.object({}),
   handler: async (ctx) => {
@@ -164,16 +164,16 @@ defineQuery({
     // portal_availability returns only SKUs orderable from stock (the stock
     // offer); portal_releases the open releases (the release offers).
     const [prices, avail, releases] = await Promise.all([
-      unwrap(ctx.db.from("portal_sku_prices").select("sku_id, sku_name, brand_name, unit_price_cents, package_type, keg_size, units_per_case, pallet_fit")
+      unwrap(ctx.db.from("portal_sku_prices").select("sku_id, sku_name, brand_name, brand_alias, format_name, unit_price_cents, package_type, keg_size, units_per_case, pallet_fit")
         .eq("brewery_id", ctx.breweryId).eq("sale_channel_id", customer.sale_channel_id)),
       unwrap(ctx.db.rpc("portal_availability", { p_customer: customerId })),
       unwrap(ctx.db.rpc("portal_releases", { p_customer: customerId })),
     ]);
     const badges = new Map((avail as { sku_id: string; badge: string }[]).map(a => [a.sku_id, a.badge]));
     const offers = Map.groupBy(releases ?? [], r => r.sku_id);
-    const priceRows = prices as { sku_id: string; sku_name: string; brand_name: string; unit_price_cents: number; package_type: string | null; keg_size: string | null; units_per_case: number | null; pallet_fit: number | null }[];
+    const priceRows = prices as { sku_id: string; sku_name: string; brand_name: string; brand_alias: string | null; format_name: string; unit_price_cents: number; package_type: string | null; keg_size: string | null; units_per_case: number | null; pallet_fit: number | null }[];
     return priceRows.filter(p => badges.has(p.sku_id) || offers.has(p.sku_id)).map(p => ({
-      skuId: p.sku_id, name: p.sku_name, product: p.brand_name,
+      skuId: p.sku_id, name: p.sku_name, product: p.brand_name, brandAlias: p.brand_alias, formatName: p.format_name,
       unitPriceCents: p.unit_price_cents, badge: badges.get(p.sku_id) ?? null,
       packageType: p.package_type, kegSize: p.keg_size, unitsPerCase: p.units_per_case, palletFit: p.pallet_fit,
       releases: (offers.get(p.sku_id) ?? []).map(r => ({ releaseId: r.release_id, shipsFrom: r.ships_from, ordersCloseOn: r.orders_close_on, badge: r.badge })),

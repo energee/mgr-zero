@@ -32,3 +32,12 @@ describe("Order detail: changes after confirm", () => {
     expect(html).toContain("Changed after confirm: Damaged,");
   });
 });
+
+describe("portal order brand alias", () => {
+  it("names a line brand · format with the brand's alias muted under it", () => {
+    const giraffe = { name: "Animal #31 · Sixtel", brands: { name: "Masai Giraffe", alias: "Animal #31" }, formats: { name: "Sixtel" } };
+    const model = toPortalOrderViewProps({ ...portalOrderShipped, lines: [{ ...portalOrderShipped.lines[0], skus: giraffe }] });
+    expect(model.lines[0]).toMatchObject({ name: "Masai Giraffe · Sixtel", alias: "Animal #31" });
+    expect(renderToStaticMarkup(createElement(PortalOrderView, { model }))).toContain('<span>Masai Giraffe · Sixtel</span><span class="text-xs font-normal text-muted-foreground">Animal #31</span>');
+  });
+});

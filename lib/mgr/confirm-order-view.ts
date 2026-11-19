@@ -8,6 +8,8 @@ export type ConfirmOrderLineView = {
   key: string;
   /** Brand heading; lines arrive grouped by it (brand-lines.ts). */
   group?: string;
+  /** The brand's alias, muted under the brand heading. */
+  alias?: string;
   /** Format under the brand, or the SKU name when it has no brand and format. */
   name: string;
   /** qty_ordered; Confirm order edits it in place. */
