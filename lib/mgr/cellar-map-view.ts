@@ -1,18 +1,23 @@
 import type { VesselReading } from "./vessel-detail-view";
 import { currentFigures, type RecentGravity } from "./batches-view";
+import { breweryDate } from "@/lib/date-format";
 
 export type CellarMapViewModel = {
   /** addHref null hides Add vessel (vessels are admin-managed). actionsOff: no
    *  tank holds beer, so Reading, Transfer and Addition are all off; the page
    *  hands the same flag to the live Transfer and Addition forms. actionHint
-   *  says why an action is off. readingHref null with beer in several tanks
-   *  hides the top Reading: each tile's reading line opens it instead.
+   *  says why an action is off. readingHref is where the day's reading round
+   *  starts: the first tank, in tile order, with no reading today, or the
+   *  first tank when all have one. It is null when no tank holds beer.
    *  A tile's `group` is its vessel-type heading. An empty tank has no volume,
-   *  reading or fill. A tile's readingHref is set only when it holds beer; it
-   *  makes the reading line a link, or with no reading yet draws an Add
-   *  reading button. The inventory gives "" to draw either inert. */
+   *  reading, fill or day, and its detail is its capacity: the view lists it on
+   *  its group's Empty line, not as a tile. `day` is the days the beer has been
+   *  in this tank ("Day 14"). `readToday` says the tank's newest reading was
+   *  taken today. A tile's readingHref is set only when it holds beer; it
+   *  draws an Add reading button beside the reading line. The inventory gives
+   *  "" to draw the button inert. */
   backHref?: string; addHref?: string | null; readingHref?: string | null; actionsOff?: boolean; actionHint?: string; brewHref?: string;
-  tiles: { name: string; group: string; detail: string; volume?: string; reading?: string; warning?: boolean; fill?: number; href?: string; readingHref?: string }[];
+  tiles: { name: string; group: string; detail: string; day?: string; volume?: string; reading?: string; readToday?: boolean; warning?: boolean; fill?: number; href?: string; readingHref?: string }[];
   detail?: { title: string; description: string; href?: string };
 };
 
@@ -39,43 +44,58 @@ export function nextTankOccupancy(vessels: OrderedVessel[], occupancies: TileOcc
   return at === -1 ? null : order[at + 1] ?? null;
 }
 
-export function toCellarMapViewProps(vessels: (OrderedVessel & { capacity_bbl: number })[], occupancies: { vessel_id: string; occupancy_id: string; brand_name: string | null; bbl: number }[], readings: Record<string, string> = {}, hrefs: Record<string, string> = {}, readingHref?: (occupancyId: string) => string): CellarMapViewModel {
-  // The map's top Reading button can only be bound when a single tank is
-  // occupied; with several there is no unambiguous target and guessing records
-  // the reading against the wrong one, so the view hides it and each occupied
-  // tile's reading line opens Reading instead (#1508). The caller supplies the
-  // path — this never invents one.
+/** Whole calendar days from `startedAt` to `now`, both read as days in `timeZone`: beer knocked out yesterday afternoon is on day 1 this morning. */
+function daysInTank(startedAt: string, timeZone: string, now: Date): number {
+  const day = (at: Date) => Date.parse(breweryDate(timeZone, at));
+  return Math.round((day(now) - day(new Date(startedAt))) / 86_400_000);
+}
+
+/** One tank's newest reading for the map: the line its tile shows, and when it was taken. */
+type CellarReading = { text: string; at: string };
+
+/** `timeZone` is the brewery's: with it each occupied tile says its days in the tank and whether it was read today; without it no tile does. */
+export function toCellarMapViewProps(vessels: (OrderedVessel & { capacity_bbl: number })[], occupancies: { vessel_id: string; occupancy_id: string; brand_name: string | null; started_at: string; bbl: number }[], readings: Record<string, CellarReading> = {}, hrefs: Record<string, string> = {}, readingHref?: (occupancyId: string) => string, timeZone?: string, now: Date = new Date()): CellarMapViewModel {
+  // The map's top Reading button starts the day's round at the first tank not
+  // read today; the sheet names its tank, and Save and next tank walks the
+  // rest in tile order (#1508). The caller supplies the path — this never
+  // invents one.
   // With no beer in any tank, Reading, Transfer and Addition are all off
   // (actionsOff), and the one hint says why, so none is a silent dead end
   // (#715, #1115).
-  const only = occupancies.length === 1 ? occupancies[0] : undefined;
+  const today = timeZone === undefined ? undefined : breweryDate(timeZone, now);
   const actionsOff = occupancies.length === 0;
   const actionHint = actionsOff ? "No tank holds beer, so there is nothing to read, transfer or add to." : undefined;
-  return { readingHref: readingHref && (only ? readingHref(only.occupancy_id) : null), actionsOff, actionHint, tiles: cellarOrder(vessels).map(vessel => {
+  const tiles = cellarOrder(vessels).map(vessel => {
     const occupancy = tileOccupancy(vessel, occupancies);
     const capacity = Number(vessel.capacity_bbl);
     const tile = { name: vessel.name, group: KIND_GROUPS[vessel.kind], href: hrefs[vessel.id] };
-    if (!occupancy) return { ...tile, detail: `Empty · ${capacity} bbl` };
+    if (!occupancy) return { ...tile, detail: `${capacity} bbl` };
     const quantity = Number(occupancy.bbl);
-    const link = readingHref?.(occupancy.occupancy_id);
-    // A linked tile with no reading has no reading line: the view draws Add reading there.
-    return { ...tile, detail: occupancy.brand_name ?? "No brand yet", volume: `${quantity} / ${capacity} bbl`, reading: readings[occupancy.occupancy_id] ?? (link === undefined ? "No readings yet" : undefined), fill: capacity > 0 ? quantity / capacity * 100 : undefined, readingHref: link };
-  }) };
+    const latest = readings[occupancy.occupancy_id];
+    return {
+      ...tile, detail: occupancy.brand_name ?? "No brand yet", day: timeZone === undefined ? undefined : `Day ${daysInTank(occupancy.started_at, timeZone, now)}`, volume: `${quantity} / ${capacity} bbl`,
+      reading: latest?.text ?? "No readings yet", readToday: timeZone !== undefined && latest !== undefined && breweryDate(timeZone, new Date(latest.at)) === today,
+      fill: capacity > 0 ? quantity / capacity * 100 : undefined, readingHref: readingHref?.(occupancy.occupancy_id),
+    };
+  });
+  const occupied = tiles.filter(tile => "volume" in tile);
+  const roundStart = occupied.find(tile => !tile.readToday) ?? occupied[0];
+  return { readingHref: readingHref && (roundStart?.readingHref ?? null), actionsOff, actionHint, tiles };
 }
 
 // Each open occupancy's latest reading, keyed by occupancy id, from one
 // list_batches({ readings: true }) read — the batch list already embeds the
 // newest reading per open occupancy, so the cellar map never asks per tank (#700).
-// A tank with no reading has no entry: the map words that line itself.
+// A tank with no reading has no entry: the map says "No readings yet" there.
 // A tile is narrow, so it says only the beer's ABV so far ("5.4% ABV"), from
 // the same figures Batches shows; the reading itself, its age and Fermenting or
 // Finished are on Batches and Vessel detail. A tank whose only gravity is the
 // OG says "No ABV yet".
 type CellarBatch = { og_reading?: { id: string; gravity_plato: number } | null; active_occupancies: { id: string; latest_reading?: VesselReading | null; recent_gravity?: RecentGravity[] }[] };
-export function cellarReadings(batches: CellarBatch[]): Record<string, string> {
+export function cellarReadings(batches: CellarBatch[]): Record<string, CellarReading> {
   return Object.fromEntries(batches.flatMap(batch => batch.active_occupancies.flatMap(({ id, latest_reading, recent_gravity }) => {
     if (!latest_reading) return [];
     const { abv } = currentFigures(batch.og_reading, recent_gravity?.[0]);
-    return [[id, abv ? `${abv} ABV` : "No ABV yet"]];
+    return [[id, { text: abv ? `${abv} ABV` : "No ABV yet", at: latest_reading.at }]];
   })));
 }

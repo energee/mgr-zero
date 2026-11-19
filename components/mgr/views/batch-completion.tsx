@@ -36,7 +36,7 @@ export function BatchCompletionView({ batches, open, onOpenChange, batchId, prev
   const reason = phase === "loading" ? null : submitReason(missing);
   return <div data-preview-action className="flex flex-col items-start gap-2"><CommandForm open={open} title="Complete batch"
     onOpenChange={next => { onOpenChange(next); if (next && batches.length === 1 && !batchId) onReview(batches[0].id); }}
-    trigger={<Button variant="outline" disabled={none} aria-describedby={none ? "completion-none" : undefined}>Complete batch</Button>}>
+    trigger={<Button variant="outline" className="w-full md:w-fit" disabled={none} aria-describedby={none ? "completion-none" : undefined}>Complete batch</Button>}>
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       {E.pick("Batch", batchId, [{ value: "", label: "Batch to complete" }, ...batches.map(batch => ({ value: batch.id, label: batch.label }))], { onChange: onReview, disabled: frozen })}
       {phase === "loading" && <p className="text-sm text-muted-foreground">Calculating from the cellar ledger...</p>}

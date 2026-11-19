@@ -1067,7 +1067,9 @@ describe("SCREENS", () => {
       (html.match(/<button\b[^>]*>/g) ?? []).filter((b) =>
         /data-variant="(?:default|irreversible)"/.test(b)
         && !/\sdisabled(?:=["'][^"']*["'])?(?=[\s>])/.test(b)
-        && !/data-size="icon"/.test(b),
+        && !/data-size="icon"/.test(b)
+        // A borderless toggle (Cellar's Tiles / Rows) is also variant "default", and commits nothing.
+        && !/data-slot="toggle-group-item"/.test(b),
       );
     for (const name of named) {
       const s = SCREENS.find((x) => x.name === name);
