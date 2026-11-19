@@ -95,7 +95,7 @@ suggest a value, shown as described in "Suggestions in forms" below.
 | 20 | Material name | `MATERIAL_CATEGORIES` | Suggest | H | `lib/recipe-ibu.ts` counts only `hop` lines, so a wrong category silently drops a hop from IBU |
 | 21 | Square item and variation name (`list_pos_variations`, `queued`) | The brewery's SKUs, poured formats, Ignore | Suggest | H | A wrong map skews taproom variance, not TTB; reversible |
 | 22 | CSV header and sample cells | The file's headers, No column | Suggest | M–H | Today only an exact header maps (`import-wizard.tsx`); preview and validation stay |
-| 23 | New customer, vendor, material or brand name | Close existing names, none | Suggest | M | The unique key is exact, so "Joe's Bar" and "Joes Bar" both save |
+| 23 | New customer, vendor, material or brand name | Close existing names, none | Suggest | M | The unique key is exact, so "Joe's Bar" and "Joes Bar" both save. Plan: `docs/plans/near-duplicate-names.md` (code first, no Jev) |
 | 24 | CSV cell for a fixed field ("Net 30 days") | `CUSTOMER_TYPES`, `PAYMENT_TERMS` | Suggest | M | Terms move due dates; staff confirm every value |
 | 25 | New brand style | Existing styles, new style | Suggest | L–M | |
 | 26 | Finished-goods movement note and its `type` | Match, mismatch, unclear | Flag | M | TTB-adjacent: defer like use case 5 |
