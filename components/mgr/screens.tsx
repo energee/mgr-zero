@@ -188,6 +188,7 @@ import { WorkView } from "@/components/mgr/views/work";
 import { TransferDetailView } from "@/components/mgr/views/transfer-detail";
 import { TransfersView } from "@/components/mgr/views/transfers";
 import { VendorView } from "@/components/mgr/views/vendor";
+import { SimilarNamesNote } from "@/components/mgr/similar-names";
 import { VendorsView } from "@/components/mgr/views/vendors";
 import { VendorDetailView } from "@/components/mgr/views/vendor-detail";
 import { RemoveVesselControl, VesselDetailView } from "@/components/mgr/views/vessel-detail";
@@ -2351,6 +2352,21 @@ export const SCREENS: Screen[] = [
     states: [["permission", "admin, warehouse or brewer required", 1], ["new", "name required · status controls appear after saving"], ["active", "available for new purchase orders"], ["inactive", "not a New purchase order choice · existing links remain"], ["change status", "Deactivate vendor or Reactivate vendor confirms before saving form changes"]],
     spec: "Contracts remain separate records because a vendor may supply many materials. Lead time lives here rather than on the material: every observation of it is an ordered-to-received span keyed by the vendor, so the estimate sits where the evidence is. Planning reads it to date the buy-by of the slowest supplier a bill of materials resolves to.",
     body: <VendorView model={vendorEdit} />,
+  },
+  {
+    step: 7,
+    slice: 2,
+    tab: "More",
+    surface: "sheet",
+    name: "Vendor similar name",
+    sheetTitle: "New vendor",
+    to: { "Save vendor": "Vendors" },
+    job: "Warn that a typed vendor name is close to one the brewery already has, before a second record is made",
+    reads: "find_similar_names",
+    writes: "upsert_vendor",
+    states: [["permission", "admin, warehouse or brewer required", 1], ["no close name", "nothing shows under the name"], ["close name", "Similar: and up to three names, closest first, each opening its record"], ["editing", "the record itself is left out · an unchanged name asks nothing"]],
+    spec: "Names are unique only to the letter, so Hartwell Distributing and Hartwell Distributing, Inc. would both save. After the name field loses focus, the form lists up to three existing names that differ only by spelling, case, punctuation, accents, a leading The, or an ampersand. It warns and never blocks Save, because two real records can have close names. The same line shows under Customer name, Material name and Brand name; a customer's or brand's alias counts as a name, and a material name is plain text because a material has no page. No model is involved.",
+    body: <VendorView model={{ ...vendorEdit, name: "Hartwell Distributing, Inc.", active: null }} nameNote={<SimilarNamesNote kind="vendor" matches={[{ id: "5f0c1d0e-7a41-4c3b-9d2e-1b6f0a9c4e11", name: "Hartwell Distributing" }]} />} />,
   },
   {
     step: 7,

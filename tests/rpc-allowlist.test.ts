@@ -203,6 +203,7 @@ const AUTHENTICATED_RPCS = [
   "schedule_packaging_run(uuid,uuid,date,uuid,jsonb,uuid)",
   "send_purchase_order(uuid,uuid,text,uuid)",
   "set_brewery_agents_enabled(uuid,boolean,uuid)",
+  "similar_names(uuid,text,text,uuid)",
   "set_brewery_suggestions_enabled(uuid,boolean,uuid)",
   "set_brewery_gravity_unit(uuid,text,uuid)",
   "set_brewery_quiet_hours(uuid,uuid,time without time zone,time without time zone,uuid)",

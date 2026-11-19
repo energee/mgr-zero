@@ -3,6 +3,7 @@
 // from. One component creates (no vendor) or edits (a vendor passed in).
 "use client";
 
+import { useSimilarNames } from "@/components/mgr/similar-names";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
@@ -26,6 +27,7 @@ export function VendorForm({ vendor }: { vendor?: Vendor }) {
     id: vendor?.id, name, email: email || undefined, phone: phone || undefined, paymentTerms: terms,
     leadTimeDays: lead === "" ? undefined : Number(lead),
   });
+  const similar = useSimilarNames("vendor", vendor);
   const form = useCommandForm("upsert_vendor", {
     validationFields: ["name", "email", "phone", "leadTimeDays"],
     build,
@@ -43,7 +45,8 @@ export function VendorForm({ vendor }: { vendor?: Vendor }) {
         <VendorView
           model={{ name, email, phone, terms: paymentTermLabel(terms), termsOptions: PAYMENT_TERMS.map(term => PAYMENT_TERM_LABEL[term]), leadDays: lead, active: vendor?.active ?? null }}
           errors={{ ...form.fieldErrors, leadDays: form.fieldErrors.leadTimeDays }}
-          controls={{ name: setName, email: setEmail, phone: setPhone, terms: (label) => setTerms(PAYMENT_TERMS.find(term => PAYMENT_TERM_LABEL[term] === label) ?? "net30"), leadDays: setLead }}
+          controls={{ name: setName, email: setEmail, phone: setPhone, terms: (label) => setTerms(PAYMENT_TERMS.find(term => PAYMENT_TERM_LABEL[term] === label) ?? "net30"), leadDays: setLead, nameBlur: () => similar.check(name) }}
+          nameNote={similar.note}
           validationAttempted={validationAttempted}
           messages={<CommandFormMessage error={form.error} />}
           footer={<CommandFormFooter>{E.submit("Save vendor", { submitting: form.submitting, reason })}</CommandFormFooter>}

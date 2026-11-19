@@ -18,6 +18,7 @@
 // from it (fieldsForKind), leaving any of them the user changed.
 "use client";
 
+import { useSimilarNames } from "@/components/mgr/similar-names";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
@@ -55,6 +56,7 @@ export function MaterialForm({ material, vendors }: { material?: Material; vendo
     "suggest_material_category", { name: askedName },
     !material && askedName !== "" && category === "",
   );
+  const similar = useSimilarNames("material", material);
   const form = useCommandForm("upsert_material", {
     build: () => ({
       id: material?.id, name, category, baseUom, purchaseUom, purchaseUomFactor: Number(factor) || 1, lotTracked,
@@ -86,7 +88,8 @@ export function MaterialForm({ material, vendors }: { material?: Material; vendo
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <MaterialView
           model={{ name, kind: category, kindOptions: MATERIAL_CATEGORIES, kindSuggestion: category === "" ? suggestion.data?.category ?? undefined : undefined, baseUnits: factor, purchaseUnit: purchaseUom, purchaseUnitOptions: UOMS, soldBy: packName, soldBySaved: Boolean(material?.pack_name), unit: baseUom, unitOptions: UOMS, defaultVendorId: vendorId, defaultVendorOptions: vendors.map(({ id, name: label }) => ({ id, label })), extractPotential: extract, alphaAcid: alpha, lotTracked, active }}
-          controls={{ name: setName, kind: material ? setCategory : changeKind, baseUnits: setFactor, purchaseUnit: setPurchaseUom, soldBy: setPackName, unit: setBaseUom, defaultVendorId: setVendorId, extractPotential: setExtract, alphaAcid: setAlpha, lotTracked: setLotTracked, active: setActive, nameBlur: material ? undefined : () => setAskedName(name.trim()) }}
+          controls={{ name: setName, kind: material ? setCategory : changeKind, baseUnits: setFactor, purchaseUnit: setPurchaseUom, soldBy: setPackName, unit: setBaseUom, defaultVendorId: setVendorId, extractPotential: setExtract, alphaAcid: setAlpha, lotTracked: setLotTracked, active: setActive, nameBlur: () => { similar.check(name); if (!material) setAskedName(name.trim()); } }}
+          nameNote={similar.note}
           messages={<CommandFormMessage error={form.error} />}
           footer={<CommandFormFooter><Button type="submit" disabled={form.submitting || !ready}>{form.submitting ? "Saving…" : "Save material"}</Button></CommandFormFooter>}
         />

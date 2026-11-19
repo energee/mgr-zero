@@ -82,6 +82,25 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "delete_ship_to", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "shipToId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
+## find_similar_names [#find_similar_names]
+
+`query` · admin, sales, warehouse, brewer
+
+Up to three existing customer, vendor, material or brand names close to a typed name (spelling, case, punctuation, accents; a customer's or brand's alias counts), closest first, so a form can warn before a near-duplicate is created; only for the roles that may create that kind
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `kind` | customer or vendor or material or brand | yes |
+| `name` | string | yes |
+| `excludeId` | uuid | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "find_similar_names", "input": { "kind": "customer", "name": "string" } }'
+```
+
 ## get_customer [#get_customer]
 
 `query` · admin, sales, warehouse

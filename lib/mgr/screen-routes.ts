@@ -216,6 +216,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Vendors", file: "app/(app)/vendors/page.tsx" },
   { name: "Vendor detail", file: "app/(app)/vendors/[id]/page.tsx" },
   { name: "Vendor", file: "app/(app)/vendors/page.tsx" },
+  { name: "Vendor similar name", file: "app/(app)/vendors/page.tsx" },
   { name: "Contracts", file: "app/(app)/vendors/page.tsx" },
   { name: "Contract", file: "app/(app)/vendors/page.tsx" },
   { name: "Recipes", file: "app/(app)/recipes/page.tsx" },

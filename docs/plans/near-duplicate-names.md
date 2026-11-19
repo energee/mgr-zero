@@ -1,6 +1,8 @@
 # Near-duplicate names
 
-Status: plan, waiting for owner approval. Nothing is built.
+Status: built 2026-11-19. The owner approved all four recommendations: code
+only, warn only, all four record kinds, and edit forms when the name changes.
+"Built, and what changed from the plan" at the end lists the differences.
 
 Source: use case 23 in `docs/plans/jev-use-cases.md`, chosen by the owner on
 2026-11-19 as the next suggestion feature.
@@ -196,3 +198,24 @@ grant execute on function public.similar_names(uuid, text, text, uuid) to authen
 2. **Warn or block?** Recommended: warn only.
 3. **Which records?** Recommended: customers, vendors, materials, brands.
 4. **Edit forms too?** Recommended: yes, when the name changes.
+
+## Built, and what changed from the plan (2026-11-19)
+
+- **Threshold 0.61, not 0.6.** On the 45 labeled pairs in
+  `tests/fixtures/near-duplicate-names.json`, 0.61 flags no look-alike pair
+  that is a different record and misses one `same` pair, a swapped-letter
+  typo ("Mosiac Cryo", 0.47). "16oz Can Lids" and "12oz Can Lids" score
+  exactly 0.60.
+- **The key also reads "&" as "and" and drops a leading "the".** Without
+  these, "Maple & Vine" and "The Rusty Anchor" were missed.
+- **`similar_names` is a security definer function.** Browser roles cannot
+  use the `extensions` schema, where `similarity` and `unaccent` live. The
+  function checks the caller's roles for the kind asked.
+- **The note is a `note` control on `E.edit`**, drawn where the error is. An
+  error replaces it.
+- **One shared hook, `useSimilarNames`** in `components/mgr/similar-names.tsx`,
+  serves all four forms.
+- **A material's close name is plain text.** A material has no page to open.
+- **45 pairs, not 60.** They were enough to place the threshold.
+- **One new inventory frame**, "Vendor similar name". The other three forms
+  are described in its spec and in the staff guide, not drawn separately.
