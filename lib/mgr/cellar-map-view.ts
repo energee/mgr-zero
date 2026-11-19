@@ -2,6 +2,9 @@ import type { VesselReading } from "./vessel-detail-view";
 import { currentFigures, type RecentGravity } from "./batches-view";
 import { breweryDate } from "@/lib/date-format";
 
+/** The cookie holding the Cellar's saved Tiles / Rows choice: CellarLayout writes it, the Cellar page reads it. */
+export const CELLAR_LAYOUT_COOKIE = "cellar_layout";
+
 export type CellarMapViewModel = {
   /** addHref null hides Add vessel (vessels are admin-managed). actionsOff: no
    *  tank holds beer, so Reading, Transfer and Addition are all off; the page
@@ -15,8 +18,9 @@ export type CellarMapViewModel = {
    *  in this tank ("Day 14"). `readToday` says the tank's newest reading was
    *  taken today. A tile's readingHref is set only when it holds beer; it
    *  draws an Add reading button beside the reading line. The inventory gives
-   *  "" to draw the button inert. */
-  backHref?: string; addHref?: string | null; readingHref?: string | null; actionsOff?: boolean; actionHint?: string; brewHref?: string;
+   *  "" to draw the button inert. `layout` is the saved Tiles / Rows choice;
+   *  none draws Tiles. */
+  layout?: "Tiles" | "Rows"; backHref?: string; addHref?: string | null; readingHref?: string | null; actionsOff?: boolean; actionHint?: string; brewHref?: string;
   tiles: { name: string; group: string; detail: string; day?: string; volume?: string; reading?: string; readToday?: boolean; warning?: boolean; fill?: number; href?: string; readingHref?: string }[];
   detail?: { title: string; description: string; href?: string };
 };

@@ -4,10 +4,11 @@
 // Each tank holding beer is a tile whose Add reading button opens Reading on
 // that tank, marked Read today once it has today's reading; the section's
 // empty tanks are one line of links under the tiles. Tiles / Rows switches the
-// tanks holding beer between tiles and one list row each (CellarLayout
-// remembers the choice); both show the same facts and actions. With beer in
-// several tanks the top Reading is Start readings: it opens the first tank
-// still to read, and the sheet's Save and next tank walks the rest.
+// tanks holding beer between tiles and one list row each; both show the same
+// facts and actions. CellarLayout saves the choice, and model.layout is the
+// saved one. With beer in several tanks the top Reading is Start readings: it
+// opens the first tank still to read, and the sheet's Save and next tank walks
+// the rest.
 // Brew day is not a cellar action: it starts from Batches, so the map draws it
 // as a link there, at the foot (#1115).
 import { Fragment, type ReactNode } from "react";
@@ -81,7 +82,7 @@ export function CellarMapView({ model, transfer, addition, complete }: { model: 
     {model.actionHint && E.info(model.actionHint)}
     {model.detail && E.nav(model.detail.title, model.detail.description, "", undefined, model.detail.href)}
     {hasVessels
-      ? <CellarLayout tiles={groupSections(model.tiles, false)} rows={groupSections(model.tiles, true)} />
+      ? <CellarLayout initial={model.layout} tiles={groupSections(model.tiles, false)} rows={groupSections(model.tiles, true)} />
       : E.blank(
         { title: "No vessels yet" },
         undefined,

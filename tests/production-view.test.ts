@@ -792,7 +792,10 @@ describe("cellar map at a glance", () => {
     expect(html).toMatch(/FV1 <span[^>]*>Pils<\/span>/);
     expect(html).toContain("Day 14 · 2 / 10 bbl");
     // Tiles is drawn first; Rows is the other choice of the Layout switch.
-    expect(html).toMatch(/aria-label="Layout"[^]*Tiles[^]*Rows/);
+    expect(html).toMatch(/aria-label="Layout"[^]*aria-label="Tiles"[^]*aria-label="Rows"/);
+    expect(html).toContain("minmax(210px,1fr)");
+    // The saved choice the page read from the cookie is drawn from the first paint.
+    expect(htmlOf(createElement(CellarMapView, { model: { ...model, layout: "Rows" } }))).not.toContain("minmax(210px,1fr)");
     // No time zone, no day: the adapter never guesses the brewery's calendar.
     expect(toCellarMapViewProps(vessels, occupancies).tiles[0].day).toBeUndefined();
   });

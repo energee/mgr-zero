@@ -1,34 +1,31 @@
 "use client";
 // components/mgr/cellar-layout.tsx — Cellar's Tiles / Rows switch. The page
-// draws its tanks both ways; this shows one and keeps the choice in this
-// browser's localStorage, so it survives a reading round and the next visit.
-import { useState, useSyncExternalStore, type ReactNode } from "react";
+// draws its tanks both ways; this shows one and saves the choice in the
+// `cellar_layout` cookie. The page reads that cookie on the server, so the
+// saved layout is drawn from the first paint, after a reading round and on the
+// next visit.
+import { useState, type ReactNode } from "react";
+import { GridViewIcon, ListViewIcon } from "@hugeicons/core-free-icons";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Icon } from "@/components/mgr/icon";
+import { CELLAR_LAYOUT_COOKIE, type CellarMapViewModel } from "@/lib/mgr/cellar-map-view";
 
-const KEY = "mgr-cellar-layout";
-const noSubscribe = () => () => {};
+const ONE_YEAR = 60 * 60 * 24 * 365;
 
-/** The saved layout. Blocked storage (a private window) means no saved choice, so Tiles. */
-function savedLayout(): string {
-  try { return localStorage.getItem(KEY) ?? "Tiles"; } catch { return "Tiles"; }
-}
-
-export function CellarLayout({ tiles, rows }: { tiles: ReactNode; rows: ReactNode }) {
-  // The server cannot read localStorage: it and hydration draw Tiles, then the saved choice.
-  const saved = useSyncExternalStore(noSubscribe, savedLayout, () => "Tiles");
-  const [picked, setPicked] = useState<string>();
-  const layout = picked ?? saved;
+/** `initial` is the saved choice the page read from the cookie; none means Tiles. */
+export function CellarLayout({ tiles, rows, initial = "Tiles" }: { tiles: ReactNode; rows: ReactNode; initial?: CellarMapViewModel["layout"] }) {
+  const [layout, setLayout] = useState<string>(initial);
   const pick = (value: string) => {
+    // The group sends "" when the pressed item is tapped again: one layout always stays picked.
     if (!value) return;
-    setPicked(value);
-    // Blocked storage only costs remembering the choice; the switch still works.
-    try { localStorage.setItem(KEY, value); } catch { /* not remembered */ }
+    setLayout(value);
+    document.cookie = `${CELLAR_LAYOUT_COOKIE}=${value}; path=/; max-age=${ONE_YEAR}; samesite=lax`;
   };
   return <>
     <div className="flex justify-end">
       <ToggleGroup type="single" size="sm" value={layout} onValueChange={pick} aria-label="Layout">
-        <ToggleGroupItem value="Tiles">Tiles</ToggleGroupItem>
-        <ToggleGroupItem value="Rows">Rows</ToggleGroupItem>
+        <ToggleGroupItem value="Tiles" aria-label="Tiles" title="Tiles"><Icon icon={GridViewIcon} /></ToggleGroupItem>
+        <ToggleGroupItem value="Rows" aria-label="Rows" title="Rows"><Icon icon={ListViewIcon} /></ToggleGroupItem>
       </ToggleGroup>
     </div>
     {layout === "Rows" ? rows : tiles}
