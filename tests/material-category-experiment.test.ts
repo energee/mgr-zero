@@ -6,6 +6,7 @@ import { MATERIAL_CATEGORIES } from "@/lib/mgr/enums";
 import { materialCategoryQuestion } from "@/lib/mgr/material-category-suggestion";
 import cases from "../scripts/material-category-cases.json";
 import holdout from "../scripts/material-category-holdout.json";
+import messy from "../scripts/material-category-holdout-messy.json";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 
@@ -55,7 +56,7 @@ describe("material kind experiment CLI safety", () => {
   });
 });
 
-describe.each([["cases", cases], ["holdout", holdout]])("material kind %s", (_set, items) => {
+describe.each([["cases", cases], ["holdout", holdout], ["messy holdout", messy]])("material kind %s", (_set, items) => {
   it("label every case with a stored kind and cover each kind at least 4 times", () => {
     for (const item of items) expect(MATERIAL_CATEGORIES).toContain(item.expected);
     for (const kind of MATERIAL_CATEGORIES) {
@@ -64,17 +65,33 @@ describe.each([["cases", cases], ["holdout", holdout]])("material kind %s", (_se
   });
 });
 
-describe("material kind holdout", () => {
+describe.each([["clean", holdout], ["messy", messy]])("material kind %s holdout", (_set, items) => {
   // The first set's names were partly copied into the kind descriptions, which overstated accuracy.
   it("uses no name that appears in the descriptions Jev reads", () => {
     const criteria = JSON.stringify(materialCategoryQuestion()).toLowerCase();
-    expect(holdout.filter(item => criteria.includes(item.name.toLowerCase())).map(item => item.name)).toEqual([]);
+    expect(items.filter(item => criteria.includes(item.name.toLowerCase())).map(item => item.name)).toEqual([]);
   });
+});
+
+describe("material kind holdout files", () => {
+  // The clean holdout already shares two names with the first set, so only the messy one is checked.
+  it("keeps the messy holdout's names out of the other two case files", () => {
+    const others = new Set([...cases, ...holdout].map(item => item.name.toLowerCase()));
+    expect(messy.filter(item => others.has(item.name.toLowerCase())).map(item => item.name)).toEqual([]);
+  });
+
 
   it("is chosen with --cases and sends nothing in dry-run mode", () => {
     const result = runExperiment("--dry-run", "--cases", "material-category-holdout.json");
     expect(result.status).toBe(0);
     const requests = result.stdout.trim().split("\n").map(line => JSON.parse(line)).filter(record => record.type === "request");
     expect(requests).toHaveLength(holdout.length * 2);
+  });
+
+  it("reports the keyword baseline on the chosen names in dry-run mode", () => {
+    const result = runExperiment("--dry-run", "--cases", "material-category-holdout-messy.json");
+    expect(result.status).toBe(0);
+    const baseline = result.stdout.trim().split("\n").map(line => JSON.parse(line)).find(record => record.type === "baseline");
+    expect(baseline).toMatchObject({ names: messy.length, coverage: expect.any(Number), precision: expect.any(Number) });
   });
 });
