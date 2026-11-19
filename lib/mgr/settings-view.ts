@@ -1,6 +1,5 @@
 // lib/mgr/settings-view.ts — view-model for Settings (get_brewery extras).
 import type { GatewayModelOption } from "@/lib/chat/models";
-import { centsMaxError, dollarsInput, toCents } from "@/lib/mgr/money";
 import type { ReportingBasisCorrection } from "@/lib/commands/compliance";
 import { submitReason } from "@/lib/mgr/submit-reason";
 import { phoneError } from "@/lib/mgr/phone";
@@ -9,12 +8,12 @@ import type { UnitsViewModel } from "@/lib/mgr/units-view";
 export type BrewerySettings = {
   name: string; timezone: string; ttb_registry_no: string | null;
   customer_phone: string | null; fermentation_reading_due_hours: number; days_to_package: number;
-  books_opened_on: string | null; one_way_keg_fee_cents: number;
+  books_opened_on: string | null;
 };
 
 export type BrewerySettingsValues = {
   name: string; timezone: string; ttb: string; phone: string; hours: string;
-  daysToPackage: string; booksOpenedOn: string; oneWayKegFee: string;
+  daysToPackage: string; booksOpenedOn: string;
 };
 
 export function toBrewerySettingsValues(brewery: BrewerySettings): BrewerySettingsValues {
@@ -22,7 +21,7 @@ export function toBrewerySettingsValues(brewery: BrewerySettings): BrewerySettin
     name: brewery.name, timezone: brewery.timezone, ttb: brewery.ttb_registry_no ?? "",
     phone: brewery.customer_phone ?? "",
     hours: String(brewery.fermentation_reading_due_hours), daysToPackage: String(brewery.days_to_package),
-    booksOpenedOn: brewery.books_opened_on ?? "", oneWayKegFee: dollarsInput(brewery.one_way_keg_fee_cents),
+    booksOpenedOn: brewery.books_opened_on ?? "",
   };
 }
 
@@ -53,7 +52,6 @@ export function brewerySettingsReason(values: BrewerySettingsValues, initial: Br
   if (missing.length) return submitReason(missing);
   const changed = (Object.keys(values) as (keyof BrewerySettingsValues)[]).some(key => {
     if (key === "hours" || key === "daysToPackage") return Number(values[key]) !== Number(initial[key]);
-    if (key === "oneWayKegFee") return (toCents(values[key]) ?? 0) !== (toCents(initial[key]) ?? 0);
     return values[key].trim() !== initial[key].trim();
   });
   return submitReason(changed ? [] : ["a change to brewery details"]);
@@ -68,6 +66,10 @@ export function refreshBrewerySettingsValues(previous: BrewerySettingsValues, va
   return refreshed;
 }
 
+/** What Settings may know about the brewery's TypeSafe key (get_brewery_suggestion_settings):
+ *  never the key, at most its last four characters, plus the suggestion switch. */
+export type TypeSafeKeyStatus = { saved: boolean; last4: string | null; enabled: boolean };
+
 export type SettingsViewModel = {
   backHref?: string;
   name: string;
@@ -81,12 +83,12 @@ export type SettingsViewModel = {
   booksOpenedOn: string;
   hasFiledReports?: boolean;
   basisCorrections?: ReportingBasisCorrection[];
-  /** The one-way keg fee in dollars ("10.00"); "0.00" bills none. */
-  oneWayKegFee: string;
   aiModel: string;
   aiModels: GatewayModelOption[];
   /** Whether outside agents such as Claude or ChatGPT may connect. */
   agentsEnabled: boolean;
+  /** The TypeSafe key status and the "Suggest kinds for new materials" switch. */
+  suggestions: TypeSafeKeyStatus;
   deployment: string;
   /** Portal fulfillment location id, or null when none is set. */
   warehouseId: string | null;
@@ -105,23 +107,4 @@ export type SettingsViewModel = {
 export function booksOpenedChange(before: string, after: string): { booksOpenedOn: string | null } | undefined {
   if (before === after) return undefined;
   return { booksOpenedOn: after || null };
-}
-
-/** Match the fee's nonnegative integer-cent storage without rounding typed fractions. */
-export function oneWayKegFeeError(value: string): string | undefined {
-  if (value === "") return undefined;
-  if (!/^\+?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value)
-    || (value.split(".")[1]?.replace(/0+$/, "").length ?? 0) > 2) {
-    return "Enter zero or a positive dollar amount with at most two decimal places.";
-  }
-  return centsMaxError(value, "a fee");
-}
-
-/**
- * The set_one_way_keg_fee input for a form save, or undefined when the fee did
- * not change. A cleared field reads as no fee (0 cents).
- */
-export function oneWayKegFeeChange(beforeCents: number, after: string): { feeCents: number } | undefined {
-  const feeCents = toCents(after) ?? 0;
-  return feeCents === beforeCents ? undefined : { feeCents };
 }

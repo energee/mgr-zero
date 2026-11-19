@@ -5,7 +5,7 @@ import { E } from "@/components/mgr/e";
 import { FieldDescription, FieldLegend, FieldSet } from "@/components/ui/field";
 import { CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { phoneError } from "@/lib/mgr/phone";
-import { oneWayKegFeeError, brewerySettingsReason, refreshBrewerySettingsValues, type BrewerySettingsValues } from "@/lib/mgr/settings-view";
+import { brewerySettingsReason, refreshBrewerySettingsValues, type BrewerySettingsValues } from "@/lib/mgr/settings-view";
 import { TimezonePicker } from "@/components/mgr/timezone-picker";
 
 /** The Brewery details section of Settings: its own form, named by its legend, saved only by Save brewery. */
@@ -25,8 +25,7 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
   }
   const id = useId();
   const change = (key: keyof BrewerySettingsValues, value: string) => setValues((current) => ({ ...current, [key]: value }));
-  const feeError = oneWayKegFeeError(values.oneWayKegFee);
-  const reason = feeError ?? brewerySettingsReason(values, initial);
+  const reason = brewerySettingsReason(values, initial);
   const field = (key: keyof BrewerySettingsValues, label: string, type = "text", required = false) => (
     E.edit(label, values[key], type, undefined, { onChange: (nextValue: string) => change(key, nextValue), id: `${id}-${key}`, required, error: fieldErrors[key] })
   );
@@ -44,10 +43,6 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
         <div className="flex min-w-0 flex-col gap-2">
           {E.edit("Customer-facing phone", values.phone, "tel", undefined, { onChange: (nextValue: string) => change("phone", nextValue), id: `${id}-phone`, placeholder: "(503) 555-0142", error: fieldErrors.phone ?? phoneError(values.phone), "aria-describedby": `${id}-phone-help` })}
           <FieldDescription id={`${id}-phone-help`}>Printed on the portal when online payment is unavailable. Leave empty for none.</FieldDescription>
-        </div>
-        <div className="flex min-w-0 flex-col gap-2">
-          {E.edit("One-way keg fee ($)", values.oneWayKegFee, "number", undefined, { contextualLabels: true, onChange: (nextValue: string) => change("oneWayKegFee", nextValue), id: `${id}-oneWayKegFee`, min: 0, max: 21474836.47, step: 0.01, error: feeError, "aria-describedby": `${id}-oneWayKegFee-help` })}
-          <FieldDescription id={`${id}-oneWayKegFee-help`}>Charged for each one-way keg shipped. Blank or 0 means no fee.</FieldDescription>
         </div>
         <div className="flex min-w-0 flex-col gap-2">
           {E.edit("Reading overdue after (hours)", values.hours, "number", undefined, { contextualLabels: true, required: true, id: `${id}-hours`, onChange: value => change("hours", value), min: 1, max: 168, step: 1, "aria-describedby": `${id}-hours-help` })}

@@ -181,7 +181,7 @@ describe("Batches view", () => {
     const base: BatchListRow = { id: "late", batch_no: 3, planned_on: "2026-09-12", planned_bbl: 10, brewed_on: null, closed_at: null, cancelled_at: null, brand_name: null, recipe_name: null, vessel_name: null, active_occupancies: [] };
     const rows = [base, { ...base, id: "today", planned_on: "2026-10-28" }, { ...base, id: "brewed", brewed_on: "2026-09-12" }, { ...base, id: "gone", cancelled_at: "2026-09-13" }];
     const hrefs = { batch: (id: string) => `/batches/${id}`, vessel: (id: string) => `/cellar/vessels/${id}` };
-    const model = toBatchesViewProps(batchesFromQuery(rows, [], hrefs, { unit: "plato", timeZone: "UTC", today: "2026-10-28" }));
+    const model = toBatchesViewProps(batchesFromQuery(rows, [], hrefs, { unit: "plato", today: "2026-10-28" }));
     expect(model.planned[0]).toMatchObject({ key: "late", overdue: true, href: `/batches/late#${CHANGE_PLAN_ID}` });
     expect(model.planned[1]).toMatchObject({ key: "today", href: "/batches/today" });
     expect(model.planned[1].overdue).toBeUndefined();
@@ -744,8 +744,8 @@ it("explains a disabled cellar Reading instead of leaving a dead end (#715)", ()
   // Each tile opens Reading on its own tank (#1508): with no reading yet, through an Add reading button.
   expect(html.match(/<a[^>]*data-slot="button"[^>]*href="\/cellar\/o\d\/reading"[^>]*>Add reading<\/a>/g)).toHaveLength(2);
   // Once a tank has a reading, that line is the link and the button is gone.
-  const read = htmlOf(createElement(CellarMapView, { model: toCellarMapViewProps(vessels, one, { o1: "4.5 °P · Sep 1" }, {}, reading) }));
-  expect(read).toMatch(/<a href="\/cellar\/o1\/reading"[^>]*>4\.5 °P · Sep 1<\/a>/);
+  const read = htmlOf(createElement(CellarMapView, { model: toCellarMapViewProps(vessels, one, { o1: "5.4% ABV" }, {}, reading) }));
+  expect(read).toMatch(/<a href="\/cellar\/o1\/reading"[^>]*>5\.4% ABV<\/a>/);
   expect(read).not.toContain("Add reading");
 });
 
@@ -770,17 +770,28 @@ describe("Recipes search", () => {
 });
 
 describe("cellar readings (#700)", () => {
-  it("formats each open occupancy's latest reading from one list_batches read", () => {
+  it("gives each tank's tile only its ABV so far, from one list_batches read", () => {
     const reading = { id: "r1", at: "2026-09-01T15:00:00Z", temp_f: 66, gravity_plato: 4.5, ph: null, note: null };
     const readings = cellarReadings([
-      { active_occupancies: [{ id: "o1", latest_reading: reading }, { id: "o2", latest_reading: null }] },
+      { og_reading: { id: "og", gravity_plato: 15 }, active_occupancies: [
+        { id: "o1", latest_reading: reading, recent_gravity: [{ id: "r1", at: reading.at, gravity_plato: 4.5 }] },
+        { id: "o2", latest_reading: null },
+        { id: "o3", latest_reading: { ...reading, id: "og" }, recent_gravity: [{ id: "og", at: reading.at, gravity_plato: 15 }] },
+      ] },
       { active_occupancies: [] },
-    ], "plato", "UTC");
+    ]);
     // A tank with no reading has no entry, so a linked tile has no reading line and draws Add reading instead.
-    expect(Object.keys(readings)).toEqual(["o1"]);
-    expect(readings.o1).toContain("2026");
-    const vessels = [{ id: "v2", name: "FV2", kind: "fermenter" as const, capacity_bbl: 10 }];
-    const tile = toCellarMapViewProps(vessels, [{ vessel_id: "v2", occupancy_id: "o2", brand_name: null, bbl: 2 }], readings, {}, id => `/cellar/${id}/reading`).tiles[0];
+    expect(Object.keys(readings)).toEqual(["o1", "o3"]);
+    // The tile says ABV and nothing else: values, age and Fermenting/Finished live on Batches and Vessel detail.
+    expect(readings.o1).toMatch(/^\d+\.\d% ABV$/);
+    // A tank whose only gravity is the OG has readings but no ABV yet.
+    expect(readings.o3).toBe("No ABV yet");
+    const vessels = [{ id: "v1", name: "FV1", kind: "fermenter" as const, capacity_bbl: 10 }];
+    const read = toCellarMapViewProps(vessels, [{ vessel_id: "v1", occupancy_id: "o1", brand_name: null, bbl: 2 }], readings, {}, id => `/cellar/${id}/reading`).tiles[0];
+    const html = htmlOf(createElement(CellarMapView, { model: { tiles: [read] } }));
+    expect(html).toMatch(/<a href="\/cellar\/o1\/reading"[^>]*>\d+\.\d% ABV<\/a>/);
+    expect(html).not.toContain("°P");
+    const tile = toCellarMapViewProps([{ ...vessels[0], id: "v2", name: "FV2" }], [{ vessel_id: "v2", occupancy_id: "o2", brand_name: null, bbl: 2 }], readings, {}, id => `/cellar/${id}/reading`).tiles[0];
     expect(tile).toMatchObject({ reading: undefined, readingHref: "/cellar/o2/reading" });
   });
 

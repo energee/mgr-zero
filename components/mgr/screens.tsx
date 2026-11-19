@@ -108,6 +108,7 @@ import { KegBalanceView } from "@/components/mgr/views/keg-balance";
 import { KegFleetView } from "@/components/mgr/views/keg-fleet";
 import { KegReportView } from "@/components/mgr/views/keg-report";
 import { KegHistoryView } from "@/components/mgr/views/keg-history";
+import { OrderChangesView } from "@/components/mgr/views/order-changes";
 import { LocationBinsView } from "@/components/mgr/views/location-bins";
 import { LicenseView } from "@/components/mgr/views/license";
 import { LocationView } from "@/components/mgr/views/location";
@@ -137,6 +138,7 @@ import { ReplenishmentView } from "@/components/mgr/views/replenishment";
 import { PickView } from "@/components/mgr/views/pick";
 import { PickSheetView } from "@/components/mgr/views/pick-sheet";
 import { PlanningView } from "@/components/mgr/views/planning";
+import { EditReleaseView, ReleaseView } from "@/components/mgr/views/release";
 import { DisconnectSquareView, PointOfSaleView, PosItemView, PosMenuView, PosSaleDetailView, PosSyncActions, SquareLocationsView } from "@/components/mgr/views/pos";
 import { PortalAccountView } from "@/components/mgr/views/portal-account";
 import { PortalInvoiceView } from "@/components/mgr/views/portal-invoice";
@@ -220,7 +222,7 @@ import { PICK_SHEET_DATE_CHIPS, pickSheet } from "@/lib/mgr/fixtures/pick-sheet"
 import { ridgelineComingUp, ridgelineReviewOrder, ridgelineShop } from "@/lib/mgr/fixtures/portal";
 import { portalAccountRidgeline, portalMeRidgeline } from "@/lib/mgr/fixtures/portal-account";
 import { portalInvoicePaid, portalInvoiceUnpaid, portalInvoicesRidgeline } from "@/lib/mgr/fixtures/portal-invoices";
-import { portalOrderShipped, portalOrdersList } from "@/lib/mgr/fixtures/portal-orders";
+import { portalOrderChangedAfterConfirm, portalOrdersList } from "@/lib/mgr/fixtures/portal-orders";
 import { priceGroupTwo, pricingGrid } from "@/lib/mgr/fixtures/pricing";
 import { channelExport, saleChannelsList } from "@/lib/mgr/fixtures/settings-catalog";
 import { newTransferDraft, transferDetailSubmitted, transfersList } from "@/lib/mgr/fixtures/transfers";
@@ -231,6 +233,8 @@ import {
 import { kegBalanceRidgeline, kegFleet, kegHistoryLedger, kegReportOwned } from "@/lib/mgr/fixtures/kegs";
 import { packagingReady, packagingRuns, repackCase, schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
 import { planningDemo } from "@/lib/mgr/fixtures/planning";
+import { releaseBatches, releaseHazyKeg } from "@/lib/mgr/fixtures/releases";
+import { batchReleaseForms } from "@/lib/mgr/release-view";
 import { monthlyComplianceAmended, monthlyComplianceAugust, monthlyComplianceSeptember, monthlyComplianceUnbalanced } from "@/lib/mgr/fixtures/monthly-compliance";
 import { confirmDeliveryStop1, driverRouteA, returnRouteA, routeAPlan, routesDriver } from "@/lib/mgr/fixtures/delivery";
 import {
@@ -259,6 +263,8 @@ import { toKegBalanceViewProps } from "@/lib/mgr/keg-balance-view";
 import { toKegFleetViewProps } from "@/lib/mgr/keg-fleet-view";
 import { toKegReportViewProps } from "@/lib/mgr/keg-report-view";
 import { toKegHistoryViewProps } from "@/lib/mgr/keg-history-view";
+import { toOrderChangesViewProps } from "@/lib/mgr/order-changes-view";
+import { orderChangesReport } from "@/lib/mgr/fixtures/order-changes";
 import { toLocationBinsViewProps } from "@/lib/mgr/location-bins-view";
 import { toLocationViewProps } from "@/lib/mgr/location-view";
 import { toLotTraceViewProps } from "@/lib/mgr/lot-trace-view";
@@ -414,7 +420,7 @@ const DEFAULT_STATES: NonNullable<Screen["states"]> = [["empty", "Nothing here y
 const occupancyActions = (reading: boolean) => <div className="flex flex-wrap gap-2">{reading && E.btn("Reading", "g")}{E.btn("Transfer", "g")}{E.btn("Addition", "g")}<BatchCompletionFixture /></div>;
 const permitted = (who: string): NonNullable<Screen["states"]> => [["permission", who, 1], ...DEFAULT_STATES.filter(([st]) => st !== "permission")];
 /** Settings and its no-warehouse variant draw the same page, so they read and write the same. */
-const SETTINGS_IO = { reads: "get_brewery · get_brewery_ai_model · list_locations · list_team_members · list_compliance_reports · list_reporting_basis_corrections · gateway.getAvailableModels [platform]", writes: "update_brewery · set_brewery_operating_defaults · set_books_opened_on · correct_reporting_basis · set_brewery_gravity_unit · set_brewery_ai_model · set_brewery_agents_enabled · update_location · set_portal_fulfillment_source" };
+const SETTINGS_IO = { reads: "get_brewery · get_brewery_ai_model · get_brewery_suggestion_settings · list_locations · list_team_members · list_compliance_reports · list_reporting_basis_corrections · gateway.getAvailableModels [platform]", writes: "update_brewery · set_brewery_operating_defaults · set_books_opened_on · correct_reporting_basis · set_brewery_gravity_unit · set_brewery_ai_model · set_brewery_agents_enabled · set_brewery_typesafe_key · set_brewery_suggestions_enabled · update_location · set_portal_fulfillment_source" };
 
 /** INV-1039 partly paid in MGR: Record payment's cap and the $300.00 check Void payment voids. */
 const LOCAL_PARTLY_PAID = toInvoiceViewProps(invoiceLocalPartlyPaid);
@@ -517,7 +523,7 @@ export const SCREENS: Screen[] = [
     to: { "Water profiles": "Water profiles" },
     ...SETTINGS_IO,
     states: [...permitted("admin only"), ["filed basis", "ordinary field is locked · recorded correction flags every affected filed period"], ["correction history", "immutable old/new basis, actor, time and reason"], ["uncertain correction", "fields freeze · retry unchanged request"]],
-    spec: "Invoices remains a first-class More and desk-rail destination. The TTB registry number is a brewery column and feeds the compliance report header; state licenses, the PA license included, live on Licenses (#1517). The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. Gravity unit under Brewery details is the brewery default, saved on tap; each person may choose their own in Me. Days to package is the brewery-wide projected packaging estimate, default 14 and whole days from 1 to 120. It adds to the actual brew date, or planned date before brewing. AI model offers the live Vercel AI Gateway language-model catalog and sets one brewery-wide Ask MGR default. Brewery details is one form saved by Save brewery. Picking an AI model or a fulfillment warehouse saves it at once; a failed save puts the picker back. After filing, the ordinary books date is locked; Correct reporting basis has its own save and immutable correction history. Deployment mode is read-only. Team opens the Team frame.",
+    spec: "Invoices remains a first-class More and desk-rail destination. The TTB registry number is a brewery column and feeds the compliance report header; state licenses, the PA license included, live on Licenses (#1517). The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. Gravity unit under Brewery details is the brewery default, saved on tap; each person may choose their own in Me. Days to package is the brewery-wide projected packaging estimate, default 14 and whole days from 1 to 120. It adds to the actual brew date, or planned date before brewing. AI model offers the live Vercel AI Gateway language-model catalog and sets one brewery-wide Ask MGR default. Brewery details is one form saved by Save brewery. Picking an AI model or a fulfillment warehouse saves it at once; a failed save puts the picker back. After filing, the ordinary books date is locked; Correct reporting basis has its own save and immutable correction history. Material suggestions holds the brewery's write-only TypeSafe key and the Suggest kinds for new materials switch (Settings suggestions on). Deployment mode is read-only. Team opens the Team frame.",
     body: <SettingsView model={settingsDemo} />,
   },
   {
@@ -527,6 +533,14 @@ export const SCREENS: Screen[] = [
     states: [["permission", "admin only", 1], ["no warehouse", "picker disabled · note names Warehouse in Uses · Edit locations opens Locations"], ["warehouse use removed", "a saved source no longer offered starts unchosen"]],
     spec: "Wholesale fulfillment offers only locations whose Uses include Warehouse. With none, the disabled picker says so beneath it and Edit locations opens Locations, where an admin adds Warehouse to a location's Uses. Picking a warehouse saves it.",
     body: <SettingsView model={{ ...settingsDemo, warehouseId: null, warehouseOptions: [] }} />,
+  },
+  {
+    step: 8, slice: "all", tab: "More", name: "Settings suggestions on", job: "Show a saved TypeSafe key by its last four characters and the switch that sends material names to it",
+    to: { "Water profiles": "Water profiles" },
+    ...SETTINGS_IO,
+    states: [["permission", "admin only", 1], ["no key", "empty password field · Save key waits for eight characters · switch disabled with Save a TypeSafe key first"], ["saved", "Saved · ends in …7f3a · Replace · Remove"], ["replacing", "empty password field · Cancel keeps the saved key"], ["switch failed", "the switch goes back"]],
+    spec: "Material suggestions holds this brewery's own TypeSafe key for Jev kind suggestions on Add material. The key is write-only: after Save key the page shows only Saved · ends in and its last four characters, never the key, and no read returns it. Replace opens an empty field; Remove asks first and turns suggestions off. Suggest kinds for new materials stays disabled, with Save a TypeSafe key first, until a key is saved; then it saves on tap and is the brewery's consent to send new material names to TypeSafe. A suggestion is asked for only while the switch is on and a key is saved. Only an Admin sees or changes either.",
+    body: <SettingsView model={{ ...settingsDemo, suggestions: { saved: true, last4: "7f3a", enabled: true } }} />,
   },
   {
     step: 8,
@@ -1063,10 +1077,10 @@ export const SCREENS: Screen[] = [
     tab: "Work",
     name: "Confirm order",
     job: "Confirm a submitted order in two taps from Today",
-    reads: "get_order · get_atp",
+    reads: "get_order · get_atp · list_releases [lines ordering from a portal release]",
     writes: "confirm_order · adjust_order_lines [submitted: replaces lines; allocations wait for confirm] · cancel_order",
-    states: [["loading", "order-shaped skeleton"], ["stale", "line changed · refresh", 1], ["permission", "sales or admin required", 1], ["cancelled", "staged quantities become restock work · Put back clears it"], ["Available below zero", "confirmed anyway: Order confirmed · Available is below zero for … · quantities read-only · Back to order"]],
-    spec: "2 taps from Today: Confirm → Confirm order, only when no blocking review exists. Lines sit under their brand, each named by its format, with the quantity as a number field: editing one asks for a Reason and swaps the verbs for Save lines and Discard changes. Confirm order stays at the bottom of the phone screen; Cancel order is the order page's quiet trigger below it. The registration warning is the same one the Order screen shows; it links to the brand’s compliance rows and never blocks.",
+    states: [["loading", "order-shaped skeleton"], ["slipped", "a release line whose batch is now ready after the requested date · Slipped: batch ready …", 1], ["over release", "a pre-order above a release lowered since · Over release: N ordered of M", 1], ["stale", "line changed · refresh", 1], ["permission", "sales or admin required", 1], ["cancelled", "staged quantities become restock work · Put back clears it"], ["Available below zero", "confirmed anyway: Order confirmed · Available is below zero for … · quantities read-only · Back to order"]],
+    spec: "2 taps from Today: Confirm → Confirm order, only when no blocking review exists. Lines sit under their brand, each named by its format, with the quantity as a number field: editing one asks for a Reason and swaps the verbs for Save lines and Discard changes. Confirm order stays at the bottom of the phone screen; Cancel order is the order page's quiet trigger below it. The registration warning is the same one the Order screen shows; it links to the brand’s compliance rows and never blocks. A line ordered from a portal release is flagged Slipped when its batch is now ready after the requested date, and Over release when staff lowered the release below what is confirmed and pre-ordered on it; staff trim the line or confirm knowingly.",
     to: { "16 oz case": "SKU detail" },
     body: <ConfirmOrderView model={toConfirmOrderViewProps(orderSubmittedRidgeline)} fulfillmentOptions={[LOC_WAREHOUSE.name, LOC_TAPROOM.name]} complianceNote={OHIO_STOUT_NOTE} />,
   },
@@ -1374,7 +1388,7 @@ export const SCREENS: Screen[] = [
     job: "Edit one customer and reach its ship-tos, prices, orders, open balance and keg balance",
     reads: "get_customer · list_customer_users · list_invoices",
     writes: "upsert_customer · invite_customer_user · revoke_customer_user · delete_customer [admin]",
-    states: [["permission", "sales or admin required", 1], ["active", "may place orders"], ["inactive", "history remains"], ["license warning", "renewal needs review", 1]],
+    states: [["release delay", "Release delay (days) under Trading terms · 0 to 60 · releases appear for this customer that many days after they open"], ["permission", "sales or admin required", 1], ["active", "may place orders"], ["inactive", "history remains"], ["license warning", "renewal needs review", 1]],
     spec: "Desktop uses open sections without card borders or backgrounds, grouping account details, ship-tos and portal users in the main column, with trading terms and customer activity alongside. The sections stack at narrow widths. Account details and trading terms save together inline; deletion sits below a separate divider. Admin can confirm Delete customer for an unused account, including its ship-tos. Linked orders, invoices, keg records, portal access, invitations and QuickBooks identities block deletion. Portal users lists each buyer by email; Admin or Sales can confirm Remove access for one buyer, which ends their portal access at once and keeps their orders, invoices and sign-in account. Customer activity shows Admin and Sales the Open balance: the sum of the customer's unpaid invoice balances by the Invoices register's rule, Unknown when any balance is unknown, never $0.00; it opens the Invoices register filtered to this customer and Unpaid.",
     body: <CustomerView model={toCustomerViewProps(customerRidgeline)} />,
   },
@@ -1501,6 +1515,19 @@ export const SCREENS: Screen[] = [
     states: [["customer", "a customer filter from Open balance adds a Customer line with Clear; Show keeps the customer"], ["overdue", "outstanding invoice due before brewery-local today", 1], ["connection health", "QuickBooks · token healthy · company 9341"], ["not turned on", "disabled Connect before navigation with the same reason as Accounting", 1], ["never connected", "no stale-payment or reconnect warning"], ["expired", "Reconnect before mapping, push or sync; Sync QuickBooks is hidden, Admin sees Connect, Sales sees Admin must connect", 1], ["live", "the ordinary case; no badge at all"], ["edited there", "SyncToken changed since MGR pushed", 1], ["voided", "amounts zeroed; this is not payment", 1], ["deleted", "the id points at nothing; sync gets a 404", 1], ["not sent", "pushed but never delivered; only a fault if MGR is not the channel"], ["paid", "payment status is confirmed by QuickBooks Online sync, or paid in full by payments recorded in MGR"], ["needs mapping", "a failed push Admin or Sales can fix; the drill-in resolves each mapping", 1]],
     spec: <>QuickBooks has no read-only invoice. Once pushed, the accountant can edit, void or delete it from the Sales transactions sidebar and no API setting prevents that, so MGR detects rather than prevents. QuickBooks hands us the detector free: SyncToken increments on every modification and already rides the response the manual sync reads for balance, so drift costs one column and no extra call. The rule this frame protects: <b>a voided invoice is not a paid invoice.</b> Voiding zeroes the amounts, so any logic inferring paid from a QuickBooks balance of zero books cancelled revenue as collected; collected revenue is a read-side rule, remote state live and balance zero, expressed once in the reporting view; no CHECK refuses a historical payment-confirmation marker, because paid-then-voided is a real history the row must be able to hold. MGR surfaces drift and stops: no re-push that overwrites an accountant’s correction, no field-level merge UI. The one exception is the deleted invoice, where the remote id points at nothing: dedupe on the original requestId would return the first result and create nothing, so that push carries a new requestId and produces a second QuickBooks invoice under the same MGR number. Ordinary retries keep the old requestId and stay protected. ASSUMPTION: a drifted invoice stays in AR at QuickBooks’ numbers, because QuickBooks owns the invoice after push. Drift is not a place, it is what some of these rows are doing, which is why it lives in the states of one list rather than a second one. An outstanding invoice is overdue only when its due date is before brewery-local today, not on the due day itself. Credit memos, invoices whose balance is unknown (push result unknown, pushed to a previous company, or not yet synced), and settled, paid, written-off, voided or deleted invoices are never marked overdue. Inventory pins its clock. Rows also carry the due date, push failure and credit-memo status; payments come back through manual sync and are read-only, except on an invoice QuickBooks never received, which takes Record payment. A failed row opens the drill-in, where connection, each mapping and push are four independent commands, and push persists its exact payload and deterministic requestId before the remote POST. Creating a credit memo stays Return shipment.</>,
     body: <InvoicesView rows={invoiceList} connection={{ connected: true, detail: "Connected · company 9341", canConnect: true }} sync={<QboSyncView status={invoicesSync} />} />,
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "More",
+    name: "Changes after confirm",
+    to: { "ORD-0231 · Ridgeline Tap Room": "Order", "ORD-0228 · Al’s Bar": "Order", "ORD-0225 · Ridgeline Tap Room": "Order" },
+    job: "See each change made to an order after the brewery confirmed it, and why",
+    reads: "list_order_changes · list_team_members · list_customers",
+    writes: "none",
+    states: [["permission", "admin or sales required", 1], ["all", "newest first · reason, lines, who, when and note"], ["filtered", "reason, staff and customer picks combine · each has All · the URL keeps them"], ["empty", "no changes after confirm, or none matching"]],
+    spec: "A confirmed or picked order can still change when beer is short or damaged, so what ships matches what the buyer sees. Each such change names one reason: Short, Damaged, Customer request, Brewery error or Other (Other needs a note). This list keeps those changes rare and visible. A pre-order change, made before confirm, is not listed, and neither is a change recorded before changes took a reason. A taproom transfer reads as one, since it has no customer. A row opens its order.",
+    body: <OrderChangesView model={toOrderChangesViewProps(orderChangesReport)} />,
   },
   {
     step: 5, slice: 1, tab: "More",
@@ -1637,12 +1664,12 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Brand",
-    to: { Edit: "Brand approval", "COLA TTB ID 25318001000034": "Brand approval", "OH registration": "State registration", "Add approval": "Brand approval", "Add registration": "State registration", Use: "Brand", "Suggested group 2": "Brand", "Edit SKU": "SKU", "Four Pack · 6 per Case": "Format", Glass: "Price group", "Manage formats": "Catalog" },
+    to: { Edit: "Brand approval", "COLA TTB ID 25318001000034": "Brand approval", "OH registration": "State registration", "Add approval": "Brand approval", "Add registration": "State registration", Use: "Brand", "Suggested group 2": "Brand", "Edit SKU": "SKU", "Four Pack · 6 per Case": "Format", Glass: "Price group", "Manage formats": "Catalog" , Release: "Release for ordering", "Release · Batch 41": "Edit release", Withdraw: "Brand" },
     job: "Sellable brand facts and compliance, including selected COLA label images",
-    reads: "list_brands [incl. the staff-only alias, SKUs and pours] · list_catalog_categories · list_formats [packaged, with contents] · list_channel_prices · list_sale_channels · list_keg_pools · get_compliance_registry [this brand’s approvals and registrations] · get_brand_recipe_cost [recipe cost per barrel and any uncosted ingredient] · get_cola_image",
-    writes: "upsert_brand · save_catalog_category · delete_catalog_category · update_sku · create_sku · upsert_brand_approval · upsert_state_registration",
-    states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class; description, category, price group and hops optional"], ["new style", "typing a style no one has used offers Add; saved with the brand", 0], ["sells as", "one switch per packaged Format · on creates the SKU or turns it back on"], ["switched off", "the SKU turns inactive, never deleted: hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"], ["COLA · None on file", "no recorded COLA; no application status inferred"], ["suggested group", "the recipe cost lands in a ceiling band · Use fills the select, Save brand commits"], ["cost unknown", "an ingredient has no receipt cost yet: the sum is not shown as a cost", 1], ["saved first", "SKUs and compliance wait until the brand is saved; the first save moves to its page"], ["badges", "missing COLA jumps to Compliance; price group or Unpriced, category, active SKU count"]],
-    spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category and hops are optional nullable columns; price group is the row of the price grid the brand sits on, so the price of any of its packaged SKUs is the cell where the customer's sale channel meets that group and the SKU's format. The brand carries no price of its own, and a brand on no group is unpriced everywhere. Package facts live on Formats. Sells as lists every packaged Format with a switch: on means the brand sells it, which is an active SKU, and Edit SKU opens that SKU's sheet (UPC, keg pool, batch share). Under the switches, each switched-on Format's contents read as lines (Four Pack · 6 per Case), then the price group's pours. A pour is a serving from the tap, not a SKU: the menu publishes brand × pour to Square, and a sale depletes the keg SKU. Every line shows its price per sale channel; prices and pours are edited on the price group. No container source editor here. Compliance is the brand’s: its COLA or formula approvals and its state registrations list under the sell sheet, each row opening its sheet, with Add approval and Add registration; a brand with no recorded COLA says None on file, as Catalog does. Manage categories opens beside Category: Admin and Sales can add, rename across all brands, and confirm deletion of unused categories. Uncategorized clears a brand’s assignment when saved. The brewery’s own licenses are the Licenses page under Compliance, never a brand row. Under the price group, the brand’s recipe cost per barrel (its last brewed version, else its newest) is read against the groups’ ceilings and names the band it falls in; Use only fills the select. A recipe with an ingredient that has never been received has no trustworthy cost, so the row says which ingredient instead of a number. No recipe, no row.",
+    reads: "list_releases [open, the SKUs' portal releases] · list_release_batches · list_brands [incl. the staff-only alias, SKUs and pours] · list_catalog_categories · list_formats [packaged, with contents] · list_channel_prices · list_sale_channels · list_keg_pools · get_compliance_registry [this brand’s approvals and registrations] · get_brand_recipe_cost [recipe cost per barrel and any uncosted ingredient] · get_cola_image",
+    writes: "upsert_brand · save_catalog_category · delete_catalog_category · update_sku · create_sku · upsert_brand_approval · upsert_state_registration · release_sku · update_release · withdraw_release",
+    states: [["release", "an active SKU offers Release beside Edit SKU · each open release is a row under it with Edit and Withdraw"], ["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class; description, category, price group and hops optional"], ["new style", "typing a style no one has used offers Add; saved with the brand", 0], ["sells as", "one switch per packaged Format · on creates the SKU or turns it back on"], ["switched off", "the SKU turns inactive, never deleted: hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"], ["COLA · None on file", "no recorded COLA; no application status inferred"], ["suggested group", "the recipe cost lands in a ceiling band · Use fills the select, Save brand commits"], ["cost unknown", "an ingredient has no receipt cost yet: the sum is not shown as a cost", 1], ["saved first", "SKUs and compliance wait until the brand is saved; the first save moves to its page"], ["badges", "missing COLA jumps to Compliance; price group or Unpriced, category, active SKU count"]],
+    spec: "Admin and Sales release an active SKU for portal ordering with Release beside Edit SKU, from packaged stock or a planned batch of the brand; each open release sits under its SKU with Edit (quantity, order-by date) and Withdraw. The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category and hops are optional nullable columns; price group is the row of the price grid the brand sits on, so the price of any of its packaged SKUs is the cell where the customer's sale channel meets that group and the SKU's format. The brand carries no price of its own, and a brand on no group is unpriced everywhere. Package facts live on Formats. Sells as lists every packaged Format with a switch: on means the brand sells it, which is an active SKU, and Edit SKU opens that SKU's sheet (UPC, keg pool, batch share). Under the switches, each switched-on Format's contents read as lines (Four Pack · 6 per Case), then the price group's pours. A pour is a serving from the tap, not a SKU: the menu publishes brand × pour to Square, and a sale depletes the keg SKU. Every line shows its price per sale channel; prices and pours are edited on the price group. No container source editor here. Compliance is the brand’s: its COLA or formula approvals and its state registrations list under the sell sheet, each row opening its sheet, with Add approval and Add registration; a brand with no recorded COLA says None on file, as Catalog does. Manage categories opens beside Category: Admin and Sales can add, rename across all brands, and confirm deletion of unused categories. Uncategorized clears a brand’s assignment when saved. The brewery’s own licenses are the Licenses page under Compliance, never a brand row. Under the price group, the brand’s recipe cost per barrel (its last brewed version, else its newest) is read against the groups’ ceilings and names the band it falls in; Use only fills the select. A recipe with an ingredient that has never been received has no trustworthy cost, so the row says which ingredient instead of a number. No recipe, no row.",
     body: <BrandView model={toBrandViewProps(brandHazy)} images={{ cola: <ColaLabelImageView label="Hazy IPA · COLA 25318001000034" src="/mock/cola-label.svg" /> }} categoryAction={<CatalogCategoriesFixture categories={toBrandViewProps(brandHazy).categoryOptions} />} />,
   },
   {
@@ -1655,8 +1682,8 @@ export const SCREENS: Screen[] = [
     job: "Edit a packaged SKU opened from its brand's Sells as",
     reads: "list_formats · list_keg_pools",
     writes: "update_sku",
-    states: [["permission", "sales or admin required", 1], ["active", "available to price and sell"], ["inactive", "history remains", 1], ["in use", "format cannot change; create another SKU", 1], ["keg pool", "keg formats only · None charges no deposit"], ["no pool", "warning on SKU list · no deposit", 1], ["batch share", "optional percentage on an existing SKU · brand total at most 100%"]],
-    spec: "A SKU is one brand in one packaged format, and holds stock. The Brand page's Sells as switch creates it, turns it off and back on; Edit SKU there opens this sheet. A pour is not a SKU: it is added on its price group. It owns active state, optional UPC, and provider mappings. Edit SKU also sets its default batch package share as a percentage; blank projects nothing, and all shares of one brand total at most 100%. Create first, then edit to set the share. A keg SKU selects a Keg pool or None; the pool kind derives container source. Out-of-service pools cannot be newly linked; existing links survive retirement. Price lives on the grid cell (sale channel × price group × format), never as a SKU exception. Group-shared barcodes are a follow-on table; until then a SKU may carry its own UPC. Name, volume and packaging derive from the Format. A different physical package is a different Format. Corrections affect future calculations and open plans; recorded movement volumes and closed packaging yield stay frozen.",
+    states: [["permission", "sales or admin required", 1], ["active", "available to price and sell"], ["inactive", "history remains", 1], ["orderable from stock", "on by default · off hides the portal stock offer; staff ordering and releases are unchanged"], ["in use", "format cannot change; create another SKU", 1], ["keg pool", "keg formats only · None charges no deposit"], ["no pool", "warning on SKU list · no deposit", 1], ["batch share", "optional percentage on an existing SKU · brand total at most 100%"]],
+    spec: "A SKU is one brand in one packaged format, and holds stock. The Brand page's Sells as switch creates it, turns it off and back on; Edit SKU there opens this sheet. A pour is not a SKU: it is added on its price group. It owns active state, optional UPC, and provider mappings. Orderable from stock says whether portal buyers can order it from packaged stock; off keeps it out of the portal unless a release offers it. Edit SKU also sets its default batch package share as a percentage; blank projects nothing, and all shares of one brand total at most 100%. Create first, then edit to set the share. A keg SKU selects a Keg pool or None; the pool kind derives container source. Out-of-service pools cannot be newly linked; existing links survive retirement. Price lives on the grid cell (sale channel × price group × format), never as a SKU exception. Group-shared barcodes are a follow-on table; until then a SKU may carry its own UPC. Name, volume and packaging derive from the Format. A different physical package is a different Format. Corrections affect future calculations and open plans; recorded movement volumes and closed packaging yield stay frozen.",
     body: <SkuView model={toSkuViewProps(skuHazyHalf)} />,
   },
   {
@@ -1673,6 +1700,34 @@ export const SCREENS: Screen[] = [
     body: <SkuListView model={toSkuListViewProps(skuListHazy)} createAction={null} />,
   },
   {
+    step: 5,
+    slice: 1,
+    tab: "More",
+    surface: "sheet",
+    name: "Release for ordering",
+    to: { "Release for ordering": "Brand" },
+    job: "Offer a planned batch or packaged stock to portal buyers, up to a quantity, from a date",
+    reads: "list_release_batches",
+    writes: "release_sku",
+    states: [["permission", "sales or admin required", 1], ["from a batch", "every projected package ticked at its projected units · ships from the batch's ready date"], ["from stock", "quantity typed · ships from today · refused above what is free to promise", 1], ["one SKU", "from the Brand page: pick packaged stock or a planned batch of its brand that has no open release of it"], ["already released", "one open release per batch and package; edit it instead", 1]],
+    spec: "Opened from a planned batch on Planning (Release for ordering) or from a SKU on the Brand page (Release). Untick a package to leave it out, or lower its quantity. Order by is optional; buyers order until that day. Saving writes one release per package. Remaining is the quantity less what submitted and confirmed orders hold; drafts do not count.",
+    body: <ReleaseView form={batchReleaseForms(releaseBatches)[0]} />,
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "More",
+    surface: "sheet",
+    name: "Edit release",
+    to: { "Save release": "Brand" },
+    job: "Change an open release's quantity or order-by date",
+    reads: "list_releases",
+    writes: "update_release · withdraw_release",
+    states: [["permission", "sales or admin required", 1], ["below confirmed", "refused: never below what is confirmed", 1], ["below pre-orders", "allowed · Confirm order flags the pre-orders above it as Over release"], ["withdrawn", "buyers can no longer order · submitted orders stay"]],
+    spec: "Opened by Edit on an open release's row under its SKU on the Brand page; Withdraw sits beside it. A stock release can grow only within what is free to promise.",
+    body: <EditReleaseView qty={String(releaseHazyKeg.qty)} ordersCloseOn={releaseHazyKeg.orders_close_on ?? ""} confirmed={releaseHazyKeg.confirmed} />,
+  },
+  {
     step: 6,
     slice: 1,
     portal: "Order",
@@ -1681,8 +1736,8 @@ export const SCREENS: Screen[] = [
     job: "A buyer catalog: listed packages by brand, quantity, Place order",
     reads: "portal_catalog · get_portal_account · portal_order",
     writes: "portal_quote_order · portal_create_order · portal_update_draft_order · portal_submit_quote",
-    states: [["empty catalog", "call brewery; nothing orderable"], ["missing price", "item cannot enter cart", 1], ["no ship-to", "contact brewery; choose an existing ship-to", 1], ["no source", "Review stays off until the brewery sets where orders ship from", 1], ["unlisted package", "a format not on the wholesale list is absent", 1], ["quote changed", "return to Shop and review current details", 1], ["receipt", "ORD number after commit"]],
-    spec: "Grouped by brand; each row is a package the brewery listed for wholesale (½ keg, ⅙ keg, case, bottle). The list is the offer, not warehouse ATP: no in/low/out badges, no counts. Unlisted packages are absent, not greyed. Schedule packaging run is where staff designate the list. Drawn with a fulfillment source already set; the no-source state keeps Review off and never silently chooses Warehouse. Stepper − and + each ship as 48×48 targets. On a phone, Save draft and Review order (which carries the subtotal) stay pinned to the foot of the scroll. No staff vocabulary (ATP, gates, fulfillment engineering) anywhere in the portal. No persistent cart: leaving the page keeps nothing. Reorder on a shipped order still prefills Review.",
+    states: [["empty catalog", "call brewery; nothing orderable"], ["release offer", "a released package reads From Dec 4 · order by Nov 27 · few left or sold out when little or none is left"], ["stock or release", "a package offered both ways picks From stock or the release"], ["ships from", "a release line moves the requested date to its ships-from date · This order ships from …"], ["missing price", "item cannot enter cart", 1], ["no ship-to", "contact brewery; choose an existing ship-to", 1], ["no source", "Review stays off until the brewery sets where orders ship from", 1], ["unlisted package", "a format not on the wholesale list is absent", 1], ["quote changed", "return to Shop and review current details", 1], ["receipt", "ORD number after commit"]],
+    spec: "Grouped by brand; each row is a package the brewery listed for wholesale (½ keg, ⅙ keg, case, bottle). The list is the offer, not warehouse ATP: no stock badges, no counts. A package staff turned off for stock appears only while a release offers it; a release says when it ships and the order-by date, and only few left or sold out. Mixed carts are allowed: the order's requested date moves to the latest ships-from date among its release lines. Unlisted packages are absent, not greyed. Schedule packaging run is where staff designate the list. Drawn with a fulfillment source already set; the no-source state keeps Review off and never silently chooses Warehouse. Stepper − and + each ship as 48×48 targets. On a phone, Save draft and Review order (which carries the subtotal) stay pinned to the foot of the scroll. No staff vocabulary (ATP, gates, fulfillment engineering) anywhere in the portal. No persistent cart: leaving the page keeps nothing. Reorder on a shipped order still prefills Review.",
     body: <ShopView model={toShopViewProps(ridgelineShop)} />,
   },
   {
@@ -1734,9 +1789,9 @@ export const SCREENS: Screen[] = [
     job: "One order’s status, lines and the invoice when it exists",
     reads: "portal_order [existing] · portal_invoices [existing]",
     writes: "none",
-    states: [["confirmed", "ships date · no invoice yet"], ["adjusted", "lines show ordered vs shipped"], ["shipped", "invoice link · Reorder"], ["shipped · stop delivered", "the order stays shipped · invoice link · Reorder"]],
+    states: [["confirmed", "ships date · no invoice yet"], ["adjusted", "lines show ordered vs shipped"], ["changed after confirm", "each change after the brewery confirmed names its reason and each line's change; never who or the staff note"], ["shipped", "invoice link · Reorder"], ["shipped · stop delivered", "the order stays shipped · invoice link · Reorder"]],
     spec: "Opened from Order history. Status is the buyer-facing state. Reorder is on shipped orders, whether or not the stop is delivered. The invoice link is absent until the brewery has billed.",
-    body: <PortalOrderView model={toPortalOrderViewProps(portalOrderShipped)} />,
+    body: <PortalOrderView model={toPortalOrderViewProps(portalOrderChangedAfterConfirm)} />,
   },
   {
     step: 6,
@@ -2266,6 +2321,21 @@ export const SCREENS: Screen[] = [
     states: [["permission", "warehouse or brewer required", 1], ["new", "name, kind and base unit required"]],
     spec: "Kind starts unselected. Unit labels name the measure without changing the stored unit or purchase-unit factor.",
     body: <MaterialView model={{ ...materialCitra, name: "", kind: "", unit: "lb", purchaseUnit: "lb", baseUnits: "1", soldBy: "", soldBySaved: false, defaultVendorId: "", lotTracked: false }} />,
+  },
+  {
+    step: 7,
+    slice: 2,
+    tab: "More",
+    surface: "sheet",
+    name: "Kind suggested",
+    sheetTitle: "Add material",
+    to: { "Save material": "Materials on hand" },
+    job: "Accept or ignore a kind suggested from a new material's name",
+    reads: "suggest_material_category",
+    writes: "upsert_material",
+    states: [["permission", "warehouse or brewer required", 1], ["suggested", "Kind empty · the suggested kind shows in grey · Tab accepts it"], ["none", "suggestions off, no confident kind, or the request failed · Kind stays empty"]],
+    spec: "Leaving Material name on Add material asks for a kind once per name. A suggestion shows only while Kind is empty and is never saved unless accepted; opening the list and choosing another kind works as before.",
+    body: <MaterialView model={{ ...materialCitra, name: "Citra T-90", kind: "", kindSuggestion: "hop", unit: "lb", purchaseUnit: "lb", baseUnits: "1", soldBy: "", soldBySaved: false, defaultVendorId: "", lotTracked: false }} />,
   },
   {
     step: 7,
@@ -2878,12 +2948,12 @@ export const SCREENS: Screen[] = [
     slice: 8,
     group: "Desk",
     name: "Planning",
-    to: { "Can labels": "Edit material", "Quadpack carriers": "Edit material", "Hazy ATP negative Sep 9, 2026": "Pars and allocation", "Create purchase order": "New PO", "Set vendor": "Materials on hand", "Hop bags": "Edit material", "Fictional Packaging Supply": "Vendor", "Fictional Label Works": "Vendor" },
+    to: { "Release for ordering": "Release for ordering", "Can labels": "Edit material", "Quadpack carriers": "Edit material", "Hazy ATP negative Sep 9, 2026": "Pars and allocation", "Create purchase order": "New PO", "Set vendor": "Materials on hand", "Hop bags": "Edit material", "Fictional Packaging Supply": "Vendor", "Fictional Label Works": "Vendor" },
     job: "See demand gaps by vendor and create each vendor's purchase order, without priority state",
-    reads: "get_material_requirements",
-    writes: "draft_purchase_order_from_requirements [one RPC: one draft PO per resolved vendor + lines; the buy-by date is needed-by less the vendor's lead time]",
-    states: [["gap", "demand exceeds supply in that week · the only actionable row"], ["projected", "includes N projected · uncovered orders and batch package shares"], ["covered", "supply meets demand · shown so the horizon reads continuously"], ["by vendor", "rows group under the vendor they resolve to, A to Z · each group ends with its own Create purchase order"], ["partly unbuyable", "a row already past its buy-by date is drawn out of reach · the rest of its group still drafts", 1], ["no vendor", "no contract and no default supplier · grouped last under No vendor · each row offers Set vendor, which opens Materials at that material", 1], ["empty", "No material shortages · shortage-only, so it never claims work is scheduled · links to Batches, Packaging, and Materials · drawn as Planning empty"]],
-    spec: "Material demand combines unbrewed recipe ingredients, open packaging runs, and projected packaging from uncovered orders and active batches with SKU package shares. Batch units are rounded down from planned barrels times the SKU share divided by format volume; needed-by is brew date (planned until brewed) plus Days to package. Any non-cancelled run linked directly or through its source tank replaces the whole batch projection, including after it closes. An unlinked tankless run does not identify a batch and cannot replace that batch's projection. Order projection is the smaller of negative ATP and open order allocations, less open runs and projected batch units of that SKU, so stock and planned supply are never counted twice. Standing allocations hold stock ahead of orders but never project alone. Order needed-by is the earliest requested ship date, or today without one. Packaging units flow through the format's material quantities once, rounding each-count materials up. One row per material includes the projected portion and reads includes N projected. On-hand material and unreceived purchase orders reduce the gap. Resolution is an active contract, then the material's default vendor; missing vendor and past buy-by rows cannot draft. Buy-by is needed-by less vendor lead time. Projected and firm shortfalls draft identically, one purchase order per vendor group, rounded to whole purchase units. Nothing here ranks or prioritises.",
+    reads: "get_material_requirements · list_release_batches · list_releases",
+    writes: "draft_purchase_order_from_requirements [one RPC: one draft PO per resolved vendor + lines; the buy-by date is needed-by less the vendor's lead time] · release_sku",
+    states: [["gap", "demand exceeds supply in that week · the only actionable row"], ["projected", "includes N projected · uncovered orders and batch package shares"], ["covered", "supply meets demand · shown so the horizon reads continuously"], ["by vendor", "rows group under the vendor they resolve to, A to Z · each group ends with its own Create purchase order"], ["partly unbuyable", "a row already past its buy-by date is drawn out of reach · the rest of its group still drafts", 1], ["no vendor", "no contract and no default supplier · grouped last under No vendor · each row offers Set vendor, which opens Materials at that material", 1], ["empty", "No material shortages · shortage-only, so it never claims work is scheduled · links to Batches, Packaging, and Materials · drawn as Planning empty"], ["planned batch", "Released once a portal release of it is open · else Release for ordering, admin and sales only"]],
+    spec: "Planned batches list every unpackaged batch with projected packages; Release for ordering opens the release form prefilled from the projection. Material demand combines unbrewed recipe ingredients, open packaging runs, and projected packaging from uncovered orders and active batches with SKU package shares. Batch units are rounded down from planned barrels times the SKU share divided by format volume; needed-by is brew date (planned until brewed) plus Days to package. Any non-cancelled run linked directly or through its source tank replaces the whole batch projection, including after it closes. An unlinked tankless run does not identify a batch and cannot replace that batch's projection. Order projection is the smaller of negative ATP and open order allocations, less open runs and projected batch units of that SKU, so stock and planned supply are never counted twice. Standing allocations hold stock ahead of orders but never project alone. Order needed-by is the earliest requested ship date, or today without one. Packaging units flow through the format's material quantities once, rounding each-count materials up. One row per material includes the projected portion and reads includes N projected. On-hand material and unreceived purchase orders reduce the gap. Resolution is an active contract, then the material's default vendor; missing vendor and past buy-by rows cannot draft. Buy-by is needed-by less vendor lead time. Projected and firm shortfalls draft identically, one purchase order per vendor group, rounded to whole purchase units. Nothing here ranks or prioritises.",
     body: <PlanningView model={toPlanningViewProps(planningDemo)} />,
   },
   {
@@ -3113,7 +3183,7 @@ export const SCREENS: Screen[] = [
     reads: "list_sale_channels",
     writes: "upsert_sale_channel · delete_sale_channel",
     states: [["permission", "admin required", 1], ["in use", "no Delete on a channel a record uses or on the system Taproom channel · rule stated only in the delete confirm · a foreign key or the Taproom check refuses the delete, human copy, not a 23503", 1], ["seeded", "four defaults arrive with the brewery"], ["inherit", "a customer with no override takes the channel default"]],
-    spec: "The channel carries a name and a default tax treatment and nothing else: removal classification stays on the movement type, which is why #42 rejected giving the channel a removal flag or a required-destination-state flag. Resolution order is customer override → channel default, and the resolved value is frozen onto the movement at write time so editing a customer in March never restates January.",
+    spec: "The channel carries a name, a default tax treatment and a one-way keg fee: removal classification stays on the movement type, which is why #42 rejected giving the channel a removal flag or a required-destination-state flag. Resolution order is customer override → channel default, and the resolved value is frozen onto the movement at write time so editing a customer in March never restates January.",
     body: <SaleChannelsView model={toSaleChannelsViewProps({ ...saleChannelsList, canDelete: true })} />,
   },
   {
@@ -3123,11 +3193,11 @@ export const SCREENS: Screen[] = [
     surface: "sheet",
     name: "Channel",
     to: { "Save channel": "Sale channels" },
-    job: "Create or edit one sale channel and its default tax treatment",
+    job: "Create or edit one sale channel, its default tax treatment and its one-way keg fee",
     reads: "list_sale_channels",
     writes: "upsert_sale_channel",
-    states: [["permission", "admin required", 1], ["new", "titled Add channel · name and tax treatment required"], ["edit", "titled with the channel being edited"]],
-    spec: "Drawn editing the Export channel. The sheet has no Delete: removal and its in-use rule live on the Sale channels list. Every selected tax treatment shows its meaning under the chips, including the default Taxable choice. The four removals without payment of tax (Export, Vessel supplies, Research, Transfer in bond) keep their approved TTB meanings.",
+    states: [["permission", "admin required", 1], ["new", "titled Add channel · name and tax treatment required · fee starts at $0.00"], ["fee", "whole cents only; blank or 0 bills none; a change reaches only drafts and lines added later"], ["edit", "titled with the channel being edited"]],
+    spec: "Drawn editing the Export channel. The sheet has no Delete: removal and its in-use rule live on the Sale channels list. Every selected tax treatment shows its meaning under the chips, including the default Taxable choice. The one-way keg fee is stamped on each one-way keg line of the channel's wholesale orders when the line is saved, and fixed once the order is submitted. The four removals without payment of tax (Export, Vessel supplies, Research, Transfer in bond) keep their approved TTB meanings.",
     body: <ChannelView model={toChannelViewProps(channelExport)} />,
   },
   {
@@ -3431,7 +3501,7 @@ export const SCREENS: Screen[] = [
     name: "Link identity",
     job: "Link one Slack user to one current brewery staff membership",
     reads: "get_chat_link_status",
-    writes: "issue_chat_link_proof [design] · consume_chat_link_proof [single-use, authenticated MGR completion]",
+    writes: "issue_chat_link_proof [platform; the Slack App Home handler mints it with the service role] · consume_chat_link_proof [single-use, authenticated MGR completion]",
     states: [["expired", "link expired · create a new one", 1], ["not staff", "customer and removed membership rejected", 1], ["linked", "show personal queue"]],
     spec: "Slack profile email and display name are never identity. The deep link requires normal MGR authentication.",
     body: (<>
@@ -3462,7 +3532,7 @@ export const SCREENS: Screen[] = [
     step: 8, slice: "chat", surface: "entry", venue: { name: "Slack", shell: "msg", ctx: "MGR", who: "Direct message", at: "8:43 AM" },
     name: "Personal DM",
     job: "Notify once when linked work becomes assigned, due or overdue",
-    reads: "get_notification_occurrence [design] · owning Today query revalidation",
+    reads: "get_notification_occurrence [view; design] · owning Today query revalidation",
     writes: "snooze_notification · set_notification_preference [integration state only]",
     states: [["quiet hours", "queued until personal window opens"], ["resolved", "same message updates to Resolved"], ["retry", "same semantic delivery; no second message"], ["unauthorized", "suppress and unlink if membership ended", 1]],
     spec: "The provider message is a projection. Deleting it does not change MGR. Deep links contain no trusted actor or tenant claims.",

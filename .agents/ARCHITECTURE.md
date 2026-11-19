@@ -15,6 +15,7 @@ never copy it into a second place.
 | `lib/agent/operations.ts` | What a model can find and describe. MCP and Ask MGR (`lib/chat/agent.ts`) share it, and `agentHidden` keeps an operation from both. |
 | `lib/commands/agent-proposals.ts` | A person's side of an agent's proposal. `isProposable` is checked when proposing and again at approval, because a token can call `create_agent_proposal` directly. Approving runs the stored command on the person's session, in the brewery it was proposed for. |
 | `lib/commands/purchasing.ts` | Vendors, materials, contracts, purchase orders (create/send/receive/cancel/close-short), material requirements/planning, and material counts. `send_purchase_order` is an attestation (`sent_via` mailto/external, never `direct` until a provider is approved) — transport is a property, never a `po_status` fork. Lead time is an observed, never-stored vendor view (`ordered_on → received_on`); a contract's remaining commitment is four numbers (committed, received, on order, available). |
+| `lib/commands/releases.ts` | Portal releases (`docs/plans/portal-release-windows.md`): `release_sku`, `update_release`, `withdraw_release` (Admin/Sales), `list_releases` and `list_release_batches`. A release offers one SKU to portal buyers from a planned batch or packaged stock, from a ships-from date. `private.release_state` owns every count (confirmed, pre-ordered, remaining), whether a release is open, and what it holds back from the stock offer; `portal_availability`, `portal_releases`, the submit guard `private.assert_portal_offers` and `release_rows` all read it. `skus.portal_from_stock` turns a SKU's portal stock offer off; staff ordering is unchanged. |
 | `lib/commands/packaging.ts` | Packaging runs: schedule (brand-first, no tank required), start against one exact source occupancy, close (lot + output movements + BOM consumption, first-expiring-first for lot-tracked materials), and repack (breakdown only, admin/warehouse). |
 | `lib/commands/delivery.ts` | Delivery routes: `save_route` (header + stops replaced in one call), `depart_route`, `leave_delivery_for_later`, `return_route`, `get_delivery_stop`. A departed route is frozen to replanning; an unattempted open stop can leave through `leave_delivery_for_later`, and return waits until no open stop remains. |
 | `lib/commands/transfers.ts` | Internal bin-to-bin and cross-location `stock_transfers` (create, which submits; pick/receive/cancel) — a document distinct from priced customer `orders`; bin-to-bin moves inside one location are structurally barred from becoming deliveries. |
@@ -241,7 +242,10 @@ a gap to close, not a convention to trust.
    proves the concrete connection is visible through `ctx.db`, then passes the
    verified actor to a service-only RPC that rechecks current membership and role
    in the same token read/write statement. Integration modules must use this
-   boundary; they never receive a service-client allowlist. `invite_staff` and
+   boundary; they never receive a service-client allowlist. The same boundary
+   holds each brewery's write-only TypeSafe key for Jev suggestions
+   (`set_brewery_typesafe_key`, `get_brewery_typesafe_key_status`,
+   `read_brewery_typesafe_key`, over `private.brewery_typesafe_keys`). `invite_staff` and
    `invite_customer_user` use `lib/supabase/invites.ts`: the RLS-bound claim RPC
    verifies the current actor and role before Auth, and the completion RPC
    rechecks them. Auth identity is bound by a private trigger in Auth's own

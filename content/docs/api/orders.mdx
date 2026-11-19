@@ -77,14 +77,15 @@ Replace lines on a submitted/confirmed/picked order; a submitted order holds no 
 | Field | Type | Required |
 | --- | --- | --- |
 | `orderId` | uuid | yes |
-| `reason` | string | yes |
 | `lines` | array of object | yes |
+| `reasonCode` | short or damaged or customer_request or brewery_error or other | no |
+| `reason` | string | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "adjust_order_lines", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "orderId": "00000000-0000-0000-0000-000000000000", "reason": "string", "lines": [ { "skuId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "adjust_order_lines", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "orderId": "00000000-0000-0000-0000-000000000000", "lines": [ { "skuId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ], "reasonCode": "short" } }'
 ```
 
 ## cancel_order [#cancel_order]
@@ -343,6 +344,27 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_invoices", "input": {} }'
 ```
 
+## list_order_changes [#list_order_changes]
+
+`query` · admin, sales
+
+Changes made to confirmed or picked orders, newest first, one page at a time: each with its order, customer, staff member, reason code, note and per-SKU quantity change; filter by reason code, staff member or customer
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `limit` | integer | no |
+| `cursor` | string | no |
+| `reasonCode` | short or damaged or customer_request or brewery_error or other | no |
+| `staffId` | uuid | no |
+| `customerId` | uuid | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_order_changes", "input": {} }'
+```
+
 ## list_orders [#list_orders]
 
 `query` · admin, sales, warehouse
@@ -421,7 +443,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin
 
-Admin only: record an order picked up before the books opened as shipped, picked up and paid at the given prices; writes no stock, deposits or fees, and its invoice is never sent to QuickBooks
+Admin only: record an order picked up before the books opened as shipped, picked up and paid at the given prices; writes no stock or deposits, records each one-way keg line's sale channel fee on the line but bills no fee line, and its invoice is never sent to QuickBooks
 
 | Field | Type | Required |
 | --- | --- | --- |

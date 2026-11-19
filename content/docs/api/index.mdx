@@ -375,6 +375,7 @@ omitted. They have no roles until they are built.
 | `get_brewery` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ |  |  |
 | `get_brewery_ai_model` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `get_brewery_operating_defaults` | Team & brewery settings | ✓ |  |  |  |  |  |
+| `get_brewery_suggestion_settings` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `get_chat_history` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `get_chat_integration_health` | Today & notifications | ✓ |  |  |  |  |  |
 | `get_chat_link_intent` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
@@ -465,6 +466,7 @@ omitted. They have no roles until they are built.
 | `list_my_invitations` | Team & brewery settings |  |  |  |  |  |  |
 | `list_occupancies` | Packaging | ✓ |  | ✓ | ✓ |  |  |
 | `list_open_taps` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
+| `list_order_changes` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
 | `list_orders` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |  |
 | `list_packaging_history` | Packaging | ✓ |  | ✓ | ✓ |  |  |
 | `list_packaging_runs` | Packaging | ✓ |  | ✓ | ✓ |  |  |
@@ -479,6 +481,8 @@ omitted. They have no roles until they are built.
 | `list_qbo_items` | Team & brewery settings | ✓ | ✓ |  |  |  |  |
 | `list_recipes` | Production | ✓ |  |  | ✓ |  |  |
 | `list_refused_returns` | Delivery & routes | ✓ | ✓ | ✓ |  |  |  |
+| `list_release_batches` | Catalog & pricing | ✓ | ✓ | ✓ | ✓ |  |  |
+| `list_releases` | Catalog & pricing | ✓ | ✓ | ✓ | ✓ |  |  |
 | `list_repack_parents` | Packaging | ✓ |  | ✓ |  |  |  |
 | `list_reporting_basis_corrections` | Compliance | ✓ | ✓ |  |  |  |  |
 | `list_routes` | Delivery & routes | ✓ | ✓ | ✓ |  |  |  |
@@ -532,6 +536,7 @@ omitted. They have no roles until they are built.
 | `record_stock_transfer_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |  |
 | `record_taproom_count` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
 | `release_allocation` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
+| `release_sku` | Catalog & pricing | ✓ | ✓ |  |  |  |  |
 | `reorder_refused_delivery` | Delivery & routes | ✓ | ✓ |  |  |  |  |
 | `replace_format_bom` | Packaging | ✓ | ✓ |  |  |  |  |
 | `replace_format_components` | Packaging | ✓ | ✓ |  |  |  |  |
@@ -562,11 +567,12 @@ omitted. They have no roles until they are built.
 | `set_brewery_gravity_unit` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `set_brewery_operating_defaults` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `set_brewery_quiet_hours` | Team & brewery settings | ✓ |  |  |  |  |  |
+| `set_brewery_suggestions_enabled` | Team & brewery settings | ✓ |  |  |  |  |  |
+| `set_brewery_typesafe_key` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `set_channel_price` | Catalog & pricing | ✓ | ✓ |  |  |  |  |
 | `set_my_gravity_unit` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `set_notification_destination` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `set_notification_preference` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
-| `set_one_way_keg_fee` | Taproom & kegs | ✓ |  |  |  |  |  |
 | `set_order_pickup` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
 | `set_personal_quiet_hours` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |  |
 | `set_portal_fulfillment_source` | Customers | ✓ |  |  |  |  |  |
@@ -588,6 +594,7 @@ omitted. They have no roles until they are built.
 | `ship_order` | Orders & invoicing | ✓ |  | ✓ |  |  |  |
 | `snooze_notification` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |  |
 | `submit_order` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
+| `suggest_material_category` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |  |
 | `swap_keg` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
 | `sync_qbo_payments` | Team & brewery settings | ✓ | ✓ |  |  |  |  |
 | `sync_square_catalog` | Team & brewery settings | ✓ |  |  |  |  |  |
@@ -604,6 +611,7 @@ omitted. They have no roles until they are built.
 | `update_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |  |
 | `update_purchase_order` | Purchasing & materials | ✓ |  | ✓ |  |  |  |
 | `update_recipe` | Production | ✓ |  |  | ✓ |  |  |
+| `update_release` | Catalog & pricing | ✓ | ✓ |  |  |  |  |
 | `update_sku` | Catalog & pricing | ✓ | ✓ |  |  |  |  |
 | `update_staff_role` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `upsert_brand` | Catalog & pricing | ✓ | ✓ |  |  |  |  |
@@ -621,6 +629,7 @@ omitted. They have no roles until they are built.
 | `upsert_vessel` | Production | ✓ |  |  |  |  |  |
 | `upsert_water_profile` | Production | ✓ |  |  | ✓ |  |  |
 | `void_invoice_payment` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
+| `withdraw_release` | Catalog & pricing | ✓ | ✓ |  |  |  |  |
 | `write_off_invoice` | Orders & invoicing | ✓ |  |  |  |  |  |
 {/* end ops:roles */}
 

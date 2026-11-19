@@ -162,7 +162,8 @@ describe("adjustment reasons", () => {
   });
 
   it.each(["command", "rpc"] as const)("stores trimmed valid reasons through %s and replays the original payload", async path => {
-    const orderId = await orderAt("confirmed");
+    // Free text is the pre-order path; after confirm a change also needs a code.
+    const orderId = await orderAt("submitted");
     const reason = " \t\u00a0Customer cut\u2003\n ";
     const requestId = crypto.randomUUID();
     const input = { orderId, reason, lines: [{ skuId, qty: 2 }] };
@@ -189,6 +190,89 @@ describe("adjustment reasons", () => {
     const rpc = await adminCtx.db.rpc("adjust_order_lines", { p_order: orderId, p_lines: payload.lines, p_reason: reason, p_request_id: requestId });
     expect(rpc.error).toBeNull();
     expect(rpc.data).toEqual(result);
+    expect(snapshot(orderId)).toEqual(before);
+  });
+
+  // Phase C: a change after confirm names one fixed reason code; a pre-order keeps free text.
+  it.each(["confirmed", "picked"] as const)("refuses a %s change without a reason code, atomically", async status => {
+    const orderId = await orderAt(status);
+    const before = snapshot(orderId);
+    await expect(runCommand("adjust_order_lines", { orderId, reason: "Customer cut", lines: [{ skuId, qty: 2 }] }, adminCtx))
+      .rejects.toMatchObject({ code: "bad_request", message: expect.stringMatching(/reason code is required/) });
+    expect(snapshot(orderId)).toEqual(before);
+  });
+
+  it("stores the code and an optional note after confirm; other needs a note", async () => {
+    const orderId = await orderAt("confirmed");
+    await expect(runCommand("adjust_order_lines", { orderId, reasonCode: "other", reason: "  ", lines: [{ skuId, qty: 2 }] }, adminCtx))
+      .rejects.toMatchObject({ code: "bad_request", message: expect.stringMatching(/note is required/) });
+    await expect(runCommand("adjust_order_lines", { orderId, reasonCode: "lost", lines: [{ skuId, qty: 2 }] }, adminCtx))
+      .rejects.toMatchObject({ code: "invalid_input" });
+    await runCommand("adjust_order_lines", { orderId, reasonCode: "damaged", lines: [{ skuId, qty: 4 }] }, adminCtx);
+    await runCommand("adjust_order_lines", { orderId, reasonCode: "other", reason: " Forklift ", lines: [{ skuId, qty: 3 }] }, adminCtx);
+    expect(sql(`select payload->>'reason_code' || ':' || coalesce(payload->>'reason', '-') from public.order_events
+      where order_id='${orderId}' and event='lines_adjusted' order by created_at`)).toEqual(["damaged:-", "other:Forklift"]);
+  });
+
+  it("refuses a reason code on a submitted (pre-order) change", async () => {
+    const orderId = await orderAt("submitted");
+    await expect(runCommand("adjust_order_lines", { orderId, reasonCode: "short", reason: "Low stock", lines: [{ skuId, qty: 2 }] }, adminCtx))
+      .rejects.toMatchObject({ code: "bad_request", message: expect.stringMatching(/only after confirm/) });
+    await runCommand("adjust_order_lines", { orderId, reason: "Low stock", lines: [{ skuId, qty: 2 }] }, adminCtx);
+  });
+
+  it("needs a reason or a reason code before any write, naming the reason field", async () => {
+    const orderId = await orderAt("submitted");
+    const requestId = crypto.randomUUID();
+    await expect(runCommand("adjust_order_lines", { orderId, lines: [{ skuId, qty: 2 }] }, adminCtx, { requestId, correlationId: requestId }))
+      .rejects.toMatchObject({ code: "invalid_input", issues: [expect.objectContaining({ path: ["reason"] })] });
+    expect(sql(`select count(*) from private.command_requests where request_id='${requestId}'`)).toEqual(["0"]);
+  });
+
+  it("refuses the same SKU twice in one adjustment, through the command and the RPC, before any write", async () => {
+    const orderId = await orderAt("confirmed");
+    const before = snapshot(orderId);
+    await expect(runCommand("adjust_order_lines", { orderId, reasonCode: "short", lines: [{ skuId, qty: 2 }, { skuId, qty: 1 }] }, adminCtx))
+      .rejects.toMatchObject({ code: "invalid_input" });
+    const rpc = await adminCtx.db.rpc("adjust_order_lines", {
+      p_order: orderId, p_lines: [{ sku_id: skuId, qty: 2 }, { sku_id: skuId, qty: 1 }], p_reason: null, p_reason_code: "short", p_request_id: crypto.randomUUID(),
+    } as never);
+    expect(rpc.error?.message).toMatch(/same SKU twice/);
+    expect(snapshot(orderId)).toEqual(before);
+  });
+
+  it("refuses the same SKU id in two letter cases, through the command and the RPC, before any write", async () => {
+    const orderId = await orderAt("confirmed");
+    const before = snapshot(orderId);
+    const upper = skuId.toUpperCase();
+    await expect(runCommand("adjust_order_lines", { orderId, reasonCode: "short", lines: [{ skuId, qty: 2 }, { skuId: upper, qty: 1 }] }, adminCtx))
+      .rejects.toMatchObject({ code: "invalid_input" });
+    const rpc = await adminCtx.db.rpc("adjust_order_lines", {
+      p_order: orderId, p_lines: [{ sku_id: skuId, qty: 2 }, { sku_id: upper, qty: 1 }], p_reason: null, p_reason_code: "short", p_request_id: crypto.randomUUID(),
+    } as never);
+    expect(rpc.error?.message).toMatch(/same SKU twice/);
+    expect(snapshot(orderId)).toEqual(before);
+  });
+
+  it("words a change in stored quantities, so a three-place quantity reads as its two-place line", async () => {
+    const orderId = await orderAt("confirmed");
+    await runCommand("adjust_order_lines", { orderId, reasonCode: "damaged", lines: [{ skuId, qty: 2.555 }] }, adminCtx);
+    // Re-sending the same 2.555 changes nothing, so it is not listed as a -0.005 change.
+    await runCommand("adjust_order_lines", { orderId, reasonCode: "damaged", lines: [{ skuId, qty: 2.555 }] }, adminCtx);
+    const { rows } = await runCommand("list_order_changes", {}, adminCtx) as { rows: { order_id: string; changes: { delta: number }[] }[] };
+    expect(rows.filter(r => r.order_id === orderId).map(r => r.changes.map(c => c.delta))).toEqual([[], [-2.44]]);
+  });
+
+  it("replays a historical code-less change on a confirmed order unchanged", async () => {
+    const orderId = await orderAt("confirmed");
+    const requestId = crypto.randomUUID();
+    const payload = { order: orderId, lines: [{ sku_id: skuId, qty: 2 }], reason: "buyer call" };
+    const result = { order_id: orderId, warnings: [], historical: true };
+    sql(`insert into private.command_requests(actor_id,brewery_id,request_id,command_name,payload_hash,result)
+      values('${adminCtx.userId}','${b.id}','${requestId}','adjust_order_lines',
+        extensions.digest('${JSON.stringify(payload)}'::jsonb::text,'sha256'),'${JSON.stringify(result)}'::jsonb)`);
+    const before = snapshot(orderId);
+    expect(await runCommand("adjust_order_lines", { orderId, reason: "buyer call", lines: [{ skuId, qty: 2 }] }, adminCtx, { requestId, correlationId: requestId })).toEqual(result);
     expect(snapshot(orderId)).toEqual(before);
   });
 });

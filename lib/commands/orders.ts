@@ -1,14 +1,14 @@
 // lib/commands/orders.ts — order lifecycle commands. Every mutation delegates
 // to one plpgsql function (00001_baseline.sql, iron rule 5); this layer does
 // zod validation, role gating, and camelCase→p_* argument mapping.
-import { numberedHistorySchema, readHistory, type HistoryRow } from "./history";
+import { historyInput, historyResult, newestFirst, numberedHistorySchema, readHistory, type HistoryRow } from "./history";
 import { z } from "zod";
 import { qboStaffInvoiceLink, type QboInvoiceIdentity, type QboPushedIdentity, type QboStaffConnection } from "@/lib/mgr/qbo-ui";
 import type { Ctx } from "./registry";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
 import { ORDER_FILTERS, salesRoles, warehouseRoles } from "@/lib/mgr/order-status";
 import { hasAnyRole } from "@/lib/mgr/roles";
-import { PAYMENT_METHODS, REFUSAL_REASONS, type PaymentMethod } from "@/lib/mgr/enums";
+import { ORDER_CHANGE_REASONS, PAYMENT_METHODS, REFUSAL_REASONS, type PaymentMethod } from "@/lib/mgr/enums";
 import { isoDate, completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, runCommand, CommandError } from "./registry";
 
 const lines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive().describe("Units of the SKU on this line") })).min(1);
@@ -76,8 +76,20 @@ defineCommand({
   compensation: "Reverse with adjust_order_lines and the previous lines; a line added back takes the current price.",
   roles: [...salesRoles], requiresConfirmation: true,
   // Keep raw reasons replayable; the RPC trims and validates new writes after its request lookup.
-  input: z.object({ orderId: z.string().uuid(), reason: z.string().min(1).describe("Why the lines changed"), lines }),
-  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("adjust_order_lines", { p_order: i.orderId, p_lines: toLines(i.lines), p_reason: i.reason, p_request_id: execution.requestId })),
+  // A confirmed or picked order needs reasonCode (reason is then its optional note, required for
+  // other); a submitted one takes reason alone. Omitting reasonCode sends the RPC the same
+  // payload as before codes existed, so old requests replay unchanged.
+  // The RPC owns which one the order's status needs; here a caller only learns it sent neither.
+  input: z.object({
+    orderId: z.string().uuid(),
+    reasonCode: z.enum(ORDER_CHANGE_REASONS).optional().describe("Why a confirmed or picked order changed; required after confirm, refused before it"),
+    reason: z.string().optional().describe("Why the lines changed; with reasonCode, an optional note (required for other)"),
+    // A uuid in two letter cases is one SKU, as the RPC compares them.
+    lines: lines.refine(ls => new Set(ls.map(l => l.skuId.toLowerCase())).size === ls.length, "Give each SKU one line"),
+  }).refine(i => i.reasonCode !== undefined || (i.reason ?? "").length > 0, { path: ["reason"], message: "Give a reason or a reason code" }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("adjust_order_lines", {
+    p_order: i.orderId, p_lines: toLines(i.lines), p_reason: i.reason ?? null, p_request_id: execution.requestId, p_reason_code: i.reasonCode,
+  })),
 });
 
 defineCommand({
@@ -270,7 +282,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "record_historical_order", description: "Admin only: record an order picked up before the books opened as shipped, picked up and paid at the given prices; writes no stock, deposits or fees, and its invoice is never sent to QuickBooks",
+  name: "record_historical_order", description: "Admin only: record an order picked up before the books opened as shipped, picked up and paid at the given prices; writes no stock or deposits, records each one-way keg line's sale channel fee on the line but bills no fee line, and its invoice is never sent to QuickBooks",
   compensation: "Cannot be undone; a historical order cannot be cancelled or returned.",
   roles: ["admin"],
   input: z.object({
@@ -334,7 +346,7 @@ defineQuery({
   input: z.object({ orderId: z.string().uuid() }),
   handler: async (ctx, i) => {
     const [order, lines, events, shipment, deposits] = await Promise.all([
-      unwrap(ctx.db.from("orders").select("*, customers(name), ship_tos(label, country, city, state)")
+      unwrap(ctx.db.from("orders").select("*, customers(name), sale_channels(name), ship_tos(label, country, city, state)")
         .eq("brewery_id", ctx.breweryId).eq("id", i.orderId).single()),
       completeRows("Order lines", start => ctx.db.from("order_lines").select("*, skus(name, brands(name, alias), formats(name))", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).eq("order_id", i.orderId).order("sku_id").range(start, start + PAGE_SIZE - 1)),
@@ -356,6 +368,23 @@ defineQuery({
     ]);
     return { order, lines, events, shipment, atp, sourceOnHand, deposits };
   },
+});
+
+/** Changes made after confirm (Phase C of docs/plans/portal-release-windows.md): every
+ *  lines_adjusted event with a reason code, newest first. order_change_rows takes the
+ *  filters as arguments, so they apply before rows are built. */
+defineQuery({
+  name: "list_order_changes", description: "Changes made to confirmed or picked orders, newest first, one page at a time: each with its order, customer, staff member, reason code, note and per-SKU quantity change; filter by reason code, staff member or customer",
+  roles: [...salesRoles],
+  input: z.object({
+    ...historyInput,
+    reasonCode: z.enum(ORDER_CHANGE_REASONS).optional().describe("Only changes with this reason code"),
+    staffId: z.string().uuid().optional().describe("Only changes this staff member made (user id)"),
+    customerId: z.string().uuid().optional(),
+  }),
+  handler: async (ctx, i) => historyResult(await unwrap(newestFirst(ctx.db.rpc("order_change_rows", {
+    p_brewery: ctx.breweryId, p_reason_code: i.reasonCode, p_actor: i.staffId, p_customer: i.customerId,
+  }).select().limit(i.limit + 1), i.cursor)) as HistoryRow[], i.limit),
 });
 
 /** Buyer questions about invoices (Program 10 task 8): unanswered first. */

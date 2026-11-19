@@ -39,7 +39,7 @@ export function ShortPickForm({ snapshot, onClose }: { snapshot: ShortPickSnapsh
         });
     }}>
       <ShortPickView model={model} countedValue={qty} onCounted={setQty} reasonValue={reason} onReason={setReason}
-        submitting={busy || saved} disabled={disabled || saved} messages={<><CommandFormMessage error={error} />{saved && error && <Button type="button" variant="outline" onClick={onClose}>Back to Pick</Button>}</>} />
+        submitting={busy} disabled={disabled || saved} messages={<><CommandFormMessage error={error} />{saved && error && <Button type="button" variant="outline" onClick={onClose}>Back to Pick</Button>}</>} />
     </form>
   </CommandForm>;
 }

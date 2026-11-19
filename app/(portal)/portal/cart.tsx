@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
 import { ShopView } from "@/components/mgr/views/shop";
 import { ReviewOrderView } from "@/components/mgr/views/review-order";
-import { toShopViewProps } from "@/lib/mgr/shop-view";
+import { chosenOffer, effectiveRequestedDate, toShopViewProps, type ShopRelease } from "@/lib/mgr/shop-view";
 import { toQuotedReviewOrderViewProps, type PortalQuote } from "@/lib/mgr/review-order-view";
 import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 import { command, CommandResponseError } from "@/lib/commands/client";
@@ -16,7 +16,8 @@ import { money } from "@/lib/mgr/money";
 import { cartActionsDisabled, cartLines, cartMissingInput, planDraftSync, portalAttemptKey, restorePortalAttempt, executePortalAttempt, clearWorkingCart, restoreWorkingCart, saveWorkingCart, type PortalAttempt, type PortalScope, type PortalFields } from "@/lib/portal-cart";
 import { canRetireCommandFailure } from "@/lib/commands/failure";
 
-export type CatalogItem = { skuId: string; name: string; product: string; unitPriceCents: number };
+/** A portal_catalog row: badge is the stock offer (null: not orderable from stock), releases the release offers. */
+export type CatalogItem = { skuId: string; name: string; product: string; unitPriceCents: number; badge: string | null; releases: ShopRelease[] };
 export type ShipToOption = { id: string; label: string; country: string; is_default?: boolean };
 export function submissionFailureMessage(message: string, draftId: string | null) {
   return draftId ? `Order saved, but submission could not be confirmed (${message}). View the order status before retrying, or contact the brewery.` : message;
@@ -24,7 +25,8 @@ export function submissionFailureMessage(message: string, draftId: string | null
 
 type CartProps = {
   items: CatalogItem[]; shipTos: ShipToOption[]; scope: PortalScope; fulfillmentSource: { id: string; name: string } | null;
-  initial?: { fields: PortalFields; draftId: string | null; removed: string[] };
+  /** A saved draft or reorder (reconcilePortalOrder); releasesClosed names lines whose release closed since. */
+  initial?: { fields: PortalFields; draftId: string | null; removed: string[]; releasesClosed?: string[] };
 };
 const subscribe = () => () => {};
 export function Cart(props: CartProps) {
@@ -45,13 +47,15 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource }: CartPr
   const initialFields = recovery.attempt?.fields ?? initial?.fields;
   const [fields, setFields] = useState<PortalFields>(initialFields ?? { shipToId: defaultShipToId(shipTos), poNumber: "", note: "", requestedShipDate: null, lines: [], ...working?.fields });
   const [qty, setQty] = useState<Record<string, string>>(working?.qty ?? Object.fromEntries((initialFields?.lines ?? []).map(l => [l.skuId, String(l.qty)])));
+  // The offer each line orders from: a release id, or "" for packaged stock.
+  const [offers, setOffers] = useState<Record<string, string>>(working?.offers ?? Object.fromEntries((initialFields?.lines ?? []).map(l => [l.skuId, l.releaseId ?? ""])));
   const removed = initial?.removed ?? working?.removed ?? [];
-  const untouched = useRef({ fields, qty });
+  const untouched = useRef({ fields, qty, offers });
   useEffect(() => {
     // Save edits only: re-saving the restored cart would restart its 7-day clock on every visit.
-    if (!keepWorking || (fields === untouched.current.fields && qty === untouched.current.qty)) return;
-    saveWorkingCart(() => localStorage, scope, { fields, qty }, items);
-  }, [keepWorking, scope, fields, qty, items]);
+    if (!keepWorking || (fields === untouched.current.fields && qty === untouched.current.qty && offers === untouched.current.offers)) return;
+    saveWorkingCart(() => localStorage, scope, { fields, qty, offers }, items);
+  }, [keepWorking, scope, fields, qty, offers, items]);
   const [draftId, setDraftId] = useState<string | null>(recovery.attempt && "orderId" in recovery.attempt.input ? recovery.attempt.input.orderId ?? null : initial?.draftId ?? null);
   const [attempt, setAttempt] = useState<PortalAttempt | null>(recovery.attempt);
   const ready = !recovery.error;
@@ -60,7 +64,15 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource }: CartPr
   const [review, setReview] = useState(false);
   const [quote, setQuote] = useState<PortalQuote | null>(null);
   const [error, setError] = useState<string | null>(recovery.error);
-  const lines = cartLines(qty);
+  const catalog = items.map(item => ({ ...item, qty: Number(qty[item.skuId] ?? 0), offer: offers[item.skuId] }));
+  // Each line names the release it orders from; a stock line names none.
+  const lines = cartLines(qty)?.map(line => {
+    const item = catalog.find(i => i.skuId === line.skuId);
+    const releaseId = item ? chosenOffer(item) : "";
+    return releaseId ? { ...line, releaseId } : line;
+  });
+  // A release line moves the requested date to its ships-from date at the earliest.
+  const requestedShipDate = effectiveRequestedDate(fields.requestedShipDate ?? "", catalog) || null;
   const locked = !ready || busy || attempt !== null;
   const disabled = cartActionsDisabled({ hasSource: fulfillmentSource !== null, busy: locked, shipToId: fields.shipToId, lineCount: lines?.length ?? 0 });
   // Shown only when missing input is the whole reason; a missing source, a
@@ -77,7 +89,7 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource }: CartPr
     let active = attempt;
     try {
       if (!active) {
-        const snapshot = { ...fields, lines: lines! };
+        const snapshot = { ...fields, requestedShipDate, lines: lines! };
         if (purpose === "submit") {
           if (!quote) return;
           active = { scope, purpose, fields: snapshot, command: "portal_submit_quote", requestId: crypto.randomUUID(), input: { quoteId: quote.quoteId, expectedIdentity: { actorId: scope.actorId, customerId: scope.customerId }, ...(draftId ? { orderId: draftId } : {}) } };
@@ -103,7 +115,7 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource }: CartPr
       // cannot disprove an earlier uncertain success.
       if (err instanceof CommandResponseError && canRetireCommandFailure(err.status, active?.requestId === attempt?.requestId, err.code)) {
         // A definitive refusal proves no order exists, so the unlocked cart is kept again.
-        try { sessionStorage.removeItem(portalAttemptKey(scope)); setAttempt(null); if (keepWorking) saveWorkingCart(() => localStorage, scope, { fields, qty }, items); }
+        try { sessionStorage.removeItem(portalAttemptKey(scope)); setAttempt(null); if (keepWorking) saveWorkingCart(() => localStorage, scope, { fields, qty, offers }, items); }
         catch { /* Keep the exact attempt if storage cannot retire it. */ }
       }
       setError(err instanceof Error ? err.message : "Order response could not be confirmed.");
@@ -113,7 +125,7 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource }: CartPr
     if (disabled || !lines) return;
     setBusy(true); setError(null);
     try {
-      const next = await command(scope.breweryId, "portal_quote_order", { ...fields, lines }, crypto.randomUUID(), scope) as PortalQuote;
+      const next = await command(scope.breweryId, "portal_quote_order", { ...fields, requestedShipDate, lines }, crypto.randomUUID(), scope) as PortalQuote;
       setQuote(next); setReview(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Order review is unavailable.");
@@ -127,9 +139,9 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource }: CartPr
   </>;
   const shopModel = toShopViewProps({
     shipTos, shipToId: fields.shipToId,
-    requestedDate: fields.requestedShipDate ?? "", poNumber: fields.poNumber, note: fields.note,
+    requestedDate: requestedShipDate ?? "", poNumber: fields.poNumber, note: fields.note,
     source: { name: fulfillmentSource?.name ?? "Not configured" },
-    catalog: items.map(item => ({ ...item, qty: Number(qty[item.skuId] ?? 0) })),
+    catalog,
   });
   shopModel.subtotal = unavailable.length ? "Unavailable for the pending request" : money(subtotal);
   shopModel.reviewVerb = `Review order · ${shopModel.subtotal}`;
@@ -137,6 +149,7 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource }: CartPr
     <ShopView model={shopModel} quantities={qty} locked={locked} disabled={disabled} preparing={busy} comingUp={<Link href="/portal/coming-up">{E.nav("Coming up")}</Link>}
       controls={{
         quantity: (id, value) => setQty(prev => ({ ...prev, [id]: value })),
+        offer: (id, value) => setOffers(prev => ({ ...prev, [id]: value })),
         shipTo: shipToId => setFields(prev => ({ ...prev, shipToId })),
         requestedDate: value => setFields(prev => ({ ...prev, requestedShipDate: value || null })),
         po: poNumber => setFields(prev => ({ ...prev, poNumber })),
@@ -146,13 +159,14 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource }: CartPr
       messages={<>
         {!fulfillmentSource && E.info("The brewery has not set where orders ship from. Contact the brewery before starting or submitting a new order. An existing uncertain request can still be retried.")}
         {removed.length ? E.info(`Removed unavailable or unpriced items: ${removed.join(", ")}. Review the remaining quantities.`, "alert") : null}
+        {initial?.releasesClosed?.length ? E.info(`The release you chose has closed for ${initial.releasesClosed.join(", ")}. Check where each now orders from and the requested date.`, "alert") : null}
         {!lines && E.info("Enter whole quantities of zero or more.", "alert")}
         {missingInput && E.info(missingInput, "alert")}
         {unavailable.length > 0 && E.info(`Pending request contains packages no longer in the catalog: ${unavailable.map(line => `${line.skuId} × ${line.qty}`).join(", ")}. Retry retains the original quantities.`, "alert")}
         {feedback}
       </>} />
     <CommandForm open={review && quote !== null} onOpenChange={open => { setReview(open); if (!open) setQuote(null); }} title="Review order">
-      {quote && <ReviewOrderView model={toQuotedReviewOrderViewProps(quote, fields)} locked={locked} disabled={disabled} submitting={busy}
+      {quote && <ReviewOrderView model={toQuotedReviewOrderViewProps(quote, { ...fields, requestedShipDate })} locked={locked} disabled={disabled} submitting={busy}
         onQuantity={(id, value) => { setQty(prev => ({ ...prev, [id]: value })); setReview(false); setQuote(null); }}
         onBack={() => { setReview(false); setQuote(null); }}
         onPlace={() => { void run("submit"); }} messages={feedback} />}

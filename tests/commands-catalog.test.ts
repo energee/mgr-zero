@@ -3,7 +3,7 @@ import type { StaffRole } from "@/lib/commands/registry";
 // tests/commands-catalog.test.ts — catalog commands must use the idempotent database API.
 import { beforeAll, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { makeBrewery, makeStaffCtx, seedPriceGroup } from "./helpers";
+import { makeBrewery, makeStaffCtx, seedCatalog, seedPriceGroup } from "./helpers";
 import { runCommand } from "../lib/commands/registry";
 import "../lib/commands/all";
 
@@ -145,5 +145,16 @@ describe("list_brands COLA facts", () => {
       const rows = await runCommand("list_brands", {}, ctx) as { id: string; colas: { ttb_id: string; approved_on: string | null }[] }[];
       expect(rows.map((b) => [b.id, b.colas.map(({ ttb_id, approved_on }) => ({ ttb_id, approved_on }))])).toEqual([[brand.id, [{ ttb_id: "00123456789012", approved_on: "2026-10-02" }]]]);
     }
+  });
+});
+
+describe("update_sku portalFromStock", () => {
+  it("keeps Orderable from stock when omitted and turns it off with false", async () => {
+    const cat = await seedCatalog(salesCtx.breweryId, { product: "Portal Toggle", sku: "Portal Toggle case" });
+    type Sku = { portal_from_stock: boolean; active: boolean };
+    expect(await runCommand("update_sku", { skuId: cat.skuId, active: true }, salesCtx)).toMatchObject<Partial<Sku>>({ portal_from_stock: true });
+    expect(await runCommand("update_sku", { skuId: cat.skuId, active: true, portalFromStock: false }, salesCtx)).toMatchObject<Partial<Sku>>({ portal_from_stock: false });
+    // Omitted keeps it off, and the SKU stays active for staff orders.
+    expect(await runCommand("update_sku", { skuId: cat.skuId, active: true }, salesCtx)).toMatchObject<Partial<Sku>>({ portal_from_stock: false, active: true });
   });
 });

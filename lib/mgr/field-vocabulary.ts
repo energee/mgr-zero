@@ -26,6 +26,7 @@ export const FIELD_VOCABULARY: Record<string, { meaning: string; unit?: string; 
 
   // Catalog
   skuId: { meaning: "A SKU: one brand in one packaged format.", entity: "sku" },
+  releaseId: { meaning: "A release: a quantity of one SKU offered to portal buyers from a planned batch or packaged stock.", entity: "release" },
   parentSkuId: { meaning: "The composed SKU being broken down.", entity: "sku" },
   childSkuId: { meaning: "The component SKU it breaks down into.", entity: "sku" },
   parentQty: { meaning: "How many units of the composed SKU are broken down.", unit: "SKU units" },
@@ -232,7 +233,7 @@ export const FIELD_VOCABULARY: Record<string, { meaning: string; unit?: string; 
   poolId: { meaning: "A keg pool: a group of kegs the brewery owns, leases or pays for by the fill.", entity: "keg_pool" },
   perFillCents: { meaning: "The cost of one keg fill.", unit: "cents" },
   depositCents: { meaning: "The deposit charged per keg.", unit: "cents" },
-  feeCents: { meaning: "The non-refundable fee per one-way keg shipped; 0 bills none.", unit: "cents" },
+  oneWayKegFeeCents: { meaning: "The non-refundable fee per one-way keg on a sale channel's wholesale orders; 0 bills none. Omitted on an edit, the fee stays.", unit: "cents" },
   countId: { meaning: "One saved taproom count.", entity: "taproom_count" },
   revision: { meaning: "The revision from the preview or snapshot the caller reviewed." },
   openIntervalId: { meaning: "The open tap interval to close.", entity: "tap_interval" },

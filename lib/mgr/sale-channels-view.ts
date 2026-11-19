@@ -6,6 +6,7 @@
 import type { EmptyState } from "./empty-state";
 import { plural } from "./plural";
 import { sentenceCase } from "./labels";
+import { money } from "./money";
 
 export type SaleChannelsRowView = {
   key: string;
@@ -42,13 +43,16 @@ export type SaleChannelsSnapshot = {
     in_use: boolean;
     /** 'taproom' marks the system Taproom channel, which is never deleted. */
     system_code: string | null;
+    /** Fee per one-way keg on the channel's wholesale orders; 0 bills none. */
+    one_way_keg_fee_cents: number;
     /** Inventory: movement count on the nav. Live omits this. */
     movements?: number;
   }[];
 };
 
 function detail(c: SaleChannelsSnapshot["channels"][number]): string {
-  const label = `Tax treatment: ${sentenceCase(c.tax_treatment)}`;
+  const fee = c.one_way_keg_fee_cents > 0 ? ` · One-way keg fee ${money(c.one_way_keg_fee_cents)}` : "";
+  const label = `Tax treatment: ${sentenceCase(c.tax_treatment)}${fee}`;
   return c.movements != null ? `${label} · ${plural(c.movements, "movement")}` : label;
 }
 

@@ -203,7 +203,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     get_batch_volume_balance: [B,plannedBatch.id],
     reverse_inventory_movement: [B,reversible.id,"Wrong entry",R()],
     preview_inventory_movement: [B,SKU,W,BIN,1,"adjustment",null,null,null,null,R()],
-    set_brewery_operating_defaults: [B,24,R(),21], set_brewery_books_opened_on: [B,"2026-10-01",R()], set_one_way_keg_fee: [B,1000,R()], set_brewery_ai_model: [B,"openai/gpt-5.4",R()], begin_csv_import: [B,"opening_balances",importRows,R()], import_csv_row: [B,importRequest,0],
+    set_brewery_operating_defaults: [B,24,R(),21], set_brewery_books_opened_on: [B,"2026-10-01",R()], set_brewery_ai_model: [B,"openai/gpt-5.4",R()], begin_csv_import: [B,"opening_balances",importRows,R()], import_csv_row: [B,importRequest,0],
     correct_reporting_basis: [B,"2026-09-01",null,"Correct basis",R()],
     claim_invite_request: [B,`${name}@test.local`,"staff","warehouse",null,R()], complete_invite_membership: [inviteRequest], record_invite_failure: [failureRequest],
     revoke_account_invitation: [B,consentInvite,R()], resend_account_invitation: [B,consentInvite,R()],
@@ -246,7 +246,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     cancel_batch: [B,plannedBatch.id,R()], set_recipe_brand: [B,f.recipe.id,BRAND,R()], update_recipe: [B,f.recipe.id,"Renamed recipe",null,R()], reschedule_batch: [B,plannedBatch.id,day,R()],
     cancel_packaging_run: [B,readyRun.id,R()], reschedule_packaging_run: [B,readyRun.id,day,R()],
     schedule_batch: [B,BRAND,f.version.id,day,2,null,R()], schedule_packaging_run: [B,BRAND,day,f.occupancy.id,[{sku_id:SKU,qty_planned:1}],R()], send_purchase_order: [B,draftPo.id,"external",R()], update_purchase_order: [B,draftPo.id,VENDOR,day,[{material_id:MAT,qty_ordered:1}],R()],
-    set_brewery_agents_enabled: [B,true,R()], set_brewery_gravity_unit: [B,"sg",R()], set_brewery_quiet_hours: [B,I,"22:00","07:00",R()], set_portal_fulfillment_source: [B,W,R()], cancel_stock_transfer: [f.transfer.id,"Fixture",R()],
+    set_brewery_agents_enabled: [B,true,R()], set_brewery_suggestions_enabled: [B,true,R()], set_brewery_gravity_unit: [B,"sg",R()], set_brewery_quiet_hours: [B,I,"22:00","07:00",R()], set_portal_fulfillment_source: [B,W,R()], cancel_stock_transfer: [f.transfer.id,"Fixture",R()],
     set_qbo_customer_mapping: [B,f.customer.customerId,"qbo-customer",R()], set_qbo_item_mapping: [B,SKU,"qbo-item",R()],
     set_qbo_deposit_mapping: [B,"qbo-deposit",R()], set_qbo_one_way_fee_mapping: [B,"qbo-fee",R()], set_qbo_push_defaults: [B,true,true,R()], start_qbo_push: [B,f.invoice.id,"initial",R()], write_off_invoice: [B,f.invoice.id,"Fixture",R()],
     record_invoice_payment: [B,f.invoice.id,100,day,"check",null,R()], void_invoice_payment: [B,sql(`select id from public.invoice_payments where brewery_id='${B}'`,true)[0],"Fixture",R()],
@@ -257,7 +257,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     set_personal_quiet_hours: [B,"22:00","07:00","America/New_York",R()], snooze_notification: [B,delivery,new Date(Date.now()+3600000).toISOString(),R()],
     generate_compliance_report: [B,"TTB",day,day], get_chat_integration_health: [B], list_chat_user_links: [B],
     get_square_connected: [B], list_compliance_active_months: [B,day,day],
-    update_bin: [B,emptyBin,name,R()], update_location: [B,W,name,["warehouse"],R()], update_sku: [B,SKU,true,null,R(),null,false,0.5,false], raise_invoice_question: [B,f.invoice.id,"Fixture question",R()],
+    update_bin: [B,emptyBin,name,R()], update_location: [B,W,name,["warehouse"],R()], update_sku: [B,SKU,true,null,R(),null,false,0.5,false,null], release_sku: [B,null,null,null,[{sku_id:SKU,qty:1}],R()], update_release: [B,R(),1,null,R()], withdraw_release: [B,R(),R()], raise_invoice_question: [B,f.invoice.id,"Fixture question",R()],
     update_packaging_run: [B,readyRun.id,f.occupancy.id,[{sku_id:SKU,qty_planned:1}],now,R()], upsert_material: [B,MAT,"Malt","malt","lb","lb",1,false,VENDOR,0,true,null,null,R(),null],
     upsert_material_contract: [B,contract,VENDOR,MAT,100,100,day,null,name,R()], upsert_vendor: [B,VENDOR,"Vendor",null,null,1,"net30",true,R()], upsert_vessel: [B,emptyVessel.id,name,"fermenter",10,R()], delete_vessel: [B,emptyVessel.id,R()],
     upsert_water_profile: [B,null,name,1,1,1,1,1,1,null,null,null,R()],
@@ -280,6 +280,10 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   readNames.push("get_saved_cola_image_permit");
   // Every staff role reads its brewery's copies of saved COLA labels; store_cola_label_image is service-only.
   readNames.push("get_stored_cola_label_image");
+  // Portal releases: staff counts (Taproom refused) and a buyer's own open releases.
+  readNames.push("release_rows", "portal_releases");
+  // Changes after confirm: Admin and Sales read the report; a buyer reads its own order's (Phase C).
+  readNames.push("order_change_rows", "portal_order_change_rows");
   // Existing-account consent is authenticated own-identity work, covered by existing-account-invites.test.ts.
   const ownNames = ["leave_agent_note","record_agent_step","begin_agent_proposal","create_agent_proposal","decline_agent_proposal","finish_agent_proposal","accept_account_invitation","set_my_gravity_unit","consume_chat_link_proof","unlink_chat_user","set_notification_preference","set_personal_notification_destination","create_chat_conversation","append_chat_message"];
   const existing = [...readFileSync(new URL("./rls-command-boundary.test.ts", import.meta.url), "utf8").matchAll(/rpc: "(\w+)"/g)].map(m => m[1]);
@@ -299,6 +303,8 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   readSignatures.push("get_staff_chat_installation(uuid)");
   readSignatures.push("get_saved_cola_image_permit(uuid,text,text)");
   readSignatures.push("get_stored_cola_label_image(uuid,text,text)");
+  readSignatures.push("release_rows(uuid,uuid[],uuid[],uuid[],boolean)", "portal_releases(uuid)");
+  readSignatures.push("order_change_rows(uuid,text,uuid,uuid)", "portal_order_change_rows(uuid)");
   const ownSignatures = ["leave_agent_note(uuid,text,text)","record_agent_step(uuid,text,text,integer,uuid,text,text,text,text,uuid)","begin_agent_proposal(uuid,uuid)","create_agent_proposal(uuid,text,jsonb)","decline_agent_proposal(uuid)","finish_agent_proposal(uuid,text,text)","accept_account_invitation(uuid,uuid)","set_my_gravity_unit(uuid,text,uuid)","consume_chat_link_proof(uuid,text,uuid)","unlink_chat_user(uuid,uuid,uuid)","set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text,boolean,uuid)","set_personal_notification_destination(uuid,text,uuid,uuid)","create_chat_conversation(uuid,text,uuid)","append_chat_message(uuid,uuid,text,text,uuid)"];
   expect(catalog.filter(c => readNames.includes(c.name)).map(c => c.signature).sort()).toEqual(readSignatures.sort());
   expect(catalog.filter(c => ownNames.includes(c.name)).map(c => c.signature).sort()).toEqual([...ownSignatures].sort());
@@ -377,6 +383,9 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     get_published_pos_menu: [R()], store_cola_label_image: [B,"26001001000999","https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Forged.jpg&filetype=l","data:image/jpeg;base64,/9j/2Q=="],
     provision_brewery: [f.taproom.id,"Fixture","America/New_York",null,R()],
     close_brewery: [B], agent_friction_report: [], prune_agent_history: [], prune_command_requests: [],
+    // The brewery's TypeSafe key: service-only, so a signed-in caller cannot set, read or see it.
+    set_brewery_typesafe_key: [B,f.taproom.id,"fixture-key-1234",R()], get_brewery_typesafe_key_status: [B,f.taproom.id],
+    read_brewery_typesafe_key: [B,f.taproom.id],
   };
   if (existsSync(".env.test.local")) {
     // Admit only this reset's verified probe; every other service RPC still

@@ -16,7 +16,12 @@ function assertExpectedIdentity(ctx: Ctx, expected: z.infer<typeof expectedIdent
   }
 }
 
-const lines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().int().positive().describe("Whole units of the SKU on this line") })).min(1);
+const lines = z.array(z.object({
+  skuId: z.string().uuid(), qty: z.number().int().positive().describe("Whole units of the SKU on this line"),
+  releaseId: z.string().uuid().optional().describe("The release this line orders from (portal_catalog releases[].releaseId); omit to order from packaged stock"),
+})).min(1);
+/** Cart lines as the RPCs take them; a stock line carries no release_id key. */
+const rpcLines = (l: z.infer<typeof lines>) => l.map(({ skuId, qty, releaseId }) => ({ sku_id: skuId, qty, ...(releaseId ? { release_id: releaseId } : {}) }));
 const quoteLines = lines;
 const quoteInput = z.object({
   shipToId: z.string().uuid(), poNumber: z.string().optional(), note: z.string().optional(),
@@ -41,7 +46,7 @@ export async function quotePortalOrder(ctx: Ctx, i: z.infer<typeof quoteInput>, 
   const start = await unwrap(ctx.db.rpc("portal_quote_order", {
     p_brewery: ctx.breweryId, p_customer: customerId, p_ship_to: i.shipToId,
     p_requested: i.requestedShipDate ?? null, p_po: i.poNumber ?? null, p_note: i.note ?? null,
-    p_lines: i.lines.map(l => ({ sku_id: l.skuId, qty: l.qty })), p_request_id: requestId,
+    p_lines: rpcLines(i.lines), p_request_id: requestId,
   })) as Record<string, unknown>;
   const { taxReady, ...pending } = start;
   if (taxReady !== true || start.taxStatus === "calculated" || typeof start.quoteId !== "string") return pending;
@@ -113,7 +118,7 @@ defineCommand({
       p_po: i.poNumber ?? null,
       p_note: i.note ?? null,
       p_requested: i.requestedShipDate ?? null,
-      p_lines: i.lines.map(l => ({ sku_id: l.skuId, qty: l.qty })),
+      p_lines: rpcLines(i.lines),
       p_request_id: execution.requestId,
     }));
   },
@@ -130,7 +135,7 @@ defineCommand({
       p_expected_brewery: ctx.breweryId, p_expected_customer: requireCustomer(ctx),
       p_order: i.orderId, p_ship_to: i.shipToId ?? null, p_requested: i.requestedShipDate ?? null, p_clear_requested: i.requestedShipDate === null,
       p_po: i.poNumber ?? null, p_note: i.note ?? null,
-      p_lines: i.lines.map(l => ({ sku_id: l.skuId, qty: l.qty })), p_request_id: execution.requestId,
+      p_lines: rpcLines(i.lines), p_request_id: execution.requestId,
     }));
   },
 });
@@ -147,7 +152,7 @@ defineCommand({
 });
 
 defineQuery({
-  name: "portal_catalog", description: "Portal: orderable SKUs with the caller's prices and an availability badge",
+  name: "portal_catalog", description: "Portal: orderable SKUs with the caller's prices and their offers: badge is the packaged-stock availability (null when the SKU is not orderable from stock) and releases are the open releases, each with its ships-from and order-by dates and its own badge. A SKU with no open offer is left out",
   roles: "customer",
   input: z.object({}),
   handler: async (ctx) => {
@@ -156,16 +161,21 @@ defineQuery({
     // portal_sku_prices is sku_prices (the grid cell where the selected
     // customer's channel meets the brand's price group and SKU format) limited
     // to active SKUs on the caller's channels; buyers cannot read skus (#788).
-    const [prices, avail] = await Promise.all([
+    // portal_availability returns only SKUs orderable from stock (the stock
+    // offer); portal_releases the open releases (the release offers).
+    const [prices, avail, releases] = await Promise.all([
       unwrap(ctx.db.from("portal_sku_prices").select("sku_id, sku_name, brand_name, unit_price_cents")
         .eq("brewery_id", ctx.breweryId).eq("sale_channel_id", customer.sale_channel_id)),
       unwrap(ctx.db.rpc("portal_availability", { p_customer: customerId })),
+      unwrap(ctx.db.rpc("portal_releases", { p_customer: customerId })),
     ]);
     const badges = new Map((avail as { sku_id: string; badge: string }[]).map(a => [a.sku_id, a.badge]));
+    const offers = Map.groupBy(releases ?? [], r => r.sku_id);
     const priceRows = prices as { sku_id: string; sku_name: string; brand_name: string; unit_price_cents: number }[];
-    return priceRows.map(p => ({
+    return priceRows.filter(p => badges.has(p.sku_id) || offers.has(p.sku_id)).map(p => ({
       skuId: p.sku_id, name: p.sku_name, product: p.brand_name,
-      unitPriceCents: p.unit_price_cents, badge: badges.get(p.sku_id) ?? "out",
+      unitPriceCents: p.unit_price_cents, badge: badges.get(p.sku_id) ?? null,
+      releases: (offers.get(p.sku_id) ?? []).map(r => ({ releaseId: r.release_id, shipsFrom: r.ships_from, ordersCloseOn: r.orders_close_on, badge: r.badge })),
     }));
   },
 });
@@ -187,7 +197,7 @@ defineQuery({
 });
 
 defineQuery({
-  name: "portal_order", description: "Portal: one order with lines, its event history, and its shipment with that shipment's invoice once billed",
+  name: "portal_order", description: "Portal: one order with lines, its event history, its changes after confirm (reason code and each line's change), and its shipment with that shipment's invoice once billed",
   roles: "customer",
   input: z.object({ orderId: z.string().uuid() }),
   handler: async (ctx, i) => {
@@ -197,14 +207,16 @@ defineQuery({
     // not_found on another customer's id, so the row is never null.
     const row = await unwrap(ctx.db.rpc("portal_order_rows", { p_order: i.orderId }).select(`${ORDER_ROW}, ship_tos, order_lines`).eq("customer_id", customerId).single()) as Omit<PortalOrderRow, "brewery_id">;
     const { order_lines: ln, ...order } = row;
-    const [events, shipment] = await Promise.all([
+    const [events, changes, shipment] = await Promise.all([
       unwrap(ctx.db.from("portal_order_events").select("id, event, created_at").eq("order_id", i.orderId).order("created_at")),
+      // Changes after confirm, with their reason code; never the actor or staff note.
+      unwrap(ctx.db.rpc("portal_order_change_rows", { p_order: i.orderId }).order("created_at")),
       unwrap(ctx.db.from("portal_shipments").select("id, invoice_timing").eq("order_id", i.orderId).maybeSingle()),
     ]);
     // A view has no foreign key to embed through, so the shipment's invoice
     // (at most one: invoices.shipment_id is unique) is a second read.
     const invoices = shipment ? await unwrap(ctx.db.from("portal_invoices").select(`${INVOICE_ROW}, invoice_lines`).eq("shipment_id", shipment.id!)) : [];
-    return { order, lines: ln, events, shipment: shipment && { ...shipment, invoices } };
+    return { order, lines: ln, events, changes, shipment: shipment && { ...shipment, invoices } };
   },
 });
 

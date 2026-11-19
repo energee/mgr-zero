@@ -9,7 +9,7 @@ import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { CellarMapViewModel } from "@/lib/mgr/cellar-map-view";
 
-/** A tile's last line: its latest reading, linked to Reading when the tile has a path there, or Add reading when it has a path but no reading yet. */
+/** A tile's last line: its ABV so far, linked to Reading when the tile has a path there, or Add reading when it has a path but no reading yet. */
 function tileReading(tile: CellarMapViewModel["tiles"][number]): ReactNode {
   if (tile.readingHref === undefined) return E.polite(tile.reading);
   const href = tile.readingHref || undefined;

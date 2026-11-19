@@ -1,11 +1,14 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
+import { CommandQueryProvider } from "@/components/mgr/query-provider";
 import { BreweryProvider } from "@/lib/brewery-provider";
-// These pages live under app/(app), whose layout mounts BreweryProvider; the
-// tests render the page subtree on its own, so they supply it here.
+// These pages live under app/(app), whose layout mounts BreweryProvider and
+// CommandQueryProvider; the tests render the page subtree on its own, so they
+// supply both here (Add material reads its kind suggestion through the query cache).
 const render = (node: Parameters<typeof renderToStaticMarkup>[0]) =>
-  renderToStaticMarkup(createElement(BreweryProvider, { id: "brewery", actorId: "actor" }, node));
+  renderToStaticMarkup(createElement(BreweryProvider, { id: "brewery", actorId: "actor" },
+    createElement(CommandQueryProvider, { scope: { actorId: "actor", breweryId: "brewery" } }, node)));
 const state = vi.hoisted(() => ({ roles: ["admin"], calls: [] as string[], customerInput: {} as Record<string, unknown>, brandInput: {} as Record<string, unknown>, inputs: {} as Record<string, unknown> }));
 vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", roles: state.roles }) }));
 // The real command registry loads (the pages import @/lib/commands/all), so canRun
@@ -29,6 +32,8 @@ async function query(name: string, input?: { basis?: string; missingPortalEmail?
     case "list_price_groups": return [{ id: "group", name: "Core", position: 1, cost_ceiling_cents: null }];
     case "list_channel_prices": return [];
     case "list_price_group_barcodes": return [];
+    case "list_releases": return [];
+    case "list_release_batches": return [];
     case "list_sale_channels": return [{ id: "channel", name: "Wholesale", tax_treatment: "taxable" }];
     case "get_customer": return { customer, shipTos: [shipTo, { ...shipTo, id: "back", label: "Back door", is_default: false }] };
     case "list_customer_users": return [{ userId: "user", email: "jo@buyer.test", createdAt: "2026-09-01T00:00:00Z" }];

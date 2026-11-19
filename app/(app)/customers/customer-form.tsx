@@ -33,6 +33,8 @@ export const upsertCustomerInput = (values: CustomerEditValues, id?: string) => 
   licenseNumber: values.licenseNumber || undefined,
   paymentTerms: values.paymentTerms as PaymentTerm,
   taxTreatment: (values.taxTreatment || undefined) as TaxTreatment | undefined,
+  // Only the detail form has the field; leaving it out keeps the saved delay.
+  ...(values.releaseDelayDays === undefined ? {} : { releaseDelayDays: Number(values.releaseDelayDays) }),
 });
 
 /** Wholesale is the channel a wholesale account almost always sits on, so it is

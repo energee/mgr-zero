@@ -12,14 +12,15 @@ import { HistoryNavigation, type HistoryNavigationProps } from "./history-naviga
 /** A brand or recipe the plan does not name, said in muted words instead of a blank. */
 const orMissing = (value: string | null, missing: string) => value ?? <span key={missing} className="text-muted-foreground">{missing}</span>;
 
-/** Where a brewed batch is: one line per open occupancy with its latest reading
- *  and its own Reading action, or "No open occupancy". */
+/** Where a brewed batch is: one line per open occupancy with its latest reading,
+ *  Fermenting or Finished once its gravity shows a trend, and its own Reading
+ *  action, or "No open occupancy". */
 function Occupancies({ readings }: { readings: BatchOccupancyView[] }) {
   return readings.length ? (
     <ul className="grid gap-1">
       {readings.map(occupancy => <li key={occupancy.key} className="flex items-center justify-between gap-3">
         {/* The text wraps in its own space, so Reading always sits at the line's right end. */}
-        <span className="min-w-0 flex-1 break-words"><span className="font-medium">{occupancy.vessel}</span> · {occupancy.reading}</span>
+        <span className="min-w-0 flex-1 break-words"><span className="font-medium">{occupancy.vessel}</span> · {occupancy.reading}{occupancy.state && <> {E.status(occupancy.state, occupancy.state === "Finished" ? "ok" : "")}</>}</span>
         <span className="shrink-0">{E.act("Reading", "info", occupancy.href)}</span>
       </li>)}
     </ul>

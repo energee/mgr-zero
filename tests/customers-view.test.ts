@@ -11,7 +11,8 @@ import { ListControls } from "../components/mgr/list-controls";
 import { ShipToView } from "../components/mgr/views/ship-to";
 import { customerRidgeline, customersList, shipToMain } from "../lib/mgr/fixtures/customers";
 import { ALS, RIDGELINE } from "../lib/mgr/fixtures/demo";
-import { toCustomerViewProps } from "../lib/mgr/customer-view";
+import { releaseDelayError, toCustomerViewProps } from "../lib/mgr/customer-view";
+import { upsertCustomerInput } from "../app/(app)/customers/customer-form";
 import { CUSTOMER_TYPES } from "../lib/mgr/enums";
 import { toCustomersViewProps } from "../lib/mgr/customers-view";
 import { shipToAddress, shipToFormFields, toShipToViewProps } from "../lib/mgr/ship-to-view";
@@ -292,4 +293,24 @@ it("a ship-to reads as one address line; missing parts drop out and a foreign on
   // The short form (city and state only) the order, portal and delivery screens use.
   expect(shipToAddress({ country: "US", city: "Columbus", state: "OH" })).toBe("Columbus, OH");
   expect(shipToAddress({ country: "JP", city: null, state: null })).toBe("Japan");
+});
+
+describe("Release delay (days)", () => {
+  it("seeds the field from the customer, saves it as a whole number, and names a value out of range", () => {
+    const model = toCustomerViewProps({ ...customerRidgeline, customer: { ...customerRidgeline.customer, release_delay_days: 3 } });
+    expect(model.editValues.releaseDelayDays).toBe("3");
+    expect(toCustomerViewProps(customerRidgeline).editValues.releaseDelayDays).toBe("0");
+    expect(upsertCustomerInput({ ...model.editValues, releaseDelayDays: "5" }, "c1")).toMatchObject({ releaseDelayDays: 5 });
+    // The create dialog has no field: the input leaves it out, so the database default (0) applies.
+    expect(upsertCustomerInput({ ...model.editValues, releaseDelayDays: undefined })).not.toHaveProperty("releaseDelayDays");
+    expect(releaseDelayError("0")).toBeUndefined();
+    expect(releaseDelayError("60")).toBeUndefined();
+    for (const bad of ["61", "-1", "1.5", ""]) expect(releaseDelayError(bad)).toMatch(/0 to 60/);
+  });
+
+  it("draws the field with its help under Trading terms", () => {
+    const html = renderToStaticMarkup(createElement(CustomerView, { model: toCustomerViewProps(customerRidgeline) }));
+    expect(html).toMatch(/Release delay \(days\)/);
+    expect(html).toMatch(/Releases appear for this customer this many days after they open\. 0 = right away\./);
+  });
 });

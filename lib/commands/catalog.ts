@@ -57,13 +57,17 @@ defineCommand({
 });
 
 defineCommand({
-  name: "update_sku", description: "Edit a SKU's active state, optional UPC, keg pool and default batch share (fraction over 0 through 1; brand shares total at most 1; omit to keep, null to clear); brand, format, provider mappings and history stay unchanged",
+  name: "update_sku", description: "Edit a SKU's active state, optional UPC, keg pool, default batch share (fraction over 0 through 1; brand shares total at most 1; omit to keep, null to clear) and whether portal buyers can order it from packaged stock (omit to keep); brand, format, provider mappings and history stay unchanged",
   compensation: "Reverse with update_sku and the previous values.",
-  input: z.object({ skuId: z.string().uuid(), active: z.boolean(), upc: upc.optional(), kegPoolId: z.string().uuid().nullable().optional(), batchShare: z.number().positive().max(1).nullable().optional().describe("Fraction of a planned batch's volume for this SKU; omit to keep, null to clear") }),
+  input: z.object({
+    skuId: z.string().uuid(), active: z.boolean(), upc: upc.optional(), kegPoolId: z.string().uuid().nullable().optional(),
+    batchShare: z.number().positive().max(1).nullable().optional().describe("Fraction of a planned batch's volume for this SKU; omit to keep, null to clear"),
+    portalFromStock: z.boolean().optional().describe("Whether portal buyers can order this SKU from packaged stock; staff ordering is unchanged. Omit to keep"),
+  }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_sku", {
     p_brewery: ctx.breweryId, p_id: i.skuId, p_active: i.active, p_upc: i.upc || null, p_request_id: execution.requestId, p_keg_pool: i.kegPoolId ?? null, p_clear_keg_pool: i.kegPoolId === null,
-    p_batch_share: i.batchShare ?? null, p_clear_batch_share: i.batchShare === null,
+    p_batch_share: i.batchShare ?? null, p_clear_batch_share: i.batchShare === null, p_portal_from_stock: i.portalFromStock ?? null,
   })),
 });
 
@@ -228,18 +232,20 @@ defineCommand({
 const TAX_TREATMENTS = ["taxable", "export", "vessel_supplies", "research", "transfer_in_bond"] as const;
 
 defineQuery({
-  name: "list_sale_channels", description: "Sale channels with their tax treatment, alphabetical; in_use says a record references the channel, and system_code 'taproom' marks the system Taproom channel",
+  name: "list_sale_channels", description: "Sale channels with their tax treatment and one-way keg fee in cents, alphabetical; in_use says a record references the channel, and system_code 'taproom' marks the system Taproom channel",
   input: z.object({}), roles: ["admin", "sales", "warehouse"],
   handler: (ctx) => unwrap(ctx.db.rpc("list_sale_channels", { p_brewery: ctx.breweryId })),
 });
 
 defineCommand({
-  name: "upsert_sale_channel", description: "Create or edit a sale channel: its name and the tax treatment its removals are recorded under",
+  name: "upsert_sale_channel", description: "Create or edit a sale channel: its name, the tax treatment its removals are recorded under, and the one-way keg fee its wholesale orders charge. A one-way keg line takes the fee when it is saved and keeps it once its order is submitted; a fee change reaches only drafts and lines added later",
   compensation: "Reverse an edit with upsert_sale_channel and the previous values, or remove an unused new channel with delete_sale_channel.",
-  input: z.object({ id: z.string().uuid().optional().describe("The sale channel to edit; omit to create one"), name: z.string().trim().min(1).describe("The sale channel's name"), taxTreatment: z.enum(TAX_TREATMENTS) }),
+  input: z.object({ id: z.string().uuid().optional().describe("The sale channel to edit; omit to create one"), name: z.string().trim().min(1).describe("The sale channel's name"), taxTreatment: z.enum(TAX_TREATMENTS),
+    oneWayKegFeeCents: z.number().int().min(0).max(2147483647).optional() }),
   roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_sale_channel", {
     p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_tax_treatment: i.taxTreatment, p_request_id: execution.requestId,
+    p_one_way_keg_fee_cents: i.oneWayKegFeeCents,
   })),
 });
 
@@ -365,7 +371,7 @@ defineQuery({
     category: z.string().trim().optional().describe("Only brands in this category; empty means every category"),
   }), roles: STAFF_ROLES,
   handler: async (ctx, i) => {
-    let brands = ctx.db.from("brands").select("*, styles(name), price_groups(name), skus(id, name, format_id, active, upc, keg_pool_id, container_source, batch_share), colas:brand_approvals(id, ttb_id, approved_on, image_url)")
+    let brands = ctx.db.from("brands").select("*, styles(name), price_groups(name), skus(id, name, format_id, active, upc, keg_pool_id, container_source, batch_share, portal_from_stock), colas:brand_approvals(id, ttb_id, approved_on, image_url)")
       .eq("brewery_id", ctx.breweryId).eq("colas.kind", "cola");
     if (i.q) {
       const pattern = quotedSearchPattern(i.q);

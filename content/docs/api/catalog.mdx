@@ -37,6 +37,17 @@ trimming whitespace and ignoring case, so `dtc` cannot be added beside `DTC`.
 `upsert_sale_channel` returns `409 duplicate_channel_name` for a clash and
 changes nothing.
 
+Portal buyers order a SKU from packaged stock while `update_sku.portalFromStock`
+is on (the default), or from a release. `release_sku` offers SKUs from one
+planned batch (`batchId`; prefill from `list_release_batches`) or, without it,
+from packaged stock, writing one release per line; a stock quantity above what
+is free to promise is refused. `list_releases` reports each release's
+`confirmed`, `preordered` (submitted, not yet confirmed) and `remaining` units
+and whether buyers can still order (`open`; pass `open` to keep only open or
+only closed releases). Only a portal buyer's own order lines may name a
+release; staff order paths refuse `release_id`. `update_release` never goes below
+`confirmed`; `withdraw_release` stops new orders and keeps the row.
+
 {/* ops:catalog */}
 
 ## clear_channel_price [#clear_channel_price]
@@ -230,11 +241,48 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_price_groups", "input": {} }'
 ```
 
+## list_release_batches [#list_release_batches]
+
+`query` · admin, sales, warehouse, brewer
+
+Planned batches a release can draw on: each unpackaged batch's projected units per SKU (with SKU and brand names) (from its brand's batch package shares) and its ready date; optionally only these SKUs
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `skuIds` | array of uuid | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_release_batches", "input": {} }'
+```
+
+## list_releases [#list_releases]
+
+`query` · admin, sales, warehouse, brewer
+
+Releases with their SKU, batch number and batch ready date, quantity, ships-from and order-by dates, whether buyers can still order (open) and whether its batch was cancelled, and units confirmed, pre-ordered (submitted, not yet confirmed) and remaining; optionally only these ids, SKUs or batches, or only open or closed releases
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `ids` | array of uuid | no |
+| `skuIds` | array of uuid | no |
+| `batchIds` | array of uuid | no |
+| `open` | boolean | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_releases", "input": {} }'
+```
+
 ## list_sale_channels [#list_sale_channels]
 
 `query` · admin, sales, warehouse
 
-Sale channels with their tax treatment, alphabetical; in_use says a record references the channel, and system_code 'taproom' marks the system Taproom channel
+Sale channels with their tax treatment and one-way keg fee in cents, alphabetical; in_use says a record references the channel, and system_code 'taproom' marks the system Taproom channel
 
 Takes no input.
 
@@ -263,6 +311,26 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_skus", "input": {} }'
+```
+
+## release_sku [#release_sku]
+
+`command` · admin, sales
+
+Release SKUs for portal ordering, one release per line: from a planned batch (each SKU a package of its brand, ships from the batch's ready date unless given) or, without batchId, from packaged stock (ships from today; each quantity must fit what is free to promise)
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `lines` | array of object | yes |
+| `batchId` | uuid | no |
+| `shipsFrom` | date (YYYY-MM-DD) | no |
+| `ordersCloseOn` | date (YYYY-MM-DD) | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "release_sku", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "lines": [ { "skuId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
 ```
 
 ## save_catalog_category [#save_catalog_category]
@@ -322,11 +390,30 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_price_group_barcode", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "priceGroupId": "00000000-0000-0000-0000-000000000000", "formatId": "00000000-0000-0000-0000-000000000000", "upc": "012345678905" } }'
 ```
 
+## update_release [#update_release]
+
+`command` · admin, sales
+
+Change a release's quantity and order-by date (null clears it); never below the quantity already confirmed on it, and a larger stock release must fit what is free to promise
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `releaseId` | uuid | yes |
+| `qty` | integer | yes |
+| `ordersCloseOn` | date (YYYY-MM-DD) or null | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "update_release", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "releaseId": "00000000-0000-0000-0000-000000000000", "qty": 1, "ordersCloseOn": "2026-01-31" } }'
+```
+
 ## update_sku [#update_sku]
 
 `command` · admin, sales
 
-Edit a SKU's active state, optional UPC, keg pool and default batch share (fraction over 0 through 1; brand shares total at most 1; omit to keep, null to clear); brand, format, provider mappings and history stay unchanged
+Edit a SKU's active state, optional UPC, keg pool, default batch share (fraction over 0 through 1; brand shares total at most 1; omit to keep, null to clear) and whether portal buyers can order it from packaged stock (omit to keep); brand, format, provider mappings and history stay unchanged
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -335,6 +422,7 @@ Edit a SKU's active state, optional UPC, keg pool and default batch share (fract
 | `upc` | string | no |
 | `kegPoolId` | uuid or null | no |
 | `batchShare` | number or null | no |
+| `portalFromStock` | boolean | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -392,19 +480,37 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin
 
-Create or edit a sale channel: its name and the tax treatment its removals are recorded under
+Create or edit a sale channel: its name, the tax treatment its removals are recorded under, and the one-way keg fee its wholesale orders charge. A one-way keg line takes the fee when it is saved and keeps it once its order is submitted; a fee change reaches only drafts and lines added later
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `name` | string | yes |
 | `taxTreatment` | taxable or export or vessel_supplies or research or transfer_in_bond | yes |
 | `id` | uuid | no |
+| `oneWayKegFeeCents` | integer | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_sale_channel", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "taxTreatment": "taxable" } }'
+```
+
+## withdraw_release [#withdraw_release]
+
+`command` · admin, sales
+
+Withdraw a release so buyers can no longer order from it; the release and orders already submitted against it stay
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `releaseId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "withdraw_release", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "releaseId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 {/* end ops:catalog */}

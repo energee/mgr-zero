@@ -16,7 +16,7 @@ const ENTITIES = new Set<string>([
   "delivery", "format", "invitation", "invoice_line", "invoice_payment", "invoice_question",
   "location", "material_contract", "movement", "notification_destination", "occupancy", "order_line",
   "po_line", "pos_item", "pos_location", "pos_sale", "pos_variation", "price_group",
-  "qbo_account", "qbo_customer", "qbo_item", "qbo_vendor", "quote", "receipt",
+  "qbo_account", "qbo_customer", "qbo_item", "qbo_vendor", "quote", "receipt", "release",
   "recipe_ingredient", "recipe_version", "sale_channel", "shipment", "tap_interval", "taproom_count",
   "user", "volume_adjustment",
 ]);

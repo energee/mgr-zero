@@ -21,6 +21,7 @@ type Controls = {
   ounces?: (value: string) => void;
   format?: (value: string) => void;
   active?: (value: boolean) => void;
+  portalFromStock?: (value: boolean) => void;
   upc?: (value: string) => void;
   batchSharePercent?: (value: string) => void;
   kegPool?: (value: string) => void;
@@ -62,6 +63,9 @@ export function SkuView({
         ? activeRow
         : E.row("Active", "available to price and sell",
           E.sw(model.active, "Active", controls.active))}
+      {/* Portal stock offer; a release still offers the SKU when this is off. Not on New SKU (on by default). */}
+      {locked ? E.row("Orderable from stock", "portal buyers can order it from packaged stock",
+        E.sw(model.portalFromStock, "Orderable from stock", controls.portalFromStock)) : null}
       {fields}
       {E.edit("UPC (optional)", model.upc, "text", undefined, { id: "sku-upc", onChange: controls.upc, onBlur: () => touched.touch(UPC), error: touched.shown(UPC) ? upcError(model.upc) : undefined })}
       {model.showKegPool ? E.pick("Keg pool", model.kegPool ?? "", model.kegPoolOptions ?? [{ value: "", label: "None" }], { id: "sku-keg-pool", onChange: controls.kegPool, "aria-describedby": "sku-keg-pool-help", description: <FieldDescription id="sku-keg-pool-help">Wholesale orders charge this pool&apos;s deposit per keg. None charges no deposit.</FieldDescription> }) : null}

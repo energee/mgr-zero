@@ -9,7 +9,7 @@ import { ReviewOrderView } from "../components/mgr/views/review-order";
 import { ShopView } from "../components/mgr/views/shop";
 import { ridgelineReviewOrder, ridgelineShop } from "../lib/mgr/fixtures/portal";
 import { toQuotedReviewOrderViewProps, toReviewOrderViewProps } from "../lib/mgr/review-order-view";
-import { toShopViewProps } from "../lib/mgr/shop-view";
+import { effectiveRequestedDate, toShopViewProps, type ShopCatalogItem } from "../lib/mgr/shop-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 
@@ -167,4 +167,43 @@ it("tells the buyer the amounts and the requested date are not final", () => {
   const info = toShopViewProps(ridgelineShop).depositInfo;
   expect(info).toContain("not included");
   expect(info).toContain("The brewery confirms final invoice amounts and the requested delivery date.");
+});
+
+describe("Shop offers (portal releases)", () => {
+  const release = (releaseId: string, shipsFrom: string, ordersCloseOn: string | null = null, badge = "in") => ({ releaseId, shipsFrom, ordersCloseOn, badge });
+  const both: ShopCatalogItem = { skuId: "s1", name: "Stout · ⅙ bbl keg", product: "Stout", unitPriceCents: 6200, badge: "in", releases: [release("r1", "2026-12-04", "2026-11-27")], qty: 0 };
+  const releaseOnly: ShopCatalogItem = { skuId: "s2", name: "Saison · case", product: "Saison", unitPriceCents: 4000, badge: null, releases: [release("r2", "2026-12-11", null, "low")], qty: 0 };
+  const base = { ...ridgelineShop, requestedDate: "", catalog: [both, releaseOnly] };
+
+  it("offers stock and each release on one row, stock first", () => {
+    const [stout, saison] = toShopViewProps(base).groups.map((g) => g.items[0]);
+    expect(stout.offers).toEqual([{ value: "", label: "From stock" }, { value: "r1", label: "From Dec 4, 2026 · order by Nov 27, 2026" }]);
+    expect(stout.offer).toBe("");
+    expect(saison.offers).toEqual([{ value: "r2", label: "From Dec 11, 2026 · few left" }]);
+    expect(saison.offer).toBe("r2");
+  });
+
+  it("floors the requested date at the latest ships-from among release lines, and says so", () => {
+    const mixed = [{ ...both, qty: 2, offer: "r1" }, { ...releaseOnly, qty: 3 }, { ...ridgelineShop.catalog[0], qty: 1 }];
+    expect(effectiveRequestedDate("", mixed)).toBe("2026-12-11");
+    expect(effectiveRequestedDate("2026-12-20", mixed)).toBe("2026-12-20");
+    expect(effectiveRequestedDate("2026-12-01", mixed)).toBe("2026-12-11");
+    // Stock lines and zero quantities set no floor.
+    expect(effectiveRequestedDate("", [{ ...both, qty: 2 }, { ...releaseOnly, qty: 0 }])).toBe("");
+    const model = toShopViewProps({ ...base, catalog: mixed });
+    expect(model.shipsFromNote).toBe("This order ships from Dec 11, 2026.");
+    expect(toShopViewProps(base).shipsFromNote).toBeUndefined();
+  });
+
+  it("draws the offer picker only for a row with more than one offer", () => {
+    const html = htmlOf(createElement(ShopView, { model: toShopViewProps({ ...base, catalog: [{ ...both, qty: 2, offer: "r1" }, releaseOnly] }) }));
+    // Stout has stock and a release: an inline picker beside the price, named for a screen reader, not a full-width field.
+    expect(html).toMatch(/aria-label="⅙ bbl keg · order from"/);
+    expect(html).not.toMatch(/<label[^>]*>⅙ bbl keg · order from/);
+    expect(html).toMatch(/From Dec 4, 2026 · order by Nov 27, 2026/);
+    // Saison has one offer: it reads beside the price, with no picker.
+    expect(html).toMatch(/\$40\.00 · From Dec 11, 2026 · few left/);
+    expect(html).not.toMatch(/case · order from/);
+    expect(html).toMatch(/This order ships from Dec 4, 2026/);
+  });
 });

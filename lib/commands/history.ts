@@ -7,7 +7,7 @@ export const HISTORY_PAGE_SIZE = 50;
 export type HistoryRow = { id: string; created_at: string };
 
 // Keep PostgreSQL's timestamp precision: converting through Date loses microseconds.
-const historyInput = {
+export const historyInput = {
   limit: z.number().int().min(1).max(200).default(HISTORY_PAGE_SIZE),
   cursor: z.string().refine(value => {
     const parts = value.split("~");
@@ -15,7 +15,7 @@ const historyInput = {
   }, "Expected created_at~id from the last displayed record").describe("Continue after the last displayed record: created_at~id, preserving the timestamp exactly").optional(),
 };
 
-/** Every history query's input: its own filters plus limit, and either a cursor or a numbered page. */
+/** Adds numbered paging to queries that support both page and cursor requests. */
 export function numberedHistorySchema<S extends z.ZodRawShape>(shape: S) {
   return z.object({
     ...shape,
@@ -49,7 +49,7 @@ type HistoryQuery<Q> = {
 /** Newest first, after the cursor. The cursor depends on this exact created_at, id order.
  *  Callers keep `.limit(i.limit + 1)` beside `.from(` so tests/unpaged-reads.test.ts sees the
  *  bound; the extra row is the lookahead historyResult reads. */
-function newestFirst<Q extends HistoryQuery<Q>>(q: Q, cursor: string | undefined): Q {
+export function newestFirst<Q extends HistoryQuery<Q>>(q: Q, cursor: string | undefined): Q {
   const ordered = q.order("created_at", { ascending: false }).order("id", { ascending: false });
   return cursor ? ordered.or(historyBefore(cursor)) : ordered;
 }
@@ -61,7 +61,7 @@ export type NumberedHistoryPage<T> = HistoryPage<T> & { total: number };
 
 /** Turns `limit + 1` fetched rows into one page: the extra row only proves
  *  another page exists, and the next page starts with it. */
-function historyResult<T extends HistoryRow>(fetched: T[], limit: number): HistoryPage<T> {
+export function historyResult<T extends HistoryRow>(fetched: T[], limit: number): HistoryPage<T> {
   const rows = fetched.slice(0, limit);
   return { rows, nextCursor: fetched.length > limit ? historyCursor(rows.at(-1)!) : null };
 }

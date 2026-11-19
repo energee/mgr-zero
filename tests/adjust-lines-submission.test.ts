@@ -27,11 +27,12 @@ beforeEach(() => { harness.values = []; harness.setters = []; harness.busy = fal
 
 const lines = [{ id: "line", sku_id: "sku", qty_ordered: 5 }, { id: "gone", sku_id: "old", qty_ordered: 1 }];
 
-/** useLineQuantities' state, in its useState order: quantities, reason, added lines, removed line ids. */
-function submit(state: { qtys?: Record<string, string>; reason: string; added?: { key: string; skuId: string }[]; removed?: string[] }, nested = false) {
+/** useLineQuantities' state, in its useState order: quantities, reason (the note), added lines, removed line ids,
+ *  reason code. The Order page edits only confirmed or picked orders, so a change there names a reason code. */
+function submit(state: { qtys?: Record<string, string>; reason?: string; code?: string; added?: { key: string; skuId: string }[]; removed?: string[] }, nested = false) {
   const form = {};
   const event = { preventDefault: vi.fn(), target: nested ? {} : form, currentTarget: form } as unknown as FormEvent<HTMLFormElement>;
-  harness.values = [state.qtys ?? { line: "2", gone: "1" }, state.reason, state.added ?? [], state.removed ?? []];
+  harness.values = [state.qtys ?? { line: "2", gone: "1" }, state.reason ?? "", state.added ?? [], state.removed ?? [], state.code ?? "customer_request"];
   OrderLinesEditor({
     orderId: "order", lines, editable: true, skus: [], warnings: [], onSaved: vi.fn(),
     model: toOrderViewProps(orderConfirmedWholesale),
@@ -39,25 +40,36 @@ function submit(state: { qtys?: Record<string, string>; reason: string; added?: 
 }
 
 describe("order line edit submit boundaries", () => {
-  it("holds blank reasons with the required message", () => {
-    for (const reason of ["", "   ", "\t\r\n", "  ", "﻿　"]) submit({ reason });
+  it("holds a change with no reason code", () => {
+    submit({ reason: "Customer cut", code: "" });
     expect(harness.run).not.toHaveBeenCalled();
-    expect(harness.setError).toHaveBeenCalledTimes(5);
-    expect(harness.setError).toHaveBeenCalledWith("Reason required");
+    expect(harness.setError).toHaveBeenCalledWith("Choose a reason");
   });
 
-  it("sends a trimmed reason with every line", () => {
-    submit({ reason: " \tCustomer cut\n " });
+  it("holds Other with a blank note", () => {
+    for (const reason of ["", "   ", "\t\r\n", "\u00a0\u2003", "\ufeff\u3000"]) submit({ reason, code: "other" });
+    expect(harness.run).not.toHaveBeenCalled();
+    expect(harness.setError).toHaveBeenCalledTimes(5);
+    expect(harness.setError).toHaveBeenCalledWith("Add a note for Other");
+  });
+
+  it("sends the code and a trimmed note with every line", () => {
+    submit({ reason: " \tPallet dropped\n ", code: "damaged" });
     expect(harness.run).toHaveBeenCalledOnce();
     expect(harness.run.mock.calls[0].slice(0, 2)).toEqual(["adjust_order_lines", {
-      orderId: "order", reason: "Customer cut", lines: [{ skuId: "sku", qty: 2 }, { skuId: "old", qty: 1 }],
+      orderId: "order", reasonCode: "damaged", reason: "Pallet dropped", lines: [{ skuId: "sku", qty: 2 }, { skuId: "old", qty: 1 }],
     }]);
+  });
+
+  it("leaves a blank note out", () => {
+    submit({ reason: "  ", code: "short" });
+    expect(harness.run.mock.calls[0][1]).toEqual({ orderId: "order", reasonCode: "short", lines: [{ skuId: "sku", qty: 2 }, { skuId: "old", qty: 1 }] });
   });
 
   it("leaves a removed line out and sends an added one with its quantity", () => {
     submit({ qtys: { line: "5", gone: "1", n1: "3" }, reason: "Swap", added: [{ key: "n1", skuId: "new" }], removed: ["gone"] });
     expect(harness.run.mock.calls[0][1]).toEqual({
-      orderId: "order", reason: "Swap", lines: [{ skuId: "sku", qty: 5 }, { skuId: "new", qty: 3 }],
+      orderId: "order", reasonCode: "customer_request", reason: "Swap", lines: [{ skuId: "sku", qty: 5 }, { skuId: "new", qty: 3 }],
     });
   });
 
@@ -79,10 +91,10 @@ describe("order line edit submit boundaries", () => {
   });
 });
 
-/** The Pickup switch's state, after useLineQuantities' four: seeded from the order, held locally so a click
+/** The Pickup switch's state, after useLineQuantities' five: seeded from the order, held locally so a click
  *  between the save and its refresh sends the new value, not the server's old one. */
 function pickupSwitch(local?: boolean) {
-  harness.values = [{ line: "5", gone: "1" }, "", [], [], ...(local === undefined ? [] : [local])];
+  harness.values = [{ line: "5", gone: "1" }, "", [], [], "", ...(local === undefined ? [] : [local])];
   harness.setters = [];
   const form = OrderLinesEditor({
     orderId: "order", lines, editable: true, skus: [], warnings: [], onSaved: vi.fn(),
@@ -99,8 +111,8 @@ describe("order pickup switch", () => {
     expect(pickup.value).toBe(false);
     pickup.onChange(true);
     expect(harness.run.mock.calls[0].slice(0, 2)).toEqual(["set_order_pickup", { orderId: "order", pickup: true }]);
-    expect(harness.setters[4]).not.toHaveBeenCalled();
+    expect(harness.setters[5]).not.toHaveBeenCalled();
     harness.run.mock.calls[0][2]();
-    expect(harness.setters[4]).toHaveBeenCalledWith(true);
+    expect(harness.setters[5]).toHaveBeenCalledWith(true);
   });
 });

@@ -63,7 +63,7 @@ it("re-confirming through an adjust after pick enqueues no second email and does
   const line = (await admin.from("order_lines").select("id").eq("order_id", id).single()).data!;
   const warehouse = await makeStaffCtx(staff.breweryId, "warehouse");
   expect((await warehouse.db.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 2 }], p_request_id: crypto.randomUUID() })).error).toBeNull();
-  const adjusted = await staff.db.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 5 }], p_reason: "customer raised", p_request_id: crypto.randomUUID() });
+  const adjusted = await staff.db.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 5 }], p_reason_code: "customer_request", p_reason: "customer raised", p_request_id: crypto.randomUUID() });
   expect(adjusted.error).toBeNull();
   expect((await admin.from("orders").select("status").eq("id", id).single()).data?.status).toBe("confirmed");
   expect(sql(`select count(*) from private.order_email_deliveries where order_id='${id}'`, true)).toEqual(["1"]);

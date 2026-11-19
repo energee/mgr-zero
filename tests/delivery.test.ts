@@ -584,6 +584,21 @@ describe("route edges", () => {
     expect((await admin.from("stock_transfers").select("status").eq("id", tr).single()).data?.status).toBe("in_transit");
   });
 
+  it("refuses to cancel a transfer that is an open route stop, and allows it once the stop is closed", async () => {
+    // Undeparted: cancelling would leave a stop that blocks Depart for the whole route.
+    const waiting = await transfer();
+    const planned = await runCommand("save_route", { deliveryDate: "2026-09-19", stops: [{ stockTransferId: waiting, stopNo: 1 }] }, adminCtx) as { routeId: string };
+    await expect(runCommand("cancel_stock_transfer", { transferId: waiting, reason: "not needed" }, adminCtx)).rejects.toThrow(/route stop/);
+    await runCommand("depart_route", { routeId: planned.routeId }, adminCtx);
+    // Departed: the stop could otherwise be confirmed delivered for a cancelled transfer.
+    await expect(runCommand("cancel_stock_transfer", { transferId: waiting, reason: "not needed" }, adminCtx)).rejects.toThrow(/route stop/);
+    const { data: stop } = await admin.from("deliveries").select("id").eq("route_id", planned.routeId).single();
+    await runCommand("confirm_delivery", { deliveryId: stop!.id, transferRefused: true, reason: "customer_refused" }, adminCtx);
+    // A refused stop is closed: the transfer, still in transit, may now be cancelled.
+    expect(await runCommand("cancel_stock_transfer", { transferId: waiting, reason: "refused at the door" }, adminCtx)).toMatchObject({ transfer_id: waiting });
+    expect((await admin.from("stock_transfers").select("status").eq("id", waiting).single()).data?.status).toBe("cancelled");
+  });
+
   it("names the shortfall when a shipped source or a removal asks for more than the bin holds (#1385)", async () => {
     const { data: sku } = await admin.from("skus").select("brand_id").eq("id", skuId).single();
     const brandId = sku!.brand_id;

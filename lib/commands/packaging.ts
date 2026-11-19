@@ -43,7 +43,7 @@ defineCommand({
 
 defineCommand({
   name: "update_packaging_run",
-  description: "Revise a planned run: pick the tank it draws from, replace the planned units, or stamp it started (which needs a tank)",
+  description: "Revise a planned run: pick the tank it draws from, replace the planned units, or stamp it started (which needs a tank); a started run's tank and start time cannot change",
   compensation: "Reverse a plan edit with update_packaging_run and the previous values; a started run cannot be unstarted.",
   input: z.object({
     runId: z.string().uuid(),

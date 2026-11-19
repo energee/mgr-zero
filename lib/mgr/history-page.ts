@@ -1,6 +1,18 @@
-import { HISTORY_PAGE_SIZE, type HistoryPage, type HistoryRow, type NumberedHistoryPage } from "@/lib/commands/history";
+import { HISTORY_PAGE_SIZE, historyInput, type HistoryPage, type HistoryRow, type NumberedHistoryPage } from "@/lib/commands/history";
 
 export type { HistoryPage, HistoryRow, NumberedHistoryPage };
+
+export function pageCursor(value: unknown) {
+  return historyInput.cursor.safeParse(value).data;
+}
+
+export function historyPage<T extends HistoryRow>(page: HistoryPage<T>, path: string, cursor: string | undefined, filters: Record<string, string | undefined> = {}) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) if (value) params.set(key, value);
+  const firstHref = cursor ? `${path}${params.size ? `?${params}` : ""}` : undefined;
+  if (page.nextCursor) params.set("cursor", page.nextCursor);
+  return { rows: page.rows, pagination: { moreHref: page.nextCursor ? `${path}?${params}` : undefined, firstHref } };
+}
 
 export const historySizes = ["10", "25", String(HISTORY_PAGE_SIZE), "100"];
 

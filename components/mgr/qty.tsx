@@ -49,10 +49,10 @@ export function StepQuantity({ label, value, defaultValue, onChange, contextualL
     value={onChange ? value : undefined} defaultValue={onChange ? undefined : value ?? defaultValue}
     onChange={event => { notation.changed(event.target.value); onChange?.(event.target.value); }}
     className={cn("field-sizing-content [appearance:textfield] text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none", compact ? "w-full min-w-16 tabular-nums" : "w-auto min-w-14")} />;
-  return <div className="flex flex-col gap-2">{compact ? control : <ButtonGroup>
-    <Button type="button" variant="outline" size="icon" data-preview-action aria-label={contextualLabels ? `Decrease ${label}` : "Decrease"} disabled={Boolean(notation.error) || attributes.disabled || attributes.readOnly || Boolean(onChange && attributes.min !== undefined && Number(value) <= Number(attributes.min))} onClick={() => step(-1)}>−</Button>
+  return <div className="flex flex-col gap-2">{compact ? control : <ButtonGroup className="rounded-lg bg-muted [&>*]:h-7 [&>*]:border-0 [&>button]:w-9 [&>input]:bg-foreground/10! [&>input]:tabular-nums [&>button:disabled]:text-muted-foreground [&>button:disabled]:opacity-100">
+    <Button type="button" variant="ghost" size="icon" data-preview-action aria-label={contextualLabels ? `Decrease ${label}` : "Decrease"} disabled={Boolean(notation.error) || attributes.disabled || attributes.readOnly || Boolean(onChange && attributes.min !== undefined && Number(value) <= Number(attributes.min))} onClick={() => step(-1)}>−</Button>
     {control}
-    <Button type="button" variant="outline" size="icon" data-preview-action aria-label={contextualLabels ? `Increase ${label}` : "Increase"} disabled={Boolean(notation.error) || attributes.disabled || attributes.readOnly || Boolean(onChange && attributes.max !== undefined && Number(value) >= Number(attributes.max))} onClick={() => step(1)}>+</Button>
+    <Button type="button" variant="ghost" size="icon" data-preview-action aria-label={contextualLabels ? `Increase ${label}` : "Increase"} disabled={Boolean(notation.error) || attributes.disabled || attributes.readOnly || Boolean(onChange && attributes.max !== undefined && Number(value) >= Number(attributes.max))} onClick={() => step(1)}>+</Button>
   </ButtonGroup>}{notationError && <FieldError id={notation.errorId}>{notationError}</FieldError>}</div>;
 }
 

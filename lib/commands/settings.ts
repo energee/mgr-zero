@@ -40,6 +40,38 @@ defineCommand({
   })),
 });
 
+// Jev kind suggestions use the brewery's own TypeSafe key (docs/plans/jev-suggestions.md).
+// The key is write-only: no operation returns it, only whether one is saved and its last four
+// characters. The key operations reach a credential, so agents never see them; the token
+// boundary is imported dynamically to keep the registry provider-free (tests/agent-hidden.test.ts).
+defineQuery({
+  name: "get_brewery_suggestion_settings", agentHidden: true,
+  description: "Whether this brewery has a TypeSafe key saved (and its last four characters only) and whether kind suggestions for new materials are on",
+  input: z.object({}), roles: ["admin"],
+  handler: async (ctx) => (await import("@/lib/supabase/integration-tokens")).readBreweryTypeSafeKeyStatus(ctx),
+});
+
+defineCommand({
+  name: "set_brewery_typesafe_key", agentHidden: true,
+  description: "Save or replace this brewery's TypeSafe API key, or remove it with null; answers with the saved status and last four characters, never the key",
+  compensation: "Cannot be undone: a replaced or removed key is never readable. Paste the previous key again with set_brewery_typesafe_key.",
+  input: z.object({ apiKey: z.string().trim().min(8).max(500).nullable().describe("The TypeSafe API key, or null to remove it") }),
+  roles: ["admin"],
+  handler: async (ctx, i, execution) =>
+    (await import("@/lib/supabase/integration-tokens")).setBreweryTypeSafeKey(ctx, i.apiKey, execution.requestId),
+});
+
+defineCommand({
+  name: "set_brewery_suggestions_enabled", agentHidden: true,
+  description: "Turn kind suggestions for new materials on or off for this brewery. On sends new material names to TypeSafe with the brewery's saved key",
+  compensation: "Reverse with set_brewery_suggestions_enabled and the opposite value.",
+  input: z.object({ enabled: z.boolean() }),
+  roles: ["admin"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_brewery_suggestions_enabled", {
+    p_brewery: ctx.breweryId, p_enabled: i.enabled, p_request_id: execution.requestId,
+  })),
+});
+
 definePreTenantQuery({
   name: "list_my_agent_breweries",
   description: "The breweries this person works at, each with whether outside agents are allowed there",
@@ -75,11 +107,11 @@ defineCommand({
 
 const readingDueHours = z.number().int().min(1).max(168);
 const gatewayModel = z.string().trim().min(3).max(200).regex(MODEL_ID);
-const BREWERY_COLUMNS = "id, name, timezone, ttb_registry_no, customer_phone, fermentation_reading_due_hours, days_to_package, gravity_unit, portal_fulfillment_location_id, books_opened_on, one_way_keg_fee_cents, agents_enabled";
+const BREWERY_COLUMNS = "id, name, timezone, ttb_registry_no, customer_phone, fermentation_reading_due_hours, days_to_package, gravity_unit, portal_fulfillment_location_id, books_opened_on, agents_enabled";
 
 defineQuery({
   name: "get_brewery",
-  description: "The current brewery's basics: name, timezone, TTB registry number, customer-facing phone, reading-overdue hours, days to package, gravity unit, portal fulfillment warehouse, the books-opened date and the one-way keg fee",
+  description: "The current brewery's basics: name, timezone, TTB registry number, customer-facing phone, reading-overdue hours, days to package, gravity unit, portal fulfillment warehouse and the books-opened date",
   input: z.object({}), roles: ["admin", "sales", "warehouse", "brewer"],
   handler: (ctx) => unwrap(ctx.db.from("breweries").select(BREWERY_COLUMNS).eq("id", ctx.breweryId).single()),
 });
@@ -134,17 +166,6 @@ defineCommand({
   input: z.object({ booksOpenedOn: isoDate.nullable() }), roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_brewery_books_opened_on", {
     p_brewery: ctx.breweryId, p_books_opened_on: i.booksOpenedOn, p_request_id: execution.requestId,
-  })),
-});
-
-// The flat fee each one-way keg shipped carries instead of a deposit; 0 bills none.
-// Frozen on the order line at ship, so a change reaches only later shipments.
-defineCommand({
-  name: "set_one_way_keg_fee", description: "Set the non-refundable fee, in cents, invoiced for each one-way keg shipped (admin); 0 bills none",
-  compensation: "Reverse with set_one_way_keg_fee and the previous fee.",
-  input: z.object({ feeCents: z.number().int().min(0) }), roles: ["admin"],
-  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_one_way_keg_fee", {
-    p_brewery: ctx.breweryId, p_fee_cents: i.feeCents, p_request_id: execution.requestId,
   })),
 });
 

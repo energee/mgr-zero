@@ -3,7 +3,7 @@ import { assert } from "vitest";
 // scoping to the caller's own customer, availability badges never leak raw ATP,
 // and staff-only commands reject a customer ctx.
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, ins, makeBrewery, makeStaffCtx, makeCustomerUser, asUser, seedCatalog, seedLocation, seedCustomer, priceSku, sql } from "./helpers";
+import { admin, ins, makeBrewery, makeStaffCtx, makeCustomerUser, asUser, seedCatalog, seedLocation, seedCustomer, pgSession, priceSku, sql } from "./helpers";
 import { runCommand } from "../lib/commands/registry";
 import "../lib/commands/all";
 
@@ -489,7 +489,7 @@ describe("portal commands", () => {
     await priceSku(otherBrewery.id, { saleChannelId: foreignCustomer.saleChannelId, brandId: foreignCatalog.brandId, formatId: foreignCatalog.formatId, cents: 7700 });
 
     const rows = await runCommand("portal_catalog", {}, custCtx) as { skuId: string; unitPriceCents: number }[];
-    expect(rows.filter(row => row.skuId === skuId)).toEqual([{ skuId, name: "IPA case", product: "IPA", unitPriceCents: 3600, badge: expect.any(String) }]);
+    expect(rows.filter(row => row.skuId === skuId)).toEqual([{ skuId, name: "IPA case", product: "IPA", unitPriceCents: 3600, badge: expect.any(String), releases: [] }]);
     expect(rows.some(row => row.skuId === foreignCatalog.skuId)).toBe(false);
   });
 
@@ -551,12 +551,13 @@ describe("portal commands", () => {
 });
 
 describe("one-way keg fee on the portal quote", () => {
-  it("quotes the fee per one-way keg, counts it before tax, and stamps it on the submitted line", async () => {
+  it("quotes the channel fee per one-way keg, counts it before tax, and stamps it on the submitted line", async () => {
     const wh = await seedLocation(b.id, { name: "One-way WH" });
     await runCommand("set_portal_fulfillment_source", { locationId: wh.id }, adminCtx);
     const keg = await seedCatalog(b.id, { product: "Export Pils", sku: "Export Pils one-way sixtel", packageType: "keg", bblPerUnit: 0.1667, format: "One-way sixtel" });
     await priceSku(b.id, { saleChannelId, brandId: keg.brandId, formatId: keg.formatId, cents: 9000 });
-    await runCommand("set_one_way_keg_fee", { feeCents: 1000 }, adminCtx);
+    const setFee = (oneWayKegFeeCents: number) => runCommand("upsert_sale_channel", { id: saleChannelId, name: "Wholesale", taxTreatment: "taxable", oneWayKegFeeCents }, adminCtx);
+    await setFee(1000);
     const quote = await runCommand("portal_quote_order", { shipToId, lines: [{ skuId: keg.skuId, qty: 3 }, { skuId, qty: 1 }] }, custCtx) as {
       quoteId: string; subtotalCents: number; oneWayFeeCents: number; amountBeforeTaxCents: number;
       oneWayFees: { name: string; qty: number; unitPriceCents: number; amountCents: number }[];
@@ -567,7 +568,29 @@ describe("one-way keg fee on the portal quote", () => {
     const placed = await runCommand("portal_submit_quote", { quoteId: quote.quoteId }, custCtx) as { order_id: string };
     expect((await admin.from("order_lines").select("one_way_fee_cents").eq("order_id", placed.order_id).eq("sku_id", keg.skuId).single()).data)
       .toEqual({ one_way_fee_cents: 1000 });
-    await runCommand("set_one_way_keg_fee", { feeCents: 0 }, adminCtx);
+    await setFee(0);
+  });
+
+  it("refuses a quote whose channel fee changes while the submit waits on the channel row", async () => {
+    const wh = await seedLocation(b.id, { name: "Race WH" });
+    await runCommand("set_portal_fulfillment_source", { locationId: wh.id }, adminCtx);
+    const keg = await seedCatalog(b.id, { product: "Race Pils", sku: "Race Pils one-way sixtel", packageType: "keg", bblPerUnit: 0.1667, format: "Race sixtel" });
+    await priceSku(b.id, { saleChannelId, brandId: keg.brandId, formatId: keg.formatId, cents: 9000 });
+    await admin.from("sale_channels").update({ one_way_keg_fee_cents: 1000 }).eq("id", saleChannelId).throwOnError();
+    const quote = await runCommand("portal_quote_order", { shipToId, lines: [{ skuId: keg.skuId, qty: 1 }] }, custCtx) as { quoteId: string };
+    // An admin's fee save holds the channel row; the submit must wait for it and then see the new fee.
+    const holder = await pgSession();
+    try {
+      await holder.query("begin");
+      await holder.query("update public.sale_channels set one_way_keg_fee_cents = 2500 where id = $1", [saleChannelId]);
+      const submitted = runCommand("portal_submit_quote", { quoteId: quote.quoteId }, custCtx);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await holder.query("commit");
+      await expect(submitted).rejects.toThrow(/order details changed/);
+    } finally {
+      await holder.query("rollback").catch(() => {});
+      await admin.from("sale_channels").update({ one_way_keg_fee_cents: 0 }).eq("id", saleChannelId).throwOnError();
+    }
   });
 });
 

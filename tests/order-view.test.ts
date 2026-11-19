@@ -91,6 +91,14 @@ describe("Order view loop", () => {
     expect(edit).toContain("SAVE");
   });
 
+  it("asks for a reason code and a note when a confirmed order's lines change", () => {
+    const model = toOrderViewProps(orderConfirmedWholesale);
+    const edit = renderToStaticMarkup(createElement(OrderView, { model, quantities: {}, onQuantity: () => {}, reason: "", onReason: () => {}, reasonCode: "damaged", onReasonCode: () => {} }));
+    expect(edit).toMatch(/>Reason</);
+    expect(edit).toMatch(/>Damaged</);
+    expect(edit).toMatch(/>Note</);
+  });
+
   it("adds and removes lines in place: ✕ on each line, Add line, and an added line's SKU picker (#1503)", () => {
     const model = toOrderViewProps(orderConfirmedWholesale);
     const lineEdit = { skus: [{ id: "new-sku", label: "Pils · case" }], added: [{ key: "n1", skuId: "" }] };
@@ -170,6 +178,13 @@ describe("Order view loop", () => {
       ? { ...event, payload: { ...event.payload, reason: " \tcustomer cut\n " } } : event);
     expect(toOrderViewProps({ ...orderPickedRestock, events }).events.at(-1)?.detail)
       .toBe("Pils · 16 oz case 10 to Pils · 16 oz case 7 (customer cut)");
+  });
+
+  it("names a change after confirm by its reason code, then its note", () => {
+    const detail = (payload: Record<string, unknown>) => toOrderViewProps({ ...orderPickedRestock, events: orderPickedRestock.events.map(event => event.event === "lines_adjusted"
+      ? { ...event, payload: { ...event.payload, ...payload } } : event) }).events.at(-1)?.detail;
+    expect(detail({ reason_code: "damaged", reason: null })).toBe("Pils · 16 oz case 10 to Pils · 16 oz case 7 (Damaged)");
+    expect(detail({ reason_code: "other", reason: "Forklift" })).toBe("Pils · 16 oz case 10 to Pils · 16 oz case 7 (Other: Forklift)");
   });
 
   it("preserves negative availability and flags the line", () => {
@@ -399,6 +414,13 @@ describe("Order view loop", () => {
       expect(html(orderConfirmedWholesale).match(/\$1,172\.00/g)).toHaveLength(1);
     });
 
+    it("leaves out a keg charge row that comes to $0", () => {
+      const lines = orderConfirmedWholesale.lines.map((l) => ({ ...l, one_way_fee_cents: null }));
+      const { summary } = toOrderViewProps({ ...orderConfirmedWholesale, lines, deposits: [] });
+      expect(summary.rows).toEqual([{ label: "Ordered items", value: "$1,028.00" }]);
+      expect(summary.total?.value).toBe("$1,028.00");
+    });
+
     it("uses each deposit's frozen amount_cents verbatim", () => {
       const deposits = orderConfirmedWholesale.deposits!.map((d) => ({ ...d, amount_cents: 11999 }));
       expect(toOrderViewProps({ ...orderConfirmedWholesale, deposits }).summary.rows[1]?.value).toBe("$119.99");
@@ -450,7 +472,7 @@ describe("Order view loop", () => {
     it("rounds a fractional fee line per unit: 1.15 × 50¢ is 58¢", () => {
       const lines = [{ ...orderConfirmedWholesale.lines[1]!, qty_ordered: 1.15, unit_price_cents: 0, one_way_fee_cents: 50 }];
       const model = toOrderViewProps({ ...orderConfirmedWholesale, lines, deposits: [] });
-      expect(model.summary.rows[2]).toEqual({ label: "One-way keg fees", value: "$0.58" });
+      expect(model.summary.rows[1]).toEqual({ label: "One-way keg fees", value: "$0.58" });
       expect(model.kegCharges[0]?.amount).toBe("$0.58");
       expect(model.summary.total?.value).toBe("$0.58");
     });
@@ -505,5 +527,16 @@ describe("#1517 order ↔ invoice", () => {
   it("get_order reads the shipment's invoice, and the page passes it", () => {
     expect(readFileSync("lib/commands/orders.ts", "utf8")).toMatch(/from\("shipments"\)\.select\("\*, deliveries\(outcome\), invoices\(id, invoice_no\)"\)/);
     expect(readFileSync(PAGE, "utf8")).toMatch(/invoice: shipment\?\.invoices\[0\] \?\? null/);
+  });
+});
+
+describe("order header channel", () => {
+  it("names a wholesale order's sale channel, since the channel sets prices and the one-way keg fee", () => {
+    const snap = { ...orderConfirmedWholesale, order: { ...orderConfirmedWholesale.order, sale_channels: { name: "Export" } } };
+    expect(toOrderViewProps(snap).kind).toBe("Export");
+  });
+
+  it("falls back to Wholesale when the read carries no channel", () => {
+    expect(toOrderViewProps(orderConfirmedWholesale).kind).toBe("Wholesale");
   });
 });

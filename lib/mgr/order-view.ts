@@ -39,7 +39,8 @@ export type OrderViewModel = {
   title: string;
   /** The customer's name, or "Taproom transfer". */
   customer: string;
-  kind: "Wholesale" | "Taproom transfer";
+  /** A wholesale order's sale channel name ("Wholesale" without one), or "Taproom transfer". */
+  kind: string;
   currentState: string;
   stateTone: "ok" | "w" | "";
   next: string;
@@ -63,7 +64,7 @@ export type OrderViewModel = {
   /** The columns with something to say (#1506): Picked and Shipped once a line
    *  records them, Available while the order still waits on stock. */
   columns: OrderLineColumn[];
-  /** Keg deposits and one-way keg fees, frozen on the order at submit, each named with its line. */
+  /** Keg deposits and one-way keg fees captured on the order, each named with its line. */
   kegCharges: { key: string; name: string; detail: string; amount: string }[];
   /** `by` names the actor when the page passed actorNames. */
   events: { key: string; at: string; event: string; by?: string; detail: string }[];
@@ -87,6 +88,8 @@ export type OrderSnapshot = {
     repick_since?: string | null;
     from_location_id?: string;
     customers: { name: string } | null;
+    /** The order's sale channel; it sets prices and the one-way keg fee. */
+    sale_channels?: { name: string } | null;
     ship_tos: { label: string; country: string; city: string | null; state: string | null } | null;
   };
   locations?: { id: string; name: string }[];
@@ -103,7 +106,7 @@ export type OrderSnapshot = {
     qty_refused?: number;
     unit_price_cents: number;
     short_reason?: string | null;
-    /** Set at submit on a one-way keg line (order_lines.one_way_fee_cents). */
+    /** A one-way keg line's channel fee, set when the line is saved and fixed once the order is submitted (order_lines.one_way_fee_cents). */
     one_way_fee_cents?: number | null;
     skus: { name: string } | null;
   }[];
@@ -186,7 +189,7 @@ function orderSummary(
     return {
       rows: [{ label: "Keg deposits and fees", value: "Not finalized until submission" }],
       total: { label: "Items estimate", value: items },
-      note: "Saved lines at their captured prices. Keg deposits and one-way fees are set when the order is submitted.",
+      note: "Saved lines at their captured prices. Keg deposits are set when the order is submitted; one-way keg fees follow the sale channel until then.",
     };
   }
   if (!deposits || lines.some((l) => l.one_way_fee_cents === undefined)) {
@@ -195,10 +198,11 @@ function orderSummary(
   const depositCents = deposits.reduce((sum, d) => sum + Number(d.amount_cents), 0);
   const feeCents = lines.reduce((sum, l) => sum + (l.one_way_fee_cents ? orderLineCents(l.qty_ordered, l.one_way_fee_cents) : 0), 0);
   const total = money(itemsCents + depositCents + feeCents);
+  // A keg charge row shows only when it adds something; $0 rows are noise.
   const rows = [
     { label: "Ordered items", value: items },
-    { label: "Returnable keg deposits", value: money(depositCents) },
-    { label: "One-way keg fees", value: money(feeCents) },
+    ...(depositCents ? [{ label: "Returnable keg deposits", value: money(depositCents) }] : []),
+    ...(feeCents ? [{ label: "One-way keg fees", value: money(feeCents) }] : []),
   ];
   if (order.status === "cancelled") {
     return { rows, total: { label: "Cancelled order amount · before tax", value: total }, note: "What the order came to when it was cancelled: history, not an amount to collect." };
@@ -260,7 +264,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, deliver
     backHref,
     title: docNo("ORD", order.order_no, "Order"),
     customer: order.customers?.name ?? "Taproom transfer",
-    kind: order.kind === "taproom_transfer" ? "Taproom transfer" : "Wholesale",
+    kind: order.kind === "taproom_transfer" ? "Taproom transfer" : order.sale_channels?.name ?? "Wholesale",
     currentState: `${state.label}${order.needs_restock ? " · restock pending" : ""}`,
     stateTone: order.needs_restock ? "w" : order.status === "cancelled" ? "" : "ok",
     next: `Next: ${state.next}`,
@@ -313,7 +317,9 @@ export function toOrderViewProps({ order, lines, events, atp, locations, deliver
       const reason = typeof e.payload.reason === "string" ? e.payload.reason.trim() : "";
       let detail = reason;
       if (e.event === "lines_adjusted") {
-        detail = `${lineChange(e.payload.before, skuNames)} to ${lineChange(e.payload.lines, skuNames)}${reason ? ` (${reason})` : ""}`;
+        // A change after confirm names its reason code first; the reason is then its note.
+        const why = [typeof e.payload.reason_code === "string" ? sentenceCase(e.payload.reason_code) : "", reason].filter(Boolean).join(": ");
+        detail = `${lineChange(e.payload.before, skuNames)} to ${lineChange(e.payload.lines, skuNames)}${why ? ` (${why})` : ""}`;
       } else if (e.event === "pickup_changed") {
         detail = e.payload.pickup ? "Delivery to pickup" : "Pickup to delivery";
       } else if (e.event === "reorder_created") {

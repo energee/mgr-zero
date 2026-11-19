@@ -4,7 +4,7 @@ import { runCommand, type Ctx } from "@/lib/commands/registry";
 import type { HistoryPage, HistoryRow, NumberedHistoryPage } from "@/lib/commands/history";
 import "@/lib/commands/all";
 
-type Batch = HistoryRow & { brand_name: string | null; recipe_name: string | null; active_occupancies: { latest_reading?: { temp_f: number } | null }[] };
+type Batch = HistoryRow & { brand_name: string | null; recipe_name: string | null; active_occupancies: { latest_reading?: { temp_f: number } | null; recent_gravity?: { gravity_plato: number }[] }[] };
 type Run = HistoryRow & { brand_name: string; qty_planned: number; closed_at: string | null; cancelled_at: string | null };
 let ctx: Ctx, other: Ctx;
 let plannedId: string, activeId: string, upcomingId: string;
@@ -32,6 +32,8 @@ beforeAll(async () => {
   activeId = (await runCommand("schedule_batch", plan, ctx) as { id: string }).id;
   const vessel = await runCommand("upsert_vessel", { name: "History FV", kind: "fermenter", capacityBbl: 30 }, ctx) as { id: string };
   const brew = await runCommand("record_brew_day", { batchId: activeId, vesselId: vessel.id, brewedOn: plan.plannedOn, initialBbl: 10, actuals: [], confirmEmpty: true }, ctx) as { occupancy: { id: string } };
+  await runCommand("record_fermentation_reading", { occupancyId: brew.occupancy.id, at: "2026-10-01T18:00:00Z", tempF: 66, gravityPlato: 15 }, ctx);
+  await runCommand("record_fermentation_reading", { occupancyId: brew.occupancy.id, at: "2026-10-02T06:00:00Z", tempF: 66, gravityPlato: 9 }, ctx);
   await runCommand("record_fermentation_reading", { occupancyId: brew.occupancy.id, at: "2026-10-02T12:00:00Z", tempF: 65 }, ctx);
   await runCommand("record_fermentation_reading", { occupancyId: brew.occupancy.id, at: "2026-10-03T12:00:00Z", tempF: 68 }, ctx);
   const common = { brewery_id: ctx.breweryId, created_by: ctx.userId, created_at: "2026-09-20T12:00:00.123456Z", planned_on: plan.plannedOn };
@@ -65,6 +67,8 @@ it("keeps current batch work separate from imported history and embeds the recip
   expect(active.map(row => row.id)).toEqual([activeId]);
   expect(planned[0]).toMatchObject({ brand_name: "History pils", recipe_name: "History recipe", active_occupancies: [] });
   expect(active[0]).toMatchObject({ brand_name: "History pils", recipe_name: "History recipe", active_occupancies: [{ latest_reading: { temp_f: 68 } }] });
+  // The last two gravity readings, newest first, skipping the newer temperature-only checks.
+  expect(active[0].active_occupancies[0].recent_gravity?.map(row => Number(row.gravity_plato))).toEqual([9, 15]);
   expect((await runCommand("list_batches", {}, ctx) as Batch[]).map(row => row.id).sort()).toEqual([plannedId, activeId].sort());
 });
 

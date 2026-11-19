@@ -142,7 +142,7 @@ describe("pick and ship", () => {
         adjusterDb.rpc("adjust_order_lines", {
           p_order: id,
           p_lines: [{ sku_id: skuId, qty: 4 }],
-          p_reason: `concurrent customer change ${attempt}`,
+          p_reason_code: "customer_request", p_reason: `concurrent customer change ${attempt}`,
           p_request_id: crypto.randomUUID(),
         }),
       ]);
@@ -193,7 +193,7 @@ describe("pick and ship", () => {
     const id = await confirmedOrder(10);
     const line = await lineOf(id);
     await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 10 }], p_request_id: crypto.randomUUID() });
-    await staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 6 }], p_reason: "cut", p_request_id: crypto.randomUUID() });
+    await staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 6 }], p_reason_code: "customer_request", p_reason: "cut", p_request_id: crypto.randomUUID() });
     let { data: o } = await admin.from("orders").select().eq("id", id).single();
     expect(o!.needs_restock).toBe(true);
     const l2 = await lineOf(id);
@@ -251,6 +251,28 @@ describe("pick and ship", () => {
     expect(await lineOf(id)).toMatchObject({ qty_ordered: 10, qty_picked: 10 });
     // Release the open allocation so later ATP assertions in this file see the same stock.
     expect((await staffDb.rpc("cancel_order", { p_order: id, p_reason: "test cleanup", p_request_id: crypto.randomUUID() })).error).toBeNull();
+  });
+  it("cancelling a confirmed order that still holds picked beer flags it for put-back", async () => {
+    // Pick in full, then add a line: the order drops back to confirmed with ten kegs still staged.
+    const id = await confirmedOrder(10);
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 10 }], p_request_id: crypto.randomUUID() });
+    const second = await seedCatalog(b.id, { product: "Restock Pils", sku: "Restock Pils 1/2bbl", packageType: "keg", bblPerUnit: 0.5 });
+    await priceSku(b.id, { saleChannelId, brandId: second.brandId, formatId: second.formatId, cents: 12000 });
+    const adjusted = await staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 10 }, { sku_id: second.skuId, qty: 1 }], p_reason_code: "customer_request", p_reason: "added a keg", p_request_id: crypto.randomUUID() });
+    expect(adjusted.error).toBeNull();
+    const staged = await admin.from("order_lines").select("qty_picked").eq("order_id", id).eq("sku_id", skuId).single();
+    expect((await admin.from("orders").select("status,needs_restock").eq("id", id).single()).data).toEqual({ status: "confirmed", needs_restock: false });
+    expect(staged.data).toEqual({ qty_picked: 10 });
+    expect((await staffDb.rpc("cancel_order", { p_order: id, p_reason: "customer closed", p_request_id: crypto.randomUUID() })).error).toBeNull();
+    expect((await admin.from("orders").select("status,needs_restock").eq("id", id).single()).data).toEqual({ status: "cancelled", needs_restock: true });
+    // Put back clears it, so later tests in this file see the same stock.
+    expect((await staffDb.rpc("confirm_restock", { p_order: id, p_request_id: crypto.randomUUID() })).error).toBeNull();
+  });
+  it("cancelling an order nobody picked leaves nothing to put back", async () => {
+    const id = await confirmedOrder(2);
+    expect((await staffDb.rpc("cancel_order", { p_order: id, p_reason: "customer closed", p_request_id: crypto.randomUUID() })).error).toBeNull();
+    expect((await admin.from("orders").select("status,needs_restock").eq("id", id).single()).data).toEqual({ status: "cancelled", needs_restock: false });
   });
   it("ship rejects when p_ship omits an order line", async () => {
     const id = await confirmedOrder(3);
@@ -390,7 +412,7 @@ describe("confirm_restock", () => {
     const id = await confirmedOrder(4);
     const line = await lineOf(id);
     await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 4 }], p_request_id: crypto.randomUUID() });
-    await staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 2 }], p_reason: "cut", p_request_id: crypto.randomUUID() });
+    await staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 2 }], p_reason_code: "customer_request", p_reason: "cut", p_request_id: crypto.randomUUID() });
     const before = await admin.from("inventory_movements").select("id").eq("ref", id);
     const { data, error } = await staffDb.rpc("confirm_restock", { p_order: id, p_request_id: crypto.randomUUID() });
     expect(error).toBeNull();
@@ -410,7 +432,7 @@ describe("confirm_restock", () => {
     const id = await confirmedOrder(3);
     const line = await lineOf(id);
     await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 3 }], p_request_id: crypto.randomUUID() });
-    await staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 1 }], p_reason: "cut", p_request_id: crypto.randomUUID() });
+    await staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 1 }], p_reason_code: "customer_request", p_reason: "cut", p_request_id: crypto.randomUUID() });
     const adjusted = await lineOf(id);
     expect((await staffDb.rpc("confirm_restock", { p_order: id, p_request_id: crypto.randomUUID() })).error).toBeNull();
     expect(await lineOf(id)).toMatchObject({ qty_ordered: 1, qty_picked: 1 });
@@ -473,7 +495,7 @@ describe("resolve_short_pick", () => {
       p_order: id, p_picks: [{ line_id: line.id, qty_picked: 10 }], p_request_id: crypto.randomUUID(),
     })).error).toBeNull();
     expect((await staffDb.rpc("adjust_order_lines", {
-      p_order: id, p_lines: [{ sku_id: skuId, qty: 6 }], p_reason: "customer reduced order", p_request_id: crypto.randomUUID(),
+      p_order: id, p_lines: [{ sku_id: skuId, qty: 6 }], p_reason_code: "customer_request", p_reason: "customer reduced order", p_request_id: crypto.randomUUID(),
     })).error).toBeNull();
     const beforeLine = await lineOf(id);
     const beforeOrder = (await admin.from("orders").select().eq("id", id).single()).data;
@@ -775,7 +797,7 @@ describe("adjust after pick (#811)", () => {
     expect(r.error).toBeNull();
   };
   const adjust = (id: string, lines: { sku_id: string; qty: number }[], requestId = crypto.randomUUID()) =>
-    staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: lines, p_reason: "customer call", p_request_id: requestId });
+    staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: lines, p_reason_code: "customer_request", p_reason: "customer call", p_request_id: requestId });
   const orderRow = async (id: string) => (await admin.from("orders").select("status,needs_restock,repick_since").eq("id", id).single()).data!;
 
   it("adding a line sends the order back to confirmed; ship is refused until it is picked", async () => {
@@ -820,7 +842,7 @@ describe("adjust after pick (#811)", () => {
   it("dropping a counted line flags restock and stays picked", async () => {
     const id = await confirmedOrder(10);
     const base = await lineOf(id);
-    await staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 10 }, { sku_id: pilsSkuId, qty: 5 }], p_reason: "add", p_request_id: crypto.randomUUID() });
+    await staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 10 }, { sku_id: pilsSkuId, qty: 5 }], p_reason_code: "customer_request", p_reason: "add", p_request_id: crypto.randomUUID() });
     expect(base.id).toBeTruthy();
     await pickAll(id);
     expect((await adjust(id, [{ sku_id: skuId, qty: 10 }])).error).toBeNull();
@@ -829,7 +851,7 @@ describe("adjust after pick (#811)", () => {
 
   it("a short-counted line left unchanged does not reopen the order", async () => {
     const id = await confirmedOrder(10);
-    await staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 10 }, { sku_id: pilsSkuId, qty: 5 }], p_reason: "add", p_request_id: crypto.randomUUID() });
+    await staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 10 }, { sku_id: pilsSkuId, qty: 5 }], p_reason_code: "customer_request", p_reason: "add", p_request_id: crypto.randomUUID() });
     const ipa = await lineFor(id, skuId), pils = await lineFor(id, pilsSkuId);
     expect((await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: ipa.id, qty_picked: 7 }], p_request_id: crypto.randomUUID() })).error).toBeNull();
     expect((await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: pils.id, qty_picked: 5 }], p_request_id: crypto.randomUUID() })).error).toBeNull();

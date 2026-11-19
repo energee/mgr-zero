@@ -1,5 +1,5 @@
-import { formatLatestReading, type VesselReading } from "./vessel-detail-view";
-import type { GravityUnit } from "./gravity-unit";
+import type { VesselReading } from "./vessel-detail-view";
+import { currentFigures, type RecentGravity } from "./batches-view";
 
 export type CellarMapViewModel = {
   /** addHref null hides Add vessel (vessels are admin-managed). actionsOff: no
@@ -67,7 +67,15 @@ export function toCellarMapViewProps(vessels: (OrderedVessel & { capacity_bbl: n
 // list_batches({ readings: true }) read — the batch list already embeds the
 // newest reading per open occupancy, so the cellar map never asks per tank (#700).
 // A tank with no reading has no entry: the map words that line itself.
-export function cellarReadings(batches: { active_occupancies: { id: string; latest_reading?: VesselReading | null }[] }[], unit: GravityUnit, timeZone: string): Record<string, string> {
-  return Object.fromEntries(batches.flatMap(batch => batch.active_occupancies).filter(occupancy => occupancy.latest_reading)
-    .map(occupancy => [occupancy.id, formatLatestReading(occupancy.latest_reading, unit, timeZone)]));
+// A tile is narrow, so it says only the beer's ABV so far ("5.4% ABV"), from
+// the same figures Batches shows; the reading itself, its age and Fermenting or
+// Finished are on Batches and Vessel detail. A tank whose only gravity is the
+// OG says "No ABV yet".
+type CellarBatch = { og_reading?: { id: string; gravity_plato: number } | null; active_occupancies: { id: string; latest_reading?: VesselReading | null; recent_gravity?: RecentGravity[] }[] };
+export function cellarReadings(batches: CellarBatch[]): Record<string, string> {
+  return Object.fromEntries(batches.flatMap(batch => batch.active_occupancies.flatMap(({ id, latest_reading, recent_gravity }) => {
+    if (!latest_reading) return [];
+    const { abv } = currentFigures(batch.og_reading, recent_gravity?.[0]);
+    return [[id, abv ? `${abv} ABV` : "No ABV yet"]];
+  })));
 }
