@@ -383,6 +383,9 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     get_published_pos_menu: [R()], store_cola_label_image: [B,"26001001000999","https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Forged.jpg&filetype=l","data:image/jpeg;base64,/9j/2Q=="],
     provision_brewery: [f.taproom.id,"Fixture","America/New_York",null,R()],
     close_brewery: [B], agent_friction_report: [], prune_agent_history: [], prune_command_requests: [],
+    // The brewery's TypeSafe key: service-only, so a signed-in caller cannot set, read or see it.
+    set_brewery_typesafe_key: [B,f.taproom.id,"fixture-key-1234",R()], get_brewery_typesafe_key_status: [B,f.taproom.id],
+    read_brewery_typesafe_key: [B,f.taproom.id],
   };
   if (existsSync(".env.test.local")) {
     // Admit only this reset's verified probe; every other service RPC still
