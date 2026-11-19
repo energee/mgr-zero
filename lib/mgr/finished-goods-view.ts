@@ -13,8 +13,9 @@ export type FinishedGoodsRowView = {
   /** The SKU's name without its leading brand or alias, which the heading above it names. */
   name: string;
   /** Set on the first row of each brand: the heading over that brand's rows.
-   *  `brand` is the name with its staff alias, as Catalog shows it. `onHand` is the brand's barrels on hand, left out when any of its SKUs
-   *  has no barrels per unit. */
+   *  `brand` is the name with its staff alias, as Catalog shows it. `onHand`
+   *  is the brand's barrels on hand, left out when any of its SKUs has no
+   *  barrels per unit. */
   group?: { brand: string; onHand?: string };
   onHand: string;
   allocated: string;
@@ -119,6 +120,15 @@ function brandBbl(skus: FinishedGoodsSku[]) {
   return movementBbl(total);
 }
 
+/** A SKU's name without what its heading already says: a leading brand, then a leading alias. */
+function nameUnderHeading(sku: FinishedGoodsSku) {
+  let name = sku.name;
+  for (const lead of [sku.brands?.name, sku.brands?.alias]) {
+    if (lead && name.startsWith(`${lead} · `)) name = name.slice(lead.length + 3);
+  }
+  return name;
+}
+
 export function toFinishedGoodsViewProps({ skus, backHref, value }: FinishedGoodsSnapshot): FinishedGoodsViewModel {
   return {
     backHref: backHref ?? "/beer",
@@ -128,13 +138,12 @@ export function toFinishedGoodsViewProps({ skus, backHref, value }: FinishedGood
     empty: skus.length === 0 ? { title: "No finished goods yet" } : undefined,
     rows: [...skus].sort((a, b) => brandOf(a).localeCompare(brandOf(b)) || a.name.localeCompare(b.name)).map((s, i, sorted) => {
       const short = s.atp < 0;
-      const brand = s.brands?.name;
-      const first = brand !== undefined && brand !== sorted[i - 1]?.brands?.name;
+      // The brand to head this row with: set on the first SKU of each brand.
+      const heading = s.brands && s.brands.name !== sorted[i - 1]?.brands?.name ? s.brands : undefined;
       return {
         key: s.id,
-        // The heading says the brand and its alias, so a SKU named after either drops that lead.
-        name: [brand, s.brands?.alias].reduce<string>((name, lead) => (lead && name.startsWith(`${lead} · `) ? name.slice(lead.length + 3) : name), s.name),
-        group: first ? { brand: nameWithAlias(s.brands!), onHand: brandBbl(sorted.filter((sku) => sku.brands?.name === brand)) } : undefined,
+        name: nameUnderHeading(s),
+        group: heading && { brand: nameWithAlias(heading), onHand: brandBbl(sorted.filter((sku) => sku.brands?.name === heading.name)) },
         onHand: String(s.on_hand),
         allocated: String(round2(s.on_hand - s.atp)),
         atp: short ? `−${Math.abs(s.atp)}` : String(s.atp),
