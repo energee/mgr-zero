@@ -2333,8 +2333,8 @@ export const SCREENS: Screen[] = [
     job: "Accept or ignore a kind suggested from a new material's name",
     reads: "suggest_material_category",
     writes: "upsert_material",
-    states: [["permission", "warehouse or brewer required", 1], ["suggested", "Kind empty · the suggested kind shows in grey · Tab accepts it"], ["none", "suggestions off, no confident kind, or the request failed · Kind stays empty"]],
-    spec: "Leaving Material name on Add material asks for a kind once per name. A suggestion shows only while Kind is empty and is never saved unless accepted; opening the list and choosing another kind works as before.",
+    states: [["permission", "warehouse or brewer required", 1], ["suggested", "Kind empty · the suggested kind shows in grey · Tab accepts it · the Tab hint hides on touch · the open list reads Hop · suggested"], ["kind set", "Base unit, Purchase unit and Lot-tracked fill from the kind unless already changed"], ["none", "suggestions off, no confident kind, or the request failed · Kind stays empty"]],
+    spec: "Leaving Material name on Add material asks for a kind once per name. A suggestion shows only while Kind is empty and is never saved unless accepted; opening the list and choosing another kind works as before. Setting Kind on Add material fills Base unit, Purchase unit and Lot-tracked from it (lib/mgr/material-view.ts fieldsForKind), but not a field the user changed, and never on Edit material.",
     body: <MaterialView model={{ ...materialCitra, name: "Citra T-90", kind: "", kindSuggestion: "hop", unit: "lb", purchaseUnit: "lb", baseUnits: "1", soldBy: "", soldBySaved: false, defaultVendorId: "", lotTracked: false }} />,
   },
   {

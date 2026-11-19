@@ -40,10 +40,13 @@ describe("Material suggestions settings", () => {
     expect(saved).not.toContain("Save a TypeSafe key first");
   });
 
-  it("draws the switch with its consent line", () => {
+  it("draws the switch with its whole consent line, with or without a key", () => {
     const html = render({ saved: true, last4: "7f3a", enabled: true });
     expect(html).toContain('aria-label="Suggest kinds for new materials"');
-    expect(html).toContain("Sends new material names to TypeSafe");
+    // The row description is clamped to two lines, so it holds only these two sentences; the key note sits below.
+    const consent = "Sends new material names to TypeSafe. Turning it on is your brewery&#x27;s consent.</p>";
+    expect(html).toContain(`>${consent}`);
+    expect(render({ saved: false, last4: null, enabled: false })).toContain(`>${consent}`);
   });
 
   it("is part of Settings", () => {
