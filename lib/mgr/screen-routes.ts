@@ -58,6 +58,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Reauthorization", file: "app/(app)/settings/chat/health/page.tsx" },
   { name: "Settings", file: "app/(app)/settings/page.tsx" },
   { name: "Settings no warehouse", file: "app/(app)/settings/page.tsx" },
+  { name: "Settings suggestions on", file: "app/(app)/settings/page.tsx" },
   { name: "Team", file: "app/(app)/settings/team/page.tsx" },
   { name: "Permission denied", file: "app/(app)/denied/page.tsx" },
   { name: "Page not found", file: "app/not-found.tsx" },

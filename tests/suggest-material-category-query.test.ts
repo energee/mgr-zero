@@ -1,21 +1,29 @@
 // tests/suggest-material-category-query.test.ts — the suggest_material_category query:
-// who may run it, what input it takes, and that it calls no model while suggestions are off
-// (docs/plans/jev-suggestions.md, Task 5). The model call itself is mocked; nothing leaves the process.
+// who may run it, what input it takes, that it calls no model without the brewery's key (the
+// key read returns null while the brewery's switch is off or no key is saved), and that it calls
+// TypeSafe with that brewery's key (docs/plans/jev-suggestions.md). The key read and the model
+// call are mocked; nothing leaves the process. tests/brewery-typesafe-key.test.ts proves the key read.
 import { environmentManager, focusManager, isServer, QueryObserver } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@/lib/commands/all";
 import { commandQueryOptions, createQueryClient } from "@/lib/commands/query-cache";
 import { getCommandDefinition, listTools, runCommand, type Ctx } from "@/lib/commands/registry";
+import { resolveDecisionModel, SUGGESTION_MODEL } from "@/lib/mgr/material-category-suggestion";
 import { suggestMaterialCategory } from "@/lib/suggest-material-category";
+import { readBreweryTypeSafeKey } from "@/lib/supabase/integration-tokens";
 
 vi.mock("@/lib/suggest-material-category", () => ({ suggestMaterialCategory: vi.fn() }));
+vi.mock("@/lib/supabase/integration-tokens", () => ({ readBreweryTypeSafeKey: vi.fn() }));
+vi.mock("@/lib/mgr/material-category-suggestion", async importOriginal => {
+  const actual = await importOriginal<typeof import("@/lib/mgr/material-category-suggestion")>();
+  return { ...actual, resolveDecisionModel: vi.fn(actual.resolveDecisionModel) };
+});
 
-// The handler never touches the database.
+// The handler never touches the database itself; the key read is mocked.
 const ctx: Ctx = { db: null as unknown as Ctx["db"], userId: "u", breweryId: "b", roles: ["brewer"] };
-const ON = { MGR_SUGGESTIONS: "on", TYPESAFE_API_KEY: "k" };
 
-function stubEnv(env: Record<string, string>) {
-  for (const name of ["MGR_SUGGESTIONS", "TYPESAFE_API_KEY", "AI_GATEWAY_API_KEY", "VERCEL_OIDC_TOKEN", "VERCEL"]) vi.stubEnv(name, env[name] ?? "");
+function savedKey(key: string | null) {
+  vi.mocked(readBreweryTypeSafeKey).mockResolvedValue(key);
 }
 
 afterEach(() => {
@@ -25,6 +33,8 @@ afterEach(() => {
   environmentManager.setIsServer(() => isServer);
   focusManager.setFocused(undefined);
   vi.mocked(suggestMaterialCategory).mockReset();
+  vi.mocked(readBreweryTypeSafeKey).mockReset();
+  vi.mocked(resolveDecisionModel).mockClear();
 });
 
 describe("suggest_material_category", () => {
@@ -37,32 +47,43 @@ describe("suggest_material_category", () => {
   });
 
   it("refuses a blank name", async () => {
-    stubEnv(ON);
+    savedKey("brewery-key");
     await expect(runCommand("suggest_material_category", { name: "  " }, ctx)).rejects.toMatchObject({ code: "invalid_input" });
     expect(suggestMaterialCategory).not.toHaveBeenCalled();
   });
 
-  it("returns nulls and calls no model while suggestions are off", async () => {
-    stubEnv({});
+  it("returns nulls and calls no model when the brewery has no usable key", async () => {
+    savedKey(null);
+    await expect(runCommand("suggest_material_category", { name: "Citra T-90" }, ctx)).resolves.toEqual({ category: null, probability: null });
+    expect(readBreweryTypeSafeKey).toHaveBeenCalledWith(ctx);
+    expect(resolveDecisionModel).not.toHaveBeenCalled();
+    expect(suggestMaterialCategory).not.toHaveBeenCalled();
+  });
+
+  it("ignores TYPESAFE_API_KEY and MGR_SUGGESTIONS in the environment", async () => {
+    savedKey(null);
+    vi.stubEnv("TYPESAFE_API_KEY", "from-env");
+    vi.stubEnv("MGR_SUGGESTIONS", "on");
     await expect(runCommand("suggest_material_category", { name: "Citra T-90" }, ctx)).resolves.toEqual({ category: null, probability: null });
     expect(suggestMaterialCategory).not.toHaveBeenCalled();
   });
 
-  it("returns the model's confident kind for the trimmed name", async () => {
-    stubEnv(ON);
+  it("asks TypeSafe with this brewery's key and returns the confident kind for the trimmed name", async () => {
+    savedKey("brewery-key");
     vi.mocked(suggestMaterialCategory).mockResolvedValueOnce({ choice: "hop", probability: 0.95 });
     await expect(runCommand("suggest_material_category", { name: " Citra T-90 " }, ctx)).resolves.toEqual({ category: "hop", probability: 0.95 });
-    expect(suggestMaterialCategory).toHaveBeenCalledWith("Citra T-90");
+    expect(resolveDecisionModel).toHaveBeenCalledWith(SUGGESTION_MODEL, "brewery-key");
+    expect(suggestMaterialCategory).toHaveBeenCalledWith("Citra T-90", vi.mocked(resolveDecisionModel).mock.results[0].value);
   });
 
   it("returns nulls when no kind reached the threshold", async () => {
-    stubEnv(ON);
+    savedKey("brewery-key");
     vi.mocked(suggestMaterialCategory).mockResolvedValueOnce(null);
     await expect(runCommand("suggest_material_category", { name: "Mystery item" }, ctx)).resolves.toEqual({ category: null, probability: null });
   });
 
   it("logs a failed call and answers 502 upstream_unavailable", async () => {
-    stubEnv(ON);
+    savedKey("brewery-key");
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.mocked(suggestMaterialCategory).mockRejectedValueOnce(new Error("timeout"));
     await expect(runCommand("suggest_material_category", { name: "Citra T-90" }, ctx)).rejects.toMatchObject({ status: 502, code: "upstream_unavailable" });

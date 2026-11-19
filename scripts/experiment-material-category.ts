@@ -84,7 +84,7 @@ async function main(): Promise<void> {
       print({ type: "request", caseId: item.id, order, request });
       if (!live) continue;
       const started = performance.now();
-      const { answers } = await experimental_decide({ ...request, model: resolveDecisionModel(model), maxRetries: 0, abortSignal: AbortSignal.timeout(30_000) });
+      const { answers } = await experimental_decide({ ...request, model: resolveDecisionModel(model, process.env.TYPESAFE_API_KEY), maxRetries: 0, abortSignal: AbortSignal.timeout(30_000) });
       const answer = answers.category;
       const result: Result = {
         caseId: item.id, order, expected: item.expected, choice: answer.choice,

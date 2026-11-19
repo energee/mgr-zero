@@ -6,6 +6,7 @@ import { isUuid } from "@/lib/uuid";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasAnyRole, onlyRoles } from "@/lib/mgr/roles";
 import type { QboTokens, QboTaxInput } from "@/lib/qbo";
+import type { TypeSafeKeyStatus } from "@/lib/mgr/settings-view";
 
 export type IntegrationProvider = "qbo" | "square";
 
@@ -896,4 +897,42 @@ export async function recordQboInvoiceSyncFailure(ctx: Ctx, requestId: string) {
     p_brewery: ctx.breweryId, p_actor: ctx.userId, p_request_id: requestId,
   });
   if (error) throw error;
+}
+
+/** Copies only the three status fields, so nothing else the function might return reaches a caller. */
+function typeSafeKeyStatus(data: unknown): TypeSafeKeyStatus {
+  const row = data as Partial<TypeSafeKeyStatus> | null;
+  if (typeof row?.saved !== "boolean" || typeof row.enabled !== "boolean" || (row.last4 !== null && typeof row.last4 !== "string")) {
+    throw new Error("TypeSafe key status response was invalid");
+  }
+  return { saved: row.saved, last4: row.last4 ?? null, enabled: row.enabled };
+}
+
+/** Saves, replaces, or (with null) removes the brewery's TypeSafe key. The function rechecks that the actor is a current Admin. */
+export async function setBreweryTypeSafeKey(ctx: Ctx, apiKey: string | null, requestId: string): Promise<TypeSafeKeyStatus> {
+  // unwrap maps a refused actor (42501) to 403 and a reused request id (MG409) to 409.
+  return typeSafeKeyStatus(await unwrap(createAdminClient().rpc("set_brewery_typesafe_key", {
+    p_brewery: ctx.breweryId, p_actor: ctx.userId, p_api_key: apiKey, p_request_id: requestId,
+  })));
+}
+
+/** Whether a key is saved, its last four characters, and the brewery's suggestion switch; Admin only. */
+export async function readBreweryTypeSafeKeyStatus(ctx: Ctx): Promise<TypeSafeKeyStatus> {
+  const { data, error } = await createAdminClient().rpc("get_brewery_typesafe_key_status", {
+    p_brewery: ctx.breweryId, p_actor: ctx.userId,
+  });
+  if (error) throw new Error("TypeSafe key status lookup failed");
+  if (data === null) throw new CommandError("only an Admin can see the TypeSafe key status", 403, "permission_denied");
+  return typeSafeKeyStatus(data);
+}
+
+/** The brewery's TypeSafe key for a kind suggestion, or null while its switch is off, no key is saved,
+ *  or the actor may not add materials there. Server-only: the key never leaves this process except to TypeSafe. */
+export async function readBreweryTypeSafeKey(ctx: Ctx): Promise<string | null> {
+  const { data, error } = await createAdminClient().rpc("read_brewery_typesafe_key", {
+    p_brewery: ctx.breweryId, p_actor: ctx.userId,
+  });
+  if (error) throw new Error("TypeSafe key lookup failed");
+  if (data !== null && typeof data !== "string") throw new Error("TypeSafe key response was invalid");
+  return data;
 }

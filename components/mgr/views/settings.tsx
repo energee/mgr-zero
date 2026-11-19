@@ -3,8 +3,9 @@
 // the forms (#1509). Brewery details, Ask MGR and Wholesale fulfillment are
 // three independently saved forms, unboxed and split by rules; the brewery's
 // gravity unit saves on tap under Brewery details.
-// Live slots SettingsForm / GravityUnitForm / AiModelSettingsForm /
-// PortalFulfillmentForm; inventory paints the same form views with fixture values.
+// Live slots SettingsForm / GravityUnitForm / AiModelSettingsForm / AgentsSettingsForm /
+// SuggestionSettingsForm / PortalFulfillmentForm; inventory paints the same form views
+// with fixture values.
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-icons";
@@ -13,6 +14,7 @@ import type { SettingsViewModel } from "@/lib/mgr/settings-view";
 import { WATER_PROFILES_CAPTION } from "@/lib/mgr/water-profiles-view";
 import { AgentsSettingsView } from "@/components/mgr/views/agents-settings";
 import { AiModelSettingsView } from "@/components/mgr/views/ai-model-settings";
+import { SuggestionSettingsView } from "@/components/mgr/views/suggestion-settings";
 import { BrewerySettingsFormView } from "@/components/mgr/views/brewery-settings-form";
 import { PortalFulfillmentView } from "@/components/mgr/views/portal-fulfillment";
 import { ThemeToggle } from "@/components/mgr/theme-toggle";
@@ -27,6 +29,7 @@ export function SettingsView({
   fulfillmentForm,
   aiModelForm,
   agentsForm,
+  suggestionsForm,
   reportingBasisForm,
   hrefs = {},
 }: {
@@ -37,6 +40,7 @@ export function SettingsView({
   fulfillmentForm?: ReactNode;
   aiModelForm?: ReactNode;
   agentsForm?: ReactNode;
+  suggestionsForm?: ReactNode;
   reportingBasisForm?: ReactNode;
   hrefs?: Partial<Record<"locations" | "team" | "accounting" | "pos" | "chat" | "import" | "water" | "channels", string>>;
 }) {
@@ -60,6 +64,8 @@ export function SettingsView({
           {aiModelForm ?? <AiModelSettingsView value={model.aiModel} models={model.aiModels} />}
           <FieldSeparator />
           {agentsForm ?? <AgentsSettingsView enabled={model.agentsEnabled} />}
+          <FieldSeparator />
+          {suggestionsForm ?? <SuggestionSettingsView status={model.suggestions} />}
           <FieldSeparator />
           {fulfillmentForm ?? <PortalFulfillmentView locations={model.warehouseOptions} currentId={model.warehouseId} />}
         </div>

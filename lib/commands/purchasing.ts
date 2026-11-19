@@ -79,20 +79,23 @@ defineCommand({
   })),
 });
 
-// A suggested kind for Add material (docs/plans/jev-suggestions.md). The model and its
-// credentials load dynamically, so the registry stays provider-free (tests/agent-hidden.test.ts);
-// agents never call it, because it sends brewery text to an outside model.
+// A suggested kind for Add material (docs/plans/jev-suggestions.md). The model and the brewery's
+// key load dynamically, so the registry stays provider-free (tests/agent-hidden.test.ts);
+// agents never call it, because it sends brewery text to an outside model. The key read returns
+// null unless an Admin saved a TypeSafe key and turned "Suggest kinds for new materials" on.
 defineQuery({
   name: "suggest_material_category", agentHidden: true,
-  description: "Suggest a kind for a new material from its name, or none; read-only, never saves, off unless MGR_SUGGESTIONS is on",
+  description: "Suggest a kind for a new material from its name, or none; read-only, never saves, off unless an Admin saved the brewery's TypeSafe key and turned suggestions on",
   input: z.object({ name: z.string().trim().min(1).max(120).describe("The new material's name") }),
   roles: [...PURCHASING],
-  handler: async (_ctx, i) => {
-    const { areSuggestionsEnabled } = await import("@/lib/mgr/material-category-suggestion");
-    if (!areSuggestionsEnabled()) return { category: null, probability: null };
-    const { suggestMaterialCategory } = await import("@/lib/suggest-material-category");
+  handler: async (ctx, i) => {
+    const apiKey = await (await import("@/lib/supabase/integration-tokens")).readBreweryTypeSafeKey(ctx);
+    if (!apiKey) return { category: null, probability: null };
+    const [{ resolveDecisionModel, SUGGESTION_MODEL }, { suggestMaterialCategory }] = await Promise.all([
+      import("@/lib/mgr/material-category-suggestion"), import("@/lib/suggest-material-category"),
+    ]);
     try {
-      const hit = await suggestMaterialCategory(i.name);
+      const hit = await suggestMaterialCategory(i.name, resolveDecisionModel(SUGGESTION_MODEL, apiKey));
       return { category: hit?.choice ?? null, probability: hit?.probability ?? null };
     } catch (error) {
       // runCommand does not log a CommandError, so the cause is logged here; the form shows no suggestion.

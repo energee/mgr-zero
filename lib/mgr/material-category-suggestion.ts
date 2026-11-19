@@ -30,24 +30,20 @@ export const SUGGESTION_MODEL = "typesafe:jev-1.14.0";
 
 const TYPESAFE = "typesafe:";
 
-/** A `typesafe:<model>` ID becomes a TypeSafe decision model keyed by TYPESAFE_API_KEY; any other ID is a
- *  Gateway model string, which `experimental_decide` resolves with the Gateway credentials. */
-export function resolveDecisionModel(id: string, env: Record<string, string | undefined> = process.env): Experimental_DecisionModel {
+/** A `typesafe:<model>` ID becomes a TypeSafe decision model keyed by `typesafeApiKey`: the brewery's saved key
+ *  on the product path, TYPESAFE_API_KEY in the experiment script. Any other ID is a Gateway model string, which
+ *  `experimental_decide` resolves with the Gateway credentials. A typesafe: ID without a key throws, because the
+ *  provider would otherwise fall back to TYPESAFE_API_KEY from the environment. */
+export function resolveDecisionModel(id: string, typesafeApiKey: string | undefined): Experimental_DecisionModel {
   if (!id.startsWith(TYPESAFE)) return id;
-  return createTypeSafeAi({ apiKey: env.TYPESAFE_API_KEY }).decisionModel(id.slice(TYPESAFE.length));
+  if (!typesafeApiKey) throw new Error(`${id} needs a TypeSafe API key`);
+  return createTypeSafeAi({ apiKey: typesafeApiKey }).decisionModel(id.slice(TYPESAFE.length));
 }
 
-/** Whether the credentials that ID needs are set: TYPESAFE_API_KEY for `typesafe:`, the Gateway's otherwise. */
+/** Whether the credentials that ID needs are set: TYPESAFE_API_KEY for `typesafe:`, the Gateway's otherwise.
+ *  The experiment script's check; the product reads the brewery's key instead (lib/supabase/integration-tokens.ts). */
 export function isDecisionModelConfigured(id: string, env: Record<string, string | undefined> = process.env): boolean {
   return id.startsWith(TYPESAFE) ? Boolean(env.TYPESAFE_API_KEY) : isChatConfigured(env);
-}
-
-/** Jev suggestions send brewery text (material names) to the suggestion model's provider.
- *  Off unless MGR_SUGGESTIONS is "on" and SUGGESTION_MODEL's credentials are set
- *  (owner decision 5 in docs/plans/jev-use-cases.md). It lives here, not in lib/env/server-parser.ts,
- *  because this module already imports that one. */
-export function areSuggestionsEnabled(env: Record<string, string | undefined> = process.env): boolean {
-  return env.MGR_SUGGESTIONS === "on" && isDecisionModelConfigured(SUGGESTION_MODEL, env);
 }
 
 /** The choice question for `experimental_decide`. `reversed` flips the criteria order, the experiment's order control. */
