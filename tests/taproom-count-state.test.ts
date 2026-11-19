@@ -20,6 +20,10 @@ import {
   updateCountQuantity,
   updateCountDisposition,
   worksheetOrder,
+  worksheetGroups,
+  packageName,
+  countOutcome,
+  savedLineDetail,
 } from "@/lib/mgr/taproom-count-state";
 
 const ids = {
@@ -345,4 +349,31 @@ it("#1516 lists count buckets by SKU then bin name, each keeping its printed wor
   const line = (skuName: string, binName: string) => ({ skuName, binName });
   expect(worksheetOrder([line("Pils", "Cold"), line("Hazy", "Walk-in"), line("Hazy", "Cold")]))
     .toEqual([{ line: line("Hazy", "Cold"), row: 3 }, { line: line("Hazy", "Walk-in"), row: 2 }, { line: line("Pils", "Cold"), row: 1 }]);
+});
+
+it("groups worksheet rows under one heading per brand, brands by name, each row keeping its printed number", () => {
+  const line = (brandName: string, skuName: string) => ({ brandId: brandName, brandName, skuName, binName: "Cold" });
+  const groups = worksheetGroups([line("Pils", "Pils · Sixtel"), line("Hazy", "Hazy · Sixtel"), line("Pils", "Pils · Case"), line("Hazy", "Hazy · Case")]);
+  expect(groups.map(group => [group.brandName, group.rows.map(({ line, row }) => [line.skuName, row])])).toEqual([
+    ["Hazy", [["Hazy · Case", 4], ["Hazy · Sixtel", 2]]],
+    ["Pils", [["Pils · Case", 3], ["Pils · Sixtel", 1]]],
+  ]);
+});
+
+it("names a bucket by its package under a brand heading, and in full when the SKU is not named for the brand", () => {
+  expect(packageName({ brandName: "Hazy", skuName: "Hazy · Sixtel (one-way)" })).toBe("Sixtel (one-way)");
+  expect(packageName({ brandName: "Hazy IPA", skuName: "Hazy · ½ bbl keg" })).toBe("Hazy · ½ bbl keg");
+});
+
+it("says what a saved count found in plain words", () => {
+  expect(countOutcome({ observations: 12, depleted_units: 0, destroyed_units: 0 })).toBe("12 counted · all matched");
+  expect(countOutcome({ observations: 12, depleted_units: 3, destroyed_units: 1 })).toBe("12 counted · 3 sold · 1 destroyed");
+  expect(countOutcome({ observations: 0, depleted_units: 0, destroyed_units: 0 })).toBe("0 counted");
+});
+
+it("names a saved line by what tells it apart: its bin when bins differ, its lot code, or its row for a taproom-only reader", () => {
+  const line = { bin_name: "Cold", lot_id: "lot", lot_code: "L-7" };
+  expect(savedLineDetail(line, 2, { showBin: true, showLotCode: true })).toBe("Cold · Lot L-7");
+  expect(savedLineDetail(line, 2, { showBin: false, showLotCode: false })).toBe("Worksheet row 2");
+  expect(savedLineDetail({ ...line, lot_id: null, lot_code: null }, 2, { showBin: false, showLotCode: true })).toBe("");
 });

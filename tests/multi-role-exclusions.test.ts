@@ -184,7 +184,7 @@ describe("role-only exclusions", () => {
       state: weeklyCount.draft!, roles, lotLabels: weeklyCount.lotLabels, timeZone: weeklyCount.timeZone,
     }));
     expect(render(["taproom"])).not.toContain("L-260901-HZ");
-    expect(render(["taproom"])).toContain("Tracked worksheet row");
+    expect(render(["taproom"])).toContain("Worksheet row 2");
     expect(render(["taproom", "brewer"])).toContain("L-260901-HZ");
   });
 
