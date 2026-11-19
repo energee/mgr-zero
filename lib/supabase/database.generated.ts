@@ -953,14 +953,14 @@ isOneToOne: false
                   ]
                 },"formats": {
                   Row: {
-                    "basis": Database["public"]['Enums']["format_basis"],"bbl_per_unit": number | null,"brand_id": string | null,"brewery_id": string,"created_at": string,"id": string,"keg_size": Database["public"]['Enums']["keg_size"] | null,"name": string,"ounces": number | null,"package_type": Database["public"]['Enums']["package_type"] | null,"price_group_id": string | null,"units_per_case": number | null
+                    "basis": Database["public"]['Enums']["format_basis"],"bbl_per_unit": number | null,"brand_id": string | null,"brewery_id": string,"created_at": string,"id": string,"keg_size": Database["public"]['Enums']["keg_size"] | null,"name": string,"ounces": number | null,"package_type": Database["public"]['Enums']["package_type"] | null,"pallet_fit": number | null,"price_group_id": string | null,"units_per_case": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "basis": Database["public"]['Enums']["format_basis"],"bbl_per_unit"?: number | null,"brand_id"?: string | null,"brewery_id": string,"created_at"?: string,"id"?: string,"keg_size"?: Database["public"]['Enums']["keg_size"] | null,"name": string,"ounces"?: number | null,"package_type"?: Database["public"]['Enums']["package_type"] | null,"price_group_id"?: string | null,"units_per_case"?: number | null
+                    "basis": Database["public"]['Enums']["format_basis"],"bbl_per_unit"?: number | null,"brand_id"?: string | null,"brewery_id": string,"created_at"?: string,"id"?: string,"keg_size"?: Database["public"]['Enums']["keg_size"] | null,"name": string,"ounces"?: number | null,"package_type"?: Database["public"]['Enums']["package_type"] | null,"pallet_fit"?: number | null,"price_group_id"?: string | null,"units_per_case"?: number | null
                   }
                   Update: {
-                    "basis"?: Database["public"]['Enums']["format_basis"],"bbl_per_unit"?: number | null,"brand_id"?: string | null,"brewery_id"?: string,"created_at"?: string,"id"?: string,"keg_size"?: Database["public"]['Enums']["keg_size"] | null,"name"?: string,"ounces"?: number | null,"package_type"?: Database["public"]['Enums']["package_type"] | null,"price_group_id"?: string | null,"units_per_case"?: number | null
+                    "basis"?: Database["public"]['Enums']["format_basis"],"bbl_per_unit"?: number | null,"brand_id"?: string | null,"brewery_id"?: string,"created_at"?: string,"id"?: string,"keg_size"?: Database["public"]['Enums']["keg_size"] | null,"name"?: string,"ounces"?: number | null,"package_type"?: Database["public"]['Enums']["package_type"] | null,"pallet_fit"?: number | null,"price_group_id"?: string | null,"units_per_case"?: number | null
                   }
                   Relationships: [
                     {
@@ -4684,7 +4684,7 @@ isOneToOne: false
                   ]
                 },"portal_sku_prices": {
                   Row: {
-                    "brand_name": string | null,"brewery_id": string | null,"sale_channel_id": string | null,"sku_id": string | null,"sku_name": string | null,"unit_price_cents": number | null
+                    "brand_name": string | null,"brewery_id": string | null,"keg_size": Database["public"]['Enums']["keg_size"] | null,"package_type": Database["public"]['Enums']["package_type"] | null,"pallet_fit": number | null,"sale_channel_id": string | null,"sku_id": string | null,"sku_name": string | null,"unit_price_cents": number | null,"units_per_case": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -5642,7 +5642,7 @@ isOneToOne: false
                            },
 "portal_sku_price_rows":
 { Args: Record<PropertyKey, never>; Returns: {
-              "brand_name": string,"brewery_id": string,"sale_channel_id": string,"sku_id": string,"sku_name": string,"unit_price_cents": number
+              "brand_name": string,"brewery_id": string,"keg_size": Database["public"]['Enums']["keg_size"],"package_type": Database["public"]['Enums']["package_type"],"pallet_fit": number,"sale_channel_id": string,"sku_id": string,"sku_name": string,"unit_price_cents": number,"units_per_case": number
             }[]
                            },
 "portal_submit_quote":
@@ -6088,7 +6088,7 @@ isOneToOne: false
 { Args: { "p_alias"?: string,"p_brewery": string,"p_country"?: string,"p_id": string,"p_license_no": string,"p_name": string,"p_payment_terms": string,"p_release_delay_days"?: number,"p_request_id": string,"p_sale_channel": string,"p_state": string,"p_tax_treatment": Database["public"]['Enums']["tax_treatment"],"p_type": Database["public"]['Enums']["customer_type"] }; Returns: Json
                            },
 "upsert_format":
-{ Args: { "p_basis": Database["public"]['Enums']["format_basis"],"p_bbl_per_unit": number,"p_brewery": string,"p_id": string,"p_keg_size": Database["public"]['Enums']["keg_size"],"p_name": string,"p_ounces"?: number,"p_package_type": Database["public"]['Enums']["package_type"],"p_price_group"?: string,"p_request_id": string,"p_units_per_case": number }; Returns: Json
+{ Args: { "p_basis": Database["public"]['Enums']["format_basis"],"p_bbl_per_unit": number,"p_brewery": string,"p_clear_pallet_fit"?: boolean,"p_id": string,"p_keg_size": Database["public"]['Enums']["keg_size"],"p_name": string,"p_ounces"?: number,"p_package_type": Database["public"]['Enums']["package_type"],"p_pallet_fit"?: number,"p_price_group"?: string,"p_request_id": string,"p_units_per_case": number }; Returns: Json
                            },
 "upsert_material":
 { Args: { "p_active": boolean,"p_alpha_acid": number,"p_base_uom": Database["public"]['Enums']["uom"],"p_brewery": string,"p_category": Database["public"]['Enums']["material_category"],"p_default_vendor": string,"p_extract_potential": number,"p_lot_tracked": boolean,"p_material": string,"p_name": string,"p_pack_name"?: string,"p_purchase_uom": Database["public"]['Enums']["uom"],"p_purchase_uom_factor": number,"p_reorder_point": number,"p_request_id": string }; Returns: Json

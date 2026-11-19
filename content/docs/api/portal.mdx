@@ -41,7 +41,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · customer
 
-Portal: orderable SKUs with the caller's prices and their offers: badge is the packaged-stock availability (null when the SKU is not orderable from stock) and releases are the open releases, each with its ships-from and order-by dates and its own badge. A SKU with no open offer is left out
+Portal: orderable SKUs with the caller's prices and their offers: badge is the packaged-stock availability (null when the SKU is not orderable from stock) and releases are the open releases, each with its ships-from and order-by dates and its own badge; packageType, kegSize, unitsPerCase and palletFit (advisory: how many fill one pallet unit) describe its package. A SKU with no open offer is left out
 
 Takes no input.
 
