@@ -5,14 +5,15 @@
 // new materials" switch. A saved key shows only its last four characters, with Replace
 // and Remove; the field is an empty password input, never filled from the server.
 // Flipping the switch is the save; a failed save puts it back. The switch stays
-// disabled until a key is saved. Shared by the Settings
+// disabled until a key is saved. Once a name has been asked, "Last 30 days" counts how
+// the suggestions turned out. Shared by the Settings
 // inventory frames and the live SuggestionSettingsForm; the fixture passes no callbacks.
 import { useState } from "react";
 import { E } from "@/components/mgr/e";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { ConfirmDeleteControl } from "@/components/mgr/views/confirm-delete";
 import { FieldLegend, FieldSet } from "@/components/ui/field";
-import type { TypeSafeKeyStatus } from "@/lib/mgr/settings-view";
+import { suggestionOutcomesLine, type TypeSafeKeyStatus } from "@/lib/mgr/settings-view";
 
 /** `onSaveKey`, `onRemoveKey` and `onEnabledChange` resolve false when the save failed. */
 export function SuggestionSettingsView({ status, onSaveKey, onRemoveKey, onEnabledChange, busy = false, error }: {
@@ -33,6 +34,7 @@ export function SuggestionSettingsView({ status, onSaveKey, onRemoveKey, onEnabl
     setEnabled(next);
     void onEnabledChange?.(next).then(ok => { if (!ok) setEnabled(!next); });
   };
+  const outcomes = suggestionOutcomesLine(status.outcomes);
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     if (busy || !onSaveKey) return;
@@ -64,6 +66,8 @@ export function SuggestionSettingsView({ status, onSaveKey, onRemoveKey, onEnabl
       E.sw(enabled, "Suggest kinds for new materials", flip, !onEnabledChange || busy || !status.saved),
       "", undefined,
       status.saved ? undefined : <p className="text-sm text-muted-foreground">Save a TypeSafe key first.</p>)}
+    {/* Kept and changed compare each suggested kind with the kind of the material saved under that name. */}
+    {outcomes && E.row("Last 30 days", outcomes)}
     <CommandFormMessage error={error} />
   </FieldSet>;
 }

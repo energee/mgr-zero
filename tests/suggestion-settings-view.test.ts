@@ -8,8 +8,9 @@ import { describe, expect, it } from "vitest";
 import { SuggestionSettingsView } from "@/components/mgr/views/suggestion-settings";
 import { SettingsView } from "@/components/mgr/views/settings";
 import { settingsDemo } from "@/lib/mgr/fixtures/settings";
+import type { TypeSafeKeyStatus } from "@/lib/mgr/settings-view";
 
-const render = (status: { saved: boolean; last4: string | null; enabled: boolean }) =>
+const render = (status: TypeSafeKeyStatus) =>
   renderToStaticMarkup(createElement(SuggestionSettingsView, { status }));
 
 describe("Material suggestions settings", () => {
@@ -47,6 +48,15 @@ describe("Material suggestions settings", () => {
     const consent = "Sends new material names to TypeSafe. Turning it on is your brewery&#x27;s consent.</p>";
     expect(html).toContain(`>${consent}`);
     expect(render({ saved: false, last4: null, enabled: false })).toContain(`>${consent}`);
+  });
+
+  it("counts the last 30 days once a name has been asked", () => {
+    const status = { saved: true, last4: "7f3a", enabled: true };
+    expect(render(status)).not.toContain("Last 30 days");
+    expect(render({ ...status, outcomes: { asked: 0, suggested: 0, kept: 0, changed: 0 } })).not.toContain("Last 30 days");
+    const html = render({ ...status, outcomes: { asked: 14, suggested: 11, kept: 10, changed: 1 } });
+    expect(html).toContain("Last 30 days");
+    expect(html).toContain("11 of 14 names got a suggestion · 10 kept · 1 changed");
   });
 
   it("is part of Settings", () => {
