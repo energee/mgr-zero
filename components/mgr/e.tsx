@@ -127,6 +127,8 @@ export type FieldControls = Pick<React.InputHTMLAttributes<HTMLInputElement>, "i
    *  marked invalid; pass `id` too, so the message (`${id}-error`) is linked.
    *  Pass it once the user has left the field (`onBlur`), not while typing. */
   error?: string;
+  /** A line under a text field that is not an error, such as a near-duplicate name warning. An error replaces it. */
+  note?: ReactNode;
 };
 
 /** A picker with nothing to offer says so, and where the missing record is
@@ -355,7 +357,7 @@ export const E = {
   edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[], controls?: FieldControls) => {
     // `error` is drawn under the field (fieldError), never passed to the input.
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { onChange, hideLabel, contextualLabels, compact, error: _error, ...rest } = controls ?? {};
+    const { onChange, hideLabel, contextualLabels, compact, error: _error, note, ...rest } = controls ?? {};
     const error = fieldError(controls);
     const attributes = { ...rest, "aria-invalid": error.invalid, "aria-describedby": error.describedBy };
     if (type === "date") return <><DatePicker label={label} defaultValue={value} value={onChange ? value : undefined} onChange={onChange} disabled={controls?.disabled} required={controls?.required} name={controls?.name} max={controls?.max === undefined ? undefined : String(controls.max)} invalid={error.invalid} aria-describedby={error.describedBy} />{error.message}</>;
@@ -378,7 +380,7 @@ export const E = {
         {suggestions?.length
           ? <SuggestInput suggestions={suggestions} value={value} onChange={onChange} {...field} />
           : <Input {...field} {...(onChange ? { value, onChange: (event) => onChange(event.target.value) } : { defaultValue: value })} />}
-        {error.message}
+        {error.message ?? note}
       </Field>
     );
   },

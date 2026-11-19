@@ -4,7 +4,7 @@ import type { CommandContextExpectation } from "./registry";
 
 export type QueryScope = CommandContextExpectation & { roles?: readonly string[] };
 // Only registered reads belong here. Never cache/retry a mutation as a query.
-type CachedQuery = "list_orders" | "list_customers" | "list_locations" | "list_skus" | "get_brewery" | "get_packaging_material_plan" | "get_cola_image" | "suggest_material_category";
+type CachedQuery = "list_orders" | "list_customers" | "list_locations" | "list_skus" | "get_brewery" | "get_packaging_material_plan" | "get_cola_image" | "suggest_material_category" | "find_similar_names";
 
 export function createQueryClient() {
   return new QueryClient({ defaultOptions: { queries: {
@@ -17,8 +17,9 @@ export function createQueryClient() {
 export function commandQueryOptions<T = unknown>(scope: QueryScope, name: CachedQuery, input: unknown) {
   const { roles, ...expectedContext } = scope;
   const refreshInterval = name === "list_orders" ? 5_000 : 30_000;
-  // Read once per input: a label image is large, and a kind suggestion is a paid model call.
-  const once = name === "get_cola_image" || name === "suggest_material_category";
+  // Read once per input: a label image is large, a kind suggestion is a paid model call,
+  // and the names close to a typed one do not change while its form is open.
+  const once = name === "get_cola_image" || name === "suggest_material_category" || name === "find_similar_names";
   return queryOptions({
     // A failed suggestion shows none (docs/plans/jev-suggestions.md); asking again would only add a model call.
     ...(name === "suggest_material_category" ? { retry: false } : {}),

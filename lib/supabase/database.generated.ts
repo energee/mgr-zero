@@ -5985,6 +5985,11 @@ isOneToOne: false
 "ship_order":
 { Args: { "p_carrier": string,"p_invoice_timing"?: string,"p_order": string,"p_request_id": string,"p_ship": Json,"p_tracking": string }; Returns: Json
                            },
+"similar_names":
+{ Args: { "p_brewery": string,"p_exclude"?: string,"p_kind": string,"p_name": string }; Returns: {
+              "id": string,"name": string
+            }[]
+                           },
 "snooze_notification":
 { Args: { "p_brewery": string,"p_delivery": string,"p_request_id": string,"p_until": string }; Returns: Json
                            },

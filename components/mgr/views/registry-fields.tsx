@@ -12,13 +12,13 @@ export function RegistrySelect({ label, value, options, onChange, disabled, plac
   return E.pick(label, value, options, { onChange, disabled, placeholder });
 }
 
-export function RegistryInput({ label, value, onChange, disabled, required, suggestions, placeholder, id, error }: {
+export function RegistryInput({ label, value, onChange, disabled, required, suggestions, placeholder, id, error, onBlur, note }: {
   label: string; value: string; onChange?: (value: string) => void; disabled?: boolean; required?: boolean;
-  placeholder?: string; id?: string; error?: string;
+  placeholder?: string; id?: string; error?: string; onBlur?: () => void; note?: ReactNode;
   /** Typed against these as suggestions (SuggestInput): an unmatched entry is still accepted. */
   suggestions?: string[];
 }) {
-  return E.edit(label, value, "text", suggestions, { onChange, disabled, required: Boolean(required && onChange), placeholder, id, error });
+  return E.edit(label, value, "text", suggestions, { onChange, disabled, required: Boolean(required && onChange), placeholder, id, error, onBlur, note });
 }
 
 /** A list row's action: the live sheet slotted under its key (null suppresses), else the drawn verb. */

@@ -17,6 +17,7 @@ export function VendorView({
   busy,
   error,
   onSetActive,
+  nameNote,
 }: {
   model: VendorViewModel;
   controls?: {
@@ -25,7 +26,11 @@ export function VendorView({
     phone?: (value: string) => void;
     terms?: (value: string) => void;
     leadDays?: (value: string) => void;
+    /** Leaving Vendor name; the live form checks for a near-duplicate then. */
+    nameBlur?: () => void;
   };
+  /** The near-duplicate warning under Vendor name. */
+  nameNote?: ReactNode;
   messages?: ReactNode;
   validationAttempted?: boolean;
   footer?: ReactNode;
@@ -40,7 +45,7 @@ export function VendorView({
   const localErrors = vendorFieldErrors(model);
   return (
     <>
-      {E.edit("Vendor name", model.name, "text", undefined, { id: `${id}-name`, error: errors.name, onChange: controlled("name") ? (nextValue: string) => controls.name?.(nextValue) : undefined, required: controlled("name") })}
+      {E.edit("Vendor name", model.name, "text", undefined, { id: `${id}-name`, error: errors.name, onChange: controlled("name") ? (nextValue: string) => controls.name?.(nextValue) : undefined, required: controlled("name"), onBlur: controls.nameBlur, note: nameNote })}
       {E.edit("Email", model.email, "email", undefined, { id: `${id}-email`, onChange: controls.email, onBlur: () => touched.touch(0), error: errors.email ?? ((!controls.email || touched.shown(0)) ? localErrors.email : undefined) })}
       {E.edit("Phone", model.phone, "tel", undefined, { id: `${id}-phone`, onBlur: () => touched.touch(2), error: errors.phone ?? ((!controls.phone || touched.shown(2)) ? localErrors.phone : undefined), placeholder: "(503) 555-0142", onChange: controls.phone })}
       {E.inline(

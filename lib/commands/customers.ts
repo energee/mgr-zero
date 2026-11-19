@@ -109,6 +109,22 @@ defineCommand({
   })),
 });
 
+// The near-duplicate warning under a name field (docs/plans/near-duplicate-names.md). The database
+// function checks the caller's roles for the kind asked, so a role that cannot create it gets 403.
+defineQuery({
+  name: "find_similar_names",
+  description: "Up to three existing customer, vendor, material or brand names close to a typed name (spelling, case, punctuation, accents; a customer's or brand's alias counts), closest first, so a form can warn before a near-duplicate is created; only for the roles that may create that kind",
+  roles: ["admin", "sales", "warehouse", "brewer"],
+  input: z.object({
+    kind: z.enum(["customer", "vendor", "material", "brand"]).describe("Which records to compare against"),
+    name: z.string().trim().min(1).max(120).describe("The typed name"),
+    excludeId: z.string().uuid().optional().describe("The record being edited, left out of the answer"),
+  }),
+  handler: (ctx, i) => unwrap(ctx.db.rpc("similar_names", {
+    p_brewery: ctx.breweryId, p_kind: i.kind, p_name: i.name, p_exclude: i.excludeId,
+  })),
+});
+
 defineQuery({
   name: "list_customers", description: "Customers alphabetical with sale channel name; optionally only those whose name or alias contains q; unmapped keeps only those with no QuickBooks id in the connected company",
   roles: ["admin", "sales", "warehouse"],

@@ -76,6 +76,8 @@ export function BrandView({
   formatAction,
   busy = false,
   nameError,
+  nameBlur,
+  nameNote,
 }: {
   model: BrandViewModel;
   controls?: BrandControls;
@@ -109,6 +111,9 @@ export function BrandView({
   busy?: boolean;
   /** Live: the save's refusal of the name, such as a duplicate. */
   nameError?: string;
+  /** Leaving Brand name; the live page checks for a near-duplicate then, and draws the warning under it. */
+  nameBlur?: () => void;
+  nameNote?: ReactNode;
 }) {
   const abvId = useId();
   const descriptionId = useId();
@@ -126,7 +131,7 @@ export function BrandView({
       <div className="grid items-start gap-6 @min-[48rem]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <section aria-label="Brand details" className="flex min-w-0 flex-col gap-4">
           {E.cols(
-            <RegistryInput label="Brand name" value={model.name} onChange={controls.name} required id="brand-name" error={nameError} />,
+            <RegistryInput label="Brand name" value={model.name} onChange={controls.name} required id="brand-name" error={nameError} onBlur={nameBlur} note={nameNote} />,
             // Staff-only: list_brands and SKU search match it; Catalog notes it under the name, pickers beside it. Never on the portal, Square or SKU names.
             <div className="flex min-w-0 flex-col gap-2">
               {E.edit("Alias", model.alias, "text", undefined, { id: "brand-alias", onChange: controls.alias, "aria-describedby": "brand-alias-help" })}

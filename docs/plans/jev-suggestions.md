@@ -612,3 +612,10 @@ removes two of the four names but still shows one at 1.00.
    good as Jev (84.5% answered and 97.1% right, against 80.7% and 97.6%
    in the product's order). Jev earns its place on names the keyword lists
    cannot hold: typos, unfamiliar brands and new varieties.
+
+### Decision (2026-11-19)
+
+The owner accepts that about 2% of shown material kind suggestions are wrong
+on messy names, and keeps the threshold at 0.9. This replaces "no wrong
+suggestion is shown" as the bar. Staff confirm every suggestion, and Settings
+now counts kept and changed.

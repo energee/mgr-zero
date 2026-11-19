@@ -4,6 +4,7 @@
 // Sale channel is required — it decides the customer's prices.
 "use client";
 
+import { useSimilarNames } from "@/components/mgr/similar-names";
 import { useState } from "react";
 import { E } from "@/components/mgr/e";
 import { CustomerAccountFields, CustomerLicenseField, CustomerPaymentTermsField, CustomerSaleChannelField, CustomerTaxTreatmentField } from "@/components/mgr/views/customer";
@@ -75,6 +76,7 @@ export function CustomerForm({
   const [taxTreatment, setTaxTreatment] = useState<TaxTreatment | "">(customer?.taxTreatment ?? "");
   const touched = useTouchedLines(false);
   const nameError = customerNameError(name);
+  const similar = useSimilarNames("customer", customer);
   const form = useCommandForm("upsert_customer", {
     validationFields: ["name", "alias", "country", "state", "saleChannelId", "licenseNumber"],
     build: () => upsertCustomerInput({ name, alias, type, country, state, saleChannelId, licenseNumber, paymentTerms, taxTreatment }, customer?.id),
@@ -106,7 +108,7 @@ export function CustomerForm({
           void form.submit(event);
         }} className="flex flex-col gap-4">
           <CustomerAccountFields values={{ name, alias, type, country, state }} nameLabel="Name" controls={{
-            name: { id: "customer-name", onChange: setName, onBlur: () => touched.touch(0), error: (touched.shown(0) ? nameError : undefined) ?? form.fieldErrors.name },
+            name: { id: "customer-name", onChange: setName, onBlur: () => { touched.touch(0); similar.check(name); }, error: (touched.shown(0) ? nameError : undefined) ?? form.fieldErrors.name, note: similar.note },
             alias: { id: "customer-alias", onChange: setAlias, error: form.fieldErrors.alias },
             type: { id: "customer-type", onChange: value => setType(value as CustomerType) },
             country: { id: "customer-country", onChange: setCountry, error: form.fieldErrors.country },

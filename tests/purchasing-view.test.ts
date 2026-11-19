@@ -545,7 +545,7 @@ describe("Materials", () => {
     expect(form).toMatch(/kindOptions: MATERIAL_CATEGORIES/);
     expect(form).not.toMatch(/const KINDS\b/);
     expect(form).toMatch(/useCommandQuery<\{ category: string \| null \}>\(\s*"suggest_material_category", \{ name: askedName \},\s*!material && askedName !== "" && category === "",?\s*\)/);
-    expect(form).toMatch(/nameBlur: material \? undefined : \(\) => setAskedName\(name\.trim\(\)\)/);
+    expect(form).toMatch(/nameBlur: \(\) => \{ similar\.check\(name\); if \(!material\) setAskedName\(name\.trim\(\)\); \}/);
     expect(form).toMatch(/kindSuggestion: category === "" \? suggestion\.data\?\.category \?\? undefined : undefined/);
     expect(form).toMatch(/setAskedName\(""\)/);
   });
