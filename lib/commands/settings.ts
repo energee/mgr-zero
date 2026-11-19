@@ -40,6 +40,38 @@ defineCommand({
   })),
 });
 
+// Jev kind suggestions use the brewery's own TypeSafe key (docs/plans/jev-suggestions.md).
+// The key is write-only: no operation returns it, only whether one is saved and its last four
+// characters. The key operations reach a credential, so agents never see them; the token
+// boundary is imported dynamically to keep the registry provider-free (tests/agent-hidden.test.ts).
+defineQuery({
+  name: "get_brewery_suggestion_settings", agentHidden: true,
+  description: "Whether this brewery has a TypeSafe key saved (and its last four characters only) and whether kind suggestions for new materials are on",
+  input: z.object({}), roles: ["admin"],
+  handler: async (ctx) => (await import("@/lib/supabase/integration-tokens")).readBreweryTypeSafeKeyStatus(ctx),
+});
+
+defineCommand({
+  name: "set_brewery_typesafe_key", agentHidden: true,
+  description: "Save or replace this brewery's TypeSafe API key, or remove it with null; answers with the saved status and last four characters, never the key",
+  compensation: "Cannot be undone: a replaced or removed key is never readable. Paste the previous key again with set_brewery_typesafe_key.",
+  input: z.object({ apiKey: z.string().trim().min(8).max(500).nullable().describe("The TypeSafe API key, or null to remove it") }),
+  roles: ["admin"],
+  handler: async (ctx, i, execution) =>
+    (await import("@/lib/supabase/integration-tokens")).setBreweryTypeSafeKey(ctx, i.apiKey, execution.requestId),
+});
+
+defineCommand({
+  name: "set_brewery_suggestions_enabled", agentHidden: true,
+  description: "Turn kind suggestions for new materials on or off for this brewery. On sends new material names to TypeSafe with the brewery's saved key",
+  compensation: "Reverse with set_brewery_suggestions_enabled and the opposite value.",
+  input: z.object({ enabled: z.boolean() }),
+  roles: ["admin"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_brewery_suggestions_enabled", {
+    p_brewery: ctx.breweryId, p_enabled: i.enabled, p_request_id: execution.requestId,
+  })),
+});
+
 definePreTenantQuery({
   name: "list_my_agent_breweries",
   description: "The breweries this person works at, each with whether outside agents are allowed there",

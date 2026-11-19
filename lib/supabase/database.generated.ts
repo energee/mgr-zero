@@ -481,14 +481,14 @@ isOneToOne: false
                   ]
                 },"breweries": {
                   Row: {
-                    "agents_enabled": boolean,"books_opened_on": string | null,"closed_at": string | null,"created_at": string,"customer_phone": string | null,"days_to_package": number,"fermentation_reading_due_hours": number,"gravity_unit": string,"id": string,"name": string,"portal_fulfillment_location_id": string | null,"settings": NonNullable<Json>,"timezone": string,"ttb_registry_no": string | null
+                    "agents_enabled": boolean,"books_opened_on": string | null,"closed_at": string | null,"created_at": string,"customer_phone": string | null,"days_to_package": number,"fermentation_reading_due_hours": number,"gravity_unit": string,"id": string,"name": string,"portal_fulfillment_location_id": string | null,"settings": NonNullable<Json>,"suggestions_enabled": boolean,"timezone": string,"ttb_registry_no": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "agents_enabled"?: boolean,"books_opened_on"?: string | null,"closed_at"?: string | null,"created_at"?: string,"customer_phone"?: string | null,"days_to_package"?: number,"fermentation_reading_due_hours"?: number,"gravity_unit"?: string,"id"?: string,"name": string,"portal_fulfillment_location_id"?: string | null,"settings"?: NonNullable<Json>,"timezone"?: string,"ttb_registry_no"?: string | null
+                    "agents_enabled"?: boolean,"books_opened_on"?: string | null,"closed_at"?: string | null,"created_at"?: string,"customer_phone"?: string | null,"days_to_package"?: number,"fermentation_reading_due_hours"?: number,"gravity_unit"?: string,"id"?: string,"name": string,"portal_fulfillment_location_id"?: string | null,"settings"?: NonNullable<Json>,"suggestions_enabled"?: boolean,"timezone"?: string,"ttb_registry_no"?: string | null
                   }
                   Update: {
-                    "agents_enabled"?: boolean,"books_opened_on"?: string | null,"closed_at"?: string | null,"created_at"?: string,"customer_phone"?: string | null,"days_to_package"?: number,"fermentation_reading_due_hours"?: number,"gravity_unit"?: string,"id"?: string,"name"?: string,"portal_fulfillment_location_id"?: string | null,"settings"?: NonNullable<Json>,"timezone"?: string,"ttb_registry_no"?: string | null
+                    "agents_enabled"?: boolean,"books_opened_on"?: string | null,"closed_at"?: string | null,"created_at"?: string,"customer_phone"?: string | null,"days_to_package"?: number,"fermentation_reading_due_hours"?: number,"gravity_unit"?: string,"id"?: string,"name"?: string,"portal_fulfillment_location_id"?: string | null,"settings"?: NonNullable<Json>,"suggestions_enabled"?: boolean,"timezone"?: string,"ttb_registry_no"?: string | null
                   }
                   Relationships: [
                     {
@@ -5343,6 +5343,9 @@ isOneToOne: false
 "get_brew_record":
 { Args: { "p_batch": string,"p_brewery": string }; Returns: Json
                            },
+"get_brewery_typesafe_key_status":
+{ Args: { "p_actor": string,"p_brewery": string }; Returns: Json
+                           },
 "get_chat_delivery_context":
 { Args: { "p_delivery": string,"p_now"?: string }; Returns: Json
                            },
@@ -5677,6 +5680,9 @@ isOneToOne: false
 "raise_invoice_question":
 { Args: { "p_body": string,"p_brewery": string,"p_invoice": string,"p_request_id": string }; Returns: Json
                            },
+"read_brewery_typesafe_key":
+{ Args: { "p_actor": string,"p_brewery": string }; Returns: string
+                           },
 "read_integration_tokens":
 { Args: { "p_actor": string,"p_brewery": string,"p_connection": string,"p_provider": string }; Returns: {
               "access_expires_at": string,"access_token": string,"credential_version": number,"refresh_expires_at": string,"refresh_hard_expires_at": string,"refresh_token": string
@@ -5894,6 +5900,12 @@ isOneToOne: false
                            },
 "set_brewery_quiet_hours":
 { Args: { "p_brewery": string,"p_end": string,"p_installation": string,"p_request_id": string,"p_start": string }; Returns: Json
+                           },
+"set_brewery_suggestions_enabled":
+{ Args: { "p_brewery": string,"p_enabled": boolean,"p_request_id": string }; Returns: Json
+                           },
+"set_brewery_typesafe_key":
+{ Args: { "p_actor": string,"p_api_key": string,"p_brewery": string,"p_request_id": string }; Returns: Json
                            },
 "set_channel_price":
 { Args: { "p_brewery": string,"p_format": string,"p_price_group": string,"p_request_id": string,"p_sale_channel": string,"p_unit_price_cents": number }; Returns: Json

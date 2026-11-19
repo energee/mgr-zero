@@ -463,3 +463,23 @@ steered Jev to packaging at 0.92 and 0.87.
    0.16 margin. At 0.9, 72.5% of clean names get a suggestion.
 3. **Accept the injection risk.** Only staff type material names, and a
    suggestion changes nothing until someone presses Tab.
+
+### Per-brewery key (owner decision 2026-11-18)
+
+Each brewery uses its own TypeSafe key; no key is shared across breweries.
+An Admin pastes it in **Settings → Material suggestions**. The key is
+write-only: Settings shows only whether one is saved and its last four
+characters. The key lives in `private.brewery_typesafe_keys`, which follows
+the `private.integration_tokens` pattern. Service-only functions
+(`set_brewery_typesafe_key`, `get_brewery_typesafe_key_status`,
+`read_brewery_typesafe_key`) recheck the actor's current role. They are
+reached only through `lib/supabase/integration-tokens.ts`.
+
+The **Suggest kinds for new materials** switch (`breweries.suggestions_enabled`)
+replaces `MGR_SUGGESTIONS`, which is gone. It cannot turn on before a key is
+saved, and removing the key turns it off. The request hash records only
+whether a key was sent, never the key. Turning it on is that brewery's
+consent to send material names to TypeSafe, so it now carries Gate 1.
+`suggest_material_category` asks TypeSafe only while the switch is on and a
+key is saved, and it uses that brewery's key. `TYPESAFE_API_KEY` in the
+environment is read only by the experiment scripts.

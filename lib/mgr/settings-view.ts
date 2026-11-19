@@ -66,6 +66,10 @@ export function refreshBrewerySettingsValues(previous: BrewerySettingsValues, va
   return refreshed;
 }
 
+/** What Settings may know about the brewery's TypeSafe key (get_brewery_suggestion_settings):
+ *  never the key, at most its last four characters, plus the suggestion switch. */
+export type TypeSafeKeyStatus = { saved: boolean; last4: string | null; enabled: boolean };
+
 export type SettingsViewModel = {
   backHref?: string;
   name: string;
@@ -83,6 +87,8 @@ export type SettingsViewModel = {
   aiModels: GatewayModelOption[];
   /** Whether outside agents such as Claude or ChatGPT may connect. */
   agentsEnabled: boolean;
+  /** The TypeSafe key status and the "Suggest kinds for new materials" switch. */
+  suggestions: TypeSafeKeyStatus;
   deployment: string;
   /** Portal fulfillment location id, or null when none is set. */
   warehouseId: string | null;

@@ -420,7 +420,7 @@ const DEFAULT_STATES: NonNullable<Screen["states"]> = [["empty", "Nothing here y
 const occupancyActions = (reading: boolean) => <div className="flex flex-wrap gap-2">{reading && E.btn("Reading", "g")}{E.btn("Transfer", "g")}{E.btn("Addition", "g")}<BatchCompletionFixture /></div>;
 const permitted = (who: string): NonNullable<Screen["states"]> => [["permission", who, 1], ...DEFAULT_STATES.filter(([st]) => st !== "permission")];
 /** Settings and its no-warehouse variant draw the same page, so they read and write the same. */
-const SETTINGS_IO = { reads: "get_brewery · get_brewery_ai_model · list_locations · list_team_members · list_compliance_reports · list_reporting_basis_corrections · gateway.getAvailableModels [platform]", writes: "update_brewery · set_brewery_operating_defaults · set_books_opened_on · correct_reporting_basis · set_brewery_gravity_unit · set_brewery_ai_model · set_brewery_agents_enabled · update_location · set_portal_fulfillment_source" };
+const SETTINGS_IO = { reads: "get_brewery · get_brewery_ai_model · get_brewery_suggestion_settings · list_locations · list_team_members · list_compliance_reports · list_reporting_basis_corrections · gateway.getAvailableModels [platform]", writes: "update_brewery · set_brewery_operating_defaults · set_books_opened_on · correct_reporting_basis · set_brewery_gravity_unit · set_brewery_ai_model · set_brewery_agents_enabled · set_brewery_typesafe_key · set_brewery_suggestions_enabled · update_location · set_portal_fulfillment_source" };
 
 /** INV-1039 partly paid in MGR: Record payment's cap and the $300.00 check Void payment voids. */
 const LOCAL_PARTLY_PAID = toInvoiceViewProps(invoiceLocalPartlyPaid);
@@ -523,7 +523,7 @@ export const SCREENS: Screen[] = [
     to: { "Water profiles": "Water profiles" },
     ...SETTINGS_IO,
     states: [...permitted("admin only"), ["filed basis", "ordinary field is locked · recorded correction flags every affected filed period"], ["correction history", "immutable old/new basis, actor, time and reason"], ["uncertain correction", "fields freeze · retry unchanged request"]],
-    spec: "Invoices remains a first-class More and desk-rail destination. The TTB registry number is a brewery column and feeds the compliance report header; state licenses, the PA license included, live on Licenses (#1517). The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. Gravity unit under Brewery details is the brewery default, saved on tap; each person may choose their own in Me. Days to package is the brewery-wide projected packaging estimate, default 14 and whole days from 1 to 120. It adds to the actual brew date, or planned date before brewing. AI model offers the live Vercel AI Gateway language-model catalog and sets one brewery-wide Ask MGR default. Brewery details is one form saved by Save brewery. Picking an AI model or a fulfillment warehouse saves it at once; a failed save puts the picker back. After filing, the ordinary books date is locked; Correct reporting basis has its own save and immutable correction history. Deployment mode is read-only. Team opens the Team frame.",
+    spec: "Invoices remains a first-class More and desk-rail destination. The TTB registry number is a brewery column and feeds the compliance report header; state licenses, the PA license included, live on Licenses (#1517). The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. Gravity unit under Brewery details is the brewery default, saved on tap; each person may choose their own in Me. Days to package is the brewery-wide projected packaging estimate, default 14 and whole days from 1 to 120. It adds to the actual brew date, or planned date before brewing. AI model offers the live Vercel AI Gateway language-model catalog and sets one brewery-wide Ask MGR default. Brewery details is one form saved by Save brewery. Picking an AI model or a fulfillment warehouse saves it at once; a failed save puts the picker back. After filing, the ordinary books date is locked; Correct reporting basis has its own save and immutable correction history. Material suggestions holds the brewery's write-only TypeSafe key and the Suggest kinds for new materials switch (Settings suggestions on). Deployment mode is read-only. Team opens the Team frame.",
     body: <SettingsView model={settingsDemo} />,
   },
   {
@@ -533,6 +533,14 @@ export const SCREENS: Screen[] = [
     states: [["permission", "admin only", 1], ["no warehouse", "picker disabled · note names Warehouse in Uses · Edit locations opens Locations"], ["warehouse use removed", "a saved source no longer offered starts unchosen"]],
     spec: "Wholesale fulfillment offers only locations whose Uses include Warehouse. With none, the disabled picker says so beneath it and Edit locations opens Locations, where an admin adds Warehouse to a location's Uses. Picking a warehouse saves it.",
     body: <SettingsView model={{ ...settingsDemo, warehouseId: null, warehouseOptions: [] }} />,
+  },
+  {
+    step: 8, slice: "all", tab: "More", name: "Settings suggestions on", job: "Show a saved TypeSafe key by its last four characters and the switch that sends material names to it",
+    to: { "Water profiles": "Water profiles" },
+    ...SETTINGS_IO,
+    states: [["permission", "admin only", 1], ["no key", "empty password field · Save key waits for eight characters · switch disabled with Save a TypeSafe key first"], ["saved", "Saved · ends in …7f3a · Replace · Remove"], ["replacing", "empty password field · Cancel keeps the saved key"], ["switch failed", "the switch goes back"]],
+    spec: "Material suggestions holds this brewery's own TypeSafe key for Jev kind suggestions on Add material. The key is write-only: after Save key the page shows only Saved · ends in and its last four characters, never the key, and no read returns it. Replace opens an empty field; Remove asks first and turns suggestions off. Suggest kinds for new materials stays disabled, with Save a TypeSafe key first, until a key is saved; then it saves on tap and is the brewery's consent to send new material names to TypeSafe. A suggestion is asked for only while the switch is on and a key is saved. Only an Admin sees or changes either.",
+    body: <SettingsView model={{ ...settingsDemo, suggestions: { saved: true, last4: "7f3a", enabled: true } }} />,
   },
   {
     step: 8,
