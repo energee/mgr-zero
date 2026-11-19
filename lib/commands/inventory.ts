@@ -236,7 +236,7 @@ defineQuery({
 
 defineQuery({
   // Brewers read SKUs too: the packaging pages pick the SKU a run fills.
-  name: "list_skus", description: "SKUs with their brand and format, alphabetical; saleChannelId keeps only SKUs active and priced on that channel; packageType keeps only SKUs whose format is that package; unmapped keeps only those with no QuickBooks id in the connected company",
+  name: "list_skus", description: "SKUs with their brand (name and staff-only alias) and format, alphabetical; saleChannelId keeps only SKUs active and priced on that channel; packageType keeps only SKUs whose format is that package; unmapped keeps only those with no QuickBooks id in the connected company",
   input: z.object({
     saleChannelId: z.string().uuid().optional().describe("Keep only SKUs a wholesale order on this sale channel can price"),
     active: z.boolean().optional().describe("Keep only active or inactive SKUs when supplied"),
@@ -249,7 +249,7 @@ defineQuery({
     const unmapped = i.unmapped ? await qboUnmappedFilter(ctx, "qbo_item_id") : null;
     const rows = await completeRows("SKU list", async (_, after?: { id: string }) => {
       let query = ctx.db.from("skus")
-        .select(`id, name, active, brand_id, format_id, qbo_item_id, qbo_realm_id, brands(name), ${formats}(name, bbl_per_unit, package_type), format_volume:format_volumes(bbl_per_unit)`)
+        .select(`id, name, active, brand_id, format_id, qbo_item_id, qbo_realm_id, brands(name, alias), ${formats}(name, bbl_per_unit, package_type), format_volume:format_volumes(bbl_per_unit)`)
         .eq("brewery_id", ctx.breweryId).order("id").limit(PAGE_SIZE);
       if (after) query = query.gt("id", after.id);
       let count = ctx.db.from("skus").select(i.packageType ? "id, formats!inner(package_type)" : "id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId);

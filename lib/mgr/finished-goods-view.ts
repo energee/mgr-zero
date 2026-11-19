@@ -1,5 +1,6 @@
 // lib/mgr/finished-goods-view.ts — Finished goods stock and authorized get_inventory_value totals.
 import type { EmptyState } from "./empty-state";
+import { nameWithAlias } from "./labels";
 import { money } from "./money";
 import type { InventoryValue } from "@/lib/commands/inventory";
 import { plural } from "./plural";
@@ -12,7 +13,7 @@ export type FinishedGoodsRowView = {
   /** The SKU's name without its brand when `group` names the brand above it. */
   name: string;
   /** Set on the first row of each brand: the heading over that brand's rows.
-   *  `onHand` is the brand's barrels on hand, left out when any of its SKUs
+   *  `brand` is the name with its staff alias, as Catalog shows it. `onHand` is the brand's barrels on hand, left out when any of its SKUs
    *  has no barrels per unit. */
   group?: { brand: string; onHand?: string };
   onHand: string;
@@ -52,7 +53,7 @@ export type FinishedGoodsMovements = {
 export type FinishedGoodsSku = {
   id: string;
   name: string;
-  brands?: { name: string } | null;
+  brands?: { name: string; alias?: string | null } | null;
   /** list_skus' flag; false withholds the row's Record movement. */
   active?: boolean;
   /** list_skus' barrels per unit, for the brand's barrels on hand. */
@@ -132,7 +133,7 @@ export function toFinishedGoodsViewProps({ skus, backHref, value }: FinishedGood
       return {
         key: s.id,
         name: brand && s.name.startsWith(`${brand} · `) ? s.name.slice(brand.length + 3) : s.name,
-        group: first ? { brand, onHand: brandBbl(sorted.filter((sku) => sku.brands?.name === brand)) } : undefined,
+        group: first ? { brand: nameWithAlias(s.brands!), onHand: brandBbl(sorted.filter((sku) => sku.brands?.name === brand)) } : undefined,
         onHand: String(s.on_hand),
         allocated: String(round2(s.on_hand - s.atp)),
         atp: short ? `−${Math.abs(s.atp)}` : String(s.atp),

@@ -14,7 +14,7 @@ export const finishedGoodsList: FinishedGoodsSnapshot = {
   skus: [
     { id: SKU_HAZY.sku_id, name: SKU_HAZY.name, brands: { name: SKU_HAZY.brand }, format_volume: { bbl_per_unit: 0.5 }, on_hand: 15, atp: 11 },
     { id: SKU_PILS.sku_id, name: SKU_PILS.name, brands: { name: SKU_PILS.brand }, format_volume: { bbl_per_unit: 0.09677419 }, on_hand: 18, atp: -6 },
-    { id: SKU_STOUT.sku_id, name: SKU_STOUT.name, brands: { name: SKU_STOUT.brand }, format_volume: { bbl_per_unit: 0.16666667 }, on_hand: 9, atp: 7 },
+    { id: SKU_STOUT.sku_id, name: SKU_STOUT.name, brands: { name: SKU_STOUT.brand, alias: "Winter #2" }, format_volume: { bbl_per_unit: 0.16666667 }, on_hand: 9, atp: 7 },
   ],
 };
 

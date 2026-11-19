@@ -59,7 +59,8 @@ describe("Finished goods view", () => {
     expect(toFinishedGoodsViewProps(finishedGoodsList).rows).toEqual([
       row(SKU_HAZY, "7.5 bbl", "15", "4", "11", false),
       row(SKU_PILS, "1.7 bbl", "18", "24", "−6", true),
-      row(SKU_STOUT, "1.5 bbl", "9", "2", "7", false),
+      // The fixture stout carries a staff alias, which its heading shows.
+      { ...row(SKU_STOUT, "1.5 bbl", "9", "2", "7", false), group: { brand: `${SKU_STOUT.brand} · Winter #2`, onHand: "1.5 bbl" } },
     ]);
   });
 
@@ -76,6 +77,11 @@ describe("Finished goods view", () => {
       ["p2", "Case", { brand: "Pils", onHand: undefined }],
       ["p1", "Sixtel", undefined],
     ]);
+  });
+
+  it("heads a brand with its staff alias, as Catalog names it", () => {
+    const { rows } = toFinishedGoodsViewProps({ skus: [{ id: "s1", name: "Hazy · Keg", brands: { name: "Hazy", alias: "Batch 12" }, on_hand: 1, atp: 1 }] });
+    expect(rows[0]).toMatchObject({ name: "Keg", group: { brand: "Hazy · Batch 12" } });
   });
 
   it("leaves a SKU without a brand ungrouped under its own name", () => {
