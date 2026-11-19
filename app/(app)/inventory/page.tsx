@@ -30,7 +30,7 @@ import { numberedHistoryPage, pageNumber, pageSize, type NumberedHistoryPage } f
 
 export const metadata = { title: navTitle("/inventory") };
 
-type Sku = { id: string; name: string; active: boolean; format_volume: { bbl_per_unit: number | null } | null; brands: { name: string } | null };
+type Sku = { id: string; name: string; active: boolean; format_volume: { bbl_per_unit: number | null } | null; brands: { name: string; alias: string | null } | null };
 type Location = { id: string; name: string; uses: string[] };
 type Bin = { id: string; location_id: string; name: string };
 type SaleChannel = { id: string; name: string; tax_treatment: string };
