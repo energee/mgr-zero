@@ -10,10 +10,10 @@ import { commandQueryOptions, createQueryClient } from "@/lib/commands/query-cac
 import { getCommandDefinition, listTools, runCommand, type Ctx } from "@/lib/commands/registry";
 import { resolveDecisionModel, SUGGESTION_MODEL } from "@/lib/mgr/material-category-suggestion";
 import { suggestMaterialCategory } from "@/lib/suggest-material-category";
-import { readBreweryTypeSafeKey } from "@/lib/supabase/integration-tokens";
+import { readBreweryTypeSafeKey, recordMaterialKindSuggestion } from "@/lib/supabase/integration-tokens";
 
 vi.mock("@/lib/suggest-material-category", () => ({ suggestMaterialCategory: vi.fn() }));
-vi.mock("@/lib/supabase/integration-tokens", () => ({ readBreweryTypeSafeKey: vi.fn() }));
+vi.mock("@/lib/supabase/integration-tokens", () => ({ readBreweryTypeSafeKey: vi.fn(), recordMaterialKindSuggestion: vi.fn() }));
 vi.mock("@/lib/mgr/material-category-suggestion", async importOriginal => {
   const actual = await importOriginal<typeof import("@/lib/mgr/material-category-suggestion")>();
   return { ...actual, resolveDecisionModel: vi.fn(actual.resolveDecisionModel) };
@@ -34,6 +34,7 @@ afterEach(() => {
   focusManager.setFocused(undefined);
   vi.mocked(suggestMaterialCategory).mockReset();
   vi.mocked(readBreweryTypeSafeKey).mockReset();
+  vi.mocked(recordMaterialKindSuggestion).mockReset();
   vi.mocked(resolveDecisionModel).mockClear();
 });
 
@@ -58,6 +59,7 @@ describe("suggest_material_category", () => {
     expect(readBreweryTypeSafeKey).toHaveBeenCalledWith(ctx);
     expect(resolveDecisionModel).not.toHaveBeenCalled();
     expect(suggestMaterialCategory).not.toHaveBeenCalled();
+    expect(recordMaterialKindSuggestion).not.toHaveBeenCalled();
   });
 
   it("ignores TYPESAFE_API_KEY and MGR_SUGGESTIONS in the environment", async () => {
@@ -74,20 +76,25 @@ describe("suggest_material_category", () => {
     await expect(runCommand("suggest_material_category", { name: " Citra T-90 " }, ctx)).resolves.toEqual({ category: "hop", probability: 0.95 });
     expect(resolveDecisionModel).toHaveBeenCalledWith(SUGGESTION_MODEL, "brewery-key");
     expect(suggestMaterialCategory).toHaveBeenCalledWith("Citra T-90", vi.mocked(resolveDecisionModel).mock.results[0].value);
+    expect(recordMaterialKindSuggestion).toHaveBeenCalledWith(ctx, "Citra T-90", { choice: "hop", probability: 0.95 });
   });
 
   it("returns nulls when no kind reached the threshold", async () => {
     savedKey("brewery-key");
     vi.mocked(suggestMaterialCategory).mockResolvedValueOnce(null);
     await expect(runCommand("suggest_material_category", { name: "Mystery item" }, ctx)).resolves.toEqual({ category: null, probability: null });
+    // Counted too, so Settings can say how many names got no suggestion.
+    expect(recordMaterialKindSuggestion).toHaveBeenCalledWith(ctx, "Mystery item", null);
   });
 
   it("logs a failed call and answers 502 upstream_unavailable", async () => {
     savedKey("brewery-key");
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.mocked(suggestMaterialCategory).mockRejectedValueOnce(new Error("timeout"));
+    // A provider error carries the request body; only its message may reach the log.
+    vi.mocked(suggestMaterialCategory).mockRejectedValueOnce(Object.assign(new Error("timeout"), { requestBodyValues: { materialName: "Citra T-90" } }));
     await expect(runCommand("suggest_material_category", { name: "Citra T-90" }, ctx)).rejects.toMatchObject({ status: 502, code: "upstream_unavailable" });
-    expect(log).toHaveBeenCalledWith("suggest_material_category_failed", expect.any(Error));
+    expect(log).toHaveBeenCalledWith("suggest_material_category_failed", "timeout");
+    expect(recordMaterialKindSuggestion).not.toHaveBeenCalled();
     log.mockRestore();
   });
 });

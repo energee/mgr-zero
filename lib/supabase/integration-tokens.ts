@@ -4,9 +4,10 @@ import { toJson } from "./json";
 import { canRun, CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import { isUuid } from "@/lib/uuid";
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { MATERIAL_CATEGORIES } from "@/lib/mgr/enums";
 import { hasAnyRole, onlyRoles } from "@/lib/mgr/roles";
 import type { QboTokens, QboTaxInput } from "@/lib/qbo";
-import type { TypeSafeKeyStatus } from "@/lib/mgr/settings-view";
+import type { SuggestionOutcomes, TypeSafeKeyStatus } from "@/lib/mgr/settings-view";
 
 export type IntegrationProvider = "qbo" | "square";
 
@@ -935,4 +936,28 @@ export async function readBreweryTypeSafeKey(ctx: Ctx): Promise<string | null> {
   if (error) throw new Error("TypeSafe key lookup failed");
   if (data !== null && typeof data !== "string") throw new Error("TypeSafe key response was invalid");
   return data;
+}
+
+/** Records what TypeSafe answered for a new material name (category null: nothing reached the threshold),
+ *  so Settings can count outcomes. Asking a name again replaces its row. */
+export async function recordMaterialKindSuggestion(ctx: Ctx, name: string, hit: { choice: (typeof MATERIAL_CATEGORIES)[number]; probability: number } | null): Promise<void> {
+  const { error } = await createAdminClient().rpc("record_material_kind_suggestion", {
+    p_brewery: ctx.breweryId, p_actor: ctx.userId, p_name: name,
+    p_category: hit?.choice ?? null, p_probability: hit?.probability ?? null,
+  });
+  if (error) throw new Error(`Kind suggestion record failed: ${error.message}`);
+}
+
+/** The last 30 days of this brewery's kind suggestions; Admin only. */
+export async function readMaterialKindSuggestionOutcomes(ctx: Ctx): Promise<SuggestionOutcomes> {
+  const { data, error } = await createAdminClient().rpc("get_material_kind_suggestion_outcomes", {
+    p_brewery: ctx.breweryId, p_actor: ctx.userId,
+  });
+  if (error) throw new Error("Kind suggestion outcomes lookup failed");
+  if (data === null) throw new CommandError("only an Admin can see suggestion outcomes", 403, "permission_denied");
+  const { asked, suggested, kept, changed } = data as Partial<SuggestionOutcomes>;
+  if (typeof asked !== "number" || typeof suggested !== "number" || typeof kept !== "number" || typeof changed !== "number") {
+    throw new Error("Kind suggestion outcomes response was invalid");
+  }
+  return { asked, suggested, kept, changed };
 }

@@ -484,6 +484,37 @@ consent to send material names to TypeSafe, so it now carries Gate 1.
 key is saved, and it uses that brewery's key. `TYPESAFE_API_KEY` in the
 environment is read only by the experiment scripts.
 
+### Key check and outcomes (2026-11-19)
+
+Two gaps from the review of #1885 and #1886 are closed.
+
+**Key check.** `set_brewery_typesafe_key` asks TypeSafe one fixed made-up
+name ("Citra T-90") with the pasted key before saving it
+(`checkTypeSafeKey` in `lib/suggest-material-category.ts`). A 401 or 403
+refuses the key with a 400. Any other failure answers 502 and saves nothing.
+Before this, a mistyped key saved and every suggestion then failed silently.
+
+**Outcomes.** `suggest_material_category` records what TypeSafe answered for
+each name in `private.material_kind_suggestions`: one row per brewery and
+lowercased name, with the kind and probability, or no kind when nothing
+reached the threshold. Nothing stores "accepted". Settings derives it:
+`get_material_kind_suggestion_outcomes` compares each suggested kind with
+the kind of the material saved under that name, over the last 30 days.
+
+| Count | Meaning |
+| --- | --- |
+| asked | Names sent to TypeSafe |
+| suggested | Names that got a kind at or above the threshold |
+| kept | Suggested names saved as a material with that kind |
+| changed | Suggested names saved as a material with another kind |
+
+A changed kind includes a later edit, which is a correction too. A name
+nobody saved counts in neither. This is the measure owner decision 1 asked
+for: Jev is judged by the suggestions it shows.
+
+The failure log now carries only the provider error's message. The error
+object holds the request body, which contains the material name.
+
 ## Results on the messy holdout (2026-11-19)
 
 ### What was added

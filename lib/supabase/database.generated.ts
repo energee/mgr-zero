@@ -5376,6 +5376,9 @@ isOneToOne: false
 "get_material_count_preview":
 { Args: { "p_bin": string,"p_brewery": string,"p_lines": Json,"p_location": string }; Returns: Json
                            },
+"get_material_kind_suggestion_outcomes":
+{ Args: { "p_actor": string,"p_brewery": string }; Returns: Json
+                           },
 "get_order_email_status":
 { Args: { "p_brewery": string,"p_order": string }; Returns: Json
                            },
@@ -5761,6 +5764,9 @@ isOneToOne: false
                            },
 "record_material_count":
 { Args: { "p_bin": string,"p_brewery": string,"p_counted_on": string,"p_lines": Json,"p_location": string,"p_request_id": string,"p_revision"?: string }; Returns: Json
+                           },
+"record_material_kind_suggestion":
+{ Args: { "p_actor": string,"p_brewery": string,"p_category": Database["public"]['Enums']["material_category"],"p_name": string,"p_probability": number }; Returns: undefined
                            },
 "record_pick":
 { Args: { "p_order": string,"p_picks": Json,"p_request_id": string }; Returns: Json

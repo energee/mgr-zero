@@ -308,7 +308,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin
 
-Whether this brewery has a TypeSafe key saved (and its last four characters only) and whether kind suggestions for new materials are on
+Whether this brewery has a TypeSafe key saved (and its last four characters only), whether kind suggestions for new materials are on, and the last 30 days of suggestion outcomes (asked, suggested, kept, changed)
 
 Takes no input.
 
@@ -934,7 +934,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin
 
-Save or replace this brewery's TypeSafe API key, or remove it with null; answers with the saved status and last four characters, never the key
+Save or replace this brewery's TypeSafe API key, or remove it with null; a new key is checked with TypeSafe first and refused if TypeSafe does not accept it; answers with the saved status and last four characters, never the key
 
 | Field | Type | Required |
 | --- | --- | --- |

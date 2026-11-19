@@ -16,6 +16,7 @@ const pureTests = [
   "tests/material-category-suggestion.test.ts",
   "tests/material-category-keywords.test.ts",
   "tests/suggest-material-category-query.test.ts",
+  "tests/typesafe-key-check.test.ts",
   "tests/agent-eval-score.test.ts",
   "tests/agent-evals-cli.test.ts",
   "tests/dependency-tooling.test.ts",
