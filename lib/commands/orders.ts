@@ -3,6 +3,7 @@
 // zod validation, role gating, and camelCase→p_* argument mapping.
 import { historyInput, historyResult, newestFirst, numberedHistorySchema, readHistory, type HistoryRow } from "./history";
 import { z } from "zod";
+import { after } from "next/server";
 import { qboStaffInvoiceLink, type QboInvoiceIdentity, type QboPushedIdentity, type QboStaffConnection } from "@/lib/mgr/qbo-ui";
 import type { Ctx } from "./registry";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
@@ -68,8 +69,24 @@ defineCommand({
   compensation: "Cannot return to submitted; reverse with cancel_order, which releases its allocations.",
   roles: [...salesRoles],
   input: z.object({ orderId: z.string().uuid() }),
-  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("confirm_order", { p_order: i.orderId, p_request_id: execution.requestId })),
+  handler: async (ctx, i, execution) => {
+    const result = await unwrap(ctx.db.rpc("confirm_order", { p_order: i.orderId, p_request_id: execution.requestId }));
+    sendConfirmationEmailSoon();
+    return result;
+  },
 });
+
+// Confirming queues the buyer email (private.order_email_deliveries); send it once the
+// response is out instead of waiting up to 5 minutes for the hosted-jobs worker, which
+// stays the retry path. The worker logs its own sanitized failure, so the rejection is
+// dropped here. Outside a request scope (scripts) after() throws; skipping is safe
+// because the row stays queued for the scheduled worker. The worker is imported lazily
+// because it is "server-only", which plain bun scripts loading the commands cannot resolve.
+function sendConfirmationEmailSoon() {
+  try {
+    after(() => import("@/lib/email/jobs").then(jobs => jobs.runOrderEmailBatch()).catch(() => undefined));
+  } catch { /* no request scope */ }
+}
 
 defineCommand({
   name: "adjust_order_lines", description: "Replace lines on a submitted/confirmed/picked order; a submitted order holds no allocations until confirm, otherwise re-syncs allocations and returnable-keg deposits; on a picked order, an added or raised line sends it back to confirmed for a re-pick, and staged excess flags a restock; returns ATP soft warnings",

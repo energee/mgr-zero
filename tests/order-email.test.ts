@@ -1,7 +1,12 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+const { after } = vi.hoisted(() => ({ after: vi.fn() }));
+vi.mock("next/server", async original => ({ ...await original<typeof import("next/server")>(), after }));
+import "@/lib/commands/all";
+import { runCommand } from "@/lib/commands/registry";
 import { admin, asUser, makeBrewery, makeCustomerUser, makeStaffCtx, priceSku, seedCatalog, seedCustomer, seedLocation, sql } from "./helpers";
 
 import { rawDatabase } from "./raw-database";
+import * as jobs from "@/lib/email/jobs";
 import { runOrderEmailBatch } from "@/lib/email/jobs";
 import * as transport from "@/lib/email/transport";
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
@@ -173,4 +178,16 @@ it("recovers a provider-accepted lost response through the durable runner once",
   await runOrderEmailBatch();
   expect(send.mock.calls.filter(([id]) => id === deliveryId)).toHaveLength(2);
   expect(accepted.get(deliveryId)?.from).toBe("MGR <orders@example.test>");
+});
+
+// The worker itself is covered above; here only that confirming runs it once the response is out.
+it("runs the email worker right after confirm_order instead of waiting for the scheduled job", async () => {
+  const worker = vi.spyOn(jobs, "runOrderEmailBatch").mockResolvedValue({ accepted: 1, retry: 0, blocked: 0 });
+  const id = await submittedOrder();
+  after.mockClear();
+  await runCommand("confirm_order", { orderId: id }, staff);
+  expect(after).toHaveBeenCalledOnce();
+  expect(worker).not.toHaveBeenCalled();
+  await after.mock.calls[0][0]();
+  expect(worker).toHaveBeenCalledOnce();
 });
