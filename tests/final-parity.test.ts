@@ -4,7 +4,7 @@ import { runPageQuery, requirePagePermission } from "@/lib/mgr/page-query";
 import { makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, priceSku, admin, insertFixture } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
-import type { HistoryPage } from "@/lib/commands/history";
+import type { HistoryPage, NumberedHistoryPage } from "@/lib/commands/history";
 import type { Database } from "@/lib/supabase/database";
 
 describe("final screen parity", () => {
@@ -67,6 +67,9 @@ describe("final screen parity", () => {
     expect(second.nextCursor).toBeNull();
     expect(new Set([...first.rows, ...second.rows].map(r => r.id)).size).toBe(52);
     expect(second.rows.some(row => row.id === arrived.id)).toBe(false);
+    const numbered = await runCommand("list_movements", { skuId: cat.skuId, page: 2, limit: 50 }, ctx) as NumberedHistoryPage<{ id: string }>;
+    expect(numbered.total).toBe(53);
+    expect(numbered.rows.map(row => row.id)).toEqual([...first.rows, ...second.rows].slice(49).map(row => row.id));
     expect(receipt).toMatchObject({ bin_id: wh.binId, note: "receipt", bbl: originalBbl });
     expect(Number(originalBbl)).toBeGreaterThan(0);
   });

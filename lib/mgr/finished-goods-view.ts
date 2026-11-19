@@ -31,7 +31,6 @@ export type FinishedGoodsViewModel = {
 
 export type FinishedGoodsMovements = {
   rows: { key: string; title: string; detail: string; trailing: string; outbound: boolean }[];
-  links?: { label: string; href: string }[];
 };
 
 export type FinishedGoodsSku = {

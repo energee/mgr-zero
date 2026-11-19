@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { historyInput, historyResult, newestFirst } from "./history";
+import { numberedHistorySchema, readHistory, type HistoryRow } from "./history";
 import { defineCommand, defineQuery, unwrap, completeRows, inChunks, PAGE_SIZE, Ctx, CommandExecution, CommandError, STAFF_ROLES } from "./registry";
 import { stockLine } from "./stock-line";
 import { qboUnmappedFilter, unmappedInput } from "./qbo";
@@ -191,15 +191,15 @@ export async function movementReferences(ctx: Ctx, references: (string | null)[]
 }
 
 defineQuery({
-  name: "list_movements", description: "Immutable movements newest-first as { rows, nextCursor }, with location/bin/lot labels, resolved source document ref_label and ref_kind, and reversal links; movementId selects an original and its exact compensation",
-  input: z.object({ skuId: z.string().uuid().optional(), movementId: z.string().uuid().optional(), ...historyInput }),
+  name: "list_movements", description: "Immutable movements newest-first as { rows, nextCursor }, plus total for a numbered page, with location/bin/lot labels, resolved source document ref_label and ref_kind, and reversal links; movementId selects an original and its exact compensation",
+  input: numberedHistorySchema({ skuId: z.string().uuid().optional(), movementId: z.string().uuid().optional() }),
   roles: [...readRoles],
   handler: async (ctx, i) => {
-    let q = ctx.db.from("inventory_movements").select("*, locations(name), bins(name), lots!inventory_movements_lot_fk(code)").eq("brewery_id", ctx.breweryId)
+    let q = ctx.db.from("inventory_movements").select("*, locations(name), bins(name), lots!inventory_movements_lot_fk(code)", { count: i.page === undefined ? undefined : "exact" }).eq("brewery_id", ctx.breweryId)
       .limit(i.limit + 1);
     if (i.skuId) q = q.eq("sku_id", i.skuId);
     if (i.movementId) q = q.or(`id.eq.${i.movementId},compensates_id.eq.${i.movementId}`);
-    const page = historyResult((await unwrap(newestFirst(q, i.cursor))) ?? [], i.limit);
+    const page = await readHistory<Database["public"]["Tables"]["inventory_movements"]["Row"] & HistoryRow>(q, i);
     const rows = page.rows;
     if (!rows.length) return page;
     const [corrections, references] = await Promise.all([

@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { expect, it } from "vitest";
-import { historyInput, numberedHistorySchema, readHistory, type HistoryRow } from "@/lib/commands/history";
+import { numberedHistorySchema, readHistory, type HistoryRow } from "@/lib/commands/history";
 import type { Database } from "@/lib/supabase/database";
 
 const row = (n: number): HistoryRow => ({ id: `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`, created_at: "2026-09-20T12:00:00.123456Z" });
@@ -72,8 +72,7 @@ it("does not turn unrelated or recovery database failures into empty pages", asy
   }
 });
 
-it("keeps numbered inputs opt-in and rejects cursor/page ambiguity", () => {
-  expect(historyInput).not.toHaveProperty("page");
+it("rejects cursor/page ambiguity", () => {
   const schema = numberedHistorySchema({});
   expect(schema.parse({ page: 1_000_000 })).toMatchObject({ page: 1_000_000, limit: 50 });
   expect(schema.safeParse({ page: 1, cursor: `${row(5).created_at}~${row(5).id}` }).success).toBe(false);

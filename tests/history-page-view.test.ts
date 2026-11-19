@@ -1,25 +1,14 @@
 import { expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { historyPage, numberedHistoryPage, pageCursor, pageNumber, pageSize } from "@/lib/mgr/history-page";
+import { numberedHistoryPage, pageNumber, pageSize } from "@/lib/mgr/history-page";
+import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
+import { InventoryDetailView } from "@/components/mgr/views/inventory-detail";
+import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 import { OrdersView } from "@/components/mgr/views/orders-list";
 import { InvoicesView } from "@/components/mgr/views/invoices";
 import { PortalOrdersView } from "@/components/mgr/views/portal-orders";
 import { PortalInvoicesView } from "@/components/mgr/views/portal-invoices";
-
-it("preserves movement history cursor precision and filters", () => {
-  const rows = Array.from({ length: 50 }, (_, n) => ({ id: String(n), created_at: "2026-09-20T12:00:00.123456+00:00" }));
-  const open = `${rows[0].created_at}~0b9f3c1e-7d1a-4c8e-9a51-2f6d8e4b7c10`;
-  const nextCursor = `${rows[49].created_at}~49`;
-  const page = historyPage({ rows, nextCursor }, "/orders", open, { status: "draft", customerId: "buyer", unused: undefined });
-  expect(page.rows).toEqual(rows);
-  const url = new URL(page.pagination.moreHref!, "http://localhost");
-  expect(url.searchParams.get("cursor")).toBe(nextCursor);
-  expect(url.searchParams.get("status")).toBe("draft");
-  expect(url.searchParams.get("customerId")).toBe("buyer");
-  expect(page.pagination.firstHref).toBe("/orders?status=draft&customerId=buyer");
-  expect(historyPage({ rows, nextCursor }, "/orders", undefined).pagination.firstHref).toBeUndefined();
-});
 
 it("keeps batch groups independent and resets only the resized group's page", () => {
   const { pagination } = numberedHistoryPage({ rows: [], nextCursor: null, total: 612 }, "/batches", 4, 25, { cancelledPage: "2" }, "completedPage");
@@ -39,6 +28,8 @@ it("shows direct page links, ellipses and an accessible current page on staff an
     createElement(InvoicesView, { rows: [], pagination }),
     createElement(PortalOrdersView, { model: { rows: [], info: "" }, pagination }),
     createElement(PortalInvoicesView, { model: { rows: [] }, pagination }),
+    createElement(FinishedGoodsView, { model: { rows: [] }, movements: { rows: [] }, pagination }),
+    createElement(InventoryDetailView, { model: INVENTORY_DETAIL, pagination }),
   ];
   for (const view of views) {
     const html = renderToStaticMarkup(view);
@@ -54,11 +45,4 @@ it("does not offer an out-of-range Next or Previous", () => {
   const result = { rows: [], nextCursor: null, total: 51 };
   expect(numberedHistoryPage(result, "/orders", 1, 50).pagination.previousHref).toBeUndefined();
   expect(numberedHistoryPage(result, "/orders", 2, 50).pagination.nextHref).toBeUndefined();
-});
-
-
-it("reads only a well-formed single cursor from the URL; anything else opens the newest page", () => {
-  const cursor = "2026-09-20T12:00:00.123456+00:00~0b9f3c1e-7d1a-4c8e-9a51-2f6d8e4b7c10";
-  expect(pageCursor(cursor)).toBe(cursor);
-  for (const bad of [undefined, "", "garbage", "2026-09-20~not-a-uuid", [cursor, cursor]]) expect(pageCursor(bad)).toBeUndefined();
 });

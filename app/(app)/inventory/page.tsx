@@ -23,7 +23,7 @@ import { formatDateTime } from "@/lib/date-format";
 import { movementFormInstanceKey } from "@/lib/composer/state";
 import { movementInput, type MovementInput, type MovementKind } from "@/lib/commands/movement-input";
 import { navTitle } from "@/lib/mgr/nav";
-import { historyPage, pageCursor, type HistoryPage } from "@/lib/mgr/history-page";
+import { numberedHistoryPage, pageNumber, pageSize, type NumberedHistoryPage } from "@/lib/mgr/history-page";
 
 export const metadata = { title: navTitle("/inventory") };
 
@@ -35,22 +35,22 @@ type BinOnHandRow = { sku_id: string; location_id: string; bin_id: string; qty: 
 type AtpRow = { sku_id: string; qty: string };
 type Movement = { bin_id: string; bbl: string; dest_state: string | null; sale_channel_id: string | null; ref_label: string | null; lots: { code: string } | null; id: string; created_at: string; type: string; qty: string; sku_id: string; location_id: string; note: string | null };
 
-type InventorySearch = { cursor?: string; recordMovement?: string; movementHandoff?: string; skuId?: string; locationId?: string; binId?: string; lotId?: string; qty?: string; type?: string; saleChannelId?: string; destState?: string; note?: string };
+type InventorySearch = { page?: string | string[]; limit?: string | string[]; recordMovement?: string; movementHandoff?: string; skuId?: string; locationId?: string; binId?: string; lotId?: string; qty?: string; type?: string; saleChannelId?: string; destState?: string; note?: string };
 const movementKinds = new Set<string>(movementInput.shape.type.options);
 
 export default async function InventoryPage({ searchParams }: { searchParams: Promise<InventorySearch> }) {
   const params = await searchParams;
   const { recordMovement } = params;
-  const cursor = pageCursor(params.cursor);
+  const currentPage = pageNumber(params.page), limit = pageSize(params.limit);
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   requirePagePermission(ctx, "get_atp", "Finished goods");
   const [skus, locations, bins, channels, onHand, atp, records, value] = (await Promise.all([
     runCommand("list_skus", {}, ctx), runCommand("list_locations", {}, ctx), runCommand("list_bins", {}, ctx), runCommand("list_sale_channels", {}, ctx),
-    runCommand("get_bin_on_hand", {}, ctx), runCommand("get_atp", {}, ctx), runCommand("list_movements", { cursor }, ctx),
+    runCommand("get_bin_on_hand", {}, ctx), runCommand("get_atp", {}, ctx), runCommand("list_movements", { page: currentPage, limit }, ctx),
     canRun(ctx, "get_inventory_value") ? runCommand("get_inventory_value", {}, ctx) : undefined,
-  ])) as [Sku[], Location[], Bin[], SaleChannel[], BinOnHandRow[], AtpRow[], HistoryPage<Movement>, InventoryValue | undefined];
-  const { rows: movements, pagination } = historyPage(records, "/inventory", cursor);
+  ])) as [Sku[], Location[], Bin[], SaleChannel[], BinOnHandRow[], AtpRow[], NumberedHistoryPage<Movement>, InventoryValue | undefined];
+  const { rows: movements, pagination } = numberedHistoryPage(records, "/inventory", currentPage, limit);
   const skuById = new Map(skus.map((s) => [s.id, s]));
   const locationById = new Map(locations.map((l) => [l.id, l.name]));
   const locationName = (id: string) => locationById.get(id) ?? "—";
@@ -72,9 +72,6 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   const initialLot = initial?.lotId && canMove
     ? await runCommand("get_inventory_lot", { lotId: initial.lotId }, ctx) as { id: string; code: string } | null
     : null;
-  const movementLinks: { label: string; href: string }[] = [];
-  if (pagination.firstHref) movementLinks.push({ label: "Newest movements", href: pagination.firstHref });
-  if (pagination.moreHref) movementLinks.push({ label: "Older movements", href: pagination.moreHref });
   return (
     <FinishedGoodsView
       model={toFinishedGoodsViewProps(assembleFinishedGoods(skus, onHand, atp, value))}
@@ -90,8 +87,8 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
           trailing: `${formatDateTime(m.created_at, brewery.timeZone)}${m.ref_label ? ` · ${m.ref_label}` : ""}`,
           outbound: Number(m.qty) < 0,
         })),
-        links: movementLinks,
       }}
+      pagination={pagination}
     />
   );
 }

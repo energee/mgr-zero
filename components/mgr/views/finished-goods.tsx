@@ -5,11 +5,12 @@
 // deep link as SKU detail's header button (#1507). The header holds
 // the page actions: live slots MovementForm as createAction beside Add SKU in
 // Catalog (#1113) and Record taproom count (#1518). The shared view also draws
-// the movement ledger and the page's supplied history links.
+// the movement ledger and, when the page supplies it, its numbered pager.
 import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { RECORD_LINK, RecordTable } from "@/components/mgr/views/record-table";
+import { HistoryNavigation, type HistoryNavigationProps } from "@/components/mgr/views/history-navigation";
 import type { FinishedGoodsMovements, FinishedGoodsRowView, FinishedGoodsViewModel } from "@/lib/mgr/finished-goods-view";
 
 /** The Available figure. Negative stock is red and also says Shortfall in
@@ -30,6 +31,7 @@ export function FinishedGoodsView({
   addSkuHref,
   countHref,
   movements,
+  pagination,
   linkRows,
 }: {
   model: FinishedGoodsViewModel;
@@ -44,8 +46,10 @@ export function FinishedGoodsView({
    *  taproom stock only); null hides it when denied. The inventory leaves it
    *  out and the button stays inert. */
   countHref?: string | null;
-  /** Already-authorized history rows and pagination destinations, never a second drawing. */
+  /** Already-authorized history rows, never a second drawing. */
   movements: FinishedGoodsMovements;
+  /** The live page's movement pages; the inventory fixture leaves it out. */
+  pagination?: HistoryNavigationProps;
   /** Live: the name and Shortfall go to their pages. Inventory leaves the name
    *  an inert tap and Shortfall "#". Each names its screen in data-to, because
    *  tests/mgr-screens.test.ts requires it of every link whose text is not a
@@ -83,7 +87,7 @@ export function FinishedGoodsView({
       {movements.rows.length === 0 ? E.blank("No movements recorded yet") : movements.rows.map(row => (
         <div key={row.key}>{E.row(row.title, row.detail, <span>{row.trailing}</span>, row.outbound ? "w" : "ok")}</div>
       ))}
-      {movements.links?.length ? <div className="flex gap-2">{movements.links.map(link => <Fragment key={link.href}>{E.btn(link.label, "g", link.href)}</Fragment>)}</div> : null}
+      {pagination && <HistoryNavigation {...pagination} />}
     </>
   );
 }
