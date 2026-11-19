@@ -10,7 +10,7 @@ import type { ScopeOption } from "@/components/mgr/scope-pick";
  *  (shown as Available) uses a true minus sign when negative, and `short` says so. */
 export type FinishedGoodsRowView = {
   key: string;
-  /** The SKU's name without its brand when `group` names the brand above it. */
+  /** The SKU's name without its leading brand or alias, which the heading above it names. */
   name: string;
   /** Set on the first row of each brand: the heading over that brand's rows.
    *  `brand` is the name with its staff alias, as Catalog shows it. `onHand` is the brand's barrels on hand, left out when any of its SKUs
@@ -132,7 +132,8 @@ export function toFinishedGoodsViewProps({ skus, backHref, value }: FinishedGood
       const first = brand !== undefined && brand !== sorted[i - 1]?.brands?.name;
       return {
         key: s.id,
-        name: brand && s.name.startsWith(`${brand} · `) ? s.name.slice(brand.length + 3) : s.name,
+        // The heading says the brand and its alias, so a SKU named after either drops that lead.
+        name: [brand, s.brands?.alias].reduce<string>((name, lead) => (lead && name.startsWith(`${lead} · `) ? name.slice(lead.length + 3) : name), s.name),
         group: first ? { brand: nameWithAlias(s.brands!), onHand: brandBbl(sorted.filter((sku) => sku.brands?.name === brand)) } : undefined,
         onHand: String(s.on_hand),
         allocated: String(round2(s.on_hand - s.atp)),

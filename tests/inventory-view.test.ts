@@ -84,6 +84,11 @@ describe("Finished goods view", () => {
     expect(rows[0]).toMatchObject({ name: "Keg", group: { brand: "Hazy · Batch 12" } });
   });
 
+  it("names a row by its format when the SKU is named after the brand's alias", () => {
+    const { rows } = toFinishedGoodsViewProps({ skus: [{ id: "s1", name: "Reptile #6 · Case", brands: { name: "Bearded Dragon", alias: "Reptile #6" }, on_hand: 1, atp: 1 }] });
+    expect(rows[0]).toMatchObject({ name: "Case", group: { brand: "Bearded Dragon · Reptile #6" } });
+  });
+
   it("leaves a SKU without a brand ungrouped under its own name", () => {
     expect(toFinishedGoodsViewProps({ skus: [{ id: "s1", name: "Loose keg", on_hand: 1, atp: 1 }] }).rows[0]).toMatchObject({ name: "Loose keg", group: undefined });
   });
