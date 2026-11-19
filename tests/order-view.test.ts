@@ -13,6 +13,26 @@ import { orderLineCents, toOrderViewProps, type OrderSnapshot } from "../lib/mgr
 // The Order screen's live body; the order page and the order sheet both mount it.
 const PAGE = "app/(app)/orders/[id]/order-detail.tsx";
 
+describe("Order pallet fit", () => {
+  const sixtel = { package_type: "keg", keg_size: "sixth_bbl", units_per_case: null, pallet_fit: 20 };
+  const withFits: OrderSnapshot = { ...orderConfirmedWholesale, lines: orderConfirmedWholesale.lines.map((l, i) => ({ ...l, skus: { name: l.skus!.name, formats: i < 2 ? sixtel : null } })) };
+
+  it("adds every line's package into pallet units while the order can still change, and draws the block", () => {
+    // 4 + 3 sixtels across two brands; the third line's format has no fit.
+    const model = toOrderViewProps(withFits);
+    expect(model.palletFit.map((g) => [g.label, g.text])).toEqual([["⅙ bbl kegs", "7 · 13 to fill"]]);
+    const html = renderToStaticMarkup(createElement(OrderView, { model }));
+    expect(html).toContain("Pallet fit");
+    expect(html).toContain("7 · 13 to fill");
+  });
+
+  it("drops the block once the order has shipped or was cancelled, and when no format has a fit", () => {
+    for (const status of ["shipped", "cancelled"] as const) expect(toOrderViewProps({ ...withFits, order: { ...withFits.order, status } }).palletFit).toEqual([]);
+    expect(toOrderViewProps(orderConfirmedWholesale).palletFit).toEqual([]);
+    expect(renderToStaticMarkup(createElement(OrderView, { model: toOrderViewProps(orderConfirmedWholesale) }))).not.toContain("Pallet fit");
+  });
+});
+
 describe("Order view loop", () => {
   it("shows the shared pickup switch only when supplied, with its saved value, busy state and failure", () => {
     const model = toOrderViewProps(orderConfirmedWholesale);

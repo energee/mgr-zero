@@ -12,15 +12,23 @@ const SHIP_DOCK = "00000000-0000-4000-8000-0000000000d2";
 const SKU_HAZY_CASE = "00000000-0000-4000-8000-0000000000a4";
 const SKU_PILS_BOTTLE = "00000000-0000-4000-8000-0000000000a5";
 
+type Pack = Pick<ShopSnapshot["catalog"][number], "packageType" | "kegSize" | "unitsPerCase" | "palletFit">;
+// Package facts and pallet fits: 8 half kegs or 20 sixtels to a pallet, 10 cases to a layer.
+const HALF: Pack = { packageType: "keg", kegSize: "half_bbl", unitsPerCase: null, palletFit: 8 };
+const SIXTEL: Pack = { packageType: "keg", kegSize: "sixth_bbl", unitsPerCase: null, palletFit: 20 };
+const CASE: Pack = { packageType: "can", kegSize: null, unitsPerCase: 24, palletFit: 10 };
+const BOTTLE: Pack = { packageType: "bottle", kegSize: null, unitsPerCase: null, palletFit: null };
+
 const item = (
   skuId: string,
   name: string,
   product: string,
   unitPriceCents: number,
   qty: number,
+  pack: Pack,
   releases: ShopRelease[] = [],
 ): ShopSnapshot["catalog"][number] => ({
-  skuId, name, product, unitPriceCents, badge: "in", releases, qty,
+  skuId, name, product, unitPriceCents, badge: "in", releases, qty, ...pack,
 });
 
 /** Ridgeline Shop cart: 4 Hazy ½ bbl + 6 Pils cases, Main · 2026-09-09. */
@@ -33,12 +41,12 @@ export const ridgelineShop: ShopSnapshot = {
   requestedDate: "2026-09-09",
   source: { name: LOC_WAREHOUSE.name },
   catalog: [
-    item(SKU_HAZY.sku_id, "½ bbl keg", "Hazy IPA", SKU_HAZY.unit_price_cents, 4),
-    item(SKU_HAZY_CASE, "case · 24×16 oz", "Hazy IPA", 4200, 0),
-    item(SKU_PILS.sku_id, "case · 24×16 oz", "Pils", SKU_PILS.unit_price_cents, 6),
-    item(SKU_PILS_BOTTLE, "12 oz bottle", "Pils", 1800, 0),
+    item(SKU_HAZY.sku_id, "½ bbl keg", "Hazy IPA", SKU_HAZY.unit_price_cents, 4, HALF),
+    item(SKU_HAZY_CASE, "case · 24×16 oz", "Hazy IPA", 4200, 0, CASE),
+    item(SKU_PILS.sku_id, "case · 24×16 oz", "Pils", SKU_PILS.unit_price_cents, 6, CASE),
+    item(SKU_PILS_BOTTLE, "12 oz bottle", "Pils", 1800, 0, BOTTLE),
     // Stout is in stock and also released from a planned batch: the row offers both.
-    item(SKU_STOUT.sku_id, "⅙ bbl keg", "Stout", 6200, 0, [{ releaseId: "00000000-0000-4000-8000-0000000000e1", shipsFrom: "2026-10-02", ordersCloseOn: "2026-09-25", badge: "in" }]),
+    item(SKU_STOUT.sku_id, "⅙ bbl keg", "Stout", 6200, 0, SIXTEL, [{ releaseId: "00000000-0000-4000-8000-0000000000e1", shipsFrom: "2026-10-02", ordersCloseOn: "2026-09-25", badge: "in" }]),
   ],
   depositCentsPerKeg: 3000,
 };

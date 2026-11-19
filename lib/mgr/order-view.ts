@@ -12,6 +12,7 @@ import { stagedQty } from "./put-back-view";
 import type { OrderCogs } from "@/lib/commands/orders";
 import type { PriceSummaryModel } from "@/components/mgr/views/price-summary";
 import { plural } from "./plural";
+import { palletFit, type PalletFitGroup } from "./pallet-fit";
 
 export type OrderLineView = {
   key: string;
@@ -68,6 +69,9 @@ export type OrderViewModel = {
   kegCharges: { key: string; name: string; detail: string; amount: string }[];
   /** `by` names the actor when the page passed actorNames. */
   events: { key: string; at: string; event: string; by?: string; detail: string }[];
+  /** Advisory pallet units of the ordered lines, for loading. Empty once shipped
+   *  or cancelled (nothing is left to load), or when no format has a fit. */
+  palletFit: PalletFitGroup[];
 };
 
 export type OrderSnapshot = {
@@ -108,7 +112,8 @@ export type OrderSnapshot = {
     short_reason?: string | null;
     /** A one-way keg line's channel fee, set when the line is saved and fixed once the order is submitted (order_lines.one_way_fee_cents). */
     one_way_fee_cents?: number | null;
-    skus: { name: string } | null;
+    /** formats: the package facts and pallet fit get_order embeds; absent or null reads as no fit. */
+    skus: { name: string; formats?: { package_type: string | null; keg_size: string | null; units_per_case: number | null; pallet_fit: number | null } | null } | null;
   }[];
   /** order_deposit_lines, one per returnable keg line. */
   deposits?: { order_line_id: string; description: string; qty_ordered: number; unit_price_cents: number; amount_cents: number }[];
@@ -333,5 +338,9 @@ export function toOrderViewProps({ order, lines, events, atp, locations, deliver
         detail,
       };
     }),
+    palletFit: order.status === "shipped" || order.status === "cancelled" ? [] : palletFit(lines.map((l) => {
+      const f = l.skus?.formats;
+      return { qty: Number(l.qty_ordered), packageType: f?.package_type ?? null, kegSize: f?.keg_size ?? null, unitsPerCase: f?.units_per_case ?? null, palletFit: f?.pallet_fit ?? null };
+    })),
   };
 }

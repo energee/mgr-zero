@@ -32,6 +32,8 @@ export type FormatViewModel = {
   volumeUnits: Array<"oz" | "gal" | "bbl">;
   volumeUnitIndex: number;
   composed: boolean;
+  /** formats.pallet_fit as field text; "" when unset. Admin edits it. */
+  palletFit: string;
   bom: FormatBomRowView[];
 };
 
@@ -48,6 +50,7 @@ export type FormatSnapshot = {
     units_per_case?: number | null;
     bbl_per_unit: string | number | null;
     composed?: boolean;
+    pallet_fit?: number | null;
   };
   /** replace_format_bom / format_bom lines with material names. */
   bom?: { material: string; qty: number | string; onBreak: string }[];
@@ -90,6 +93,7 @@ export function toFormatViewProps({
     volumeUnits: UNITS,
     volumeUnitIndex: volume.index,
     composed: Boolean(format.composed),
+    palletFit: format.pallet_fit == null ? "" : String(format.pallet_fit),
     bom: bom.map((line) => ({
       material: line.material,
       qty: String(line.qty),
@@ -131,14 +135,18 @@ export function formatControls(model: FormatViewModel, patch: (next: Partial<For
     volumeValue: (volumeValue: string) => patch({ volumeValue }),
     volumeUnit: (unit: string) => patch({ volumeUnitIndex: model.volumeUnits.indexOf(unit as FormatViewModel["volumeUnits"][number]) }),
     composed: (composed: boolean) => patch({ composed }),
+    palletFit: (palletFit: string) => patch({ palletFit }),
   };
 }
 
 export function formatCommandInput(model: FormatViewModel, saved?: FormatSnapshot["format"]) {
   const sizing = formatSizing(model);
-  // A legacy format may have no package type; send none rather than "" (#447).
-  const input = { id: saved?.id, name: sizing.name, basis: "packaged", packageType: model.packageType || undefined };
   const initial = saved ? toFormatViewProps({ format: saved }) : undefined;
+  // Only Admin sees the Pallet fit field, so an unchanged fit is never sent and
+  // Sales saves stay within Sales' rights. A cleared field clears it.
+  const palletFit = model.palletFit === (initial?.palletFit ?? "") ? {} : { palletFit: model.palletFit ? Number(model.palletFit) : null };
+  // A legacy format may have no package type; send none rather than "" (#447).
+  const input = { id: saved?.id, name: sizing.name, basis: "packaged", packageType: model.packageType || undefined, ...palletFit };
   if (saved && initial) {
     const unchanged = (["packageType", "kegSize", "unitsPerCase", "volumeValue", "volumeUnitIndex", "composed"] as const).every(key => model[key] === initial[key]);
     if (unchanged) return {

@@ -82,7 +82,7 @@ export default async function CatalogPage({ searchParams }: { searchParams?: Pro
       }}
       formats={toFormatsViewProps({ formats, formatHref: format => `/catalog/formats/${format.id}` })}
       sheet={sheet && <BrandSheetFromAddress id={sheet} />}
-      formatAction={canWrite ? <FormatForm componentOptions={formats.filter(format => format.bbl_per_unit !== null)} takenNames={formats.map(format => format.name)} /> : null}
+      formatAction={canWrite ? <FormatForm componentOptions={formats.filter(format => format.bbl_per_unit !== null)} takenNames={formats.map(format => format.name)} canSetPalletFit={brewery.roles.includes("admin")} /> : null}
     />
   );
 }

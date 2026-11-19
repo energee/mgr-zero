@@ -24,6 +24,7 @@ import { ORDER_CHANGE_REASON_OPTIONS } from "@/lib/mgr/labels";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { FactsGrid } from "@/components/mgr/views/facts-grid";
 import { PriceSummary } from "@/components/mgr/views/price-summary";
+import { PalletFitBlock } from "@/components/mgr/views/pallet-fit";
 import { CancelOrderControl } from "./cancel-order";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -256,6 +257,8 @@ export function OrderView({
           </ul>
         </section>
       ) : null}
+
+      {model.palletFit.length ? <div className="border-t pt-5"><PalletFitBlock groups={model.palletFit} /></div> : null}
 
       {model.costLine ? (
         <section aria-labelledby="order-cost" className="border-t pt-5">

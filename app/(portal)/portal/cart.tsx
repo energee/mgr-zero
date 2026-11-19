@@ -16,8 +16,12 @@ import { money } from "@/lib/mgr/money";
 import { cartActionsDisabled, cartLines, cartMissingInput, planDraftSync, portalAttemptKey, restorePortalAttempt, executePortalAttempt, clearWorkingCart, restoreWorkingCart, saveWorkingCart, type PortalAttempt, type PortalScope, type PortalFields } from "@/lib/portal-cart";
 import { canRetireCommandFailure } from "@/lib/commands/failure";
 
-/** A portal_catalog row: badge is the stock offer (null: not orderable from stock), releases the release offers. */
-export type CatalogItem = { skuId: string; name: string; product: string; unitPriceCents: number; badge: string | null; releases: ShopRelease[] };
+/** A portal_catalog row: badge is the stock offer (null: not orderable from stock), releases the release offers;
+ *  the package facts and pallet fit feed the summary's Pallet fit. */
+export type CatalogItem = {
+  skuId: string; name: string; product: string; unitPriceCents: number; badge: string | null; releases: ShopRelease[];
+  packageType?: string | null; kegSize?: string | null; unitsPerCase?: number | null; palletFit?: number | null;
+};
 export type ShipToOption = { id: string; label: string; country: string; is_default?: boolean };
 export function submissionFailureMessage(message: string, draftId: string | null) {
   return draftId ? `Order saved, but submission could not be confirmed (${message}). View the order status before retrying, or contact the brewery.` : message;
@@ -144,7 +148,6 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource }: CartPr
     catalog,
   });
   shopModel.subtotal = unavailable.length ? "Unavailable for the pending request" : money(subtotal);
-  shopModel.reviewVerb = `Review order · ${shopModel.subtotal}`;
   return <>
     <ShopView model={shopModel} quantities={qty} locked={locked} disabled={disabled} preparing={busy} comingUp={<Link href="/portal/coming-up">{E.nav("Coming up")}</Link>}
       controls={{
@@ -166,7 +169,7 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource }: CartPr
         {feedback}
       </>} />
     <CommandForm open={review && quote !== null} onOpenChange={open => { setReview(open); if (!open) setQuote(null); }} title="Review order">
-      {quote && <ReviewOrderView model={toQuotedReviewOrderViewProps(quote, { ...fields, requestedShipDate })} locked={locked} disabled={disabled} submitting={busy}
+      {quote && <ReviewOrderView model={{ ...toQuotedReviewOrderViewProps(quote, { ...fields, requestedShipDate }), palletFit: shopModel.summary.palletFit }} locked={locked} disabled={disabled} submitting={busy}
         onQuantity={(id, value) => { setQty(prev => ({ ...prev, [id]: value })); setReview(false); setQuote(null); }}
         onBack={() => { setReview(false); setQuote(null); }}
         onPlace={() => { void run("submit"); }} messages={feedback} />}

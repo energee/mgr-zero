@@ -833,6 +833,13 @@ describe("Format view", () => {
     expect(html).not.toMatch(/→/);
   });
 
+  it("offers Pallet fit only to Admin, with what it means", () => {
+    expect(htmlOf(createElement(FormatView, { model: toFormatViewProps(formatCan) }))).not.toMatch(/Pallet fit/);
+    const html = htmlOf(createElement(FormatView, { model: toFormatViewProps(formatCan), canSetPalletFit: true }));
+    expect(html).toMatch(/Pallet fit/);
+    expect(html).toContain("How many of this package fill one layer or pallet the way you load. Leave blank to skip. Advisory only.");
+  });
+
   it("the Format inventory record is FormatView through its fixture adapter", () => {
     const body = screen("Format").body as { type: unknown; props: { children: { type: unknown; props: { model: unknown } } } };
     expect(body.type).toBe(FormatFixture);

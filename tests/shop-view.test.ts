@@ -29,14 +29,14 @@ describe("Shop view", () => {
     expect(model.source).toBe("Warehouse");
     expect(model.shipToLine).toBe("Main · Sep 9, 2026");
     expect(toShopViewProps({ ...ridgelineShop, requestedDate: "" }).shipToLine).toBe("Main");
-    expect(model.reviewVerb).toBe("Review order · $828.00");
-    expect(model.depositInfo).toMatch(/pending/);
+    expect(model.subtotal).toBe("$828.00");
+    expect(model.chargesLine).toBe("Keg deposits & fees added at review");
   });
 
   it("renders Review order, Hazy IPA, and the Coming up nav from the adapter", () => {
     const html = htmlOf(createElement(ShopView, { model: toShopViewProps(ridgelineShop) }));
     expect(html).toMatch(/Hazy IPA/);
-    expect(html).toMatch(/Review order · \$828\.00/);
+    expect(html).toMatch(/>Review order</);
     expect(html).toMatch(/Coming up/);
     expect(html).toMatch(/½ bbl keg/);
     expect(html).toMatch(/Ships from/);
@@ -45,11 +45,27 @@ describe("Shop view", () => {
     expect(html).not.toMatch(/→/);
   });
 
-  // On a phone the catalog is longer than the screen; Review order (which
-  // carries the subtotal) and Save draft stay pinned to its foot.
-  it("keeps Save draft and Review order in the sticky footer", () => {
+  // The order summary is drawn once and shown two ways: a sticky panel beside
+  // the catalog from md up, and on a phone a bar pinned to the foot of the
+  // scroll (above the tab bar) whose tap opens the same summary in a sheet.
+  it("draws the summary as a desk panel with Save draft and Review, and a phone bar that announces the total", () => {
     const html = htmlOf(createElement(ShopView, { model: toShopViewProps(ridgelineShop) }));
-    expect(html).toMatch(/<div class="sticky [^"]*">(?:(?!<\/div>).)*>Save draft<\/button>(?:(?!<\/div>).)*>Review order · \$828\.00<\/button>/);
+    const panel = html.match(/<aside aria-label="Your order" class="([^"]*)"/)?.[1].split(" ");
+    expect(panel).toEqual(expect.arrayContaining(["hidden", "md:block", "md:sticky"]));
+    expect(html).toMatch(/<aside[^>]*>(?:(?!<\/aside>).)*>Review order<(?:(?!<\/aside>).)*>Save draft<\/button>/);
+    expect(html).toMatch(/<section aria-label="Order summary" class="sticky [^"]*md:hidden/);
+    expect(html).toMatch(/aria-live="polite"[^>]*>10 items · \$828\.00</);
+    // One subtotal line and one charges line; the long notice is gone.
+    expect(html.match(/Items subtotal/g)).toHaveLength(1);
+    expect(html).toMatch(/Keg deposits &amp; fees added at review/);
+    expect(html).not.toMatch(/Current catalog subtotal/);
+  });
+
+  it("hides the phone bar with an empty cart", () => {
+    const empty = { ...ridgelineShop, catalog: ridgelineShop.catalog.map((i) => ({ ...i, qty: 0 })) };
+    const html = htmlOf(createElement(ShopView, { model: toShopViewProps(empty) }));
+    expect(html).not.toMatch(/aria-label="Order summary"/);
+    expect(html).toMatch(/aria-label="Your order"/);
   });
 
   it("controlled quantities use the same brand and package controls", () => {
@@ -60,7 +76,7 @@ describe("Shop view", () => {
     expect(html).toMatch(/value="7"/);
     expect(html).toMatch(/½ bbl keg/);
     expect(html).toMatch(/Hazy IPA/);
-    expect(html).toMatch(/Review order · \$828\.00/);
+    expect(html).toMatch(/\$828\.00/);
   });
 
   it("null footer and comingUp omit inventory Review/ship-to and Coming up", () => {
@@ -80,7 +96,7 @@ describe("Review order view", () => {
   it("shows current merchandise and keeps unquoted tax and deposits pending", () => {
     const shop = toShopViewProps(ridgelineShop);
     const model = toReviewOrderViewProps(ridgelineShop);
-    expect(shop.reviewVerb).toBe("Review order · $828.00");
+    expect(shop.subtotal).toBe("$828.00");
     expect(model.lines.map((l) => [l.name, l.price, l.qty])).toEqual([
       ["Hazy IPA · ½ bbl keg", "$150.00", 4],
       ["Pils · case · 24×16 oz", "$38.00", 6],
@@ -99,6 +115,15 @@ describe("Review order view", () => {
   it("names a foreign ship-to's country and never prints a missing part as null", () => {
     const model = toReviewOrderViewProps({ ...ridgelineShop, shipTos: [{ id: ridgelineShop.shipToId, label: "Main", country: "JP" }] });
     expect(model.shipTo).toBe("Main · Japan");
+  });
+
+  it("shows the cart's pallet fit, quoted or not", () => {
+    const expected = [["½ bbl kegs", "4 · 4 to fill"], ["Cases of 24 cans", "6 · 4 to fill"]];
+    expect(toReviewOrderViewProps(ridgelineReviewOrder).palletFit?.map((g) => [g.label, g.text])).toEqual(expected);
+    expect(toReviewOrderViewProps({ ...ridgelineReviewOrder, quote: undefined }).palletFit?.map((g) => [g.label, g.text])).toEqual(expected);
+    const html = htmlOf(createElement(ReviewOrderView, { model: toReviewOrderViewProps(ridgelineReviewOrder) }));
+    expect(html).toMatch(/Pallet fit/);
+    expect(html).toMatch(/Cases of 24 cans/);
   });
 
   it("renders Place order and Hazy IPA from the adapter", () => {
@@ -133,7 +158,6 @@ describe("inventory and live Shop", () => {
     const cart = readFileSync("app/(portal)/portal/cart.tsx", "utf8");
     expect(cart).toMatch(/<ShopView\b/);
     expect(cart).toMatch(/<ReviewOrderView\b/);
-    expect(cart).toContain("shopModel.reviewVerb = `Review order · ${shopModel.subtotal}`");
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
   });
 });
@@ -165,7 +189,7 @@ it("tells the buyer the amounts and the requested date are not final", () => {
   // the date. Dropping either half of this leaves the buyer reading the
   // subtotal as a quote and the requested date as a commitment.
   const info = toShopViewProps(ridgelineShop).depositInfo;
-  expect(info).toContain("not included");
+  expect(info).toContain("Tax is not included.");
   expect(info).toContain("The brewery confirms final invoice amounts and the requested delivery date.");
 });
 
@@ -205,5 +229,39 @@ describe("Shop offers (portal releases)", () => {
     expect(html).toMatch(/\$40\.00 · From Dec 11, 2026 · few left/);
     expect(html).not.toMatch(/case · order from/);
     expect(html).toMatch(/This order ships from Dec 4, 2026/);
+  });
+});
+
+describe("Shop order summary", () => {
+  const release = { releaseId: "r1", shipsFrom: "2026-12-04", ordersCloseOn: null, badge: "in" };
+  const stout: ShopCatalogItem = { skuId: "s1", name: "Stout · ⅙ bbl keg", product: "Stout", unitPriceCents: 6200, badge: "in", releases: [release], qty: 0,
+    packageType: "keg", kegSize: "sixth_bbl", unitsPerCase: null, palletFit: 20 };
+  const pils: ShopCatalogItem = { skuId: "s2", name: "Pils · ⅙ bbl keg", product: "Pils", unitPriceCents: 6000, badge: "in", qty: 0,
+    packageType: "keg", kegSize: "sixth_bbl", unitsPerCase: null, palletFit: 20 };
+  const bottle: ShopCatalogItem = { skuId: "s3", name: "Pils · 12 oz bottle", product: "Pils", unitPriceCents: 1800, badge: "in", qty: 0 };
+
+  it("lists only lines in the cart, each with its amount and the release it ships from", () => {
+    const summary = toShopViewProps({ ...ridgelineShop, catalog: [{ ...stout, qty: 2, offer: "r1" }, { ...pils, qty: 16 }, bottle] }).summary;
+    expect(summary.lines).toEqual([
+      { key: "s1", name: "Stout · ⅙ bbl keg", detail: "2 × $62.00 · from the Dec 4, 2026 release", amount: "$124.00", anchor: "brand-stout" },
+      { key: "s2", name: "Pils · ⅙ bbl keg", detail: "16 × $60.00", amount: "$960.00", anchor: "brand-pils" },
+    ]);
+    expect(summary.items).toBe("18 items");
+    expect(summary.shipsOn).toBe("Ships Dec 4, 2026");
+  });
+
+  it("adds pallet fit across brands of one package, and hints when a unit is nearly full", () => {
+    const summary = toShopViewProps({ ...ridgelineShop, catalog: [{ ...stout, qty: 2 }, { ...pils, qty: 16 }, { ...bottle, qty: 5 }] }).summary;
+    expect(summary.palletFit.map((g) => [g.label, g.text])).toEqual([["⅙ bbl kegs", "18 · 2 to fill"]]);
+    expect(summary.palletHint).toBe("⅙ bbl kegs 2 short of full");
+    expect(summary.shipsOn).toBeUndefined();
+    expect(toShopViewProps({ ...ridgelineShop, catalog: [{ ...pils, qty: 10 }] }).summary.palletHint).toBeUndefined();
+  });
+
+  it("draws the pallet fit block in the summary", () => {
+    const html = htmlOf(createElement(ShopView, { model: toShopViewProps({ ...ridgelineShop, catalog: [{ ...stout, qty: 25 }] }) }));
+    expect(html).toMatch(/Pallet fit/);
+    expect(html).toMatch(/⅙ bbl kegs/);
+    expect(html).toMatch(/1 full \+ 5 · 15 to fill/);
   });
 });

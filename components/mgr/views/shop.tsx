@@ -2,11 +2,8 @@
 
 import { Fragment, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import { Button } from "@/components/ui/button";
-import { CommandForm } from "@/components/mgr/command-form";
-import { DatePicker } from "@/components/mgr/date-picker";
-import { BrewFooter } from "./brew-prep";
 import { OrderQuantity } from "./new-order";
+import { OrderSummary } from "./order-summary";
 import { brandAnchor, type ShopViewModel } from "@/lib/mgr/shop-view";
 
 export type ShopControls = {
@@ -18,52 +15,35 @@ export type ShopControls = {
   saveDraft?: () => void; review?: () => void;
 };
 
+/** The catalog, with the order summary beside it from md up (a sticky panel)
+ *  and pinned to its foot on a phone (a bar that opens a sheet). `footer={null}`
+ *  draws the catalog alone. */
 export function ShopView({ model, footer, comingUp, controls = {}, quantities, locked = false, disabled = false, preparing = false, messages }: {
   model: ShopViewModel; footer?: ReactNode; comingUp?: ReactNode;
   controls?: ShopControls; quantities?: Record<string, string>; locked?: boolean;
   disabled?: boolean; preparing?: boolean; messages?: ReactNode;
 }) {
-  const [deliveryOpen, setDeliveryOpen] = useState(false);
+  // A focused quantity field means the phone keyboard is up: the bar steps aside.
+  const [typing, setTyping] = useState(false);
   return <>
     {E.hd("Order")}
-    <fieldset disabled={locked} className="contents">
-      {model.empty ? E.blank(model.empty) : model.groups.map(group => <Fragment key={group.product}>
-        {E.ttl(group.product, brandAnchor(group.product))}
-        {/* Beside the price: a lone release reads as text (stock alone needs no words); several offers are an inline pick. */}
-        {group.items.map(item => <Fragment key={item.key}>
-          {E.row(item.name, item.offers.length > 1
-            ? <>{item.price} · {E.pick(`${item.name} · order from`, item.offer, item.offers, { inline: true, onChange: controls.offer && (value => controls.offer?.(item.key, value)) })}</>
-            : item.offers.length === 1 && item.offer ? `${item.price} · ${item.offers[0].label}` : item.price,
-          <OrderQuantity label={item.name} value={quantities?.[item.key] ?? item.qty} step="1" onChange={controls.quantity && (value => controls.quantity?.(item.key, value))} />)}
-        </Fragment>)}
-      </Fragment>)}
-    </fieldset>
-    {comingUp !== undefined ? comingUp : E.nav("Coming up")}
-    {footer !== undefined ? footer : <>
-      {E.row("Ships from", model.source)}
-      {E.row("Ship-to · requested date", model.shipToLine,
-        <CommandForm title="Delivery details" open={deliveryOpen} onOpenChange={setDeliveryOpen}
-          trigger={<Button type="button" variant="ghost" disabled={locked} aria-label="Change delivery details">Change</Button>}>
-          <fieldset disabled={locked} className="flex flex-col gap-2">
-            {E.pick("Ship to", model.shipToId, [{ value: "", label: "Select a ship-to", disabled: true }, ...(model.shipTos.map(shipTo => ({ value: shipTo.id, label: shipTo.label })))], { onChange: controls.shipTo })}
-            <DatePicker label="Requested date (optional)" value={controls.requestedDate ? model.requestedDate : undefined} defaultValue={model.requestedDate} onChange={controls.requestedDate} />
-            {E.edit("PO number", model.po, "text", undefined, { onChange: controls.po })}
-            {E.edit("Note", model.note, "text", undefined, { onChange: controls.note })}
-            <Button type="button" onClick={() => setDeliveryOpen(false)}>Done</Button>
-          </fieldset>
-        </CommandForm>)}
-      {model.shipsFromNote ? E.note(model.shipsFromNote) : null}
-      {E.fld("Current catalog subtotal", model.subtotal)}
-      {messages}
-      {E.sp()}
-      {E.info(model.depositInfo)}
-      {/* Pinned to the phone's foot so Review (which carries the subtotal) stays in reach on a long catalog; one row keeps the bar slim. */}
-      <BrewFooter>
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" disabled={disabled} onClick={controls.saveDraft}>Save draft</Button>
-          <Button type="button" className="flex-1 md:flex-none" disabled={disabled} onClick={controls.review}>{preparing ? "Preparing review…" : model.reviewVerb}</Button>
-        </div>
-      </BrewFooter>
-    </>}
+    <div className="flex flex-col gap-3 md:grid md:grid-cols-[minmax(0,1fr)_20rem] md:items-start md:gap-8">
+      <div className="flex min-w-0 flex-col gap-3">
+        <fieldset disabled={locked} className="contents" onFocusCapture={event => setTyping(event.target instanceof HTMLInputElement)} onBlurCapture={() => setTyping(false)}>
+          {model.empty ? E.blank(model.empty) : model.groups.map(group => <Fragment key={group.product}>
+            {E.ttl(group.product, brandAnchor(group.product))}
+            {/* Beside the price: a lone release reads as text (stock alone needs no words); several offers are an inline pick. */}
+            {group.items.map(item => <Fragment key={item.key}>
+              {E.row(item.name, item.offers.length > 1
+                ? <>{item.price} · {E.pick(`${item.name} · order from`, item.offer, item.offers, { inline: true, onChange: controls.offer && (value => controls.offer?.(item.key, value)) })}</>
+                : item.offers.length === 1 && item.offer ? `${item.price} · ${item.offers[0].label}` : item.price,
+              <OrderQuantity label={item.name} value={quantities?.[item.key] ?? item.qty} step="1" onChange={controls.quantity && (value => controls.quantity?.(item.key, value))} />)}
+            </Fragment>)}
+          </Fragment>)}
+        </fieldset>
+        {comingUp !== undefined ? comingUp : E.nav("Coming up")}
+      </div>
+      {footer !== undefined ? footer : <OrderSummary model={model} controls={controls} locked={locked} disabled={disabled} preparing={preparing} messages={messages} typing={typing} />}
+    </div>
   </>;
 }

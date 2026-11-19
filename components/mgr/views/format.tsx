@@ -19,8 +19,10 @@ function FormatSelect({ label, value, options, onChange }: { label: string; valu
   return E.pick(label, value, choices, { onChange, displayValue: choices.find(option => option.value === value)?.label });
 }
 
-export function FormatView({ model, createAction, controls = {}, messages, footer, onSubmit, materials, contents, editing = false, canCompose = !editing, componentOptions = [], componentRows = NO_ROWS, onComponentRowsChange = () => {}, deleteAction, formId, nameError }: {
+export function FormatView({ model, createAction, controls = {}, messages, footer, onSubmit, materials, contents, editing = false, canCompose = !editing, componentOptions = [], componentRows = NO_ROWS, onComponentRowsChange = () => {}, deleteAction, formId, nameError, canSetPalletFit = false }: {
   model: FormatViewModel;
+  /** Admin only: the advisory Pallet fit field. */
+  canSetPalletFit?: boolean;
   /** Live: the name is taken, by another format or the save's refusal. Opens the name field. */
   nameError?: string;
   createAction?: ReactNode;
@@ -67,6 +69,10 @@ export function FormatView({ model, createAction, controls = {}, messages, foote
         <FormatRowsView kind="components" rows={componentRows} options={componentOptions} valid={validFormatRows(componentRows, componentOptions.map(o => o.id), false)} onChange={onComponentRowsChange} confirmClear={false} onConfirmClear={() => {}} />
         <p className="text-xs text-muted-foreground">Choose packages with their own volume; packages already built from contents cannot be nested. Create format saves the format and its contents together. Volume is derived from the saved contents.</p>
       </section>}
+      {canSetPalletFit && <div className="flex flex-col gap-1">
+        {E.edit("Pallet fit", model.palletFit, "number", undefined, { onChange: controls.palletFit, min: 1, step: 1, id: `${id}-pallet-fit`, "aria-describedby": `${id}-pallet-fit-help` })}
+        <p id={`${id}-pallet-fit-help`} className="text-xs text-muted-foreground">How many of this package fill one layer or pallet the way you load. Leave blank to skip. Advisory only.</p>
+      </div>}
       {editing && <p className="text-xs text-muted-foreground">Shared by every SKU using this format. Sizing changes affect future calculations and open plans; recorded movement volumes stay unchanged.</p>}
       {sizing.error && E.info(sizing.error, "alert")}
       {messages}

@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 }
 
 type Detail = {
-  format: { price_group_id: string | null; price_groups: { name: string } | null; ounces: number | null; id: string; name: string; basis: "packaged" | "poured"; bbl_per_unit: string | null; package_type: string | null; keg_size: string | null; units_per_case: number | null };
+  format: { price_group_id: string | null; price_groups: { name: string } | null; ounces: number | null; id: string; name: string; basis: "packaged" | "poured"; bbl_per_unit: string | null; package_type: string | null; keg_size: string | null; units_per_case: number | null; pallet_fit: number | null };
   components: { child_format_id: string; qty: number }[];
   lines: { material_id: string; qty_per_unit: number; on_break: "consumed" | "return_to_stock" }[];
   formats: { id: string; name: string; basis: string; bbl_per_unit: string | null; composed: boolean }[];
@@ -61,7 +61,7 @@ export default async function FormatPage({ params }: { params: Promise<{ id: str
   });
   const composable = canComposeFormat(data.format, data.usedAsChild);
   return <>
-    {E.back("Catalog", data.format.name, writable ? <FormatForm key={JSON.stringify(data.format)} format={{ ...data.format, composed: components.length > 0 } satisfies FormatSnapshot["format"]}
+    {E.back("Catalog", data.format.name, writable ? <FormatForm key={JSON.stringify(data.format)} format={{ ...data.format, composed: components.length > 0 } satisfies FormatSnapshot["format"]} canSetPalletFit={ctx.roles.includes("admin")}
       deleteAction={ctx.roles.includes("admin") ? <DeleteCommandButton control={DeleteFormatControl} command="delete_format" input={{ formatId: id }} name={data.format.name} redirect="/catalog" /> : null}
       canCompose={components.length === 0 && composable}
       materials={<FormatRowsForm key={JSON.stringify(lines)} formatId={id} kind="bom" initial={lines} options={materialOptions} />}
