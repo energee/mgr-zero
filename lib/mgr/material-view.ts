@@ -1,4 +1,4 @@
-// lib/mgr/material-view.ts — view-model for Material (inventory sheet).
+// lib/mgr/material-view.ts — view-model for Material (inventory sheet), and the fields a kind fills on Add material.
 export type MaterialViewModel = {
   name: string;
   kind: string;
@@ -31,3 +31,27 @@ export type MaterialViewModel = {
   lotTracked: boolean;
   active: boolean;
 };
+
+/** The Add material fields a kind fills: Base unit, Purchase unit, Lot-tracked. */
+export type KindFields = { unit: string; purchaseUnit: string; lotTracked: boolean };
+
+/** What each kind fills on Add material. Adjunct, chemical and other fill nothing: their units vary too much. */
+const KIND_DEFAULTS: Record<string, KindFields> = {
+  malt: { unit: "lb", purchaseUnit: "lb", lotTracked: true },
+  hop: { unit: "lb", purchaseUnit: "lb", lotTracked: true },
+  yeast: { unit: "each", purchaseUnit: "each", lotTracked: true },
+  packaging: { unit: "each", purchaseUnit: "each", lotTracked: false },
+};
+
+/** The fields after the kind changes from `from` to `to` on Add material. A field takes the new kind's value only
+ *  while it still holds what the form gave it (`initial`, or what `from` filled), so a field the user changed stays. */
+export function fieldsForKind(fields: KindFields, from: string, to: string, initial: KindFields): KindFields {
+  const next = KIND_DEFAULTS[to];
+  if (!next) return fields;
+  const given = { ...initial, ...KIND_DEFAULTS[from] };
+  return {
+    unit: fields.unit === given.unit ? next.unit : fields.unit,
+    purchaseUnit: fields.purchaseUnit === given.purchaseUnit ? next.purchaseUnit : fields.purchaseUnit,
+    lotTracked: fields.lotTracked === given.lotTracked ? next.lotTracked : fields.lotTracked,
+  };
+}

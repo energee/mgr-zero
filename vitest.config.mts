@@ -14,6 +14,7 @@ const pureTests = [
   "tests/production-attention-experiment.test.ts",
   "tests/material-category-experiment.test.ts",
   "tests/material-category-suggestion.test.ts",
+  "tests/material-kind-defaults.test.ts",
   "tests/material-category-keywords.test.ts",
   "tests/suggest-material-category-query.test.ts",
   "tests/typesafe-key-check.test.ts",

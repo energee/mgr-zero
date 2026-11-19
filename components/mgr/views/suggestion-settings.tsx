@@ -59,10 +59,13 @@ export function SuggestionSettingsView({ status, onSaveKey, onRemoveKey, onEnabl
           {E.btn("Save key", draft.trim().length >= 8 && !busy ? "p" : "p disabled", undefined, undefined, { type: "submit", "data-preview-action": true })}
         </div>
       </form>}
-    {/* The switch waits for a saved key; the database refuses it otherwise, and removing the key turns it off. */}
+    {/* The switch waits for a saved key; the database refuses it otherwise, and removing the key turns it off.
+        Why it waits sits under the row: E.row clamps its description to two lines, which must keep the consent line. */}
     {E.row("Suggest kinds for new materials",
-      `${status.saved ? "" : "Save a TypeSafe key first. "}Sends new material names to TypeSafe with this key. Turning it on is your brewery's consent.`,
-      E.sw(enabled, "Suggest kinds for new materials", flip, !onEnabledChange || busy || !status.saved))}
+      "Sends new material names to TypeSafe. Turning it on is your brewery's consent.",
+      E.sw(enabled, "Suggest kinds for new materials", flip, !onEnabledChange || busy || !status.saved),
+      "", undefined,
+      status.saved ? undefined : <p className="text-sm text-muted-foreground">Save a TypeSafe key first.</p>)}
     {/* Kept and changed compare each suggested kind with the kind of the material saved under that name. */}
     {outcomes && E.row("Last 30 days", outcomes)}
     <CommandFormMessage error={error} />

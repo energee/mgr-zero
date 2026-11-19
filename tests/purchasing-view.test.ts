@@ -521,7 +521,7 @@ describe("Materials", () => {
     expect(suggested.body.props.model).toMatchObject({ name: "Citra T-90", kind: "", kindSuggestion: "hop" });
     const html = htmlOf(suggested.body);
     expect(html).toContain('id="material-kind-suggestion"');
-    expect(html).toContain("Suggested: Hop. Press Tab to accept.");
+    expect(html).toContain("Suggested: Hop. Press Tab or choose it in the list to accept.");
   });
 
   it("MaterialView shows no suggestion without one, or once a kind is picked", () => {
