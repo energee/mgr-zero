@@ -92,6 +92,16 @@ customer/SKU creation is blocked; channel-price rows set the existing grid cell.
 Opening quantities are positive SKU-unit quantities with a bin belonging to the
 location. Prices are nonnegative integer cents, at most 2147483647.
 
+TypeSafe keys belong to one brewery. `set_brewery_typesafe_key` saves or
+replaces the key and answers with the saved status, `{ saved, last4, enabled }`.
+No operation returns the key itself. `get_brewery_suggestion_settings` returns
+the same status. Removing the key (`apiKey: null`) also turns suggestions off.
+`set_brewery_suggestions_enabled` with `enabled: true` fails with `400` and the
+message `Save a TypeSafe key first.` until a key is saved. The request hash does
+not include the key's value, so a reused `requestId` that sends a different key
+returns the saved status and keeps the old key. Send a new `requestId` for each
+new key.
+
 {/* ops:team */}
 
 ## accept_account_invitation [#accept_account_invitation]
