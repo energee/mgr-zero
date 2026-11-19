@@ -5,6 +5,7 @@ import { stockLine } from "./stock-line";
 import { qboUnmappedFilter, unmappedInput } from "./qbo";
 import { movementInput } from "./movement-input";
 import type { Database } from "@/lib/supabase/database";
+import { Constants } from "@/lib/supabase/database.generated";
 import { docNo, runNo, trfNo } from "@/lib/mgr/doc-no";
 import { formatDate } from "@/lib/date-format";
 
@@ -191,13 +192,14 @@ export async function movementReferences(ctx: Ctx, references: (string | null)[]
 }
 
 defineQuery({
-  name: "list_movements", description: "Immutable movements newest-first as { rows, nextCursor }, plus total for a numbered page, with location/bin/lot labels, resolved source document ref_label and ref_kind, and reversal links; movementId selects an original and its exact compensation",
-  input: numberedHistorySchema({ skuId: z.string().uuid().optional(), movementId: z.string().uuid().optional() }),
+  name: "list_movements", description: "Immutable movements newest-first as { rows, nextCursor }, plus total for a numbered page, with location/bin/lot labels, resolved source document ref_label and ref_kind, and reversal links; type keeps one movement type; movementId selects an original and its exact compensation",
+  input: numberedHistorySchema({ skuId: z.string().uuid().optional(), type: z.enum(Constants.public.Enums.movement_type).optional().describe("Keep only movements of this type"), movementId: z.string().uuid().optional() }),
   roles: [...readRoles],
   handler: async (ctx, i) => {
     let q = ctx.db.from("inventory_movements").select("*, locations(name), bins(name), lots!inventory_movements_lot_fk(code)", { count: i.page === undefined ? undefined : "exact" }).eq("brewery_id", ctx.breweryId)
       .limit(i.limit + 1);
     if (i.skuId) q = q.eq("sku_id", i.skuId);
+    if (i.type) q = q.eq("type", i.type);
     if (i.movementId) q = q.or(`id.eq.${i.movementId},compensates_id.eq.${i.movementId}`);
     const page = await readHistory<Database["public"]["Tables"]["inventory_movements"]["Row"] & HistoryRow>(q, i);
     const rows = page.rows;

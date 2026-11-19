@@ -4,11 +4,17 @@ import { money } from "./money";
 import type { InventoryValue } from "@/lib/commands/inventory";
 import { plural } from "./plural";
 import { bblExact } from "@/lib/volume";
+import type { ScopeOption } from "@/components/mgr/scope-pick";
 /** One SKU in the register. Counts are display text in package units; `atp`
  *  (shown as Available) uses a true minus sign when negative, and `short` says so. */
 export type FinishedGoodsRowView = {
   key: string;
+  /** The SKU's name without its brand when `group` names the brand above it. */
   name: string;
+  /** Set on the first row of each brand: the heading over that brand's rows.
+   *  `onHand` is the brand's barrels on hand, left out when any of its SKUs
+   *  has no barrels per unit. */
+  group?: { brand: string; onHand?: string };
   onHand: string;
   allocated: string;
   atp: string;
@@ -30,7 +36,17 @@ export type FinishedGoodsViewModel = {
 };
 
 export type FinishedGoodsMovements = {
-  rows: { key: string; title: string; detail: string; trailing: string; outbound: boolean }[];
+  rows: {
+    key: string; title: string; detail: string; outbound: boolean;
+    /** The recorded day; consecutive rows of one day share a heading. */
+    day: string;
+    time: string;
+    /** The document the movement came from; `href` when it has a staff page. */
+    ref?: { label: string; href?: string };
+  }[];
+  /** The ledger's movement-type filter. `value` is the selected option
+   *  ("all" for none); the fixture's options carry no href and stay inert. */
+  type?: { value: string; options: ScopeOption[] };
 };
 
 export type FinishedGoodsSku = {
@@ -39,6 +55,8 @@ export type FinishedGoodsSku = {
   brands?: { name: string } | null;
   /** list_skus' flag; false withholds the row's Record movement. */
   active?: boolean;
+  /** list_skus' barrels per unit, for the brand's barrels on hand. */
+  format_volume?: { bbl_per_unit: number | null } | null;
   on_hand: number;
   atp: number;
 };
@@ -86,6 +104,20 @@ export function assembleFinishedGoods(
 export const skuLabel = (sku: { name: string; brands?: { name: string } | null }) =>
   sku.brands?.name && !sku.name.startsWith(sku.brands.name) ? `${sku.brands.name} · ${sku.name}` : sku.name;
 
+/** The name a SKU sorts and groups under: its brand, or its own name without one. */
+const brandOf = (sku: FinishedGoodsSku) => sku.brands?.name ?? sku.name;
+
+/** A brand's barrels on hand to the nearest tenth; undefined when any SKU has no barrels per unit. */
+function brandBbl(skus: FinishedGoodsSku[]) {
+  let total = 0;
+  for (const sku of skus) {
+    const perUnit = sku.format_volume?.bbl_per_unit;
+    if (perUnit == null) return undefined;
+    total += sku.on_hand * Number(perUnit);
+  }
+  return movementBbl(total);
+}
+
 export function toFinishedGoodsViewProps({ skus, backHref, value }: FinishedGoodsSnapshot): FinishedGoodsViewModel {
   return {
     backHref: backHref ?? "/beer",
@@ -93,11 +125,14 @@ export function toFinishedGoodsViewProps({ skus, backHref, value }: FinishedGood
     // read $0.00, so it shows once some stock is costed.
     valueLine: value?.cents ? `${money(value.cents)}${value.uncostedUnits ? ` · ${plural(value.uncostedUnits, "unit")} without cost` : ""}` : undefined,
     empty: skus.length === 0 ? { title: "No finished goods yet" } : undefined,
-    rows: skus.map((s) => {
+    rows: [...skus].sort((a, b) => brandOf(a).localeCompare(brandOf(b)) || a.name.localeCompare(b.name)).map((s, i, sorted) => {
       const short = s.atp < 0;
+      const brand = s.brands?.name;
+      const first = brand !== undefined && brand !== sorted[i - 1]?.brands?.name;
       return {
         key: s.id,
-        name: skuLabel(s),
+        name: brand && s.name.startsWith(`${brand} · `) ? s.name.slice(brand.length + 3) : s.name,
+        group: first ? { brand, onHand: brandBbl(sorted.filter((sku) => sku.brands?.name === brand)) } : undefined,
         onHand: String(s.on_hand),
         allocated: String(round2(s.on_hand - s.atp)),
         atp: short ? `−${Math.abs(s.atp)}` : String(s.atp),
