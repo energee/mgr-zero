@@ -196,10 +196,3 @@ grant execute on function public.similar_names(uuid, text, text, uuid) to authen
 2. **Warn or block?** Recommended: warn only.
 3. **Which records?** Recommended: customers, vendors, materials, brands.
 4. **Edit forms too?** Recommended: yes, when the name changes.
-
-## Decision recorded from the Jev review (2026-11-19)
-
-The owner accepts that about 2% of shown material kind suggestions are wrong
-on messy names, and keeps the threshold at 0.9. This replaces "no wrong
-suggestion is shown" in `docs/plans/jev-suggestions.md`. Staff confirm every
-suggestion, and Settings now counts kept and changed.
