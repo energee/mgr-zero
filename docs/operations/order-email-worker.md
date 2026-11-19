@@ -11,8 +11,12 @@ not that it reached an inbox.
 The internal `POST /api/email/jobs/deliver` worker requires a bearer token
 matching `ORDER_EMAIL_JOB_SECRET`. It uses `RESEND_API_KEY` and
 `ORDER_EMAIL_FROM`; missing configuration refuses the job before any lease.
-Each call processes at most ten emails. `.github/workflows/hosted-jobs.yml`
-calls it every 5 minutes (Vercel Hobby cron is daily at most). It needs the
+Each call processes at most ten emails. `confirm_order` runs the same batch
+through Next's `after()` once its response is sent, so a new confirmation
+goes out within seconds without the route or its secret. That run's failures
+log the same categories and leave the row queued. `.github/workflows/hosted-jobs.yml`
+calls the route every 5 minutes as the retry path and as a backstop for
+confirmations made outside a request (Vercel Hobby cron is daily at most). It needs the
 repository variable `MGR_URL` and the secret `ORDER_EMAIL_JOB_SECRET`, equal to
 the Vercel value. A selected job fails when `MGR_URL` is absent or its call fails.
 The workflow monitor opens one issue per failing worker, so an open email-worker

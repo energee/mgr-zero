@@ -2,7 +2,8 @@
 #
 # Vercel Hobby cron runs at most once a day, too slow for order confirmations,
 # so this POSTs the existing bearer-authenticated routes instead:
-#   - order email every 5 minutes (each call sends at most ten)
+#   - order email every 5 minutes (each call sends at most ten): retries, since
+#     confirm_order already sends a new confirmation right after it responds
 #   - retention prune daily (#766)
 #   - agent friction report weekly, which rewrites the "Agent friction" issue (#1766)
 # GitHub may delay or skip a scheduled run under load; the next run catches up.
