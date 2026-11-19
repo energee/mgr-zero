@@ -4,7 +4,8 @@ import { Fragment, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { OrderQuantity } from "./new-order";
 import { OrderSummary } from "./order-summary";
-import { brandAnchor, type ShopLabel, type ShopViewModel } from "@/lib/mgr/shop-view";
+import { BrandHeading } from "./brand-heading";
+import { brandAnchor, type ShopGroupView, type ShopViewModel } from "@/lib/mgr/shop-view";
 
 export type ShopControls = {
   quantity?: (id: string, value: string) => void;
@@ -18,10 +19,10 @@ export type ShopControls = {
 /** The catalog, with the order summary beside it from md up (a sticky panel)
  *  and pinned to its foot on a phone (a bar that opens a sheet). `footer={null}`
  *  draws the catalog alone. */
-export function ShopView({ model, footer, comingUp, controls = {}, quantities, locked = false, disabled = false, preparing = false, messages, labelImage }: {
+export function ShopView({ model, footer, comingUp, controls = {}, quantities, locked = false, disabled = false, preparing = false, messages, brandHeading }: {
   model: ShopViewModel; footer?: ReactNode; comingUp?: ReactNode;
-  /** Draws a brand's COLA label thumbnail beside its heading (the live Shop loads it); absent draws none. */
-  labelImage?: (label: ShopLabel, brand: string) => ReactNode;
+  /** The live Shop's brand heading: BrandHeading with the label and reference sheet. Absent draws the plain BrandHeading. */
+  brandHeading?: (group: ShopGroupView) => ReactNode;
   controls?: ShopControls; quantities?: Record<string, string>; locked?: boolean;
   disabled?: boolean; preparing?: boolean; messages?: ReactNode;
 }) {
@@ -33,11 +34,7 @@ export function ShopView({ model, footer, comingUp, controls = {}, quantities, l
       <div className="flex min-w-0 flex-col gap-3">
         <fieldset disabled={locked} className="contents" onFocusCapture={event => setTyping(event.target instanceof HTMLInputElement)} onBlurCapture={() => setTyping(false)}>
           {model.empty ? E.blank(model.empty) : model.groups.map(group => <Fragment key={group.product}>
-            {/* The brand heading, its alias under it, and its label beside them when one is on file. */}
-            <div className="flex items-end gap-3">
-              {group.label && labelImage?.(group.label, group.product)}
-              <div className="flex flex-col">{E.ttl(group.product, brandAnchor(group.product))}{group.alias ? <p className="text-xs text-muted-foreground">{group.alias}</p> : null}</div>
-            </div>
+            {brandHeading ? brandHeading(group) : <BrandHeading name={group.product} alias={group.alias} anchor={brandAnchor(group.product)} />}
             {/* Beside the price: a lone release reads as text (stock alone needs no words); several offers are an inline pick. */}
             {group.items.map(item => <Fragment key={item.key}>
               {E.row(item.name, item.offers.length > 1

@@ -7,6 +7,7 @@ import { formatDate } from "@/lib/date-format";
 import { money } from "./money";
 import { palletFit, palletHint, type PalletFitGroup } from "./pallet-fit";
 import { lineLabel, type LineLabel } from "./brand-lines";
+import type { PortalBrand } from "./brand-reference-view";
 import { plural } from "./plural";
 
 /** One open release of a SKU, as portal_catalog returns it. */
@@ -54,8 +55,8 @@ export type ShopSnapshot = {
   requestedDate: string;
   source: { name: string };
   catalog: ShopCatalogItem[];
-  /** portal_cola_labels: brands with a COLA label on file, matched to a heading by brand name (unique per brewery). */
-  labels?: { brandId: string; brand: string; ttbId: string }[];
+  /** portal_brands: the buyer's brands with sell-sheet fields and label, matched to a heading by brand name (unique per brewery). */
+  brands?: PortalBrand[];
   /** Refundable deposit charged per keg on Review; Shop only mentions it. */
   depositCentsPerKeg?: number;
   poNumber?: string;
@@ -87,15 +88,12 @@ export type ShopSummary = {
   palletHint?: string;
 };
 
-/** A brand's label on file: what the live Shop asks portal_cola_label_image for, and the TTB id it names. */
-export type ShopLabel = { brandId: string; ttbId: string };
-
 export type ShopGroupView = {
   product: string;
   /** The brand's alias, muted under the brand heading. */
   alias?: string;
-  /** The brand's COLA label on file; the live Shop loads its image beside the heading. */
-  label?: ShopLabel;
+  /** The brand's portal_brands row: the live Shop draws its label and opens its reference sheet. */
+  brand?: PortalBrand;
   items: ShopItemView[];
 };
 
@@ -220,7 +218,7 @@ export function toShopViewProps({
   depositCentsPerKeg,
   poNumber,
   note,
-  labels = [],
+  brands = [],
 }: ShopSnapshot): ShopViewModel {
   const groups: ShopGroupView[] = [];
   for (const item of catalog) {
@@ -235,8 +233,8 @@ export function toShopViewProps({
     const group = groups.find((g) => g.product === item.product);
     if (group) group.items.push(row);
     else {
-      const label = labels.find((l) => l.brand === item.product);
-      groups.push({ product: item.product, ...(item.brandAlias ? { alias: item.brandAlias } : {}), ...(label ? { label: { brandId: label.brandId, ttbId: label.ttbId } } : {}), items: [row] });
+      const brand = brands.find((b) => b.name === item.product);
+      groups.push({ product: item.product, ...(item.brandAlias ? { alias: item.brandAlias } : {}), ...(brand ? { brand } : {}), items: [row] });
     }
   }
   const shipTo = shipTos.find((s) => s.id === shipToId);

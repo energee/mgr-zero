@@ -33,11 +33,28 @@ describe("Order detail: changes after confirm", () => {
   });
 });
 
-describe("portal order brand alias", () => {
-  it("names a line brand · format with the brand's alias muted under it", () => {
-    const giraffe = { name: "Animal #31 · Sixtel", brands: { name: "Masai Giraffe", alias: "Animal #31" }, formats: { name: "Sixtel" } };
-    const model = toPortalOrderViewProps({ ...portalOrderShipped, lines: [{ ...portalOrderShipped.lines[0], skus: giraffe }] });
-    expect(model.lines[0]).toMatchObject({ name: "Masai Giraffe · Sixtel", alias: "Animal #31" });
-    expect(renderToStaticMarkup(createElement(PortalOrderView, { model }))).toContain('<span>Masai Giraffe · Sixtel</span><span class="text-xs font-normal text-muted-foreground">Animal #31</span>');
+describe("portal order brand headings", () => {
+  const giraffe = { name: "Animal #31 · Sixtel", brands: { id: "b-giraffe", name: "Masai Giraffe", alias: "Animal #31" }, formats: { name: "Sixtel" } };
+  const giraffeCase = { ...giraffe, name: "Animal #31 · Case", formats: { name: "Case" } };
+  const pils = { name: "Pils · Case", brands: { id: "b-pils", name: "Pils", alias: null }, formats: { name: "Case" } };
+
+  it("groups lines under their brand, each named by its format, with the brand id for the heading", () => {
+    const [l] = portalOrderShipped.lines;
+    const model = toPortalOrderViewProps({ ...portalOrderShipped, lines: [{ ...l, id: "p", skus: pils }, { ...l, id: "g1", skus: giraffe }, { ...l, id: "g2", skus: giraffeCase }] });
+    expect(model.lines.map((x) => [x.key, x.group, x.alias, x.brandId, x.name])).toEqual([
+      ["g2", "Masai Giraffe", "Animal #31", "b-giraffe", "Case"],
+      ["g1", "Masai Giraffe", "Animal #31", "b-giraffe", "Sixtel"],
+      ["p", "Pils", undefined, "b-pils", "Case"],
+    ]);
+  });
+
+  it("draws one BrandHeading per brand, and lets the live page supply its own", () => {
+    const [l] = portalOrderShipped.lines;
+    const model = toPortalOrderViewProps({ ...portalOrderShipped, lines: [{ ...l, id: "g1", skus: giraffe }, { ...l, id: "g2", skus: giraffeCase }] });
+    const html = renderToStaticMarkup(createElement(PortalOrderView, { model }));
+    expect(html.match(/data-brand-heading/g)).toHaveLength(1);
+    expect(html).toMatch(/>Masai Giraffe<\/h2><p[^>]*>Animal #31<\/p>/);
+    const live = renderToStaticMarkup(createElement(PortalOrderView, { model, brandHeading: (line) => createElement("i", null, `heading ${line.brandId}`) }));
+    expect(live.match(/<i>heading b-giraffe<\/i>/g)).toHaveLength(1);
   });
 });

@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { ReviewOrderView } from "../components/mgr/views/review-order";
 import { ShopView } from "../components/mgr/views/shop";
+import { BrandHeading } from "../components/mgr/views/brand-heading";
 import { ridgelineReviewOrder, ridgelineShop } from "../lib/mgr/fixtures/portal";
 import { toQuotedReviewOrderViewProps, toReviewOrderViewProps } from "../lib/mgr/review-order-view";
 import { effectiveRequestedDate, toShopViewProps, type ShopCatalogItem } from "../lib/mgr/shop-view";
@@ -288,20 +289,29 @@ describe("Shop brand alias", () => {
   });
 });
 
-describe("Shop COLA labels", () => {
-  it("gives a brand heading its stored label, and nothing to a brand without one", () => {
-    const labels = [{ brandId: "b-hazy", brand: "Hazy IPA", ttbId: "26001001000001" }];
-    const groups = toShopViewProps({ ...ridgelineShop, labels }).groups;
-    expect(groups.map((g) => [g.product, g.label])).toEqual([
-      ["Hazy IPA", { brandId: "b-hazy", ttbId: "26001001000001" }], ["Pils", undefined], ["Stout", undefined],
-    ]);
-    expect(toShopViewProps(ridgelineShop).groups.every((g) => g.label === undefined)).toBe(true);
+describe("Shop brand headings", () => {
+  const hazy = { brandId: "b-hazy", name: "Hazy IPA", alias: null, style: "IPA", abv: 6.5, description: null, hops: null, ttbId: "26001001000001", hasLabel: true };
+
+  it("gives a brand heading its portal_brands row, and nothing to a brand without one", () => {
+    const groups = toShopViewProps({ ...ridgelineShop, brands: [hazy] }).groups;
+    expect(groups.map((g) => [g.product, g.brand?.brandId])).toEqual([["Hazy IPA", "b-hazy"], ["Pils", undefined], ["Stout", undefined]]);
+    expect(toShopViewProps(ridgelineShop).groups.every((g) => g.brand === undefined)).toBe(true);
   });
 
-  it("draws the label slot beside the heading only for a brand with a label", () => {
-    const labels = [{ brandId: "b-hazy", brand: "Hazy IPA", ttbId: "26001001000001" }];
-    const html = htmlOf(createElement(ShopView, { model: toShopViewProps({ ...ridgelineShop, labels }), footer: null, labelImage: (label) => createElement("i", null, `label ${label.ttbId}`) }));
-    expect(html.match(/<i>label /g)).toHaveLength(1);
-    expect(html).toMatch(/<i>label 26001001000001<\/i>(?:(?!<h2).)*<h2 id="brand-hazy-ipa"/);
+  it("draws every heading with BrandHeading, and lets the live Shop supply its own", () => {
+    const model = toShopViewProps({ ...ridgelineShop, brands: [hazy] });
+    const plain = htmlOf(createElement(ShopView, { model, footer: null }));
+    expect(plain.match(/data-brand-heading/g)).toHaveLength(3);
+    const live = htmlOf(createElement(ShopView, { model, footer: null, brandHeading: (group) => createElement("i", null, `heading ${group.brand?.brandId ?? group.product}`) }));
+    expect(live).toContain("<i>heading b-hazy</i>");
+    expect(live).toContain("<i>heading Pils</i>");
+  });
+});
+
+describe("BrandHeading", () => {
+  it("draws the thumbnail, then the name (a button when it opens the sheet) with the alias right under it", () => {
+    const html = htmlOf(createElement(BrandHeading, { name: "Rose Quartz", alias: "Mineral #7", anchor: "brand-rose-quartz", thumb: createElement("i", null, "thumb"), onOpen: () => {} }));
+    expect(html).toMatch(/<i>thumb<\/i><div[^>]*><h2 id="brand-rose-quartz"[^>]*><button type="button"[^>]*>Rose Quartz<\/button><\/h2><p[^>]*>Mineral #7<\/p><\/div>/);
+    expect(htmlOf(createElement(BrandHeading, { name: "Pils" }))).not.toContain("<button");
   });
 });

@@ -46,7 +46,7 @@ function requestBindings() {
     if (name === "get_gravity_unit") return { effective: "plato" };
     if (name === "list_movements") return { rows: [], nextCursor: null };
     if (name === "portal_catalog") return [];
-    if (name === "portal_cola_labels") return [];
+    if (name === "portal_brands") return [];
     if (name === "get_portal_account") return { shipTos: [], membership: { userId: "actor" }, fulfillmentSource: null };
     if (name.startsWith("list_")) return [];
     throw new CommandError("record not found", 404, "not_found");

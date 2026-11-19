@@ -5,9 +5,7 @@ import { getPortalContext } from "@/lib/portal";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { Cart, type CatalogItem, type ShipToOption } from "./cart";
-import type { ShopSnapshot } from "@/lib/mgr/shop-view";
-
-type ShopLabels = NonNullable<ShopSnapshot["labels"]>;
+import type { PortalBrand } from "@/lib/mgr/brand-reference-view";
 import { shipToPlace } from "@/lib/mgr/ship-to-view";
 import { cache } from "react";
 
@@ -31,10 +29,10 @@ const shipToOptionLabel = (s: ShipToRow) => { const place = shipToPlace(s); retu
 export default async function ShopPage({ searchParams }: { searchParams: Promise<{ draft?: string; reorder?: string }> }) {
   const query = await searchParams;
   const { customer, ctx } = await getPortalContext();
-  const [items, account, labels] = await Promise.all([
+  const [items, account, brands] = await Promise.all([
     runCommand("portal_catalog", {}, ctx) as Promise<CatalogItem[]>,
     runCommand("get_portal_account", {}, ctx) as Promise<{ shipTos: ShipToRow[]; membership: { userId: string }; fulfillmentSource: { id: string; name: string } | null }>,
-    runCommand("portal_cola_labels", {}, ctx) as Promise<ShopLabels>,
+    runCommand("portal_brands", {}, ctx) as Promise<PortalBrand[]>,
   ]);
   const shipToOptions: ShipToOption[] = account.shipTos.map((s) => ({ id: s.id, is_default: s.is_default, country: s.country, label: shipToOptionLabel(s) }));
   const sourceId = query.draft ?? query.reorder;
@@ -42,6 +40,6 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
   if (saved && query.draft && saved.order.status !== "draft") redirect(`/portal/orders/${saved.order.id}`);
   const initial = saved ? reconcilePortalOrder(saved, items, shipToOptions, !query.draft) : undefined;
   return (
-    <Cart key={`${account.membership.userId}:${customer.customerId}:${customer.breweryId}:${sourceId ?? "new"}`} items={items} labels={labels} fulfillmentSource={account.fulfillmentSource} shipTos={shipToOptions} initial={initial} scope={{ actorId: account.membership.userId, customerId: customer.customerId, breweryId: customer.breweryId }} />
+    <Cart key={`${account.membership.userId}:${customer.customerId}:${customer.breweryId}:${sourceId ?? "new"}`} items={items} brands={brands} fulfillmentSource={account.fulfillmentSource} shipTos={shipToOptions} initial={initial} scope={{ actorId: account.membership.userId, customerId: customer.customerId, breweryId: customer.breweryId }} />
   );
 }

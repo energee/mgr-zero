@@ -181,16 +181,18 @@ defineQuery({
   },
 });
 
-// COLA labels (20261119020000_portal_cola_images.sql): only MGR's stored
-// copies, for brands priced on the buyer's channel; never a TTB fetch. The list
-// stays light, and each image loads on its own when Shop scrolls it into view.
+// Brand reference (20261119030000_portal_brand_reference.sql): each brand the
+// buyer can order, with its sell-sheet fields and COLA TTB id, for the brand
+// headings and reference sheet on Shop and orders. Labels are only MGR's stored
+// copies, never a TTB fetch; each image loads on its own when its heading
+// scrolls into view (portal_cola_label_image).
 defineQuery({
-  name: "portal_cola_labels", description: "Portal: brands on the buyer's list whose COLA label image the brewery has on file, one label per brand (the earliest approval), as brand id, brand name and TTB id; load each image with portal_cola_label_image",
+  name: "portal_brands", description: "Portal: the brands on the buyer's list, each with its alias, style, ABV, description and hops, the TTB id of its COLA (null without one), and whether the brewery has the label image on file (load it with portal_cola_label_image)",
   roles: "customer",
   input: z.object({}),
   handler: async (ctx) => {
-    const rows = await unwrap(ctx.db.rpc("portal_cola_labels", { p_customer: requireCustomer(ctx) })) as { brand_id: string; brand_name: string; ttb_id: string }[];
-    return rows.map(r => ({ brandId: r.brand_id, brand: r.brand_name, ttbId: r.ttb_id }));
+    const rows = await unwrap(ctx.db.rpc("portal_brand_rows", { p_customer: requireCustomer(ctx) })) as { brand_id: string; name: string; alias: string | null; style: string | null; abv: number | null; description: string | null; hops: string | null; ttb_id: string | null; has_label: boolean }[];
+    return rows.map(r => ({ brandId: r.brand_id, name: r.name, alias: r.alias, style: r.style, abv: r.abv === null ? null : Number(r.abv), description: r.description, hops: r.hops, ttbId: r.ttb_id, hasLabel: r.has_label }));
   },
 });
 

@@ -37,6 +37,6 @@ describe("portal brand alias", () => {
   it("portal_order lines carry brand, alias and format beside the SKU name", async () => {
     const draft = await runCommand("portal_create_order", { shipToId, lines: [{ skuId, qty: 2 }] }, buyer) as { order_id: string };
     const { lines } = await runCommand("portal_order", { orderId: draft.order_id }, buyer) as { lines: { skus: unknown }[] };
-    expect(lines[0].skus).toEqual({ name: "Animal #31 · Sixtel", brands: brand, formats: { name: "Sixtel" } });
+    expect(lines[0].skus).toEqual({ name: "Animal #31 · Sixtel", brands: { id: expect.any(String), ...brand }, formats: { name: "Sixtel" } });
   });
 });

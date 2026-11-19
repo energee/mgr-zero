@@ -38,7 +38,7 @@ async function query(name: string, input: unknown) {
     case "list_standing_allocations": return [];
     case "replenishment_suggestions": return [];
     case "portal_catalog": return [];
-    case "portal_cola_labels": return [];
+    case "portal_brands": return [];
     case "get_portal_account": return { membership: { userId: "actor" }, shipTos: [{ id: "ship", label: "Door", is_default: true, city: "Town", state: "PA" }], fulfillmentSource: state.source };
     default: throw new Error(name);
   }
