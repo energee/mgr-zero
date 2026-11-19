@@ -440,7 +440,7 @@ export const E = {
           className={cn(controls?.forward && "[&_svg:last-child]:hidden", controls?.inline && "inline h-auto! min-h-0! rounded-sm border-0 p-0 align-baseline text-[length:inherit] text-primary whitespace-normal underline-offset-4 hover:underline data-placeholder:text-primary data-placeholder:underline bg-transparent! [&_svg]:hidden *:data-[slot=select-value]:inline")}><SelectValue placeholder={suggestion ? <>{suggestion.label}<span aria-hidden className="ml-2 text-xs pointer-coarse:hidden">Tab</span></> : options.find((o): o is { value: string; label: string } => typeof o !== "string" && o.value === "")?.label ?? controls?.placeholder}>{controls?.displayValue ?? items.find((o) => o.value === value)?.label}</SelectValue>{controls?.forward ? <DirectionIcon label="Open" /> : null}</SelectTrigger>
         <SelectContent><SelectGroup>{items.map((o) => (
           <SelectItem key={o.value} value={o.value || "__empty_field__"} disabled={o.disabled}>
-            {o.label}{o.value === suggestion?.value ? <span className="text-muted-foreground">· suggested</span> : null}
+            {o.value === suggestion?.value ? <>{o.label}<span className="text-muted-foreground">· suggested</span></> : o.label}
           </SelectItem>
         ))}</SelectGroup></SelectContent>
         {suggestion ? <span id={suggestionId} className="sr-only">Suggested: {suggestion.label}. Press Tab or choose it in the list to accept.</span> : null}
