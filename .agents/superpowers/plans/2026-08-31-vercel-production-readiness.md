@@ -1,5 +1,9 @@
 # Vercel Production-Readiness Remediation Blueprint
 
+> **Superseded in part.** Task 16 asks for separate Preview and Production Supabase projects.
+> The owner dropped that on 2026-11-12 (#1616, PR #1825): there is no Preview project.
+> Current state is in `docs/operations/pilot-gate-status.md`.
+
 **Date:** 2026-08-31
 **Branch:** `vercel-production-readiness`
 **Worktree:** `.agents/worktrees/vercel-production-readiness`
