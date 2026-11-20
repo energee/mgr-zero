@@ -1,5 +1,9 @@
 # Issue #278 — lift the schema and missing-view gates Implementation Plan
 
+> **`aiExposed` removed.** PR #1785 deleted the `aiExposed` flag and `listTools({ aiOnly })`.
+> Ask MGR now reads its operations through `lib/agent/operations.ts`, and a definition opts out with `agentHidden`.
+> Mentions of either below are history.
+
 > **Completed:** #278 closed 2026-09-14. The `TODO.md` block cited below is historical.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

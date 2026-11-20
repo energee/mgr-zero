@@ -7,6 +7,10 @@ material formerly spread over the UI layout plan §2 ("Proposal safety"),
 `.agents/ARCHITECTURE.md` (pre-implementation gate), and the slice 1C plan.
 Plan: `.agents/superpowers/plans/2026-09-07-ai-chat.md`.
 
+> **`aiExposed` removed.** PR #1785 deleted the `aiExposed` flag and `listTools({ aiOnly })`.
+> Ask MGR now reads its operations through `lib/agent/operations.ts`, and a definition opts out with `agentHidden`.
+> Mentions of either below are history.
+
 > **Transport replaced.** The model transport is the AI SDK through Vercel AI
 > Gateway (`plans/2026-09-11-composer-ai-sdk.md`; `lib/chat/models.ts`), not a
 > direct `@anthropic-ai/sdk` client. The registry and proposal contract below
