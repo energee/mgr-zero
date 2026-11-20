@@ -20,7 +20,7 @@ export const cellarMapBrewer: CellarMapViewModel = {
     { name: "FV1", group: "Fermenters", detail: "Pils", day: "Day 9", volume: "12.8 / 15 bbl", reading: "5.1% ABV", readToday: true, fill: 85, readingHref: "" },
     { name: "FV2", group: "Fermenters", detail: "Hazy", day: "Day 4", volume: "9.0 / 15 bbl", reading: "3.4% ABV", fill: 60, readingHref: "" },
     { name: "FV3", group: "Fermenters", detail: "Stout", day: "Day 7", volume: "13.5 / 15 bbl", reading: "4.6% ABV", fill: 90, readingHref: "" },
-    { name: "BT1", group: "Brite tanks", detail: "Pils", day: "Day 2", volume: "7.0 / 10 bbl", reading: "No readings yet", fill: 70, readingHref: "" },
+    { name: "BT1", group: "Brite tanks", detail: "Pils", day: "Day 2", volume: "7.0 / 10 bbl", fill: 70, readingHref: "" },
     { name: "BT2", group: "Brite tanks", detail: "10 bbl" },
     { name: "FB1", group: "Barrels", detail: "Saison", day: "Day 41", volume: "0.4 / 1 bbl", reading: "No ABV yet", fill: 40, readingHref: "" },
   ],

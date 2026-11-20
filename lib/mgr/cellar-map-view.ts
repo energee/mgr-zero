@@ -76,10 +76,12 @@ export function toCellarMapViewProps(vessels: (OrderedVessel & { capacity_bbl: n
     if (!occupancy) return { ...tile, detail: `${capacity} bbl` };
     const quantity = Number(occupancy.bbl);
     const latest = readings[occupancy.occupancy_id];
+    const link = readingHref?.(occupancy.occupancy_id);
     return {
       ...tile, detail: occupancy.brand_name ?? "No brand yet", day: timeZone === undefined ? undefined : `Day ${daysInTank(occupancy.started_at, timeZone, now)}`, volume: `${quantity} / ${capacity} bbl`,
-      reading: latest?.text ?? "No readings yet", readToday: timeZone !== undefined && latest !== undefined && breweryDate(timeZone, new Date(latest.at)) === today,
-      fill: capacity > 0 ? quantity / capacity * 100 : undefined, readingHref: readingHref?.(occupancy.occupancy_id),
+      // A linked tile with no reading says nothing there: its Add reading link already does.
+      reading: latest?.text ?? (link === undefined ? "No readings yet" : undefined), readToday: timeZone !== undefined && latest !== undefined && breweryDate(timeZone, new Date(latest.at)) === today,
+      fill: capacity > 0 ? quantity / capacity * 100 : undefined, readingHref: link,
     };
   });
   const occupied = tiles.filter(tile => "volume" in tile);
@@ -90,7 +92,7 @@ export function toCellarMapViewProps(vessels: (OrderedVessel & { capacity_bbl: n
 // Each open occupancy's latest reading, keyed by occupancy id, from one
 // list_batches({ readings: true }) read — the batch list already embeds the
 // newest reading per open occupancy, so the cellar map never asks per tank (#700).
-// A tank with no reading has no entry: the map says "No readings yet" there.
+// A tank with no reading has no entry: the map says "No readings yet" there, or only Add reading when it links to Reading.
 // A tile is narrow, so it says only the beer's ABV so far ("5.4% ABV"), from
 // the same figures Batches shows; the reading itself, its age and Fermenting or
 // Finished are on Batches and Vessel detail. A tank whose only gravity is the

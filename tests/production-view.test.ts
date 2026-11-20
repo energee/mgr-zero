@@ -747,9 +747,9 @@ it("explains a disabled cellar Reading instead of leaving a dead end (#715)", ()
   const html = htmlOf(createElement(CellarMapView, { model: toCellarMapViewProps(vessels, two, {}, { v1: "/cellar/vessels/v1" }, reading) }));
   expect(html).not.toMatch(/>Reading</);
   expect(html).toMatch(/<a[^>]*href="\/cellar\/o1\/reading"[^>]*>Start readings<\/a>/);
-  // Each tile opens Reading on its own tank (#1508) through an Add reading button.
-  expect(html.match(/<a[^>]*data-slot="button"[^>]*href="\/cellar\/o\d\/reading"[^>]*>Add reading</g)).toHaveLength(2);
-  // A tank with a reading keeps the same button: its ABV is a fact beside it, not a second kind of link.
+  // Each tile opens Reading on its own tank (#1508) through an Add reading link.
+  expect(html.match(/<a[^>]*href="\/cellar\/o\d\/reading"[^>]*>Add reading</g)).toHaveLength(2);
+  // A tank with a reading keeps the same link: its ABV is a fact beside it, not a second kind of link.
   const read = htmlOf(createElement(CellarMapView, { model: toCellarMapViewProps(vessels, one, { o1: { text: "5.4% ABV", at: "2026-09-01T12:00:00Z" } }, {}, reading) }));
   expect(read).toMatch(/<p[^>]*>5\.4% ABV<\/p>/);
   expect(read).toMatch(/<a[^>]*href="\/cellar\/o1\/reading"[^>]*>Add reading</);
@@ -809,9 +809,12 @@ describe("cellar map at a glance", () => {
     expect(model.tiles.slice(0, 2).map(tile => tile.readToday)).toEqual([true, false]);
     expect(model.readingHref).toBe("/cellar/o2/reading");
     const html = htmlOf(createElement(CellarMapView, { model }));
-    expect(html.match(/Read today/g)).toHaveLength(1);
-    // Every tank holding beer keeps Add reading, read today or not.
-    expect(html.match(/>Add reading</g)).toHaveLength(2);
+    // A tank read today says a muted ✓ Today where the others say Add reading; no status pill.
+    expect(html).not.toContain("Read today");
+    expect(html.match(/✓ <\/span>Today/g)).toHaveLength(1);
+    expect(html.match(/>Add reading</g)).toHaveLength(1);
+    // Every tank holding beer still opens Reading, read today or not.
+    expect(html.match(/data-to="Fermentation reading"/g)).toHaveLength(2);
     // With every tank read, the round starts over at the first tank.
     const done = toCellarMapViewProps(vessels, occupancies, { ...readings, o2: readings.o1 }, {}, reading, "America/New_York", now);
     expect(done.readingHref).toBe("/cellar/o1/reading");
@@ -841,7 +844,7 @@ describe("cellar readings (#700)", () => {
       ] },
       { active_occupancies: [] },
     ]);
-    // A tank with no reading has no entry: its tile says "No readings yet".
+    // A tank with no reading has no entry: an unlinked tile says "No readings yet", a linked one only Add reading.
     expect(Object.keys(readings)).toEqual(["o1", "o3"]);
     // The tile says ABV and nothing else: values, age and Fermenting/Finished live on Batches and Vessel detail.
     expect(readings.o1).toEqual({ text: expect.any(String), at: reading.at });
@@ -854,7 +857,8 @@ describe("cellar readings (#700)", () => {
     expect(html).toMatch(/<p[^>]*>\d+\.\d% ABV<\/p>/);
     expect(html).not.toContain("°P");
     const tile = toCellarMapViewProps([{ ...vessels[0], id: "v2", name: "FV2" }], [{ vessel_id: "v2", occupancy_id: "o2", brand_name: null, started_at: "2026-09-01T12:00:00Z", bbl: 2 }], readings, {}, id => `/cellar/${id}/reading`).tiles[0];
-    expect(tile).toMatchObject({ reading: "No readings yet", readingHref: "/cellar/o2/reading" });
+    expect(tile).toMatchObject({ readingHref: "/cellar/o2/reading" });
+    expect(tile.reading).toBeUndefined();
   });
 
 });
