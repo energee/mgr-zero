@@ -221,9 +221,9 @@ with its neighbours once its dependency is done.
 - **Partial submit.** A cart with three ship dates makes three requests. If the
   second fails, the first order exists and the rest stay in the cart with the
   error shown.
-- **Landing.** Migrations must sort after every migration on main. The two
-  here do; `20261119150500_portal_release_from_batch.sql` and this branch's
-  earlier ones do not, and need renaming when the branch lands.
+- **Landing.** Migrations must sort after every migration on main. The
+  branch's earlier ones did not, so they were renamed to `2026111915xxxx` when
+  the PR opened (2026-11-20).
 - **Limits on a new release with no history.** A calculated limit needs
   purchases in the window. A new customer has none, so they are uncapped until
   a share is typed on their page.

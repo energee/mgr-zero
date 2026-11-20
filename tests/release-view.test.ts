@@ -37,6 +37,8 @@ describe("release form view-model", () => {
   it("uses the brewery's defaults, and a batch's own pool once it has one", () => {
     expect(batchReleaseForms(rows, [], { openPct: 50, orderByDays: 10 })[0]).toMatchObject({ wholesaleBbl: "8.5", ordersCloseOn: "2026-11-24" });
     expect(batchReleaseForms(rows.map((r) => ({ ...r, wholesale_bbl: 9 })))[0]).toMatchObject({ wholesaleBbl: "9" });
+    // At 100% the default rounds down, so it never reads above what is planned.
+    expect(batchReleaseForms(rows.map((r) => ({ ...r, planned_bbl: 17.0468 })), [], { openPct: 100, orderByDays: 7 })[0]).toMatchObject({ wholesaleBbl: "17.04" });
   });
 
   it("offers a SKU packaged stock first, then each planned batch that projects it", () => {

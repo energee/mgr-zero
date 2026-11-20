@@ -494,7 +494,7 @@ grant execute on function public.portal_release_share(uuid) to authenticated;
 -- the latest order it drew on. An order's size is not used: imported orders
 -- sometimes merge several can weeks, so only per-beer quantities are trusted.
 create function private.suggested_order(p_brewery uuid, p_customer uuid)
-returns table(release_id uuid, sku_id uuid, qty numeric, last_on date)
+returns table(release_id uuid, sku_id uuid, qty numeric, last_on date, can_round_up boolean)
 language sql stable set search_path = '' as $$
   with c as (
     select sale_channel_id, release_delay_days from public.customers where id = p_customer and brewery_id = p_brewery
@@ -515,11 +515,12 @@ language sql stable set search_path = '' as $$
       and o.status in ('submitted','confirmed','picked','shipped')
     group by 1
   ), beers as (
-  select r.id, r.sku_id, r.ships_from, r.remaining, usual.qty, usual.last_on, coalesce(mine.qty, 0) as mine
+  select r.id, r.sku_id, r.ships_from, r.remaining, usual.qty, usual.last_on, coalesce(mine.qty, 0) as mine, f.pallet_fit
   from private.release_state(p_brewery) r
   join c on r.days_open >= c.release_delay_days
   join public.skus s on s.id = r.sku_id and s.brewery_id = p_brewery
   join public.brands br on br.id = s.brand_id
+  join public.formats f on f.id = s.format_id
   join public.sku_prices p on p.sku_id = r.sku_id and p.active and p.sale_channel_id = c.sale_channel_id
   left join mine on mine.release_id = r.id
   cross join lateral (
@@ -537,7 +538,10 @@ language sql stable set search_path = '' as $$
   ) usual
   where r.open and r.batch_id is not null and usual.qty is not null
   )
-  select b.id, b.sku_id, least(b.qty - b.mine, b.remaining), b.last_on
+  -- can_round_up: the release has a whole layer to spare after the suggestion, so
+  -- the portal may round it up to a full layer without asking for more than is left.
+  select b.id, b.sku_id, least(b.qty - b.mine, b.remaining), b.last_on,
+    b.remaining - least(b.qty - b.mine, b.remaining) >= coalesce(b.pallet_fit, 0)
   from beers b
   where least(b.qty - b.mine, b.remaining) > 0
   order by b.ships_from, b.id;
@@ -545,9 +549,9 @@ $$;
 revoke all on function private.suggested_order(uuid, uuid) from public, anon, authenticated, service_role;
 
 create function public.portal_suggested_order(p_customer uuid)
-returns table(release_id uuid, sku_id uuid, qty numeric, last_on date)
+returns table(release_id uuid, sku_id uuid, qty numeric, last_on date, can_round_up boolean)
 language sql stable security definer set search_path = '' as $$
-  select s.release_id, s.sku_id, s.qty, s.last_on
+  select s.release_id, s.sku_id, s.qty, s.last_on, s.can_round_up
   from public.customers c, private.suggested_order(c.brewery_id, c.id) s
   where c.id = p_customer and c.id in (select public.my_customer_ids());
 $$;

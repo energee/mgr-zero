@@ -31,7 +31,11 @@ export type ShopRelease = {
 /** portal_release_share: the buyer's ceiling in percent of each batch pool, what it would be with every purchase counted once, and the days before ship it lifts. */
 export type ShopShare = { pct: number; basePct: number | null; manual: boolean; liftDays: number };
 /** One portal_suggested_order row; lastOn is the date of the latest order it drew on. */
-export type ShopSuggestion = { releaseId: string; skuId: string; qty: number; lastOn?: string };
+export type ShopSuggestion = {
+  releaseId: string; skuId: string; qty: number; lastOn?: string;
+  /** False when the release has less than a whole layer to spare, so the suggestion is not rounded up; absent reads as true. */
+  canRoundUp?: boolean;
+};
 
 export type ShopCatalogItem = {
   skuId: string;
@@ -267,7 +271,9 @@ function fillLayers(suggested: ShopSuggestion[], catalog: ShopCatalogItem[]): Sh
     const fit = Number(load.split("|").pop());
     const total = lines.reduce((n, s) => n + s.qty, 0);
     const short = (fit - (total % fit)) % fit;
-    if (short && short <= total * 0.2) lines.reduce((most, s) => (s.qty > most.qty ? s : most)).qty += short;
+    // Only a beer with a layer to spare takes the extra, so rounding up never asks for more than is left.
+    const roomy = lines.filter((s) => s.canRoundUp !== false);
+    if (short && short <= total * 0.2 && roomy.length) roomy.reduce((most, s) => (s.qty > most.qty ? s : most)).qty += short;
   }
   return filled;
 }
@@ -275,14 +281,22 @@ function fillLayers(suggested: ShopSuggestion[], catalog: ShopCatalogItem[]): Sh
 /** The buyer's usual quantities as an order worth shipping: each ship date
  *  filled to full layers when that is close (fillLayers), then held to their
  *  ceiling. A batch's packages share one limit in barrels, so later packages
- *  get what earlier ones leave. */
+ *  get what earlier ones leave, after what the cart already holds of that
+ *  batch. A package the cart holds gets no suggestion. */
 export function fitSuggestions(suggested: ShopSuggestion[], catalog: ShopCatalogItem[]): ShopSuggestion[] {
+  const batchOf = (item: ShopCatalogItem, release: ShopRelease) => `${item.product}|${release.shipsFrom}`;
   const used = new Map<string, number>();
+  for (const item of catalog) {
+    const release = item.qty > 0 ? chosenRelease(item) : undefined;
+    if (!release?.bblPerUnit) continue;
+    const batch = batchOf(item, release);
+    used.set(batch, (used.get(batch) ?? 0) + item.qty * release.bblPerUnit);
+  }
   return fillLayers(suggested, catalog).flatMap((s) => {
     const { item, release } = suggestionTarget(s, catalog);
-    if (!item || !release) return [];
+    if (!item || !release || item.qty > 0) return [];
     if (release.limitLeftBbl == null || !release.bblPerUnit) return [s];
-    const batch = `${item.product}|${release.shipsFrom}`;
+    const batch = batchOf(item, release);
     const qty = Math.min(s.qty, Math.floor((release.limitLeftBbl - (used.get(batch) ?? 0)) / release.bblPerUnit + 1e-9));
     if (qty <= 0) return [];
     used.set(batch, (used.get(batch) ?? 0) + qty * release.bblPerUnit);
@@ -313,25 +327,32 @@ export function cartPalletFit(catalog: ShopCatalogItem[]): PalletFitGroup[] {
   return palletFit(catalog.map((i) => palletLine(i)));
 }
 
+/** The most units "Fill the pallet" adds: more than any pallet holds. */
+const FILL_STOP = 1000;
+
 /** "Fill the pallet" for one ship date ("" is what ships now): the new
  *  quantity of each line that grows. Beers already in that order are topped up
  *  one unit at a time, the one that has grown least for its size first, until
  *  one more of anything would need another pallet or pass the buyer's limit
  *  on its batch. */
 export function fillPallet(catalog: ShopCatalogItem[], shipsFrom: string, rules: PalletRules = DEFAULT_PALLET_RULES): Record<string, number> {
-  const items = shipGroups(catalog).find((g) => g.shipsFrom === shipsFrom)?.items.filter((i) => i.palletFit) ?? [];
-  const qty = new Map(items.map((i) => [i.skuId, i.qty]));
-  const count = (plus?: ShopCatalogItem) => palletCount(items.map((i) => palletLine(i, qty.get(i.skuId)! + (i === plus ? 1 : 0))), rules);
+  // Every line of the order counts toward weight and the batch limit; only lines with a pallet fit grow.
+  const order = shipGroups(catalog).find((g) => g.shipsFrom === shipsFrom)?.items ?? [];
+  const items = order.filter((i) => i.palletFit);
+  const qty = new Map(order.map((i) => [i.skuId, i.qty]));
+  const count = (plus?: ShopCatalogItem) => palletCount(order.map((i) => palletLine(i, qty.get(i.skuId)! + (i === plus ? 1 : 0))), rules);
   const pallets = count();
   const overLimit = (item: ShopCatalogItem) => {
     const release = chosenRelease(item);
     if (release?.limitLeftBbl == null || !release.bblPerUnit) return false;
     // A batch's packages share one limit in barrels.
-    const used = items.filter((i) => i.product === item.product).reduce((n, i) => n + qty.get(i.skuId)! * (chosenRelease(i)?.bblPerUnit ?? 0), 0);
+    const used = order.filter((i) => i.product === item.product).reduce((n, i) => n + qty.get(i.skuId)! * (chosenRelease(i)?.bblPerUnit ?? 0), 0);
     return used + release.bblPerUnit > release.limitLeftBbl + 1e-9;
   };
   const growth = (item: ShopCatalogItem) => (qty.get(item.skuId)! - item.qty) / item.qty;
-  for (;;) {
+  // A package that adds neither weight nor height never fills a pallet; past FILL_STOP units there is nothing sound to offer.
+  for (let added = 0; ; added++) {
+    if (added === FILL_STOP) return {};
     const next = items.filter((i) => !overLimit(i) && count(i) === pallets).sort((a, b) => growth(a) - growth(b))[0];
     if (!next) break;
     qty.set(next.skuId, qty.get(next.skuId)! + 1);

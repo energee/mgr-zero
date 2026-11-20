@@ -17,8 +17,10 @@ Two import gaps need product support. Examples below are fictional.
 
 ## Decisions (user, 2026-10-14)
 
-- One alias per brand. Staff-only: shown and searchable in MGR, never on the
+- One alias per brand. Staff-only at first: shown and searchable in MGR, never on the
   portal, Square, the public menu, or SKU, QBO or invoice names.
+  Revised 2026-11-19 (`20261119150200_portal_brand_alias.sql`): portal buyers
+  now see the alias under the brand name on order lines and Shop.
 - Name = the beer's real name; alias = the series number.
 
 | Fictional source name | Brand name | Alias | Description note |

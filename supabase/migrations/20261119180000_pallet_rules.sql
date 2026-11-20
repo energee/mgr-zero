@@ -80,8 +80,9 @@ begin
     end if;
     update public.formats set name = p_name, basis = p_basis, package_type = p_package_type, keg_size = p_keg_size,
       units_per_case = p_units_per_case, bbl_per_unit = p_bbl_per_unit, ounces = p_ounces, price_group_id = p_price_group,
-      pallet_fit = case when p_clear_pallet_fit then null else coalesce(p_pallet_fit, v_row.pallet_fit) end,
-      pallet_fit_mixed = nullif(coalesce(p_pallet_fit_mixed, v_row.pallet_fit_mixed), 0),
+      -- A format changed to a pour keeps no pallet fit: only a packaged one may carry it.
+      pallet_fit = case when p_clear_pallet_fit or p_basis = 'poured' then null else coalesce(p_pallet_fit, v_row.pallet_fit) end,
+      pallet_fit_mixed = case when p_basis = 'poured' then null else nullif(coalesce(p_pallet_fit_mixed, v_row.pallet_fit_mixed), 0) end,
       packaging_lb = coalesce(p_packaging_lb, v_row.packaging_lb),
       height_in = nullif(coalesce(p_height_in, v_row.height_in), 0)
     where id = p_id returning * into v_row;
@@ -102,11 +103,13 @@ returns table (brewery_id uuid, sale_channel_id uuid, sku_id uuid, sku_name text
 language sql stable security definer set search_path = '' as $$
   select p.brewery_id, p.sale_channel_id, p.sku_id, p.sku_name, p.brand_name, p.unit_price_cents,
     f.package_type, f.keg_size, f.units_per_case, case when sc.pallets then f.pallet_fit end, b.alias, f.name,
-    case when sc.pallets then f.pallet_fit_mixed end, f.bbl_per_unit, f.packaging_lb, f.height_in
+    case when sc.pallets then f.pallet_fit_mixed end, fv.bbl_per_unit, f.packaging_lb, f.height_in
   from public.sku_prices p
   join public.skus s on s.id = p.sku_id and s.brewery_id = p.brewery_id
   join public.brands b on b.id = s.brand_id and b.brewery_id = s.brewery_id
   join public.formats f on f.id = s.format_id and f.brewery_id = s.brewery_id
+  -- format_volumes, not formats: a format built from other packages has its barrels only there.
+  join public.format_volumes fv on fv.id = f.id
   join public.sale_channels sc on sc.id = p.sale_channel_id and sc.brewery_id = p.brewery_id
   where p.active
     and p.sale_channel_id in (select c.sale_channel_id from public.customers c

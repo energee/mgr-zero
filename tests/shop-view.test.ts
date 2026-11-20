@@ -477,6 +477,28 @@ describe("Shop ship dates, limits and suggestions", () => {
     expect(full.summary.pallet).toBe("1 full pallet ✓");
     expect(full.preOrder?.fillable).toEqual([]);
   });
+  it("counts the order's lines with no pallet fit toward the batch limit", () => {
+    const loose = item("x", "Hazy", 10, { name: "Loose", formatName: "Loose", packageType: "can", kegSize: null, releases: [rel("r-x", "2026-12-09", { bblPerUnit: 0.1 })] });
+    // 3 bbl left: the ten loose cans take 1 bbl, so the halves stop at four.
+    expect(fillPallet([half(2, { limitLeftBbl: 3 }), loose], "2026-12-09")).toEqual({ h: 4 });
+  });
+  it("offers nothing for a package that adds neither weight nor height", () => {
+    const blankCase = item("u", "Pils", 3, { name: "Case", formatName: "Case", packageType: "can", kegSize: null, unitsPerCase: 24, palletFit: 20, releases: [rel("r-u", "2026-12-09", { bblPerUnit: null })] });
+    expect(fillPallet([blankCase], "2026-12-09")).toEqual({});
+    expect(toShopViewProps({ ...ridgelineShop, catalog: [blankCase] }).summary.pallet).toBe("1 pallet");
+  });
+  it("holds suggestions to the limit left after what the cart already has, and rounds up only with a layer to spare", () => {
+    const capped = rel("r-keg", "2026-12-09", { limitLeftBbl: 3 });
+    const catalog = [
+      item("k", "Sooner Saison", 4, { releases: [capped], offer: "r-keg" }),
+      item("c", "Sooner Saison", 0, { name: "Sixtel", formatName: "Sixtel", kegSize: "sixth_bbl", releases: [{ ...capped, releaseId: "r-six", bblPerUnit: 0.25 }] }),
+    ];
+    // Four halves in the cart use 2 of the 3 bbl, so twelve suggested sixtels become four; the held halves get no suggestion.
+    expect(fitSuggestions([{ releaseId: "r-keg", skuId: "k", qty: 2 }, { releaseId: "r-six", skuId: "c", qty: 12 }], catalog)).toEqual([{ releaseId: "r-six", skuId: "c", qty: 4 }]);
+    const caseOf24 = item("p", "Pils", 0, { name: "Case", formatName: "Case", packageType: "can", kegSize: null, unitsPerCase: 24, palletFit: 20, releases: [rel("r-p", "2026-12-09")] });
+    expect(fitSuggestions([{ releaseId: "r-p", skuId: "p", qty: 98 }], [caseOf24])[0].qty).toBe(100);
+    expect(fitSuggestions([{ releaseId: "r-p", skuId: "p", qty: 98, canRoundUp: false }], [caseOf24])[0].qty).toBe(98);
+  });
   });
 });
 

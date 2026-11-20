@@ -201,8 +201,9 @@ defineQuery({
   roles: "customer",
   input: z.object({}),
   handler: async (ctx) => {
-    const rows = await unwrap(ctx.db.rpc("portal_suggested_order", { p_customer: requireCustomer(ctx) })) as { release_id: string; sku_id: string; qty: number; last_on: string }[];
-    return rows.map(r => ({ releaseId: r.release_id, skuId: r.sku_id, qty: Number(r.qty), lastOn: r.last_on }));
+    // canRoundUp: the release has a whole layer to spare, so the portal may round the suggestion up to a full layer.
+    const rows = await unwrap(ctx.db.rpc("portal_suggested_order", { p_customer: requireCustomer(ctx) })) as { release_id: string; sku_id: string; qty: number; last_on: string; can_round_up: boolean }[];
+    return rows.map(r => ({ releaseId: r.release_id, skuId: r.sku_id, qty: Number(r.qty), lastOn: r.last_on, canRoundUp: r.can_round_up }));
   },
 });
 

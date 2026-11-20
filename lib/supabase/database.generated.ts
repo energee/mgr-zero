@@ -5735,7 +5735,7 @@ isOneToOne: false
                            },
 "portal_suggested_order":
 { Args: { "p_customer": string }; Returns: {
-              "last_on": string,"qty": number,"release_id": string,"sku_id": string
+              "can_round_up": boolean,"last_on": string,"qty": number,"release_id": string,"sku_id": string
             }[]
                            },
 "pos_order_versions":

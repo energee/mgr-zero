@@ -182,6 +182,9 @@ export function palletCount(lines: PalletLine[], rules: PalletRules = DEFAULT_PA
   }
 }
 
+/** More of one package than any pallet holds: where palletLoad stops counting room. */
+const ROOM_STOP = 500;
+
 export type PalletLoad = {
   pallets: number;
   /** Per package, how many more ride on the same pallets (only packages with room). */
@@ -197,19 +200,23 @@ export function palletLoad(lines: PalletLine[], kinds: PalletLine[] = lines, rul
   const pallets = palletCount(lines, rules);
   if (!pallets) return undefined;
   const seen = new Set<string>();
+  let unmeasured = false;
   const room = kinds.flatMap((kind) => {
     const label = packageLabel(kind);
     if (!kind.palletFit || seen.has(label)) return [];
     seen.add(label);
     let more = 0;
     // A pallet holds at most a few hundred of anything, so counting up is cheap.
-    while (more < 500 && palletCount([...lines, { ...kind, qty: more + 1 }], rules) === pallets) more++;
+    while (more < ROOM_STOP && palletCount([...lines, { ...kind, qty: more + 1 }], rules) === pallets) more++;
+    // A package that adds neither weight nor height has no measurable room.
+    if (more === ROOM_STOP) { unmeasured = true; return []; }
     return more ? [{ label, more }] : [];
   });
-  const count = `${pallets} ${room.length ? "" : "full "}pallet${pallets === 1 ? "" : "s"}`;
+  const full = !room.length && !unmeasured;
+  const count = `${pallets} ${full ? "full " : ""}pallet${pallets === 1 ? "" : "s"}`;
   // Labels are plural; one more reads in the singular ("1 more ⅙ bbl keg", "1 more case of 24 cans").
   const one = (label: string) => (label.startsWith("Cases of") ? label.replace("Cases", "Case") : label.replace(/s$/, ""));
   const parts = room.map((r) => { const label = r.more === 1 ? one(r.label) : r.label; return `${r.more} more ${label[0].toLowerCase()}${label.slice(1)}`; });
   const list = parts.length > 1 ? `${parts.slice(0, -1).join(", ")} or ${parts.at(-1)}` : parts[0];
-  return { pallets, room, text: room.length ? `${count}. Room for ${list}.` : `${count} ✓` };
+  return { pallets, room, text: room.length ? `${count}. Room for ${list}.` : `${count}${full ? " ✓" : ""}` };
 }

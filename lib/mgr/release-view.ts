@@ -36,7 +36,8 @@ export const bbl = (value: number) => String(Math.round(value * 100) / 100);
 
 /** A batch form's pool fields: the batch's pool when it has one, else the default percent of its planned barrels, and ordering closed the default days before ship. */
 const poolFields = (row: ReleaseBatchRow, defaults: ReleaseDefaults) => ({
-  wholesaleBbl: bbl(row.wholesale_bbl ?? row.planned_bbl * defaults.openPct / 100), plannedBbl: row.planned_bbl,
+  // Rounded down to the cent of a barrel, so the default at 100% never reads above what is planned.
+  wholesaleBbl: bbl(row.wholesale_bbl ?? Math.floor(row.planned_bbl * defaults.openPct + 1e-9) / 100), plannedBbl: row.planned_bbl,
   ordersCloseOn: shiftDays(row.needed_by, -defaults.orderByDays),
 });
 

@@ -62,17 +62,18 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource, brands, 
   const initialFields = recovery.attempt?.fields ?? initial?.fields;
   const [fields, setFields] = useState<PortalFields>(initialFields ?? { shipToId: defaultShipToId(shipTos), poNumber: "", note: "", requestedShipDate: null, lines: [], ...working?.fields });
   /** The buyer's usual quantities for one ship date (absent: the soonest with any), for packages the cart does not hold yet, each on the release it was suggested for. */
-  const suggestions = (held: Record<string, string>, shipsFrom?: string) => {
-    const blank = items.map(item => ({ ...item, qty: 0 }));
-    const dated = fitSuggestions(suggested, blank).map(s => ({ ...s, shipsFrom: suggestionShipsFrom(s, blank) ?? "" }));
+  const suggestions = (held: Record<string, string>, heldOffers: Record<string, string>, shipsFrom?: string) => {
+    // What the cart holds counts against the buyer's limit on each batch before anything is suggested.
+    const cart = items.map(item => ({ ...item, qty: Number(held[item.skuId] ?? 0), offer: heldOffers[item.skuId] }));
+    const dated = fitSuggestions(suggested, cart).map(s => ({ ...s, shipsFrom: suggestionShipsFrom(s, cart) ?? "" }));
     const date = shipsFrom ?? dated.map(s => s.shipsFrom).sort()[0];
-    return dated.filter(s => s.shipsFrom === date && !(Number(held[s.skuId]) > 0));
+    return dated.filter(s => s.shipsFrom === date);
   };
   // Opened from the digest, a new cart starts with the soonest ship date's suggested quantities filled in.
   const [opening] = useState(() => {
     const qty = working?.qty ?? Object.fromEntries((initialFields?.lines ?? []).map(l => [l.skuId, String(l.qty)]));
     const offers = working?.offers ?? Object.fromEntries((initialFields?.lines ?? []).map(l => [l.skuId, l.releaseId ?? ""]));
-    const fill = autoSuggest && !initialFields ? suggestions(qty) : [];
+    const fill = autoSuggest && !initialFields ? suggestions(qty, offers) : [];
     return { qty: { ...qty, ...Object.fromEntries(fill.map(s => [s.skuId, String(s.qty)])) }, offers: { ...offers, ...Object.fromEntries(fill.map(s => [s.skuId, s.releaseId])) } };
   });
   const [qty, setQty] = useState<Record<string, string>>(opening.qty);
@@ -233,7 +234,7 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource, brands, 
         note: note => setFields(prev => ({ ...prev, note })),
         saveDraft: () => { void run("draft"); }, review: () => { void openReview(); },
         suggest: shipsFrom => {
-          const fill = suggestions(qty, shipsFrom);
+          const fill = suggestions(qty, offers, shipsFrom);
           setQty(prev => ({ ...prev, ...Object.fromEntries(fill.map(s => [s.skuId, String(s.qty)])) }));
           setOffers(prev => ({ ...prev, ...Object.fromEntries(fill.map(s => [s.skuId, s.releaseId])) }));
         },
