@@ -22,7 +22,7 @@ import type { CellarMapViewModel } from "@/lib/mgr/cellar-map-view";
 type Tile = CellarMapViewModel["tiles"][number];
 
 /** A tank's reading link, one quiet word on the ABV line: Add reading, or a muted ✓ Today once it has today's reading. Either opens Reading, so a second reading stays one tap away. `linkClassName` styles the link. */
-const readingActions = (tile: Tile, linkClassName?: string): ReactNode => {
+const readingLink = (tile: Tile, linkClassName?: string): ReactNode => {
   const label = tile.readToday
     ? <><span aria-hidden="true">✓ </span>Today<span className="sr-only">: read. Add another reading for {tile.name}</span></>
     : <>Add reading<span className="sr-only"> for {tile.name}</span></>;
@@ -36,7 +36,7 @@ const readingActions = (tile: Tile, linkClassName?: string): ReactNode => {
 function tileReading(tile: Tile): ReactNode {
   return tile.readingHref === undefined ? E.polite(tile.reading) : <div className="flex w-full flex-wrap items-center justify-between gap-x-2 gap-y-1">
     {E.polite(tile.reading)}
-    {readingActions(tile)}
+    {readingLink(tile)}
   </div>;
 }
 
@@ -51,7 +51,7 @@ const tileName = (tile: Tile): ReactNode => <>{tile.name}{" "}<span className="f
 const tankRow = (tile: Tile): ReactNode => <Fragment key={tile.name}>{E.row(
   <>{vesselLink(tile, tile.name, "relative z-10")}{" "}<span className="font-normal text-muted-foreground">{tile.detail}</span></>,
   [tile.day, tile.volume, tile.reading].filter(Boolean).join(" · "),
-  tile.readingHref === undefined ? "" : readingActions(tile, ROW_LINK_COVER),
+  tile.readingHref === undefined ? "" : readingLink(tile, ROW_LINK_COVER),
 )}</Fragment>;
 
 /** One section per vessel type: its tanks holding beer as tiles or as list rows, then its Empty line. */
