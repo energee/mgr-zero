@@ -21,7 +21,7 @@ import "@/lib/commands/all";
 import type { BrandSnapshot } from "@/lib/mgr/brand-view";
 import type { KegPoolOption } from "@/lib/mgr/sku-view";
 import { BrandPage, type BrandRow, type SellsReads } from "./brand-page";
-import type { ReleaseBatchRow, ReleaseRow } from "@/lib/mgr/release-view";
+import { releaseDefaultsOf, type ReleaseBatchRow, type ReleaseRow } from "@/lib/mgr/release-view";
 import { breweryDate } from "@/lib/date-format";
 
 /** The brand's reads for the page, its metadata and the brand sheet within one request.
@@ -51,11 +51,12 @@ export const findBrandPageData = cache(async function findBrandPageData(id: stri
   if (brand === undefined) return null;
   const own = brand ? registry.brands.find((b) => b.id === brand.id) : undefined;
   const skuIds = brand?.skus.map((s) => s.id) ?? [];
-  const [releases, releaseBatches] = skuIds.length && canRun(ctx, "release_sku") ? await Promise.all([
+  const [releases, releaseBatches, releaseDefaults] = skuIds.length && canRun(ctx, "release_sku") ? await Promise.all([
     runCommand("list_releases", { skuIds, open: true }, ctx) as Promise<ReleaseRow[]>,
     runCommand("list_release_batches", { skuIds }, ctx) as Promise<ReleaseBatchRow[]>,
-  ]) : [[], []];
-  return { ctx, brands, groups, cost, categories, sells, brand, own, releases, releaseBatches, today: breweryDate(brewery.timeZone) };
+    (runCommand("get_brewery", {}, ctx) as Promise<Parameters<typeof releaseDefaultsOf>[0]>).then(releaseDefaultsOf),
+  ]) : [[], [], undefined];
+  return { ctx, brands, groups, cost, categories, sells, brand, own, releases, releaseBatches, releaseDefaults, today: breweryDate(brewery.timeZone) };
 });
 
 /** findBrandPageData for the page: a saved id with no brand renders not-found.tsx. */
@@ -64,7 +65,7 @@ export const getBrandPageData = cache(async function getBrandPageData(id: string
 });
 
 export async function BrandDetail({ id }: { id: string }) {
-  const { ctx, brands, groups, cost, categories, sells, brand, own, releases, releaseBatches, today } = await getBrandPageData(id);
+  const { ctx, brands, groups, cost, categories, sells, brand, own, releases, releaseBatches, releaseDefaults, today } = await getBrandPageData(id);
   return (
     <BrandPage
       brand={brand}
@@ -75,6 +76,7 @@ export async function BrandDetail({ id }: { id: string }) {
       compliance={own}
       sells={sells && { formats: sells[0], prices: sells[1], channels: sells[2], releases }}
       releaseBatches={releaseBatches}
+      releaseDefaults={releaseDefaults}
       today={today}
       pools={sells?.[3] ?? []}
       canSell={canRun(ctx, "create_sku")}

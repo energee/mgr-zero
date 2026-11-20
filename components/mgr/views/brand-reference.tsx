@@ -1,21 +1,29 @@
 // components/mgr/views/brand-reference.tsx — the body of the portal brand
-// reference sheet (toBrandReference, lib/mgr/brand-reference-view.ts): the
-// label image (a slot the live adapter fills with ColaLabelImageView), alias,
-// style, ABV, hops, description, and the COLA TTB ID linked to TTB's registry.
-import { Fragment, type ReactNode } from "react";
+// sheet (toBrandReference, lib/mgr/brand-reference-view.ts), laid out as a
+// product page: the label (a slot the live adapter fills with
+// ColaLabelImageView) beside the details from md up and above them on a phone.
+// The details are one alias · style · ABV line, the description, the hops,
+// `order` (on Shop, the brand's package rows, so the buyer orders from the
+// sheet; absent on a past order), and the COLA TTB ID as a small registry link.
+import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { cn } from "@/lib/utils";
 import type { BrandReferenceModel } from "@/lib/mgr/brand-reference-view";
 
-export function BrandReferenceView({ model, image }: { model: BrandReferenceModel; image?: ReactNode }) {
-  const empty = !image && !model.facts.length && !model.description && !model.cola;
-  return <div className="flex flex-col gap-2">
+export function BrandReferenceView({ model, image, order }: { model: BrandReferenceModel; image?: ReactNode; order?: ReactNode }) {
+  const lead = [model.alias, model.tagline].filter(Boolean).join(" · ");
+  const empty = !image && !lead && !model.hops && !model.description && !model.cola && !order;
+  return <div className={cn("flex flex-col gap-4", image && "md:grid md:grid-cols-2 md:items-start")}>
     {image}
-    {model.alias ? <p className="text-sm text-muted-foreground">{model.alias}</p> : null}
-    {model.facts.map((fact) => <Fragment key={fact.label}>{E.fld(fact.label, fact.value)}</Fragment>)}
-    {model.description ? <p className="text-sm">{model.description}</p> : null}
-    {model.cola ? E.fld("COLA TTB ID", model.cola.href
-      ? <a href={model.cola.href} target="_blank" rel="noopener noreferrer" className="underline">{model.cola.ttbId}</a>
-      : model.cola.ttbId) : null}
-    {empty ? <p className="text-sm text-muted-foreground">No more details from the brewery yet.</p> : null}
+    <div className="flex min-w-0 flex-col gap-3">
+      {lead ? <p className="text-sm text-muted-foreground">{lead}</p> : null}
+      {model.description ? <p className="text-sm">{model.description}</p> : null}
+      {model.hops ? E.fld("Hops", model.hops) : null}
+      {order}
+      {model.cola ? <p className="text-xs text-muted-foreground">Label approval (TTB): {model.cola.href
+        ? <a href={model.cola.href} target="_blank" rel="noopener noreferrer" className="underline">{model.cola.ttbId}</a>
+        : model.cola.ttbId}</p> : null}
+      {empty ? <p className="text-sm text-muted-foreground">No more details from the brewery yet.</p> : null}
+    </div>
   </div>;
 }

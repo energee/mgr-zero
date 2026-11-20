@@ -5,13 +5,13 @@
 -- portal_brand_rows returns those fields, scoped like portal_availability
 -- (my_customer_ids(), brands priced on the caller's sale channel only).
 --
--- It replaces portal_cola_labels (20261119020000): one list read for Shop and
+-- It replaces portal_cola_labels (20261119150300): one list read for Shop and
 -- orders. ttb_id is the COLA whose stored label Shop shows
 -- (private.portal_cola_label_rows), else the brand's earliest approved COLA,
 -- so the sheet's TTB ID and image name the same approval whenever there is an
 -- image. has_label says MGR holds a copy; portal_cola_label_image serves it.
 --
--- portal_order_rows (latest: 20261119010000_portal_brand_alias.sql) adds the
+-- portal_order_rows (latest: 20261119150200_portal_brand_alias.sql) adds the
 -- brand id to each line's skus.brands, so an order groups its lines under the
 -- same brand heading Shop draws. Otherwise unchanged.
 

@@ -479,7 +479,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (priceGroupId and positive finite ounces required; no package facts, never stock). A format in use keeps its basis: one used by a SKU, component or BOM stays packaged; one used by a POS mapping, menu or sale stays poured. The same use also fixes its bblPerUnit, unitsPerCase and ounces; a rename still saves. palletFit (advisory, packaged only) is Admin only: omit to keep, null to clear
+Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (priceGroupId and positive finite ounces required; no package facts, never stock). A format in use keeps its basis: one used by a SKU, component or BOM stays packaged; one used by a POS mapping, menu or sale stays poured. The same use also fixes its bblPerUnit, unitsPerCase and ounces; a rename still saves. palletFit and palletFitMixed (advisory, packaged only) are Admin only: omit to keep, null to clear
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -493,6 +493,9 @@ Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) 
 | `priceGroupId` | uuid | no |
 | `ounces` | number | no |
 | `palletFit` | integer or null | no |
+| `palletFitMixed` | integer or null | no |
+| `packagingLb` | number | no |
+| `heightIn` | number | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

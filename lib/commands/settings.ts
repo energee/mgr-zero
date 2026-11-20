@@ -10,6 +10,7 @@
 import { z } from "zod";
 import { completeRows, isoDate, defineCommand, definePreTenantQuery, defineQuery, PAGE_SIZE, phone, unwrap, STAFF_ROLES } from "./registry";
 import { GRAVITY_UNITS, type GravityUnit } from "@/lib/mgr/gravity-unit";
+import { KEG_SIZES } from "@/lib/mgr/enums";
 import { chatModelFromSettings, DEFAULT_CHAT_MODEL, MODEL_ID } from "@/lib/chat/models";
 
 defineQuery({
@@ -75,11 +76,11 @@ defineCommand({
 
 const readingDueHours = z.number().int().min(1).max(168);
 const gatewayModel = z.string().trim().min(3).max(200).regex(MODEL_ID);
-const BREWERY_COLUMNS = "id, name, timezone, ttb_registry_no, customer_phone, fermentation_reading_due_hours, days_to_package, gravity_unit, portal_fulfillment_location_id, books_opened_on, agents_enabled";
+const BREWERY_COLUMNS = "id, name, timezone, ttb_registry_no, customer_phone, fermentation_reading_due_hours, days_to_package, gravity_unit, portal_fulfillment_location_id, books_opened_on, agents_enabled, release_open_pct, release_order_by_days, release_cap_lift_days, release_digest_dow, release_share_window_days, release_stock_multiplier, release_max_share_pct, pallet_rules";
 
 defineQuery({
   name: "get_brewery",
-  description: "The current brewery's basics: name, timezone, TTB registry number, customer-facing phone, reading-overdue hours, days to package, gravity unit, portal fulfillment warehouse and the books-opened date",
+  description: "The current brewery's basics: name, timezone, TTB registry number, customer-facing phone, reading-overdue hours, days to package, gravity unit, portal fulfillment warehouse, the books-opened date, the release defaults and the pallet rules",
   input: z.object({}), roles: ["admin", "sales", "warehouse", "brewer"],
   handler: (ctx) => unwrap(ctx.db.from("breweries").select(BREWERY_COLUMNS).eq("id", ctx.breweryId).single()),
 });
@@ -135,6 +136,38 @@ defineCommand({
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_brewery_books_opened_on", {
     p_brewery: ctx.breweryId, p_books_opened_on: i.booksOpenedOn, p_request_id: execution.requestId,
   })),
+});
+
+defineCommand({
+  name: "set_release_defaults", description: "Set the brewery's release defaults: the percent of a planned batch the release form opens to wholesale, the days before ship that ordering closes by default and that customer ceilings lift, the history window, stock multiplier and maximum for calculated ceilings (a null window calculates none), and the weekday the release digest is sent (null sends none)",
+  compensation: "Reverse with set_release_defaults and the previous values.",
+  input: z.object({
+    openPct: z.number().int().min(1).max(100).describe("Percent of a planned batch opened to wholesale by default"),
+    orderByDays: z.number().int().min(0).max(60).describe("Days before ship that ordering closes by default"),
+    capLiftDays: z.number().int().min(0).max(90).describe("Days before ship that customer ceilings stop applying"),
+    shareWindowDays: z.number().int().min(7).max(730).nullable().describe("Days of purchases a calculated ceiling looks back over; null calculates none"),
+    stockMultiplier: z.number().min(1).max(10).multipleOf(0.01).describe("How many times a barrel bought from stock counts toward a calculated ceiling"),
+    maxSharePct: z.number().int().min(1).max(100).describe("The most a calculated ceiling can be, in percent of a pool"),
+    digestDay: z.number().int().min(0).max(6).nullable().describe("Weekday the release digest is sent, 0 Sunday to 6 Saturday; null sends none"),
+  }), roles: ["admin"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_release_defaults", {
+    p_brewery: ctx.breweryId, p_open_pct: i.openPct, p_order_by_days: i.orderByDays, p_cap_lift_days: i.capLiftDays,
+    p_share_window_days: i.shareWindowDays as number, p_stock_multiplier: i.stockMultiplier, p_max_share_pct: i.maxSharePct,
+    p_digest_dow: i.digestDay as number, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "set_pallet_rules", description: "Set how the brewery stacks a pallet, which the portal uses for the buyer's pallet line and Fill the pallet: the most a pallet carries in pounds, the tallest a loaded pallet stands and the empty pallet's own height in inches (layers stack in the room between, each as tall as its format's height), and the ways one keg layer loads (each a count per keg size; a pallet carries at most two keg layers). Advisory: nothing is enforced",
+  compensation: "Reverse with set_pallet_rules and the previous values.",
+  input: z.object({
+    maxLb: z.number().int().min(1).max(10000).describe("The most one pallet carries, in pounds"),
+    maxHeightIn: z.number().int().min(12).max(120).describe("The tallest a loaded pallet stands from the floor, in inches"),
+    palletHeightIn: z.number().min(0).max(24).multipleOf(0.1).describe("The empty pallet's own height in inches, taken off maxHeightIn to get the room for layers"),
+    kegLayers: z.array(z.object(Object.fromEntries(KEG_SIZES.map((size) => [size, z.number().int().min(1).max(500).optional().describe("Kegs of this size in the layer; omit for none")]))))
+      .max(50).describe("The ways one keg layer loads, each a count per keg size, such as { half_bbl: 6, sixth_bbl: 6 }; empty uses each format's pallet fit"),
+  }), roles: ["admin"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_pallet_rules", { p_brewery: ctx.breweryId, p_rules: i, p_request_id: execution.requestId })),
 });
 
 defineCommand({

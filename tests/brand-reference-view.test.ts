@@ -15,14 +15,14 @@ describe("toBrandReference", () => {
   it("shows every fact the brewery set, and links the COLA to its TTB registry page", () => {
     expect(toBrandReference(full)).toEqual({
       brandId: "b1", title: "Rose Quartz", alias: "Mineral #7", hasLabel: true,
-      facts: [{ label: "Style", value: "Pilsner" }, { label: "ABV", value: "5.2%" }, { label: "Hops", value: "Saaz, Hallertau" }],
+      tagline: "Pilsner · 5.2% ABV", hops: "Saaz, Hallertau",
       description: "A crisp, dry pilsner.",
       cola: { ttbId: "26001001000777", href: colaUrl("26001001000777") },
     });
   });
 
   it("leaves out every fact that is not set", () => {
-    expect(toBrandReference(bare)).toEqual({ brandId: "b2", title: "Hazy IPA", hasLabel: false, facts: [] });
+    expect(toBrandReference(bare)).toEqual({ brandId: "b2", title: "Hazy IPA", hasLabel: false });
   });
 
   it("keeps a TTB id that is not a valid COLA id as text, with no link", () => {
@@ -31,8 +31,12 @@ describe("toBrandReference", () => {
 });
 
 describe("BrandReferenceView", () => {
-  it("draws the image slot, alias, facts, description and the registry link", () => {
-    const html = renderToStaticMarkup(createElement(BrandReferenceView, { model: toBrandReference(full), image: createElement("i", null, "label") }));
+  it("draws the image slot, one alias · style · ABV line, description, hops, the order slot and the registry link", () => {
+    const html = renderToStaticMarkup(createElement(BrandReferenceView, { model: toBrandReference(full), image: createElement("i", null, "label"), order: createElement("b", null, "formats") }));
+    expect(html).toContain("Mineral #7 · Pilsner · 5.2% ABV");
+    expect(html).toContain("Saaz, Hallertau");
+    expect(html).toContain("<b>formats</b>");
+    expect(html).toContain("Label approval (TTB)");
     expect(html).toContain("<i>label</i>");
     expect(html).toContain("Mineral #7");
     expect(html).toContain("5.2%");

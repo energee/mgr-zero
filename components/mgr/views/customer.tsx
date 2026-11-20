@@ -10,7 +10,7 @@ import { TAX_TREATMENTS } from "@/lib/mgr/tax-treatments";
 import { E, type FieldControls } from "@/components/mgr/e";
 import { FieldDescription } from "@/components/ui/field";
 import { UsStateField } from "@/components/mgr/us-state-field";
-import { CUSTOMER_ALIAS_HELP, customerNameError, customerStateReason, RELEASE_DELAY_HELP, releaseDelayError, type CustomerEditValues, type CustomerViewModel } from "@/lib/mgr/customer-view";
+import { CUSTOMER_ALIAS_HELP, customerNameError, customerStateReason, RELEASE_DELAY_HELP, RELEASE_SHARE_HELP, releaseDelayError, releaseShareError, type CustomerEditValues, type CustomerViewModel } from "@/lib/mgr/customer-view";
 import { submitReason } from "@/lib/mgr/submit-reason";
 import { useTouchedLines } from "@/lib/mgr/touched-lines";
 import { DeleteCustomerControl } from "./delete-customer";
@@ -113,6 +113,7 @@ export function CustomerView({
   const removal = deleteAction !== undefined ? deleteAction : <DeleteCustomerControl name={model.name} />;
   const stateReason = customerStateReason(values);
   const delayError = releaseDelayError(values.releaseDelayDays ?? "0");
+  const shareError = releaseShareError(values.releaseSharePct ?? "");
   return (
     <div className="@container flex min-w-0 flex-col gap-6">
       <header className="min-w-0 [overflow-wrap:anywhere] [&_h1]:font-heading [&_h1]:text-2xl [&_h1]:tracking-tight @min-[48rem]:[&_h1]:text-3xl">
@@ -172,6 +173,10 @@ export function CustomerView({
                 {E.edit("Release delay (days)", values.releaseDelayDays ?? "0", "number", undefined, { ...controls("releaseDelayDays"), "aria-describedby": `${formId}-release-delay-help`, min: 0, max: 60, step: 1, onBlur: () => touched.touch(1), error: touched.shown(1) ? releaseDelayError(values.releaseDelayDays ?? "0") : undefined })}
                 <FieldDescription id={`${formId}-release-delay-help`}>{RELEASE_DELAY_HELP}</FieldDescription>
               </div>
+              <div className="flex min-w-0 flex-col gap-2">
+                {E.edit("Release share (%)", values.releaseSharePct ?? "", "number", undefined, { ...controls("releaseSharePct"), "aria-describedby": `${formId}-release-share-help`, min: 0.01, max: 100, step: 0.01, onBlur: () => touched.touch(2), error: touched.shown(2) ? shareError : undefined })}
+                <FieldDescription id={`${formId}-release-share-help`}>{RELEASE_SHARE_HELP}</FieldDescription>
+              </div>
             </div>
           </section>
           <section aria-label="Customer activity" className="flex flex-col gap-3">
@@ -187,10 +192,11 @@ export function CustomerView({
         event.preventDefault();
         touched.touch(0);
         touched.touch(1);
-        if (canWrite && !busy && !nameError && !stateReason && !delayError) onSave?.(values);
+        touched.touch(2);
+        if (canWrite && !busy && !nameError && !stateReason && !delayError && !shareError) onSave?.(values);
       }}>
         <CommandFormMessage error={error} />
-        {footer !== undefined ? footer : canWrite ? <div className="flex justify-end">{E.submit("Save customer", { submitting: busy, reason: submitReason([...(nameError ? ["a name"] : []), ...(stateReason ? ["a state"] : []), ...(delayError ? ["a release delay of 0 to 60 days"] : [])]) })}</div> : null}
+        {footer !== undefined ? footer : canWrite ? <div className="flex justify-end">{E.submit("Save customer", { submitting: busy, reason: submitReason([...(nameError ? ["a name"] : []), ...(stateReason ? ["a state"] : []), ...(delayError ? ["a release delay of 0 to 60 days"] : []), ...(shareError ? ["a release share above 0 up to 100, or none"] : [])]) })}</div> : null}
       </form>
       {removal && <section aria-label="Delete customer" className="mt-2 flex flex-col gap-4 border-t pt-5 @min-[48rem]:flex-row @min-[48rem]:items-center @min-[48rem]:justify-between">
         <div>

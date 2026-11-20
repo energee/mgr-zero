@@ -49,12 +49,14 @@ defineCommand({
     // (§16.3); omit it to inherit the channel default.
     taxTreatment: z.enum(["taxable", "export", "vessel_supplies", "research", "transfer_in_bond"]).optional(),
     releaseDelayDays: z.number().int().min(0).max(60).optional().describe("Days after a portal release opens before this customer sees it (0 to 60; 0 is right away); omit to keep it"),
+    releaseSharePct: z.number().positive().max(100).multipleOf(0.01).nullable().optional().describe("Ceiling: the percent of a batch pool this customer may order until ceilings lift; null removes it, omit to keep it"),
   }).refine(hasStateIffUs, stateByCountry),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_customer", {
     p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_type: i.type, p_state: i.state ?? null,
     p_sale_channel: i.saleChannelId, p_license_no: i.licenseNumber ?? null,
     p_payment_terms: i.paymentTerms ?? null, p_tax_treatment: i.taxTreatment ?? null, p_request_id: execution.requestId,
     p_alias: i.alias ?? null, p_country: i.country, p_release_delay_days: i.releaseDelayDays ?? null,
+    ...(i.releaseSharePct === null ? { p_clear_release_share: true } : i.releaseSharePct !== undefined ? { p_release_share_pct: i.releaseSharePct } : {}),
   })),
 });
 

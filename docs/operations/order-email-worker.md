@@ -2,6 +2,33 @@
 
 How the order-confirmation email worker is configured and scheduled, and how an operator reads its failures and recovers.
 
+## Weekly release digest
+
+The same worker also delivers the weekly release digest
+(`docs/plans/release-pool-and-ceilings.md`). `POST /api/email/jobs/digest`
+builds and queues the digests; it sends nothing itself. It takes the same bearer
+token (`ORDER_EMAIL_JOB_SECRET`) and also needs `APP_URL` for the link in the
+email. `.github/workflows/hosted-jobs.yml` calls it once a day at 13:07 UTC.
+A brewery is included only on the weekday an admin chose under **Settings →
+Releases → Weekly digest**; the default is **Off**, which queues nothing.
+
+- One delivery is queued per portal user per week (the key is the Monday of
+  that week). Calling the job again, or changing the digest day mid-week,
+  queues nothing new, so a re-dispatch is safe.
+- A digest row has `digest_week` set and no `order_id`. It does not appear
+  in an order's confirmation status.
+- A user with nothing to read (no new release, no limit lifting within a week,
+  no beer open to everyone) is skipped.
+- A skipped GitHub schedule on the digest day means that week's digest is not
+  sent. Re-dispatch `hosted jobs` the same day to send it.
+- Failures log `Release digest failure` with a `stage` of `configuration`,
+  `read`, `build` or `queue`, and never an address or message body. The
+  route answers a generic HTTP 500.
+- Delivery failures after queueing are the worker failures described below.
+
+Do not turn the digest on for a brewery with real customer logins until the
+wording is approved: the first run emails every portal user.
+
 Wholesale confirmation queues mail for the customer's currently linked portal
 buyers. No linked buyers produces a blocked `no_recipient` record. Admin/Sales
 can read confirmation email states on the order screen and through the

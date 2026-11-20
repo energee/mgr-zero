@@ -203,7 +203,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     get_batch_volume_balance: [B,plannedBatch.id],
     reverse_inventory_movement: [B,reversible.id,"Wrong entry",R()],
     preview_inventory_movement: [B,SKU,W,BIN,1,"adjustment",null,null,null,null,R()],
-    set_brewery_operating_defaults: [B,24,R(),21], set_brewery_books_opened_on: [B,"2026-10-01",R()], set_brewery_ai_model: [B,"openai/gpt-5.4",R()], begin_csv_import: [B,"opening_balances",importRows,R()], import_csv_row: [B,importRequest,0],
+    set_brewery_operating_defaults: [B,24,R(),21], set_release_defaults: [B,75,7,14,null,2,50,null,R()], set_pallet_rules: [B,{ maxLb: 2500, maxHeightIn: 60, palletHeightIn: 5.5, kegLayers: [] },R()], set_brewery_books_opened_on: [B,"2026-10-01",R()], set_brewery_ai_model: [B,"openai/gpt-5.4",R()], begin_csv_import: [B,"opening_balances",importRows,R()], import_csv_row: [B,importRequest,0],
     correct_reporting_basis: [B,"2026-09-01",null,"Correct basis",R()],
     claim_invite_request: [B,`${name}@test.local`,"staff","warehouse",null,R()], complete_invite_membership: [inviteRequest], record_invite_failure: [failureRequest],
     revoke_account_invitation: [B,consentInvite,R()], resend_account_invitation: [B,consentInvite,R()],
@@ -257,7 +257,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     set_personal_quiet_hours: [B,"22:00","07:00","America/New_York",R()], snooze_notification: [B,delivery,new Date(Date.now()+3600000).toISOString(),R()],
     generate_compliance_report: [B,"TTB",day,day], get_chat_integration_health: [B], list_chat_user_links: [B],
     get_square_connected: [B], list_compliance_active_months: [B,day,day],
-    update_bin: [B,emptyBin,name,R()], update_location: [B,W,name,["warehouse"],R()], update_sku: [B,SKU,true,null,R(),null,false,0.5,false,null], release_sku: [B,null,null,null,[{sku_id:SKU,qty:1}],R()], update_release: [B,R(),1,null,R()], withdraw_release: [B,R(),R()], raise_invoice_question: [B,f.invoice.id,"Fixture question",R()],
+    update_bin: [B,emptyBin,name,R()], update_location: [B,W,name,["warehouse"],R()], update_sku: [B,SKU,true,null,R(),null,false,0.5,false,null], release_sku: [B,null,null,null,[{sku_id:SKU,qty:1}],R(),null], update_release: [B,R(),1,null,R(),null], withdraw_release: [B,R(),R()], raise_invoice_question: [B,f.invoice.id,"Fixture question",R()],
     update_packaging_run: [B,readyRun.id,f.occupancy.id,[{sku_id:SKU,qty_planned:1}],now,R()], upsert_material: [B,MAT,"Malt","malt","lb","lb",1,false,VENDOR,0,true,null,null,R(),null],
     upsert_material_contract: [B,contract,VENDOR,MAT,100,100,day,null,name,R()], upsert_vendor: [B,VENDOR,"Vendor",null,null,1,"net30",true,R()], upsert_vessel: [B,emptyVessel.id,name,"fermenter",10,R()], delete_vessel: [B,emptyVessel.id,R()],
     upsert_water_profile: [B,null,name,1,1,1,1,1,1,null,null,null,R()],
@@ -282,6 +282,8 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   readNames.push("get_stored_cola_label_image");
   // Portal releases: staff counts (Taproom refused) and a buyer's own open releases.
   readNames.push("release_rows", "portal_releases");
+  // Ceilings and suggestions: Admin and Sales read every customer's share; a buyer reads its own share and usual order.
+  readNames.push("release_share_rows", "portal_release_share", "portal_suggested_order", "portal_pallet_rules");
   // Changes after confirm: Admin and Sales read the report; a buyer reads its own order's (Phase C).
   readNames.push("order_change_rows", "portal_order_change_rows");
   // Existing-account consent is authenticated own-identity work, covered by existing-account-invites.test.ts.
@@ -304,6 +306,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   readSignatures.push("get_saved_cola_image_permit(uuid,text,text)");
   readSignatures.push("get_stored_cola_label_image(uuid,text,text)");
   readSignatures.push("release_rows(uuid,uuid[],uuid[],uuid[],boolean)", "portal_releases(uuid)");
+  readSignatures.push("release_share_rows(uuid)", "portal_release_share(uuid)", "portal_suggested_order(uuid)", "portal_pallet_rules(uuid)");
   readSignatures.push("order_change_rows(uuid,text,uuid,uuid)", "portal_order_change_rows(uuid)");
   const ownSignatures = ["leave_agent_note(uuid,text,text)","record_agent_step(uuid,text,text,integer,uuid,text,text,text,text,uuid)","begin_agent_proposal(uuid,uuid)","create_agent_proposal(uuid,text,jsonb)","decline_agent_proposal(uuid)","finish_agent_proposal(uuid,text,text)","accept_account_invitation(uuid,uuid)","set_my_gravity_unit(uuid,text,uuid)","consume_chat_link_proof(uuid,text,uuid)","unlink_chat_user(uuid,uuid,uuid)","set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text,boolean,uuid)","set_personal_notification_destination(uuid,text,uuid,uuid)","create_chat_conversation(uuid,text,uuid)","append_chat_message(uuid,uuid,text,text,uuid)"];
   expect(catalog.filter(c => readNames.includes(c.name)).map(c => c.signature).sort()).toEqual(readSignatures.sort());
@@ -338,6 +341,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   const destination = (await admin.from("notification_destinations").select("id").eq("brewery_id", B).eq("user_id", f.taproom.id).single()).data!.id;
   const serviceCases: Record<string, unknown[]> = {
     lease_order_emails: ["orders@example.test"], finish_order_email: [R(),R(),"provider-id",null],
+    release_digest_rows: [], queue_release_digest: [B,f.customer.customerId,f.taproom.id,"2026-01-05","Pre-orders","Body"],
     record_qbo_invoice_sync_failure: [B,f.taproom.id,R()],
     store_integration_tokens: [B,"square",pos,f.owner.id,"fixture-access","fixture-refresh"], read_integration_tokens: [B,"square",pos,f.owner.id],
     read_portal_quote_tax: [B,f.customer.customerId,R(),f.taproom.id], finish_portal_quote_tax: [B,f.customer.customerId,R(),f.taproom.id,R(),0],

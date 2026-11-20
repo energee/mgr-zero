@@ -233,6 +233,7 @@ export const FIELD_VOCABULARY: Record<string, { meaning: string; unit?: string; 
   poolId: { meaning: "A keg pool: a group of kegs the brewery owns, leases or pays for by the fill.", entity: "keg_pool" },
   perFillCents: { meaning: "The cost of one keg fill.", unit: "cents" },
   depositCents: { meaning: "The deposit charged per keg.", unit: "cents" },
+  pallets: { meaning: "Whether a sale channel's orders ship on pallets. False turns pallet advice off for the channel's portal buyers. Omitted on an edit, the setting stays." },
   oneWayKegFeeCents: { meaning: "The non-refundable fee per one-way keg on a sale channel's wholesale orders; 0 bills none. Omitted on an edit, the fee stays.", unit: "cents" },
   countId: { meaning: "One saved taproom count.", entity: "taproom_count" },
   revision: { meaning: "The revision from the preview or snapshot the caller reviewed." },

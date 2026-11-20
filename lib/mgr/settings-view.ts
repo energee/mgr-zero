@@ -4,6 +4,8 @@ import type { ReportingBasisCorrection } from "@/lib/commands/compliance";
 import { submitReason } from "@/lib/mgr/submit-reason";
 import { phoneError } from "@/lib/mgr/phone";
 import type { UnitsViewModel } from "@/lib/mgr/units-view";
+import type { ReleaseSettingsValues, ReleaseShareRow } from "@/lib/mgr/release-settings-view";
+import type { PalletRulesValues } from "@/lib/mgr/pallet-rules-view";
 
 export type BrewerySettings = {
   name: string; timezone: string; ttb_registry_no: string | null;
@@ -91,6 +93,11 @@ export type SettingsViewModel = {
   team: string;
   /** The brewery gravity unit chips; live passes GravityUnitForm in their place. */
   units?: UnitsViewModel;
+  /** The Releases section and each customer's limit; live passes ReleaseSettingsForm in their place. */
+  releases?: ReleaseSettingsValues;
+  releaseShares?: ReleaseShareRow[];
+  /** The Pallets section and its keg size columns; live passes PalletRulesForm in its place. */
+  pallets?: { values: PalletRulesValues; sizes: string[] };
 };
 
 /**

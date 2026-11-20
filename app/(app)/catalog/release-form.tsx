@@ -13,7 +13,7 @@ import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components
 import { EditReleaseView, ReleaseView } from "@/components/mgr/views/release";
 import { ConfirmDeleteControl } from "@/components/mgr/views/confirm-delete";
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
-import { releaseCommand, updateReleaseCommand, type ReleaseForm as Form, type ReleaseRow } from "@/lib/mgr/release-view";
+import { bbl, releaseCommand, updateReleaseCommand, type ReleaseForm as Form, type ReleaseRow } from "@/lib/mgr/release-view";
 
 /** `forms` are the sources to choose from (batchReleaseForms gives one, skuReleaseForms several); the first is the default.
  *  The trigger reads `triggerLabel`: Release on a Brand page SKU row, Release for ordering on Planning. */
@@ -32,6 +32,7 @@ export function ReleaseForm({ title, forms, triggerLabel = "Release for ordering
             source: (key) => setForm(forms.find((f) => f.key === key) ?? forms[0]),
             include: (index, include) => line(index, { include }),
             qty: (index, qty) => line(index, { qty }),
+            wholesaleBbl: (wholesaleBbl) => setForm((f) => ({ ...f, wholesaleBbl })),
             shipsFrom: (shipsFrom) => setForm((f) => ({ ...f, shipsFrom })),
             ordersCloseOn: (ordersCloseOn) => setForm((f) => ({ ...f, ordersCloseOn })),
           }}
@@ -43,16 +44,20 @@ export function ReleaseForm({ title, forms, triggerLabel = "Release for ordering
 }
 
 export function EditReleaseForm({ release }: { release: ReleaseRow }) {
-  const [qty, setQty] = useState(String(release.qty));
-  const [ordersCloseOn, setOrdersCloseOn] = useState(release.orders_close_on ?? "");
-  const reset = () => { setQty(String(release.qty)); setOrdersCloseOn(release.orders_close_on ?? ""); };
-  const command = updateReleaseCommand(release, qty, ordersCloseOn);
+  // A release with a pool edits the batch's barrels too; its quantity is blank when the package has no limit of its own.
+  const saved = { qty: release.qty == null ? "" : String(release.qty), ordersCloseOn: release.orders_close_on ?? "", wholesaleBbl: release.pool_bbl == null ? undefined : bbl(release.pool_bbl) };
+  const [qty, setQty] = useState(saved.qty);
+  const [ordersCloseOn, setOrdersCloseOn] = useState(saved.ordersCloseOn);
+  const [wholesaleBbl, setWholesaleBbl] = useState(saved.wholesaleBbl);
+  const reset = () => { setQty(saved.qty); setOrdersCloseOn(saved.ordersCloseOn); setWholesaleBbl(saved.wholesaleBbl); };
+  const command = updateReleaseCommand(release, qty, ordersCloseOn, wholesaleBbl);
   const sheet = useCommandForm(command.name, { build: () => command.input, reset });
   return (
     <CommandForm open={sheet.open} onOpenChange={sheet.setOpen} title={`Edit release · ${release.sku_name}`} trigger={<Button variant="outline" size="sm">Edit</Button>}>
       <form onSubmit={(event) => { if (command.reason) { event.preventDefault(); return; } void sheet.submit(event); }} className="flex flex-col gap-4">
         <EditReleaseView qty={qty} ordersCloseOn={ordersCloseOn} confirmed={release.confirmed}
-          controls={{ qty: setQty, ordersCloseOn: setOrdersCloseOn }}
+          pool={wholesaleBbl === undefined ? undefined : { wholesaleBbl, plannedBbl: release.planned_bbl }}
+          controls={{ qty: setQty, ordersCloseOn: setOrdersCloseOn, wholesaleBbl: setWholesaleBbl }}
           messages={<CommandFormMessage error={sheet.error} />}
           footer={<CommandFormFooter>{E.submit("Save release", { submitting: sheet.submitting, reason: command.reason })}</CommandFormFooter>} />
       </form>

@@ -14,7 +14,7 @@ import { CommandForm } from "@/components/mgr/command-form";
 import { DatePicker } from "@/components/mgr/date-picker";
 import { PalletFitBlock } from "./pallet-fit";
 import { BrandedName } from "./branded-name";
-import type { ShopViewModel } from "@/lib/mgr/shop-view";
+import type { ShopSummaryLine, ShopViewModel } from "@/lib/mgr/shop-view";
 import type { ShopControls } from "./shop";
 
 type SummaryProps = { model: ShopViewModel; controls: ShopControls; locked: boolean; disabled: boolean; preparing: boolean };
@@ -39,25 +39,36 @@ function DeliveryDetails({ model, controls, locked }: Omit<SummaryProps, "disabl
     </CommandForm>);
 }
 
-/** What the panel and the sheet both list. `onLine` runs when a line is tapped (the sheet closes first). */
+/** What the panel and the sheet both list. `onLine` runs when a line is tapped (the sheet closes first).
+ *  A cart that ships on more than one date lists each order it becomes, with its own subtotal and pallet fit. */
 function SummaryBody({ model, controls, locked, onLine }: Omit<SummaryProps, "disabled" | "preparing"> & { onLine?: () => void }) {
   const { summary } = model;
+  const split = summary.shipments.length > 1;
+  const list = (lines: ShopSummaryLine[]) => <ul className="flex flex-col divide-y">
+    {lines.map(line => <li key={line.key}>
+      <a href={`#${line.anchor}`} data-to="Shop" onClick={onLine} className="flex items-start justify-between gap-3 py-2 text-sm">
+        <span className="min-w-0"><span className="block font-medium"><BrandedName name={line.name} alias={line.alias} /></span><span className="block text-xs text-muted-foreground">{line.detail}</span></span>
+        <span className="shrink-0 tabular-nums">{line.amount}</span>
+      </a>
+    </li>)}
+  </ul>;
   return <div className="flex flex-col gap-1">
-    {summary.lines.length ? <ul className="flex flex-col divide-y">
-      {summary.lines.map(line => <li key={line.key}>
-        <a href={`#${line.anchor}`} data-to="Shop" onClick={onLine} className="flex items-start justify-between gap-3 py-2 text-sm">
-          <span className="min-w-0"><span className="block font-medium"><BrandedName name={line.name} alias={line.alias} /></span><span className="block text-xs text-muted-foreground">{line.detail}</span></span>
-          <span className="shrink-0 tabular-nums">{line.amount}</span>
-        </a>
-      </li>)}
-    </ul> : <p className="py-2 text-sm text-muted-foreground">Nothing in your order yet.</p>}
+    {!summary.lines.length ? <p className="py-2 text-sm text-muted-foreground">Nothing in your order yet.</p>
+      : split ? summary.shipments.map(shipment => <section key={shipment.key} aria-label={shipment.title} className="flex flex-col">
+        <h3 className="flex justify-between gap-3 pt-2 text-sm font-semibold"><span>{shipment.title}</span><span className="tabular-nums">{shipment.subtotal}</span></h3>
+        {list(shipment.lines)}
+        {shipment.palletFit.length ? <div className="pb-2"><PalletFitBlock groups={shipment.palletFit} /></div> : null}
+        {shipment.pallet ? <p className="pb-2 text-sm">{shipment.pallet}</p> : null}
+      </section>)
+      : list(summary.lines)}
     {E.fld("Items subtotal", <span className="font-medium tabular-nums">{model.subtotal}</span>)}
     <p className="text-sm text-muted-foreground">{model.chargesLine}</p>
     <p className="text-xs text-muted-foreground">{model.depositInfo}</p>
     {E.row("Ships from", model.source)}
     <DeliveryDetails model={model} controls={controls} locked={locked} />
     {model.shipsFromNote ? E.note(model.shipsFromNote) : null}
-    {summary.palletFit.length ? <div className="pt-2"><PalletFitBlock groups={summary.palletFit} /></div> : null}
+    {summary.palletFit.length && !split ? <div className="pt-2"><PalletFitBlock groups={summary.palletFit} /></div> : null}
+    {summary.pallet ? <p className="text-sm">{summary.pallet}</p> : null}
   </div>;
 }
 

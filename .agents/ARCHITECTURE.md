@@ -49,7 +49,7 @@ never copy it into a second place.
 | `components/mgr/views/`, `lib/mgr/*-view.ts`, `lib/mgr/fixtures/` | Shared screen drawings, their pure command-payload adapters, and inventory snapshots. Live pages supply existing controlled forms and explicit links; undefined slots keep fixture defaults, null suppresses them. Adapters preserve missing domain facts and do not give fixture frames live route destinations. `lib/mgr/screen-routes.ts` anchors routed screens at their public `page.tsx` entries, then parity checks follow thin adapters to the shared drawing; header/dialog-only screens name their mounted component. |
 | `lib/mgr/page-query.ts` | Staff server-page query adapter: checks the registry's actual role permission before reading and redirects denied deep links to the existing No access screen. Dedicated mutation pages call its permission guard without executing a write. API/command authorization stays in the registry/RPC. |
 | `lib/mgr/not-found.ts` | `orNotFound()`: wraps a detail page's registry read so an unknown or malformed id renders the app's `not-found.tsx` instead of the generic error boundary; shared by `(app)` and `(portal)` detail pages. |
-| `lib/email/jobs.ts`, `lib/email/transport.ts` | Buyer order-confirmation delivery. The confirmation transaction snapshots linked customer users and order facts in private delivery rows. Only the email job service boundary leases and finishes those rows; it sends immutable Resend requests within their deduplication window. `get_order_email_status` exposes tenant-authorized Admin/Sales diagnostics. |
+| `lib/email/jobs.ts`, `lib/email/digest.ts`, `lib/email/transport.ts` | Buyer order-confirmation delivery and the weekly release digest (`docs/plans/release-pool-and-ceilings.md`), which queues into the same delivery rows. The confirmation transaction snapshots linked customer users and order facts in private delivery rows. Only the email job service boundary leases and finishes those rows; it sends immutable Resend requests within their deduplication window. `get_order_email_status` exposes tenant-authorized Admin/Sales diagnostics. |
 | `lib/chat/` | Provider-neutral chat notification contracts and validation, Chat SDK state, Slack adapter/transport/renderer, OAuth installation and staff linking, job authentication, preview fixtures, and `jobs.ts`, the rule-4 service-role owner. Service access is limited to integration state: OAuth/link lifecycle, callback receipts and action intents, occurrence scan/fan-out, delivery leases/results, App Home reads, destination proofs, and `chat_sdk` cleanup; it never executes domain commands or impersonates staff. |
 | `lib/commands/chat.ts`, `lib/commands/today.ts` | Staff chat linking and notification settings; the role-filtered Today projection. |
 | `app/api/chat/`, `app/api/webhooks/slack/` | Thin Slack OAuth, scheduled-job, and events/App Home routes that delegate to `lib/chat/`. |
@@ -280,10 +280,15 @@ a gap to close, not a convention to trust.
    from `get_cola_image` after the command admitted the caller and TTB returned
    the permit-checked label; the function keeps only labels saved on an approved
    COLA and never replaces a stored copy, so no client can supply the bytes.
-   `lib/email/jobs.ts` may call only `lease_order_emails` and
-   `finish_order_email`. These service-only RPCs expose frozen confirmation
-   deliveries, check recipient membership, and require the current lease token
-   when recording provider outcomes. The job cannot execute domain commands.
+   `lib/email/jobs.ts` may call only `lease_order_emails`,
+   `finish_order_email`, `release_digest_rows` and `queue_release_digest`
+   (the last two through `lib/email/digest.ts`, which is handed the client).
+   These service-only RPCs expose frozen confirmation deliveries, check
+   recipient membership, and require the current lease token when recording
+   provider outcomes. The digest pair reads each customer's open pre-orders on
+   the brewery's digest day and queues one delivery per portal user and week;
+   the recipient is read in the database, never taken from the job. The job
+   cannot execute domain commands.
    *Enforced by:* `no-restricted-imports` in `eslint.config.mjs`, run in CI.
 5. **Every mutation is one idempotent Postgres transaction.**
    Application roles have no direct table DML. A write handler calls one

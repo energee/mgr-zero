@@ -10,7 +10,7 @@
 -- data.
 --
 -- Redefined functions start from their latest definition and keep all of it:
---   portal_sku_price_rows 20261119000000_format_pallet_fit.sql
+--   portal_sku_price_rows 20261119150100_format_pallet_fit.sql
 --   portal_order_rows     20261118190000_releases.sql
 --   portal_invoice_rows   20261008130000_portal_buyer_columns.sql
 

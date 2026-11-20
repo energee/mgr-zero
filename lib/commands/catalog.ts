@@ -93,7 +93,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "upsert_format", description: "Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (priceGroupId and positive finite ounces required; no package facts, never stock). A format in use keeps its basis: one used by a SKU, component or BOM stays packaged; one used by a POS mapping, menu or sale stays poured. The same use also fixes its bblPerUnit, unitsPerCase and ounces; a rename still saves. palletFit (advisory, packaged only) is Admin only: omit to keep, null to clear",
+  name: "upsert_format", description: "Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (priceGroupId and positive finite ounces required; no package facts, never stock). A format in use keeps its basis: one used by a SKU, component or BOM stays packaged; one used by a POS mapping, menu or sale stays poured. The same use also fixes its bblPerUnit, unitsPerCase and ounces; a rename still saves. palletFit and palletFitMixed (advisory, packaged only) are Admin only: omit to keep, null to clear",
   compensation: "Reverse an edit with upsert_format and the previous values, or remove an unused new format with delete_format.",
   input: z.object({
     id: z.string().uuid().optional().describe("The format to edit; omit to create one"), name: z.string().trim().min(1).describe("The format's name"), basis: z.enum(["packaged", "poured"]),
@@ -101,8 +101,11 @@ defineCommand({
     unitsPerCase: z.number().int().positive().optional(), bblPerUnit: z.number().positive().optional(),
     priceGroupId: z.string().uuid().optional(), ounces: z.number().finite().positive().optional(),
     palletFit: z.number().int().positive().nullable().optional().describe("How many of this package fill one layer or pallet the way the brewery loads; advisory only. Admin only; omit to keep, null to clear"),
+    palletFitMixed: z.number().int().positive().nullable().optional().describe("How many of this keg fill a layer that another keg size shares (8 half kegs fill a layer alone, about 6 beside sixtels); blank reads as palletFit. Advisory only. Admin only; omit to keep, null to clear"),
+    packagingLb: z.number().min(0).max(2000).optional().describe("Pounds the empty package adds to the beer: a keg shell, or the cans and cardboard. The portal adds the beer's weight from the format's barrels. Admin only; omit to keep"),
+    heightIn: z.number().min(0).max(100).optional().describe("How tall one keg stands, or one case sits in a layer, in inches; the portal stacks layers up to the brewery's pallet height. Admin only; omit to keep, 0 to clear"),
   }).refine((i) => i.basis === "poured"
-    ? i.priceGroupId !== undefined && i.ounces !== undefined && [i.packageType, i.kegSize, i.unitsPerCase, i.bblPerUnit, i.palletFit].every((v) => v === undefined)
+    ? i.priceGroupId !== undefined && i.ounces !== undefined && [i.packageType, i.kegSize, i.unitsPerCase, i.bblPerUnit, i.palletFit, i.palletFitMixed, i.packagingLb, i.heightIn].every((v) => v === undefined)
     : i.priceGroupId === undefined && i.ounces === undefined,
   { message: "Pours require a price group and positive ounces, with no package facts; packaged formats cannot have a price group or ounces" }),
   roles: ["admin", "sales"],
@@ -112,6 +115,10 @@ defineCommand({
     ...(i.basis === "poured" ? { p_price_group: i.priceGroupId, p_ounces: i.ounces } : {}),
     // Only Admin may set or clear it; the RPC checks, so Sales sends neither.
     ...(i.palletFit === null ? { p_clear_pallet_fit: true } : i.palletFit !== undefined ? { p_pallet_fit: i.palletFit } : {}),
+    // The RPC reads 0 as "clear".
+    ...(i.palletFitMixed !== undefined ? { p_pallet_fit_mixed: i.palletFitMixed ?? 0 } : {}),
+    ...(i.packagingLb !== undefined ? { p_packaging_lb: i.packagingLb } : {}),
+    ...(i.heightIn !== undefined ? { p_height_in: i.heightIn } : {}),
   })),
 });
 
@@ -235,7 +242,7 @@ defineCommand({
 const TAX_TREATMENTS = ["taxable", "export", "vessel_supplies", "research", "transfer_in_bond"] as const;
 
 defineQuery({
-  name: "list_sale_channels", description: "Sale channels with their tax treatment and one-way keg fee in cents, alphabetical; in_use says a record references the channel, and system_code 'taproom' marks the system Taproom channel",
+  name: "list_sale_channels", description: "Sale channels with their tax treatment, one-way keg fee in cents and pallets (whether their orders ship on pallets), alphabetical; in_use says a record references the channel, and system_code 'taproom' marks the system Taproom channel",
   input: z.object({}), roles: ["admin", "sales", "warehouse"],
   handler: (ctx) => unwrap(ctx.db.rpc("list_sale_channels", { p_brewery: ctx.breweryId })),
 });
@@ -244,11 +251,12 @@ defineCommand({
   name: "upsert_sale_channel", description: "Create or edit a sale channel: its name, the tax treatment its removals are recorded under, and the one-way keg fee its wholesale orders charge. A one-way keg line takes the fee when it is saved and keeps it once its order is submitted; a fee change reaches only drafts and lines added later",
   compensation: "Reverse an edit with upsert_sale_channel and the previous values, or remove an unused new channel with delete_sale_channel.",
   input: z.object({ id: z.string().uuid().optional().describe("The sale channel to edit; omit to create one"), name: z.string().trim().min(1).describe("The sale channel's name"), taxTreatment: z.enum(TAX_TREATMENTS),
-    oneWayKegFeeCents: z.number().int().min(0).max(2147483647).optional() }),
+    oneWayKegFeeCents: z.number().int().min(0).max(2147483647).optional(),
+    pallets: z.boolean().optional().describe("Whether this channel's orders ship on pallets; false turns pallet advice off for its portal buyers. Omit to keep (a new channel ships on pallets)") }),
   roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_sale_channel", {
     p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_tax_treatment: i.taxTreatment, p_request_id: execution.requestId,
-    p_one_way_keg_fee_cents: i.oneWayKegFeeCents,
+    p_one_way_keg_fee_cents: i.oneWayKegFeeCents, p_pallets: i.pallets,
   })),
 });
 

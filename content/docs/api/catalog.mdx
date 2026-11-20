@@ -245,7 +245,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer
 
-Planned batches a release can draw on: each unpackaged batch's projected units per SKU (with SKU and brand names) (from its brand's batch package shares) and its ready date; optionally only these SKUs
+Planned batches a release can draw on: each unpackaged batch's active packaged SKUs (with SKU and brand names), its planned barrels, its pool when it has one (wholesale_bbl) and its ready date; optionally only these SKUs
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -258,11 +258,26 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_release_batches", "input": {} }'
 ```
 
+## list_release_shares [#list_release_shares]
+
+`query` · admin, sales
+
+Each customer's ceiling on a batch pool, in percent: the share typed on the customer (manual_pct), their part of recent purchases counted once (base_pct, null without a history window or purchases) and the ceiling that applies (pct: typed, else calculated with stock purchases counting for more, else null for none)
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_release_shares", "input": {} }'
+```
+
 ## list_releases [#list_releases]
 
 `query` · admin, sales, warehouse, brewer
 
-Releases with their SKU, batch number and batch ready date, quantity, ships-from and order-by dates, whether buyers can still order (open) and whether its batch was cancelled, and units confirmed, pre-ordered (submitted, not yet confirmed) and remaining; optionally only these ids, SKUs or batches, or only open or closed releases
+Releases with their SKU, batch number and batch ready date, quantity, ships-from and order-by dates, whether buyers can still order (open) and whether its batch was cancelled, units confirmed, pre-ordered (submitted, not yet confirmed) and remaining, and for a batch with a pool the package's barrels per unit, the pool and the barrels of it left (qty is null when the package has no limit of its own); optionally only these ids, SKUs or batches, or only open or closed releases
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -282,7 +297,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Sale channels with their tax treatment and one-way keg fee in cents, alphabetical; in_use says a record references the channel, and system_code 'taproom' marks the system Taproom channel
+Sale channels with their tax treatment, one-way keg fee in cents and pallets (whether their orders ship on pallets), alphabetical; in_use says a record references the channel, and system_code 'taproom' marks the system Taproom channel
 
 Takes no input.
 
@@ -317,7 +332,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Release SKUs for portal ordering, one release per line: from a planned batch (each SKU a package of its brand, ships from the batch's ready date unless given) or, without batchId, from packaged stock (ships from today; each quantity must fit what is free to promise)
+Release SKUs for portal ordering, one release per line: from a planned batch (each SKU a package of its brand, ships from the batch's ready date unless given; wholesaleBbl sets the pool its packages share, and a line may then leave qty out) or, without batchId, from packaged stock (ships from today; each line needs a qty that fits what is free to promise)
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -325,12 +340,13 @@ Release SKUs for portal ordering, one release per line: from a planned batch (ea
 | `batchId` | uuid | no |
 | `shipsFrom` | date (YYYY-MM-DD) | no |
 | `ordersCloseOn` | date (YYYY-MM-DD) | no |
+| `wholesaleBbl` | number | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "release_sku", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "lines": [ { "skuId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "release_sku", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "lines": [ { "skuId": "00000000-0000-0000-0000-000000000000" } ] } }'
 ```
 
 ## save_catalog_category [#save_catalog_category]
@@ -371,6 +387,26 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_channel_price", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "saleChannelId": "00000000-0000-0000-0000-000000000000", "priceGroupId": "00000000-0000-0000-0000-000000000000", "formatId": "00000000-0000-0000-0000-000000000000", "unitPriceCents": 1 } }'
 ```
 
+## set_pallet_rules [#set_pallet_rules]
+
+`command` · admin
+
+Set how the brewery stacks a pallet, which the portal uses for the buyer's pallet line and Fill the pallet: the most a pallet carries in pounds, the tallest a loaded pallet stands and the empty pallet's own height in inches (layers stack in the room between, each as tall as its format's height), and the ways one keg layer loads (each a count per keg size; a pallet carries at most two keg layers). Advisory: nothing is enforced
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `maxLb` | integer | yes |
+| `maxHeightIn` | integer | yes |
+| `palletHeightIn` | number | yes |
+| `kegLayers` | array of object | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_pallet_rules", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "maxLb": 1, "maxHeightIn": 12, "palletHeightIn": 1, "kegLayers": [ {} ] } }'
+```
+
 ## set_price_group_barcode [#set_price_group_barcode]
 
 `command` · admin, sales
@@ -390,17 +426,41 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_price_group_barcode", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "priceGroupId": "00000000-0000-0000-0000-000000000000", "formatId": "00000000-0000-0000-0000-000000000000", "upc": "012345678905" } }'
 ```
 
+## set_release_defaults [#set_release_defaults]
+
+`command` · admin
+
+Set the brewery's release defaults: the percent of a planned batch the release form opens to wholesale, the days before ship that ordering closes by default and that customer ceilings lift, the history window, stock multiplier and maximum for calculated ceilings (a null window calculates none), and the weekday the release digest is sent (null sends none)
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `openPct` | integer | yes |
+| `orderByDays` | integer | yes |
+| `capLiftDays` | integer | yes |
+| `shareWindowDays` | integer or null | yes |
+| `stockMultiplier` | number | yes |
+| `maxSharePct` | integer | yes |
+| `digestDay` | integer or null | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_release_defaults", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "openPct": 1, "orderByDays": 1, "capLiftDays": 1, "shareWindowDays": 7, "stockMultiplier": 1, "maxSharePct": 1, "digestDay": 1 } }'
+```
+
 ## update_release [#update_release]
 
 `command` · admin, sales
 
-Change a release's quantity and order-by date (null clears it); never below the quantity already confirmed on it, and a larger stock release must fit what is free to promise
+Change a release's quantity and order-by date (null clears it); never below the quantity already confirmed on it, and a larger stock release must fit what is free to promise. On a batch release with a pool, a null qty removes the package's own limit, and wholesaleBbl changes the batch's pool for all its packages
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `releaseId` | uuid | yes |
-| `qty` | integer | yes |
+| `qty` | integer or null | yes |
 | `ordersCloseOn` | date (YYYY-MM-DD) or null | yes |
+| `wholesaleBbl` | number | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -488,6 +548,7 @@ Create or edit a sale channel: its name, the tax treatment its removals are reco
 | `taxTreatment` | taxable or export or vessel_supplies or research or transfer_in_bond | yes |
 | `id` | uuid | no |
 | `oneWayKegFeeCents` | integer | no |
+| `pallets` | boolean | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

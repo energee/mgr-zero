@@ -152,7 +152,7 @@ defineCommand({
 });
 
 defineQuery({
-  name: "portal_catalog", description: "Portal: orderable SKUs with the caller's prices and their offers: badge is the packaged-stock availability (null when the SKU is not orderable from stock) and releases are the open releases, each with its ships-from and order-by dates and its own badge; packageType, kegSize, unitsPerCase and palletFit (advisory: how many fill one pallet unit) describe its package; product is the brand, brandAlias its alias (null when none) and formatName the format, which name the line. A SKU with no open offer is left out",
+  name: "portal_catalog", description: "Portal: orderable SKUs with the caller's prices and their offers: badge is the packaged-stock availability (null when the SKU is not orderable from stock) and releases are the open releases, each with its ships-from and order-by dates, its own badge, fromBatch (true for a release from a planned batch, which the Pre-order page lists; false for one from packaged stock), bblPerUnit (the package's barrels), and the buyer's ceiling when one applies: limitLeftBbl (barrels of that batch still open to them, null when none or lifted) and limitLiftsOn, and lbPerBbl (pounds a barrel of that batch weighs by its latest gravity reading, null before one); bblPerUnit (the package's barrels) and packagingLb (pounds the package adds to the beer) give a unit's weight, and heightIn is how tall one keg stands or one case sits in a layer (null when not set); packageType, kegSize, unitsPerCase and palletFit (advisory: how many fill one pallet unit) describe its package; product is the brand, brandAlias its alias (null when none) and formatName the format, which name the line. A SKU with no open offer is left out",
   roles: "customer",
   input: z.object({}),
   handler: async (ctx) => {
@@ -164,24 +164,49 @@ defineQuery({
     // portal_availability returns only SKUs orderable from stock (the stock
     // offer); portal_releases the open releases (the release offers).
     const [prices, avail, releases] = await Promise.all([
-      unwrap(ctx.db.from("portal_sku_prices").select("sku_id, sku_name, brand_name, brand_alias, format_name, unit_price_cents, package_type, keg_size, units_per_case, pallet_fit")
+      unwrap(ctx.db.from("portal_sku_prices").select("sku_id, sku_name, brand_name, brand_alias, format_name, unit_price_cents, package_type, keg_size, units_per_case, pallet_fit, pallet_fit_mixed, bbl_per_unit, packaging_lb, height_in")
         .eq("brewery_id", ctx.breweryId).eq("sale_channel_id", customer.sale_channel_id)),
       unwrap(ctx.db.rpc("portal_availability", { p_customer: customerId })),
       unwrap(ctx.db.rpc("portal_releases", { p_customer: customerId })),
     ]);
     const badges = new Map((avail as { sku_id: string; badge: string }[]).map(a => [a.sku_id, a.badge]));
     const offers = Map.groupBy(releases ?? [], r => r.sku_id);
-    const priceRows = prices as { sku_id: string; sku_name: string; brand_name: string; brand_alias: string | null; format_name: string; unit_price_cents: number; package_type: string | null; keg_size: string | null; units_per_case: number | null; pallet_fit: number | null }[];
+    const priceRows = prices as { sku_id: string; sku_name: string; brand_name: string; brand_alias: string | null; format_name: string; unit_price_cents: number; package_type: string | null; keg_size: string | null; units_per_case: number | null; pallet_fit: number | null; pallet_fit_mixed: number | null; bbl_per_unit: number | null; packaging_lb: number; height_in: number | null }[];
     return priceRows.filter(p => badges.has(p.sku_id) || offers.has(p.sku_id)).map(p => ({
       skuId: p.sku_id, name: p.sku_name, product: p.brand_name, brandAlias: p.brand_alias, formatName: p.format_name,
       unitPriceCents: p.unit_price_cents, badge: badges.get(p.sku_id) ?? null,
-      packageType: p.package_type, kegSize: p.keg_size, unitsPerCase: p.units_per_case, palletFit: p.pallet_fit,
-      releases: (offers.get(p.sku_id) ?? []).map(r => ({ releaseId: r.release_id, shipsFrom: r.ships_from, ordersCloseOn: r.orders_close_on, badge: r.badge })),
+      packageType: p.package_type, kegSize: p.keg_size, unitsPerCase: p.units_per_case, palletFit: p.pallet_fit, palletFitMixed: p.pallet_fit_mixed,
+      bblPerUnit: p.bbl_per_unit == null ? null : Number(p.bbl_per_unit), packagingLb: Number(p.packaging_lb), heightIn: p.height_in == null ? null : Number(p.height_in),
+      releases: (offers.get(p.sku_id) ?? []).map(r => ({ releaseId: r.release_id, shipsFrom: r.ships_from, ordersCloseOn: r.orders_close_on, badge: r.badge, fromBatch: r.from_batch,
+        bblPerUnit: r.bbl_per_unit == null ? null : Number(r.bbl_per_unit), limitLeftBbl: r.limit_left_bbl == null ? null : Number(r.limit_left_bbl), limitLiftsOn: r.limit_lifts_on,
+        lbPerBbl: r.lb_per_bbl == null ? null : Number(r.lb_per_bbl) })),
     }));
   },
 });
 
-// Brand reference (20261119030000_portal_brand_reference.sql): each brand the
+// Ceilings and suggestions (20261119160000_release_pool_ceilings.sql).
+defineQuery({
+  name: "portal_release_share", description: "Portal: the buyer's ceiling on a batch pool, or null when they have none: pct (percent of each pool), basePct (what it would be with every purchase counted once; null for a typed ceiling), manual (typed by the brewery) and liftDays (days before ship that it lifts)",
+  roles: "customer",
+  input: z.object({}),
+  handler: async (ctx) => {
+    const rows = await unwrap(ctx.db.rpc("portal_release_share", { p_customer: requireCustomer(ctx) })) as { pct: number; base_pct: number | null; manual: boolean; lift_days: number }[];
+    const row = rows[0];
+    return row ? { pct: Number(row.pct), basePct: row.manual || row.base_pct == null ? null : Number(row.base_pct), manual: row.manual, liftDays: row.lift_days } : null;
+  },
+});
+
+defineQuery({
+  name: "portal_suggested_order", description: "Portal: the buyer's usual quantity of each open batch release, following their recent buying: an average of their last six order lines from the past 180 days in which the latest counts most, of the same style and package when they have ordered it and otherwise of the package alone, less what they already ordered on the release and never more than is left; lastOn is the date of the latest order it drew on, and releases with nothing to suggest are left out",
+  roles: "customer",
+  input: z.object({}),
+  handler: async (ctx) => {
+    const rows = await unwrap(ctx.db.rpc("portal_suggested_order", { p_customer: requireCustomer(ctx) })) as { release_id: string; sku_id: string; qty: number; last_on: string }[];
+    return rows.map(r => ({ releaseId: r.release_id, skuId: r.sku_id, qty: Number(r.qty), lastOn: r.last_on }));
+  },
+});
+
+// Brand reference (20261119150400_portal_brand_reference.sql): each brand the
 // buyer can order, with its sell-sheet fields and COLA TTB id, for the brand
 // headings and reference sheet on Shop and orders. Labels are only MGR's stored
 // copies, never a TTB fetch; each image loads on its own when its heading
@@ -251,12 +276,13 @@ defineQuery({
 });
 
 defineQuery({
-  name: "get_portal_account", description: "Portal: the caller's customer, ship-tos, this login's membership, and keg deposits held; peer portal users are never listed",
+  name: "get_portal_account", description: "Portal: the caller's customer, ship-tos, this login's membership, keg deposits held, and palletRules (how the brewery stacks a pallet: maxLb, maxHeightIn, palletHeightIn and kegLayers, each a count per keg size); peer portal users are never listed",
   roles: "customer",
   input: z.object({}),
   handler: async (ctx) => {
     const customerId = requireCustomer(ctx);
-    const [customer, shipTos, deposits, fulfillmentSource] = await Promise.all([
+    const [palletRules, customer, shipTos, deposits, fulfillmentSource] = await Promise.all([
+      unwrap(ctx.db.rpc("portal_pallet_rules", { p_customer: customerId })),
       unwrap(ctx.db.from("portal_customers").select("id, name").eq("id", customerId).single()),
       unwrap(ctx.db.from("ship_tos").select("id, label, country, address1, city, state, zip, is_default").eq("customer_id", customerId).order("label")),
       unwrap(ctx.db.from("portal_keg_deposits").select("keg_size, kegs_on_deposit, deposit_cents").eq("customer_id", customerId)),
@@ -269,7 +295,7 @@ defineQuery({
           return id ? unwrap(ctx.db.from("locations").select("id, name").eq("id", id).maybeSingle()) : null; }),
     ]);
     return {
-      customer, shipTos, fulfillmentSource, membership: { userId: ctx.userId },
+      customer, shipTos, fulfillmentSource, membership: { userId: ctx.userId }, palletRules,
       deposits: (deposits as { keg_size: string | null; kegs_on_deposit: number; deposit_cents: number }[])
         .filter((d) => d.kegs_on_deposit !== 0)
         .map((d) => ({ kegSize: d.keg_size, kegsOnDeposit: d.kegs_on_deposit, depositCents: d.deposit_cents })),

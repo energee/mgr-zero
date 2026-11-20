@@ -14,8 +14,9 @@ export type BrandReferenceModel = {
   brandId: string;
   title: string;
   alias?: string;
-  /** Style, ABV and Hops, each only when set. */
-  facts: { label: string; value: string }[];
+  /** "Pilsner · 5.2% ABV": style and ABV, whichever is set. */
+  tagline?: string;
+  hops?: string;
   description?: string;
   /** The brand's COLA; href is null when the id is not a valid TTB id, so it reads as text. */
   cola?: { ttbId: string; href: string | null };
@@ -23,14 +24,16 @@ export type BrandReferenceModel = {
   hasLabel: boolean;
 };
 
+/** A brand's style and ABV on one line ("Pilsner · 5.2% ABV"), or "" when neither is set. Shop cards and the reference sheet both read it. */
+export function brandTagline(b: Pick<PortalBrand, "style" | "abv">): string {
+  return [b.style, b.abv !== null ? `${b.abv}% ABV` : null].filter(Boolean).join(" · ");
+}
+
 export function toBrandReference(b: PortalBrand): BrandReferenceModel {
-  const facts = [
-    b.style ? { label: "Style", value: b.style } : null,
-    b.abv !== null ? { label: "ABV", value: `${b.abv}%` } : null,
-    b.hops ? { label: "Hops", value: b.hops } : null,
-  ].filter((f) => f !== null);
+  const tagline = brandTagline(b);
   return {
-    brandId: b.brandId, title: b.name, ...(b.alias ? { alias: b.alias } : {}), hasLabel: b.hasLabel, facts,
+    brandId: b.brandId, title: b.name, ...(b.alias ? { alias: b.alias } : {}), hasLabel: b.hasLabel,
+    ...(tagline ? { tagline } : {}), ...(b.hops ? { hops: b.hops } : {}),
     ...(b.description ? { description: b.description } : {}),
     ...(b.ttbId ? { cola: { ttbId: b.ttbId, href: colaUrl(b.ttbId) } } : {}),
   };

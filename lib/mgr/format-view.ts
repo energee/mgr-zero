@@ -3,6 +3,7 @@
 import { GALLONS_PER_BBL, LITERS_PER_BBL, OUNCES_PER_BBL, parseVolumeToBbl, formatVolume } from "@/lib/volume";
 
 import { SIZE_LABEL } from "@/lib/mgr/keg-labels";
+import { BEER_LB_PER_BBL } from "@/lib/mgr/pallet-fit";
 
 export const KEG_BBL: Record<string, number> = {
   half_bbl: 0.5, quarter_bbl: 0.25, sixth_bbl: 1 / 6,
@@ -34,6 +35,14 @@ export type FormatViewModel = {
   composed: boolean;
   /** formats.pallet_fit as field text; "" when unset. Admin edits it. */
   palletFit: string;
+  /** formats.pallet_fit_mixed as field text; "" when unset. Kegs only; Admin edits it. */
+  palletFitMixed: string;
+  /** formats.packaging_lb as field text ("" for none): pounds the empty package adds to the beer. Admin edits it. */
+  packagingLb: string;
+  /** What the beer in one unit weighs at 1.010, in pounds; "" when the volume is unknown. Shown beside packagingLb. */
+  beerLb: string;
+  /** formats.height_in as field text ("" when unset): how tall one keg stands or one case sits in a layer. Admin edits it. */
+  heightIn: string;
   bom: FormatBomRowView[];
 };
 
@@ -51,6 +60,9 @@ export type FormatSnapshot = {
     bbl_per_unit: string | number | null;
     composed?: boolean;
     pallet_fit?: number | null;
+    pallet_fit_mixed?: number | null;
+    packaging_lb?: string | number | null;
+    height_in?: string | number | null;
   };
   /** replace_format_bom / format_bom lines with material names. */
   bom?: { material: string; qty: number | string; onBreak: string }[];
@@ -94,6 +106,10 @@ export function toFormatViewProps({
     volumeUnitIndex: volume.index,
     composed: Boolean(format.composed),
     palletFit: format.pallet_fit == null ? "" : String(format.pallet_fit),
+    palletFitMixed: format.pallet_fit_mixed == null ? "" : String(format.pallet_fit_mixed),
+    packagingLb: Number(format.packaging_lb) ? String(Number(format.packaging_lb)) : "",
+    heightIn: Number(format.height_in) ? String(Number(format.height_in)) : "",
+    beerLb: Number(format.bbl_per_unit) ? (Number(format.bbl_per_unit) * BEER_LB_PER_BBL).toFixed(1) : "",
     bom: bom.map((line) => ({
       material: line.material,
       qty: String(line.qty),
@@ -136,15 +152,21 @@ export function formatControls(model: FormatViewModel, patch: (next: Partial<For
     volumeUnit: (unit: string) => patch({ volumeUnitIndex: model.volumeUnits.indexOf(unit as FormatViewModel["volumeUnits"][number]) }),
     composed: (composed: boolean) => patch({ composed }),
     palletFit: (palletFit: string) => patch({ palletFit }),
+    palletFitMixed: (palletFitMixed: string) => patch({ palletFitMixed }),
+    packagingLb: (packagingLb: string) => patch({ packagingLb }),
+    heightIn: (heightIn: string) => patch({ heightIn }),
   };
 }
 
 export function formatCommandInput(model: FormatViewModel, saved?: FormatSnapshot["format"]) {
   const sizing = formatSizing(model);
   const initial = saved ? toFormatViewProps({ format: saved }) : undefined;
-  // Only Admin sees the Pallet fit field, so an unchanged fit is never sent and
+  // Only Admin sees the pallet fit fields, so an unchanged fit is never sent and
   // Sales saves stay within Sales' rights. A cleared field clears it.
-  const palletFit = model.palletFit === (initial?.palletFit ?? "") ? {} : { palletFit: model.palletFit ? Number(model.palletFit) : null };
+  const fit = (key: "palletFit" | "palletFitMixed") => model[key] === (initial?.[key] ?? "") ? {} : { [key]: model[key] ? Number(model[key]) : null };
+  // A cleared weight or height sends 0: no packaging weight, and no height.
+  const size = (key: "packagingLb" | "heightIn") => model[key] === (initial?.[key] ?? "") ? {} : { [key]: Number(model[key] || 0) };
+  const palletFit = { ...fit("palletFit"), ...fit("palletFitMixed"), ...size("packagingLb"), ...size("heightIn") };
   // A legacy format may have no package type; send none rather than "" (#447).
   const input = { id: saved?.id, name: sizing.name, basis: "packaged", packageType: model.packageType || undefined, ...palletFit };
   if (saved && initial) {

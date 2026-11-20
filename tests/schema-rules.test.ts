@@ -165,7 +165,7 @@ describe("schema rules", () => {
       order by 1
     `)).toEqual(["order_deposit_lines:staff_read", "order_lines:staff_read", "orders:staff_read", "skus:staff_read"]);
     expect(columns("portal_orders")).toBe("id,brewery_id,customer_id,order_no,status,ship_to_id,requested_ship_date,po_number,note,created_at,ship_tos,order_lines");
-    expect(columns("portal_sku_prices")).toBe("brewery_id,sale_channel_id,sku_id,sku_name,brand_name,unit_price_cents,package_type,keg_size,units_per_case,pallet_fit,brand_alias,format_name");
+    expect(columns("portal_sku_prices")).toBe("brewery_id,sale_channel_id,sku_id,sku_name,brand_name,unit_price_cents,package_type,keg_size,units_per_case,pallet_fit,brand_alias,format_name,pallet_fit_mixed,bbl_per_unit,packaging_lb,height_in");
   });
 
   it("restricts brewery_counters keys to committed document kinds", () => {

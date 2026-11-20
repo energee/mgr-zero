@@ -27,6 +27,9 @@ async function query(name: string, input: unknown) {
   switch (name) {
     case "daily_pick_sheet": return ["confirmed", "picked"].map((status, i) => ({ id: status, order_no: i + 1, status, requested_ship_date: null, customers: { name: status === "confirmed" ? "Needs picking" : "Already staged" }, order_lines: [{ id: "line", sku_id: "sku", qty_ordered: 4, qty_picked: status === "picked" ? 4 : null, skus: { name: "Keg" } }] }));
     case "list_orders": return { rows: [], nextCursor: null };
+    case "portal_schedule": return [];
+    case "portal_release_share": return null;
+    case "portal_suggested_order": return [];
     case "list_customers": return [{ id: "buyer", name: "Buyer", shipTos: [{ id: "ship", label: "Door", is_default: true }] }];
     case "get_customer": return { customer: { name: "Buyer" }, shipTos: [{ id: "ship", label: "Door", is_default: true }] };
     case "list_locations": {

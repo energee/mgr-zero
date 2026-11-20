@@ -53,11 +53,12 @@ describe("activeTab", () => {
     expect(activeTab(STAFF_NAV, "/settings/team")?.label).toBe("More");
     expect(activeTab(PORTAL_NAV, "/portal/orders/1")?.label).toBe("Orders");
     expect(activeTab(PORTAL_NAV, "/portal")?.label).toBe("Order");
+    expect(activeTab(PORTAL_NAV, "/portal/pre-order")?.label).toBe("Pre-order");
     expect(activeTab(PORTAL_NAV, "/portal/account")?.label).toBe("Account");
   });
 
   it("includes Account on the portal shell", () => {
-    expect(PORTAL_NAV.map((t) => t.label)).toEqual(["Order", "Orders", "Invoices", "Account"]);
+    expect(PORTAL_NAV.map((t) => t.label)).toEqual(["Order", "Pre-order", "Orders", "Invoices", "Account"]);
   });
   it("returns undefined off the map", () => {
     expect(activeTab(STAFF_NAV, "/nowhere")).toBeUndefined();
@@ -156,7 +157,7 @@ describe("multi-role navigation", () => {
     expect(canOpen(roles, "/settings")).toBe(false);
     expect(workHrefsFor(roles)).toEqual({ all: "/work", orders: "/orders", batches: "/batches", runs: "/packaging", replenishment: "/replenishment" });
     expect(navFor(STAFF_NAV, roles).some(item => item.href.startsWith("/portal"))).toBe(false);
-    expect(PORTAL_NAV.map(item => item.href)).toEqual(["/portal", "/portal/orders", "/portal/invoices", "/portal/account"]);
+    expect(PORTAL_NAV.map(item => item.href)).toEqual(["/portal", "/portal/pre-order", "/portal/orders", "/portal/invoices", "/portal/account"]);
   });
 });
 

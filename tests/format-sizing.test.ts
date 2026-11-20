@@ -68,6 +68,13 @@ describe("pallet fit (Admin only, advisory)", () => {
     expect(formatCommandInput({ ...model, palletFit: "6" }, saved)).toMatchObject({ palletFit: 6 });
     expect(formatCommandInput({ ...model, palletFit: "" }, saved)).toMatchObject({ palletFit: null });
   });
+  it("sends the fit when mixed the same way", () => {
+    const model = toFormatViewProps({ format: { ...saved, pallet_fit_mixed: 6 } });
+    expect(model.palletFitMixed).toBe("6");
+    expect(formatCommandInput(model, { ...saved, pallet_fit_mixed: 6 })).not.toHaveProperty("palletFitMixed");
+    expect(formatCommandInput({ ...model, palletFitMixed: "" }, { ...saved, pallet_fit_mixed: 6 })).toMatchObject({ palletFitMixed: null });
+    expect(formatCommandInput({ ...toFormatViewProps({ format: saved }), palletFitMixed: "6" }, saved)).toMatchObject({ palletFitMixed: 6 });
+  });
   it("a new format sends a fit only when one was entered", () => {
     const model = toFormatViewProps({ format: { id: "new", name: "", basis: "packaged", package_type: "keg", keg_size: "half_bbl", bbl_per_unit: null } });
     expect(model.palletFit).toBe("");

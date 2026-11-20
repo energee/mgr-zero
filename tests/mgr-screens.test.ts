@@ -972,6 +972,8 @@ describe("SCREENS", () => {
     }
     expect(body("Me")).toMatch(/md:flex[\s\S]*Change password[\s\S]*Sign out/);
     expect(body("Portal Me")).toMatch(/md:flex[\s\S]*Change password[\s\S]*Sign out/);
+    // The portal has no Settings page, so its light/dark switch lives in Me.
+    expect(body("Portal Me")).toMatch(/Switch to dark mode/);
     const firstRun = body("First-run checklist");
     expect(firstRun).not.toMatch(/md:flex-row[^>]*>[\s\S]*Set up Demo Brewing[\s\S]*Add location/);
     expect(firstRun).toMatch(/>Add location</);

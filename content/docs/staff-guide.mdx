@@ -320,6 +320,12 @@ For packages built from smaller packages, expand **Build from other packages** a
 
 **Pallet fit** (Admin only) is how many of this package fill one layer or pallet the way you load, such as 10 cases, 20 sixtels, or 8 half kegs. Leave it blank to skip. It is advisory: staff order pages and the portal show how full each layer or pallet is, and nothing enforces it. Admin sets it in **New format** or **Edit format**. A format built from other packages gets it through **Edit format** after creation. Sales does not see the field and its saves leave the pallet fit unchanged.
 
+**Fit when mixed** (Admin only, kegs) is how many of this keg fill a layer that another keg size shares. Eight half kegs fill a layer on their own, but beside sixtels a layer holds about six, so a half keg format with a pallet fit of 8 takes a fit when mixed of 6. Leave it blank to use the pallet fit. It is used only while [Pallets on Settings](#pallet-settings) lists no keg layers; once it does, the layers there decide how sizes share.
+
+**Packaging weight (lb)** (Admin only) is what the empty package adds to the beer: a keg shell, or the cans and cardboard of a case. The field shows what the beer in one unit weighs, so you enter only the rest. The portal adds the two to weigh a pallet. It weighs the beer by the latest gravity reading of the batch a release comes from, and at 1.010 when the batch has no reading or the beer ships from stock. Leave it blank to count the beer alone.
+
+**Height (in)** (Admin only) is how tall one keg stands, or one case sits in a layer. The portal stacks layers up to the pallet height set in [Pallets on Settings](#pallet-settings). Leave it blank to count no height for that package.
+
 Admins can open a packaged format, select **Edit format → Delete format**, and confirm its removal. **Delete format** sits beside **Save format**, with destructive styling. Deletion removes that format's contents and packaging-material assignments, leaving the smaller formats and materials themselves intact. Formats referenced by SKUs, other packages, prices or history cannot be deleted; the confirmation shows the refusal. Cancel leaves the format unchanged.
 
 ### Water profiles
@@ -381,16 +387,18 @@ A brand's **SKU list** page has no link in the app anymore, but a saved link to 
 
 A **release** offers a quantity of one package to portal buyers, for delivery on or after its **Ships from** date. Admin and Sales release, edit, and withdraw; nothing is released automatically. Release from either place:
 
-- **Planning**, under **Planned batches**: **Release for ordering** on a batch lists every package its brand's batch package shares project, each at its projected quantity, shipping from the batch's ready date (the brew date plus **Days to package**). Untick a package to leave it out, or lower its quantity.
+- **Planning**, under **Planned batches**: **Release for ordering** on a batch asks for **Open to wholesale (bbl)**, the barrels of that batch buyers can pre-order. It starts at the percent of the planned batch set in Settings (75% unless you changed it) and cannot exceed the planned barrels. Every package of the beer is listed with a switch; untick one to leave it out. No quantity is typed per package: a half, a sixtel and a case all draw from the same barrels by their size. The barrels you do not release cover the taprooms and a short yield. It ships from the batch's ready date (the brew date plus **Days to package**).
 - **Catalog → brand**, under **Sells as**: **Release** beside **Edit SKU** on an active SKU picks **Packaged stock** or a planned batch of its brand that has no open release of that SKU yet. Packaged stock ships from today, and MGR refuses a quantity above what is available to promise, counting what other releases already set aside.
 
-**Order by** is optional; buyers can order until that day. **Release for ordering** saves one release per package. A planned batch can have one open release per package; edit that one instead. Planning marks a batch **Released** once every package it projects has an open release; until then its form offers only the packages not yet released.
+**Order by** starts at the number of days before ship set in Settings (7 unless you changed it); buyers can order until that day, and you can clear it. **Release for ordering** saves one release per package and sets the batch's pool. A planned batch can have one open release per package; edit that one instead. Planning lists every planned batch whose beer has an active packaged SKU, and marks a batch **Released** once every package has an open release; until then its form offers only the packages not yet released. A release from packaged stock still takes a whole quantity.
 
-A customer with a **Release delay** on its page sees a release that many days after it opens. What remains is the release's quantity less what submitted and confirmed orders hold; drafts do not count. Buyers see when it ships, the order-by date, and **few left** or **sold out**, never counts. A release closes when it is withdrawn, its order-by date passes, or its batch is packaged or cancelled. Packaged units then follow **Orderable from stock**. While a stock release is open, the portal's stock offer for that SKU leaves out what it still holds; once a released batch is packaged, its unconfirmed pre-orders are held the same way.
+A customer with a **Release delay** on its page sees a release that many days after it opens. What remains of a batch is its pool less what submitted and confirmed orders hold across all its packages; drafts do not count. A stock release keeps its own quantity. Buyers see when it ships, the order-by date, and **few left** or **sold out**, never counts. A buyer's order is refused when its lines together would take a batch past its pool. A release closes when it is withdrawn, its order-by date passes, or its batch is packaged or cancelled. Packaged units then follow **Orderable from stock**. While a stock release is open, the portal's stock offer for that SKU leaves out what it still holds; once a released batch is packaged, its unconfirmed pre-orders are held the same way.
+
+**Customer limits.** A customer with a **Release share (%)** on its page can pre-order at most that share of each batch's pool, counted across all its packages. The limit applies until a set number of days before ship (14 unless you changed it in Settings); after that, what is left is open to every customer until ordering closes. A limit holds nothing back for the customer: if they do not order, other customers can take the beer. Orders staff enter are not held to it. Settings can also calculate a limit for each customer without a typed share from their recent purchases; see [Release settings](#release-settings).
 
 <Screen name="Edit release" />
 
-On the brand page, each open release is a row under its SKU and reads like **6 of 12 left · 4 confirmed · 2 pre-ordered · ships Oct 2, 2026**. **Edit** changes the quantity and order-by date. The quantity can never go below what is already confirmed; it can go below confirmed plus pre-ordered, and Confirm order then flags the pre-orders above it. A larger stock release must fit what is available to promise. **Withdraw** stops new orders; orders already submitted stay, and you handle them at Confirm order.
+On the brand page, each open release is a row under its SKU. A batch release reads like **8.25 of 11.25 bbl left in the batch · 16 more of this package · 4 confirmed · ships Oct 2, 2026**; a stock release reads like **6 of 12 left · 4 confirmed · 2 pre-ordered · ships Oct 2, 2026**. **Edit** on a batch release changes **Open to wholesale (bbl)** for the whole batch, an optional **Package limit** for that one package, and the order-by date. Lower the pool when a batch packages short. The pool cannot go below the barrels already confirmed or above the planned batch. It can go below confirmed plus pre-ordered, and Confirm order then flags the batch **Over pool**. On a stock release **Edit** changes the quantity, which can never go below what is already confirmed; a larger one must fit what is available to promise. **Withdraw** stops new orders; orders already submitted stay, and you handle them at Confirm order.
 
 A buyer's submitted order with a released package is a **pre-order** in the portal until you confirm it.
 
@@ -507,6 +515,8 @@ The customer form has no ship-to fields. Add ship-to addresses on the customer's
 The new-customer form and customer detail show **Tax treatment**. Choose **Inherit sale channel** to use the channel default, or select a customer override; editing another field preserves the selected treatment. **Export** tax treatment means shipment outside the US without payment of tax, rather than a pricing channel. Notes under both pickers explain the distinction. **Orders** opens only this customer’s orders, and status filters keep that customer selected. **Clear** returns to all customers.
 
 **Release delay (days)** under **Trading terms** on customer detail holds every [release](#releases) back from that customer: a release appears for them, and they can order from it, only that many days after it opens. **0** (the default) means right away; enter whole days from 0 to 60. Use it to give other customers early access. Ordering from stock is unaffected. A new customer starts at 0; set the delay on its page after you create it.
+
+**Release share (%)** under **Trading terms** is the customer's limit on [pre-orders](#releases): the most of each batch's wholesale barrels they can order until limits lift. Enter a percent above 0 up to 100, with at most two decimals. Leave it blank for no typed limit. A typed share always wins over a calculated one. A new customer starts with none; set it on its page after you create it.
 
 On desktop, **Account details**, **Ship-tos**, and **Portal users** sit together, with **Trading terms** and **Customer activity** alongside them. Long customer names wrap in the page heading without shortening the saved name. **New ship-to** belongs to the Ship-tos section; **Delete customer** is separated below the account sections. The same sections stack on smaller screens.
 
@@ -1447,7 +1457,7 @@ Correcting a posted receipt does not edit its Bill or create a vendor credit. Th
 
 <Screen name="Planning empty" />
 
-Above the shortages, **Planned batches** lists each planned batch that projects packages, with its ready date. A batch whose packages all have an open release reads **Released**; one with some released says how many, like **2 packages · 1 released**; otherwise Admin and Sales see **Release for ordering** for the packages not yet released (see [Release beer for portal ordering](#releases)). Planning opens for Admin, Warehouse, and Brewer, so Sales releases from the brand page instead.
+Above the shortages, **Planned batches** lists each planned batch whose beer has an active packaged SKU, with its ready date and planned barrels. A batch whose packages all have an open release reads **Released**; one with some released says how many, like **2 packages · 1 released**; otherwise Admin and Sales see **Release for ordering** for the packages not yet released (see [Release beer for portal ordering](#releases)). Planning opens for Admin, Warehouse, and Brewer, so Sales releases from the brand page instead.
 
 Planning lists only shortages. With nothing short it says **No material shortages**, which does not mean any batch or packaging run is scheduled. The **Batches** hint asks you to plan a batch so its recipe's ingredients are counted. The **Packaging** hint asks you to schedule a run so its formats' materials are counted. The **Materials** hint asks you to give each material a default vendor so its shortage can be drafted into a purchase order. Batches is Brewer's, so Warehouse sees only the Packaging and Materials links.
 
@@ -1487,6 +1497,42 @@ The **Customer-facing phone** field explains that the portal prints this number 
 After filing, **Correct reporting basis** is another independently saved form. **Save brewery**, the AI model and the warehouse never submit a reporting-basis correction or change its permanent history.
 
 **Days to package** under **Brewery details** estimates when batch packaging materials will be needed. It starts at 14 days; enter a whole number from 1 to 120 and **Save brewery**. Changing it updates projected batch needed-by and buy-by dates on Planning without rescheduling any actual packaging run.
+
+#### Pallet settings [#pallet-settings]
+
+**Pallets** on Settings has its own **Save pallets**. It says how you stack a pallet. The customer portal uses it to tell a buyer how many pallets an order needs, what else fits, and what **Fill the pallet** adds. Nothing here blocks an order.
+
+| Setting | What it does | Starts at |
+| --- | --- | --- |
+| **Most a pallet carries (lb)** | The weight limit for one pallet, beer and packaging together. | 2,500 |
+| **Tallest loaded pallet (in)** | How tall a loaded pallet may stand, measured from the floor with the pallet included. | 60 |
+| **Empty pallet height (in)** | The pallet itself. It is taken off the tallest loaded pallet to get the room for kegs and cases. | 5.5 |
+
+**Keg layers** lists the ways one layer of kegs loads. Each row has a count for each keg size you package, such as 6 half kegs and 6 sixtels, or 8 half kegs alone. **Add keg layer** adds a row and **Remove** takes one out. A blank or zero count means none of that size. A pallet takes at most two keg layers. The portal picks the rows that carry an order's kegs in the fewest layers. A keg size that no row names loads by its format's pallet fit. With no rows at all, each keg format's pallet fit is a layer and its fit when mixed decides how two sizes share one.
+
+A layer of cases holds the case format's **Pallet fit**. Each layer is as tall as its format's **Height**: a keg layer as tall as its tallest keg, a case layer as tall as one case. Layers stack on a pallet until the height runs out, so cases ride on one keg layer, or on two when there is still room, and a pallet is full when either height or weight is used up. A format with no height adds none. A unit's weight is its beer plus its format's **Packaging weight**.
+
+#### Release settings [#release-settings]
+
+**Releases** on Settings has its own **Save releases**. It holds the defaults for [releasing beer](#releases) and for customer limits:
+
+| Setting | What it does | Starts at |
+| --- | --- | --- |
+| **Open to wholesale (%)** | The share of a planned batch the release form offers | 75 |
+| **Ordering closes (days before ship)** | The order-by date the release form suggests | 7 |
+| **Customer limits lift (days before ship)** | Until then a customer with a limit can order only up to it | 14 |
+| **Weekly digest** | The weekday one email goes to each customer's portal users | Off |
+| **Calculate limits from purchases (days)** | With a number, a customer without a typed share is limited to their part of all customers' purchases over that many days | blank (off) |
+| **Stock purchases count (times)** | How much more a barrel bought from stock counts toward a calculated limit than a pre-ordered one | 2 |
+| **Largest calculated limit (%)** | A calculated limit never goes above this | 50 |
+
+Changing the first two only changes what the release form suggests next time; open releases keep their dates and pools. Changing when limits lift applies to open releases at once.
+
+A calculated limit counts barrels on confirmed, picked and shipped wholesale orders. It is never below 5%, so a small buyer can still order. Because stock purchases count for more, a customer who helps clear packaged beer earns a larger share of new releases. A customer with no purchases in the window has no calculated limit; type a share on their page if you want one.
+
+**Customer limits** under the section lists each customer's limit today and where it comes from: **18% · 15% from purchases, +3% from stock**, **25% · set on the customer**, or **No limit**.
+
+**Weekly digest.** On the chosen weekday, each portal user of a customer gets one email covering every open pre-order: beers released in the last week with that customer's usual quantities, limits that lift within a week, and beer now open to everyone. A user with nothing to read gets no email. The email links to the Pre-order page with the usual quantities filled in for the soonest ship date. **Off** sends nothing. The digest uses the same sender and delivery worker as order confirmations.
 
 Admin opens **Settings** from **More** to edit the brewery's basics in one form: **Brewery name**, **Timezone** (search the browser's supported IANA zones by readable names such as Eastern Time (America/New_York)), **TTB registry number** (free text), the **Customer-facing phone** the portal prints when online payment is unavailable (7 to 15 digits, optionally starting with +; spaces, dots, dashes and parentheses are fine; leave it empty for none), and **Reading overdue after (hours)**, which sets when a fermentation reading counts as overdue on Today and in Slack reminders; this is the only place to change it. **Save brewery** writes them together. A blank **TTB registry number** shows a warning under the field, because COLA search and label retrieval need it; it does not block **Save brewery**. **Reading overdue after (hours)** cannot be blank or zero. The one-way keg fee is set per sale channel; see [Sale channels](#channels). **Books opened on** (optional) is the day compliance reports start counting. Records dated earlier, such as history brought over from another system, stay in batches, lots and inventory history but change no report figure. A period that starts before this date cannot be generated or filed. Before the first filed snapshot, Admin can set, change, or clear the date; an empty value counts everything. After filing, this field is locked. Use the separate **Correct reporting basis** section to record the old/new value, actor, time and reason and flag affected periods for external amendment; see [Compliance](#compliance). **AI model** searches the language models available through Vercel AI Gateway by name or provider. MGR refreshes that list at most once an hour, so a newly released model can take up to an hour to appear. Picking one changes the model Ask MGR uses for everyone at this brewery. The note below the selected model explains that brewery-wide scope without repeating its provider. Successful saves confirm at the top right; failures remain beside the affected form. If the catalog cannot load, the saved model remains active and cannot be changed until the catalog is available; the next visit to Settings tries again. **Appearance** switches this device between light and dark mode. Rows for **Accounting**, **Point of sale** and **Chat** sit above the forms; rows for **Team**, **Locations** and **Import** sit below them. **Water profiles** (**Manage water profiles**) opens the catalog of the same name. A profile has no source or target role; a recipe's Water sheet picks that. This link does not configure a brewery-wide source default or suggest salt additions.
 
@@ -1561,11 +1607,13 @@ Below **Publish changes**, **Also in Square** lists Square items you did not pub
 
 A sale channel is a named way your brewery sells beer. Every brewery starts with four: **Wholesale**, **Taproom**, **DTC**, and **Export**. Open **Sale channels** from the **More** navigation to see each channel and its explicitly labeled **Tax treatment**, so a channel named **Export** is distinct from its **Tax treatment: Export**. Only Admin adds, edits, or deletes channels; Sales and Warehouse see the list read-only, and their back link returns to **More**.
 
-1. Select **Add channel**, enter a **Channel name**, choose a **Tax treatment**, set the **One-way keg fee ($)**, and select **Save channel**.
+1. Select **Add channel**, enter a **Channel name**, choose a **Tax treatment**, set the **One-way keg fee ($)** and **Ships on pallets**, and select **Save channel**.
 2. To rename a channel or change its treatment or fee, select **Edit** on its row. The sheet is titled with the channel's name, for example **Edit channel · DTC**. Change the fields and select **Save channel**.
 3. To remove a channel, select **Delete** on its row and confirm. **Delete** appears only on a channel that can be removed.
 
 **One-way keg fee ($)** is the non-refundable charge for each one-way keg on this channel's wholesale orders. A blank fee saves as zero, and zero charges none. A channel with a fee shows it on its row, for example **One-way keg fee $10.00**. Each one-way keg line takes the fee of its order's channel when the line is saved. A submitted order keeps its fee; a changed fee applies to drafts and to lines added after the save. Enter zero or a positive dollar amount, with at most two decimal places and no exponent notation. A fee above $21,474,836.47 cannot be saved. An invalid fee is marked at its field and keeps **Save channel** disabled until it is corrected. When the fee moved from Settings to channels, only channels with the **Export** tax treatment took the old brewery fee; the others, Taproom included, start at zero because the taproom builds the fee into its price.
+
+**Ships on pallets** is **Yes** for a new channel. Choose **No** for a channel whose orders never go on a pallet, such as retail or direct to consumer. Portal buyers on that channel then see no pallet fit, no pallet line and no **Fill the pallet**. Staff order pages still show the pallet fit.
 
 **Save channel** stays disabled until the name contains something other than whitespace. Names are saved without surrounding whitespace and must be unique within your brewery, ignoring case: **dtc** cannot be added beside **DTC**. A duplicate appears as an error under **Channel name**; change the name and save again. Renaming a channel only to change its capitalization is allowed.
 
