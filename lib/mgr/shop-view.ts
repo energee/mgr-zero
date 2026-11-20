@@ -91,6 +91,8 @@ export type ShopSnapshot = {
   brands?: PortalBrand[];
   /** portal_release_share; null or absent when the buyer has no ceiling. */
   share?: ShopShare | null;
+  /** Cart state: the pre-order ship date the stock lines ship with; "" or absent ships them now. */
+  shipWith?: string;
   /** get_portal_account palletRules: how the brewery stacks a pallet; absent uses the defaults. */
   palletRules?: PalletRules;
   /** portal_suggested_order: the buyer's usual quantities of the open batch releases. */
@@ -132,6 +134,8 @@ export type ShopSummary = {
   lines: ShopSummaryLine[];
   /** The same lines as the orders they become, stock first and then by ship date. */
   shipments: ShopShipment[];
+  /** "Ship with": which order the stock lines join ("" ships them now, else a pre-order ship date). Present while the cart holds both stock beer and a pre-order date. */
+  shipWith?: { value: string; options: { value: string; label: string }[] };
   /** "10 items": the cart's units, read beside the subtotal on the phone bar. */
   items: string;
   /** "Ships Dec 4, 2026" when a release line sets the date; "3 orders" when the cart splits. */
@@ -246,8 +250,12 @@ const chosenRelease = (item: ShopCatalogItem) => item.releases?.find((r) => r.re
  *  date. Stock and stock releases ship now (shipsFrom ""); each planned-batch
  *  ship date is its own order, so nobody's beer waits for a later one. Stock
  *  first, then by date. */
-export function shipGroups<T extends ShopCatalogItem>(catalog: T[]): { shipsFrom: string; items: T[] }[] {
+export function shipGroups<T extends ShopCatalogItem>(catalog: T[], shipWith = ""): { shipsFrom: string; items: T[] }[] {
   const groups = Map.groupBy(catalog.filter((i) => i.qty > 0), (i) => { const release = chosenRelease(i); return release?.fromBatch ? release.shipsFrom : ""; });
+  // "Ship with": the buyer's stock lines join a pre-order date's order, when the cart has both.
+  const stock = groups.get("");
+  const joined = shipWith ? groups.get(shipWith) : undefined;
+  if (stock && joined) { joined.push(...stock); groups.delete(""); }
   return [...groups].map(([shipsFrom, items]) => ({ shipsFrom, items })).sort((a, b) => a.shipsFrom.localeCompare(b.shipsFrom));
 }
 
@@ -335,10 +343,11 @@ const FILL_STOP = 1000;
  *  one unit at a time, the one that has grown least for its size first, until
  *  one more of anything would need another pallet or pass the buyer's limit
  *  on its batch. */
-export function fillPallet(catalog: ShopCatalogItem[], shipsFrom: string, rules: PalletRules = DEFAULT_PALLET_RULES): Record<string, number> {
+export function fillPallet(catalog: ShopCatalogItem[], shipsFrom: string, rules: PalletRules = DEFAULT_PALLET_RULES, shipWith = ""): Record<string, number> {
   // Every line of the order counts toward weight and the batch limit; only lines with a pallet fit grow.
-  const order = shipGroups(catalog).find((g) => g.shipsFrom === shipsFrom)?.items ?? [];
-  const items = order.filter((i) => i.palletFit);
+  const order = shipGroups(catalog, shipWith).find((g) => g.shipsFrom === shipsFrom)?.items ?? [];
+  // Stock beer shipped with a pre-order counts toward its pallets but is not topped up: the portal does not know how much stock is left.
+  const items = order.filter((i) => i.palletFit && (!shipsFrom || chosenRelease(i)?.fromBatch));
   const qty = new Map(order.map((i) => [i.skuId, i.qty]));
   const count = (plus?: ShopCatalogItem) => palletCount(order.map((i) => palletLine(i, qty.get(i.skuId)! + (i === plus ? 1 : 0))), rules);
   const pallets = count();
@@ -361,7 +370,7 @@ export function fillPallet(catalog: ShopCatalogItem[], shipsFrom: string, rules:
 }
 
 /** The cart lines, unit count, ship date and pallet fit the summary shows. */
-function shopSummary(catalog: ShopCatalogItem[], floor: string, rules: PalletRules): ShopSummary {
+function shopSummary(catalog: ShopCatalogItem[], floor: string, rules: PalletRules, shipWith: string): ShopSummary {
   const inCart = catalog.filter((i) => i.qty > 0);
   const groups = cartPalletFit(inCart);
   // Room is reported for every package the buyer can order, not only the ones in the cart.
@@ -377,7 +386,14 @@ function shopSummary(catalog: ShopCatalogItem[], floor: string, rules: PalletRul
       anchor: brandAnchor(i.product),
     };
   };
-  const shipments = shipGroups(inCart).map(({ shipsFrom, items }) => ({
+  // The choice is offered while the cart holds both stock beer and a pre-order date.
+  const dates = shipGroups(inCart).map((g) => g.shipsFrom);
+  const preOrderDates = dates.filter(Boolean);
+  const chosenDate = preOrderDates.includes(shipWith) ? shipWith : "";
+  const shipWithChoice = dates.includes("") && preOrderDates.length
+    ? { value: chosenDate, options: [{ value: "", label: "Now" }, ...preOrderDates.map((date) => ({ value: date, label: formatDate(date) }))] }
+    : undefined;
+  const shipments = shipGroups(inCart, shipWith).map(({ shipsFrom, items }) => ({
     key: shipsFrom || "now", title: shipsFrom ? `Ships ${formatDate(shipsFrom)}` : "Ships now", lines: items.map(line),
     subtotal: money(items.reduce((n, i) => n + i.qty * i.unitPriceCents, 0)), palletFit: cartPalletFit(items), pallet: pallet(items),
   }));
@@ -387,6 +403,7 @@ function shopSummary(catalog: ShopCatalogItem[], floor: string, rules: PalletRul
     items: plural(inCart.reduce((n, i) => n + i.qty, 0), "item"),
     shipsOn: shipments.length > 1 ? plural(shipments.length, "order") : floor ? `Ships ${formatDate(floor)}` : undefined,
     palletFit: groups,
+    ...(shipWithChoice ? { shipWith: shipWithChoice } : {}),
     pallet: shipments.length === 1 ? shipments[0].pallet : undefined,
     palletHint: palletHint(groups),
   };
@@ -433,6 +450,7 @@ export function toShopViewProps({
   share,
   suggested = [],
   palletRules = DEFAULT_PALLET_RULES,
+  shipWith = "",
 }: ShopSnapshot): ShopViewModel {
   const rank = new Map(catalog.map((i) => [i.skuId, packageRank(i)]));
   type Entry = { item: ShopCatalogItem; row: ShopItemView };
@@ -503,7 +521,7 @@ export function toShopViewProps({
   const fitted = fitSuggestions(suggested, catalog);
   const shipTo = shipTos.find((s) => s.id === shipToId);
   const floor = shipsFromFloor(catalog);
-  const summary = shopSummary(catalog, floor, palletRules);
+  const summary = shopSummary(catalog, floor, palletRules, shipWith);
   const { merchandiseCents } = shopCartTotals(catalog, depositCentsPerKeg);
   return {
     groups,
@@ -520,6 +538,6 @@ export function toShopViewProps({
     subtotal: money(merchandiseCents),
     shipsFromNote: summary.shipments.length > 1 ? `This cart becomes ${plural(summary.shipments.length, "order")}, one for each ship date.` : floor ? `This order ships from ${formatDate(floor)}.` : undefined,
     summary,
-    ...(preOrderGroups.length || notOpen.length ? { preOrder: { groups: preOrderGroups, planned: notOpen, ...(share ? { note: shareNote(share) } : {}), suggested: suggestedDates(fitted, catalog), fillable: summary.shipments.map((s) => s.key).filter((date) => date !== "now" && Object.keys(fillPallet(catalog, date, palletRules)).length), ...(fitted.length ? { suggestedNote: suggestedNote(fitted) } : {}) } } : {}),
+    ...(preOrderGroups.length || notOpen.length ? { preOrder: { groups: preOrderGroups, planned: notOpen, ...(share ? { note: shareNote(share) } : {}), suggested: suggestedDates(fitted, catalog), fillable: summary.shipments.map((s) => s.key).filter((date) => date !== "now" && Object.keys(fillPallet(catalog, date, palletRules, shipWith)).length), ...(fitted.length ? { suggestedNote: suggestedNote(fitted) } : {}) } } : {}),
   };
 }

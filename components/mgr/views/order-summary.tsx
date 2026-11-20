@@ -53,6 +53,7 @@ function SummaryBody({ model, controls, locked, onLine }: Omit<SummaryProps, "di
     </li>)}
   </ul>;
   return <div className="flex flex-col gap-1">
+    {summary.shipWith ? <fieldset disabled={locked}>{E.pick("Ship stock beer", summary.shipWith.value, summary.shipWith.options, { onChange: controls.shipWith })}</fieldset> : null}
     {!summary.lines.length ? <p className="py-2 text-sm text-muted-foreground">Nothing in your order yet.</p>
       : split ? summary.shipments.map(shipment => <section key={shipment.key} aria-label={shipment.title} className="flex flex-col">
         <h3 className="flex justify-between gap-3 pt-2 text-sm font-semibold"><span>{shipment.title}</span><span className="tabular-nums">{shipment.subtotal}</span></h3>

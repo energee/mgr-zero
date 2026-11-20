@@ -18,6 +18,8 @@ export type ShopControls = {
   suggest?: (shipsFrom: string) => void;
   /** Tops up one ship date's order until its pallets are full. */
   fill?: (shipsFrom: string) => void;
+  /** Which order the stock lines ship with: "" for now, else a pre-order ship date in the cart. */
+  shipWith?: (shipsFrom: string) => void;
 };
 
 /** The catalog, with the order summary beside it from md up (a sticky panel)

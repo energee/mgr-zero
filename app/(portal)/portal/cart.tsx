@@ -91,6 +91,8 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource, brands, 
   const ready = !recovery.error;
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
+  // ponytail: "Ship with" is not saved with the cart, so a reload ships stock now again; save it with the working cart if buyers lose it.
+  const [shipWith, setShipWith] = useState("");
   const [review, setReview] = useState(false);
   // One quote per order the cart becomes (shipGroups), in ship order.
   const [quotes, setQuotes] = useState<QuotedOrder[] | null>(null);
@@ -112,9 +114,10 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource, brands, 
   const unavailable = (lines ?? []).filter(l => !items.some(i => i.skuId === l.skuId));
   const subtotal = (lines ?? []).reduce((n, l) => n + (items.find(i => i.skuId === l.skuId)?.unitPriceCents ?? 0) * l.qty, 0);
 
-  // The cart as the orders it becomes: stock ships now on the buyer's date, and
-  // each pre-order ship date is its own order on that date, so no beer is held.
-  const orders = shipGroups(catalog).map(group => ({
+  // The cart as the orders it becomes: stock ships now on the buyer's date, unless
+  // they chose to ship it with a pre-order date, and each pre-order ship date is
+  // its own order on that date.
+  const orders = shipGroups(catalog, shipWith).map(group => ({
     shipsFrom: group.shipsFrom,
     requestedShipDate: group.shipsFrom || effectiveRequestedDate(fields.requestedShipDate ?? "", group.items) || null,
     lines: group.items.map(item => { const releaseId = chosenOffer(item); return { skuId: item.skuId, qty: item.qty, ...(releaseId ? { releaseId } : {}) }; }),
@@ -219,7 +222,7 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource, brands, 
     // A cart that splits has a date per order, so the summary shows only the date the buyer chose for what ships now.
     requestedDate: (orders.length > 1 ? fields.requestedShipDate : requestedShipDate) ?? "", poNumber: fields.poNumber, note: fields.note,
     source: { name: fulfillmentSource?.name ?? "Not configured" },
-    catalog, brands, planned, share, suggested, palletRules,
+    catalog, brands, planned, share, suggested, palletRules, shipWith,
   });
   shopModel.subtotal = unavailable.length ? "Unavailable for the pending request" : money(subtotal);
   return <>
@@ -228,6 +231,7 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource, brands, 
       controls={{
         quantity: (id, value) => setQty(prev => ({ ...prev, [id]: value })),
         offer: (id, value) => setOffers(prev => ({ ...prev, [id]: value })),
+        shipWith: setShipWith,
         shipTo: shipToId => setFields(prev => ({ ...prev, shipToId })),
         requestedDate: value => setFields(prev => ({ ...prev, requestedShipDate: value || null })),
         po: poNumber => setFields(prev => ({ ...prev, poNumber })),
@@ -238,7 +242,7 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource, brands, 
           setQty(prev => ({ ...prev, ...Object.fromEntries(fill.map(s => [s.skuId, String(s.qty)])) }));
           setOffers(prev => ({ ...prev, ...Object.fromEntries(fill.map(s => [s.skuId, s.releaseId])) }));
         },
-        fill: shipsFrom => setQty(prev => ({ ...prev, ...Object.fromEntries(Object.entries(fillPallet(catalog, shipsFrom, palletRules)).map(([id, n]) => [id, String(n)])) })),
+        fill: shipsFrom => setQty(prev => ({ ...prev, ...Object.fromEntries(Object.entries(fillPallet(catalog, shipsFrom, palletRules, shipWith)).map(([id, n]) => [id, String(n)])) })),
       }}
       messages={<>
         {!fulfillmentSource && E.info("The brewery has not set where orders ship from. Contact the brewery before starting or submitting a new order. An existing uncertain request can still be retried.")}

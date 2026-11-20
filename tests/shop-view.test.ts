@@ -477,6 +477,22 @@ describe("Shop ship dates, limits and suggestions", () => {
     expect(full.summary.pallet).toBe("1 full pallet ✓");
     expect(full.preOrder?.fillable).toEqual([]);
   });
+  it("ships stock beer with a pre-order date when the buyer chooses to", () => {
+    const stock = item("s", "Stock Stout", 2, { badge: "in", palletFit: 8, palletFitMixed: 6, bblPerUnit: 0.5, packagingLb: 29.35, heightIn: 23.5 });
+    const cart = [stock, half(5), later];
+    const groups = (shipWith?: string) => shipGroups(cart, shipWith).map((g) => [g.shipsFrom, g.items.map((i) => i.skuId)]);
+    expect(groups()).toEqual([["", ["s"]], ["2026-12-09", ["h"]], ["2026-12-16", ["l"]]]);
+    expect(groups("2026-12-09")).toEqual([["2026-12-09", ["h", "s"]], ["2026-12-16", ["l"]]]);
+    // A date with no order in the cart changes nothing: the stock beer ships now.
+    expect(shipGroups([stock], "2026-12-09").map((g) => g.shipsFrom)).toEqual([""]);
+    const model = toShopViewProps({ ...ridgelineShop, catalog: cart, shipWith: "2026-12-09" });
+    expect(model.summary.shipments.map((s) => s.key)).toEqual(["2026-12-09", "2026-12-16"]);
+    expect(model.summary.shipWith).toEqual({ value: "2026-12-09", options: [{ value: "", label: "Now" }, { value: "2026-12-09", label: "Dec 9, 2026" }, { value: "2026-12-16", label: "Dec 16, 2026" }] });
+    expect(toShopViewProps({ ...ridgelineShop, catalog: [half(5)] }).summary.shipWith).toBeUndefined();
+    // The two stock kegs count toward the pallet's weight, so the pre-order halves stop at 13 (15 kegs, 2,400 lb); the stock kegs are not topped up.
+    expect(fillPallet(cart, "2026-12-09", undefined, "2026-12-09")).toEqual({ h: 13 });
+    expect(fillPallet(cart, "2026-12-09")).toEqual({ h: 15 });
+  });
   it("counts the order's lines with no pallet fit toward the batch limit", () => {
     const loose = item("x", "Hazy", 10, { name: "Loose", formatName: "Loose", packageType: "can", kegSize: null, releases: [rel("r-x", "2026-12-09", { bblPerUnit: 0.1 })] });
     // 3 bbl left: the ten loose cans take 1 bbl, so the halves stop at four.
