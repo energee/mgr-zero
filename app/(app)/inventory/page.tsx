@@ -5,9 +5,10 @@ import { isUuid } from "@/lib/uuid";
 // append-only inventory write; on hand is read at bin grain (get_bin_on_hand),
 // summed per SKU here, and handed to the form so a chosen SKU starts on the
 // bin holding the most of it. FinishedGoodsView draws the register and movement
-// ledger from the loaded data. Add SKU in Catalog sits beside Record
-// movement, and the form's empty SKU picker links Catalog, only for a user who
-// may create a SKU (#1113). Each active SKU's row opens Record movement on
+// ledger from the loaded data. ?movementType= narrows the ledger to one
+// movement type in the query (the form's own prefill owns ?type=). Add SKU in
+// Catalog sits beside Record movement, and the form's empty SKU picker links
+// Catalog, only for a user who may create a SKU (#1113). Each active SKU's row opens Record movement on
 // that SKU for the same roles (#1507).
 import { sentenceCase } from "@/lib/mgr/labels";
 import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
@@ -19,38 +20,42 @@ import type { InventoryValue } from "@/lib/commands/inventory";
 import { assembleFinishedGoods, movementBbl, toFinishedGoodsViewProps, skuLabel } from "@/lib/mgr/finished-goods-view";
 import "@/lib/commands/all";
 import { MovementForm } from "./movement-form";
-import { formatDateTime } from "@/lib/date-format";
+import { formatDayHeader, formatTimeOfDay } from "@/lib/date-format";
+import { movementSourceHref } from "@/lib/mgr/inventory-detail-view";
+import { Constants } from "@/lib/supabase/database.generated";
 import { movementFormInstanceKey } from "@/lib/composer/state";
 import { movementInput, type MovementInput, type MovementKind } from "@/lib/commands/movement-input";
 import { navTitle } from "@/lib/mgr/nav";
-import { historyPage, pageCursor, type HistoryPage } from "@/lib/mgr/history-page";
+import { numberedHistoryPage, pageNumber, pageSize, type NumberedHistoryPage } from "@/lib/mgr/history-page";
 
 export const metadata = { title: navTitle("/inventory") };
 
-type Sku = { id: string; name: string; active: boolean; format_volume: { bbl_per_unit: number | null } | null; brands: { name: string } | null };
+type Sku = { id: string; name: string; active: boolean; format_volume: { bbl_per_unit: number | null } | null; brands: { name: string; alias: string | null } | null };
 type Location = { id: string; name: string; uses: string[] };
 type Bin = { id: string; location_id: string; name: string };
 type SaleChannel = { id: string; name: string; tax_treatment: string };
 type BinOnHandRow = { sku_id: string; location_id: string; bin_id: string; qty: string };
 type AtpRow = { sku_id: string; qty: string };
-type Movement = { bin_id: string; bbl: string; dest_state: string | null; sale_channel_id: string | null; ref_label: string | null; lots: { code: string } | null; id: string; created_at: string; type: string; qty: string; sku_id: string; location_id: string; note: string | null };
+type Movement = { bin_id: string; bbl: string; dest_state: string | null; sale_channel_id: string | null; ref: string | null; ref_kind: string | null; ref_label: string | null; lots: { code: string } | null; id: string; created_at: string; type: string; qty: string; sku_id: string; location_id: string; note: string | null };
 
-type InventorySearch = { cursor?: string; recordMovement?: string; movementHandoff?: string; skuId?: string; locationId?: string; binId?: string; lotId?: string; qty?: string; type?: string; saleChannelId?: string; destState?: string; note?: string };
+type InventorySearch = { page?: string | string[]; limit?: string | string[]; movementType?: string; recordMovement?: string; movementHandoff?: string; skuId?: string; locationId?: string; binId?: string; lotId?: string; qty?: string; type?: string; saleChannelId?: string; destState?: string; note?: string };
 const movementKinds = new Set<string>(movementInput.shape.type.options);
+const movementTypes = Constants.public.Enums.movement_type;
 
 export default async function InventoryPage({ searchParams }: { searchParams: Promise<InventorySearch> }) {
   const params = await searchParams;
   const { recordMovement } = params;
-  const cursor = pageCursor(params.cursor);
+  const currentPage = pageNumber(params.page), limit = pageSize(params.limit);
+  const movementType = movementTypes.find((type) => type === params.movementType);
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   requirePagePermission(ctx, "get_atp", "Finished goods");
   const [skus, locations, bins, channels, onHand, atp, records, value] = (await Promise.all([
     runCommand("list_skus", {}, ctx), runCommand("list_locations", {}, ctx), runCommand("list_bins", {}, ctx), runCommand("list_sale_channels", {}, ctx),
-    runCommand("get_bin_on_hand", {}, ctx), runCommand("get_atp", {}, ctx), runCommand("list_movements", { cursor }, ctx),
+    runCommand("get_bin_on_hand", {}, ctx), runCommand("get_atp", {}, ctx), runCommand("list_movements", { page: currentPage, limit, type: movementType }, ctx),
     canRun(ctx, "get_inventory_value") ? runCommand("get_inventory_value", {}, ctx) : undefined,
-  ])) as [Sku[], Location[], Bin[], SaleChannel[], BinOnHandRow[], AtpRow[], HistoryPage<Movement>, InventoryValue | undefined];
-  const { rows: movements, pagination } = historyPage(records, "/inventory", cursor);
+  ])) as [Sku[], Location[], Bin[], SaleChannel[], BinOnHandRow[], AtpRow[], NumberedHistoryPage<Movement>, InventoryValue | undefined];
+  const { rows: movements, pagination } = numberedHistoryPage(records, "/inventory", currentPage, limit, { movementType });
   const skuById = new Map(skus.map((s) => [s.id, s]));
   const locationById = new Map(locations.map((l) => [l.id, l.name]));
   const locationName = (id: string) => locationById.get(id) ?? "—";
@@ -72,9 +77,6 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   const initialLot = initial?.lotId && canMove
     ? await runCommand("get_inventory_lot", { lotId: initial.lotId }, ctx) as { id: string; code: string } | null
     : null;
-  const movementLinks: { label: string; href: string }[] = [];
-  if (pagination.firstHref) movementLinks.push({ label: "Newest movements", href: pagination.firstHref });
-  if (pagination.moreHref) movementLinks.push({ label: "Older movements", href: pagination.moreHref });
   return (
     <FinishedGoodsView
       model={toFinishedGoodsViewProps(assembleFinishedGoods(skus, onHand, atp, value))}
@@ -87,11 +89,17 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
           key: m.id,
           title: `${Number(m.qty) > 0 ? "+" : ""}${m.qty} ${skuLabel(skuById.get(m.sku_id) ?? { name: "—" })}`,
           detail: `${sentenceCase(m.type)} · ${locationName(m.location_id)} · ${bins.find(b => b.id === m.bin_id)?.name ?? "—"}${m.lots?.code ? ` · ${m.lots.code}` : ""} · ${movementBbl(m.bbl)}${m.dest_state ? ` · ${m.dest_state}` : ""}${m.sale_channel_id ? ` · ${channels.find(c => c.id === m.sale_channel_id)?.name ?? "—"}` : ""}${m.note ? ` · ${m.note}` : ""}`,
-          trailing: `${formatDateTime(m.created_at, brewery.timeZone)}${m.ref_label ? ` · ${m.ref_label}` : ""}`,
+          day: formatDayHeader(m.created_at, brewery.timeZone),
+          time: formatTimeOfDay(m.created_at, brewery.timeZone),
+          ref: m.ref_label ? { label: m.ref_label, href: movementSourceHref(m) } : undefined,
           outbound: Number(m.qty) < 0,
         })),
-        links: movementLinks,
+        type: {
+          value: movementType ?? "all",
+          options: [{ value: "all", label: "All", href: "/inventory" }, ...movementTypes.map((type) => ({ value: type, label: sentenceCase(type), href: `/inventory?movementType=${type}` }))],
+        },
       }}
+      pagination={pagination}
     />
   );
 }

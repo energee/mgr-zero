@@ -1,10 +1,11 @@
 import { z } from "zod";
-import { historyInput, historyResult, newestFirst } from "./history";
+import { numberedHistorySchema, readHistory, type HistoryRow } from "./history";
 import { defineCommand, defineQuery, unwrap, completeRows, inChunks, PAGE_SIZE, Ctx, CommandExecution, CommandError, STAFF_ROLES } from "./registry";
 import { stockLine } from "./stock-line";
 import { qboUnmappedFilter, unmappedInput } from "./qbo";
 import { movementInput } from "./movement-input";
 import type { Database } from "@/lib/supabase/database";
+import { Constants } from "@/lib/supabase/database.generated";
 import { docNo, runNo, trfNo } from "@/lib/mgr/doc-no";
 import { formatDate } from "@/lib/date-format";
 
@@ -191,15 +192,16 @@ export async function movementReferences(ctx: Ctx, references: (string | null)[]
 }
 
 defineQuery({
-  name: "list_movements", description: "Immutable movements newest-first as { rows, nextCursor }, with location/bin/lot labels, resolved source document ref_label and ref_kind, and reversal links; movementId selects an original and its exact compensation",
-  input: z.object({ skuId: z.string().uuid().optional(), movementId: z.string().uuid().optional(), ...historyInput }),
+  name: "list_movements", description: "Immutable movements newest-first as { rows, nextCursor }, plus total for a numbered page, with location/bin/lot labels, resolved source document ref_label and ref_kind, and reversal links; type keeps one movement type; movementId selects an original and its exact compensation",
+  input: numberedHistorySchema({ skuId: z.string().uuid().optional(), type: z.enum(Constants.public.Enums.movement_type).optional().describe("Keep only movements of this type"), movementId: z.string().uuid().optional() }),
   roles: [...readRoles],
   handler: async (ctx, i) => {
-    let q = ctx.db.from("inventory_movements").select("*, locations(name), bins(name), lots!inventory_movements_lot_fk(code)").eq("brewery_id", ctx.breweryId)
+    let q = ctx.db.from("inventory_movements").select("*, locations(name), bins(name), lots!inventory_movements_lot_fk(code)", { count: i.page === undefined ? undefined : "exact" }).eq("brewery_id", ctx.breweryId)
       .limit(i.limit + 1);
     if (i.skuId) q = q.eq("sku_id", i.skuId);
+    if (i.type) q = q.eq("type", i.type);
     if (i.movementId) q = q.or(`id.eq.${i.movementId},compensates_id.eq.${i.movementId}`);
-    const page = historyResult((await unwrap(newestFirst(q, i.cursor))) ?? [], i.limit);
+    const page = await readHistory<Database["public"]["Tables"]["inventory_movements"]["Row"] & HistoryRow>(q, i);
     const rows = page.rows;
     if (!rows.length) return page;
     const [corrections, references] = await Promise.all([
@@ -234,7 +236,7 @@ defineQuery({
 
 defineQuery({
   // Brewers read SKUs too: the packaging pages pick the SKU a run fills.
-  name: "list_skus", description: "SKUs with their brand and format, alphabetical; saleChannelId keeps only SKUs active and priced on that channel; packageType keeps only SKUs whose format is that package; unmapped keeps only those with no QuickBooks id in the connected company",
+  name: "list_skus", description: "SKUs with their brand (name and staff-only alias) and format, alphabetical; saleChannelId keeps only SKUs active and priced on that channel; packageType keeps only SKUs whose format is that package; unmapped keeps only those with no QuickBooks id in the connected company",
   input: z.object({
     saleChannelId: z.string().uuid().optional().describe("Keep only SKUs a wholesale order on this sale channel can price"),
     active: z.boolean().optional().describe("Keep only active or inactive SKUs when supplied"),

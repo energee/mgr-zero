@@ -38,6 +38,8 @@ About twenty placements product-wide; most screens show two or three.
    is a shape) — those headers stay text rather than fake a brand.
 7. **Empty states** — `E.blank` takes one muted contextual icon per use.
 8. **Command form close** — the close mark is `Cancel01Icon` through `Icon`.
+9. **Layout switch** — Cellar's Tiles / Rows switch: `GridViewIcon` /
+   `ListViewIcon`, icon-only, each named by its `aria-label`.
 
 ## Left alone, on purpose
 

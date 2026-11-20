@@ -5,16 +5,16 @@ import { SKU_HAZY, SKU_PILS, SKU_STOUT, LOC_WAREHOUSE, LOC_TAPROOM } from "./dem
 import { movementBbl, type FinishedGoodsMovements, type FinishedGoodsSnapshot } from "@/lib/mgr/finished-goods-view";
 import type { RecordMovementSnapshot } from "@/lib/mgr/record-movement-view";
 import type { ReverseMovementSnapshot } from "@/lib/mgr/reverse-movement-view";
-import { formatDateTime } from "@/lib/date-format";
+import { formatDayHeader, formatTimeOfDay } from "@/lib/date-format";
 import { DEMO_TIME_ZONE } from "./settings";
 
 /** Beer → Finished goods: Hazy / Pils shortfall / Stout. */
 export const finishedGoodsList: FinishedGoodsSnapshot = {
   value: { cents: 1248000, uncostedUnits: 6 },
   skus: [
-    { id: SKU_HAZY.sku_id, name: SKU_HAZY.name, on_hand: 15, atp: 11 },
-    { id: SKU_PILS.sku_id, name: SKU_PILS.name, on_hand: 18, atp: -6 },
-    { id: SKU_STOUT.sku_id, name: SKU_STOUT.name, on_hand: 9, atp: 7 },
+    { id: SKU_HAZY.sku_id, name: SKU_HAZY.name, brands: { name: SKU_HAZY.brand }, format_volume: { bbl_per_unit: 0.5 }, on_hand: 15, atp: 11 },
+    { id: SKU_PILS.sku_id, name: SKU_PILS.name, brands: { name: SKU_PILS.brand }, format_volume: { bbl_per_unit: 0.09677419 }, on_hand: 18, atp: -6 },
+    { id: SKU_STOUT.sku_id, name: SKU_STOUT.name, brands: { name: SKU_STOUT.brand, alias: "Winter #2" }, format_volume: { bbl_per_unit: 0.16666667 }, on_hand: 9, atp: 7 },
   ],
 };
 
@@ -56,15 +56,18 @@ export const finishedGoodsMovements: FinishedGoodsMovements = {
       key: "festival-removal",
       title: `-${recordMovementFestival.qty} ${SKU_HAZY.name}`,
       detail: `Festival removal · ${recordMovementFestival.location} · ${recordMovementFestival.bin} · ${movementBbl(recordMovementFestival.bbl)} · PA · ${recordMovementFestival.channel} · Community festival`,
-      trailing: formatDateTime("2026-09-10T14:00:00Z", DEMO_TIME_ZONE),
+      day: formatDayHeader("2026-09-10T14:00:00Z", DEMO_TIME_ZONE),
+      time: formatTimeOfDay("2026-09-10T14:00:00Z", DEMO_TIME_ZONE),
       outbound: true,
     },
     {
       key: "standalone-adjustment",
       title: `+${reverseMovementAdjustment.qty} ${SKU_HAZY.name}`,
       detail: `Adjustment · ${reverseMovementAdjustment.location} · ${reverseMovementAdjustment.bin} · ${movementBbl(reverseMovementAdjustment.bbl)} · ${reverseMovementAdjustment.note}`,
-      trailing: formatDateTime("2026-09-10T13:00:00Z", DEMO_TIME_ZONE),
+      day: formatDayHeader("2026-09-10T13:00:00Z", DEMO_TIME_ZONE),
+      time: formatTimeOfDay("2026-09-10T13:00:00Z", DEMO_TIME_ZONE),
       outbound: false,
     },
   ],
+  type: { value: "all", options: [{ value: "all", label: "All" }, { value: "adjustment", label: "Adjustment" }, { value: "festival_removal", label: "Festival removal" }] },
 };

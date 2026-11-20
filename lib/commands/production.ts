@@ -13,7 +13,7 @@
 // row per tank for a batch split across several, and beside them the batches
 // other recipes brewed on the same grain bill.
 import { z } from "zod";
-import { historyInput, historyResult, newestFirst, type HistoryRow } from "./history";
+import { numberedHistorySchema, readHistory, type HistoryRow } from "./history";
 import type { VesselReading } from "@/lib/mgr/vessel-detail-view";
 import { currentBrewRecords } from "@/lib/mgr/brew-day-view";
 import { INGREDIENT_STAGES, scheduleDays, timedInDays, timingLimitMinutes } from "@/lib/mgr/recipe-process-view";
@@ -755,13 +755,12 @@ defineQuery({
 
 defineQuery({
   name: "list_batch_history", description: "One page of completed or cancelled batches, newest created first, with brand and embedded recipe; each completed batch also carries its first and last gravity readings (og_reading and fg_reading, each null when it has no gravity reading)",
-  input: z.object({ status: z.enum(["completed", "cancelled"]).describe("Which finished batches to list"), ...historyInput }), roles: ["admin", "brewer"],
+  input: numberedHistorySchema({ status: z.enum(["completed", "cancelled"]).describe("Which finished batches to list") }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {
-    let q = ctx.db.from("batches").select(`${BATCH_COLUMNS}, created_at`)
+    let q = ctx.db.from("batches").select(`${BATCH_COLUMNS}, created_at`, { count: i.page === undefined ? undefined : "exact" })
       .eq("brewery_id", ctx.breweryId).limit(i.limit + 1);
     q = i.status === "cancelled" ? q.not("cancelled_at", "is", null) : q.not("closed_at", "is", null).is("cancelled_at", null);
-    const fetched = (await unwrap(newestFirst(q, i.cursor))) ?? [];
-    const page = historyResult(fetched as unknown as (BatchRow & HistoryRow)[], i.limit);
+    const page = await readHistory<BatchRow & HistoryRow>(q, i);
     const rows = await batchListRows(ctx, page.rows);
     if (i.status === "cancelled") return { ...page, rows };
     const ids = page.rows.map(b => b.id);

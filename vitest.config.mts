@@ -10,10 +10,15 @@ const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 // The screen-only proof contract, pure form checks, and harness regressions.
 // Every unlisted file stays in the guarded database project.
 const pureTests = [
+  "tests/history-page-view.test.ts",
   "tests/production-attention-experiment.test.ts",
   "tests/material-category-experiment.test.ts",
   "tests/material-category-suggestion.test.ts",
+  "tests/material-kind-defaults.test.ts",
+  "tests/material-category-keywords.test.ts",
   "tests/suggest-material-category-query.test.ts",
+  "tests/similar-names-view.test.ts",
+  "tests/typesafe-key-check.test.ts",
   "tests/agent-eval-score.test.ts",
   "tests/agent-evals-cli.test.ts",
   "tests/dependency-tooling.test.ts",
@@ -38,6 +43,7 @@ const pureTests = [
   "tests/chat-failure.test.ts",
   "tests/chat-view.test.ts",
   "tests/settings-view.test.ts",
+  "tests/suggestion-settings-view.test.ts",
   "tests/proposal-view.test.ts",
   "tests/agent-connect-view.test.ts",
   "tests/agent-hidden.test.ts",

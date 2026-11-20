@@ -499,14 +499,14 @@ isOneToOne: false
                   ]
                 },"breweries": {
                   Row: {
-                    "agents_enabled": boolean,"books_opened_on": string | null,"closed_at": string | null,"created_at": string,"customer_phone": string | null,"days_to_package": number,"fermentation_reading_due_hours": number,"gravity_unit": string,"id": string,"name": string,"pallet_rules": NonNullable<Json>,"portal_fulfillment_location_id": string | null,"release_cap_lift_days": number,"release_digest_dow": number | null,"release_max_share_pct": number,"release_open_pct": number,"release_order_by_days": number,"release_share_window_days": number | null,"release_stock_multiplier": number,"settings": NonNullable<Json>,"timezone": string,"ttb_registry_no": string | null
+                    "agents_enabled": boolean,"books_opened_on": string | null,"closed_at": string | null,"created_at": string,"customer_phone": string | null,"days_to_package": number,"fermentation_reading_due_hours": number,"gravity_unit": string,"id": string,"name": string,"pallet_rules": NonNullable<Json>,"portal_fulfillment_location_id": string | null,"release_cap_lift_days": number,"release_digest_dow": number | null,"release_max_share_pct": number,"release_open_pct": number,"release_order_by_days": number,"release_share_window_days": number | null,"release_stock_multiplier": number,"settings": NonNullable<Json>,"suggestions_enabled": boolean,"timezone": string,"ttb_registry_no": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "agents_enabled"?: boolean,"books_opened_on"?: string | null,"closed_at"?: string | null,"created_at"?: string,"customer_phone"?: string | null,"days_to_package"?: number,"fermentation_reading_due_hours"?: number,"gravity_unit"?: string,"id"?: string,"name": string,"pallet_rules"?: NonNullable<Json>,"portal_fulfillment_location_id"?: string | null,"release_cap_lift_days"?: number,"release_digest_dow"?: number | null,"release_max_share_pct"?: number,"release_open_pct"?: number,"release_order_by_days"?: number,"release_share_window_days"?: number | null,"release_stock_multiplier"?: number,"settings"?: NonNullable<Json>,"timezone"?: string,"ttb_registry_no"?: string | null
+                    "agents_enabled"?: boolean,"books_opened_on"?: string | null,"closed_at"?: string | null,"created_at"?: string,"customer_phone"?: string | null,"days_to_package"?: number,"fermentation_reading_due_hours"?: number,"gravity_unit"?: string,"id"?: string,"name": string,"pallet_rules"?: NonNullable<Json>,"portal_fulfillment_location_id"?: string | null,"release_cap_lift_days"?: number,"release_digest_dow"?: number | null,"release_max_share_pct"?: number,"release_open_pct"?: number,"release_order_by_days"?: number,"release_share_window_days"?: number | null,"release_stock_multiplier"?: number,"settings"?: NonNullable<Json>,"suggestions_enabled"?: boolean,"timezone"?: string,"ttb_registry_no"?: string | null
                   }
                   Update: {
-                    "agents_enabled"?: boolean,"books_opened_on"?: string | null,"closed_at"?: string | null,"created_at"?: string,"customer_phone"?: string | null,"days_to_package"?: number,"fermentation_reading_due_hours"?: number,"gravity_unit"?: string,"id"?: string,"name"?: string,"pallet_rules"?: NonNullable<Json>,"portal_fulfillment_location_id"?: string | null,"release_cap_lift_days"?: number,"release_digest_dow"?: number | null,"release_max_share_pct"?: number,"release_open_pct"?: number,"release_order_by_days"?: number,"release_share_window_days"?: number | null,"release_stock_multiplier"?: number,"settings"?: NonNullable<Json>,"timezone"?: string,"ttb_registry_no"?: string | null
+                    "agents_enabled"?: boolean,"books_opened_on"?: string | null,"closed_at"?: string | null,"created_at"?: string,"customer_phone"?: string | null,"days_to_package"?: number,"fermentation_reading_due_hours"?: number,"gravity_unit"?: string,"id"?: string,"name"?: string,"pallet_rules"?: NonNullable<Json>,"portal_fulfillment_location_id"?: string | null,"release_cap_lift_days"?: number,"release_digest_dow"?: number | null,"release_max_share_pct"?: number,"release_open_pct"?: number,"release_order_by_days"?: number,"release_share_window_days"?: number | null,"release_stock_multiplier"?: number,"settings"?: NonNullable<Json>,"suggestions_enabled"?: boolean,"timezone"?: string,"ttb_registry_no"?: string | null
                   }
                   Relationships: [
                     {
@@ -5406,6 +5406,9 @@ isOneToOne: false
 "get_brew_record":
 { Args: { "p_batch": string,"p_brewery": string }; Returns: Json
                            },
+"get_brewery_typesafe_key_status":
+{ Args: { "p_actor": string,"p_brewery": string }; Returns: Json
+                           },
 "get_chat_delivery_context":
 { Args: { "p_delivery": string,"p_now"?: string }; Returns: Json
                            },
@@ -5435,6 +5438,9 @@ isOneToOne: false
                            },
 "get_material_count_preview":
 { Args: { "p_bin": string,"p_brewery": string,"p_lines": Json,"p_location": string }; Returns: Json
+                           },
+"get_material_kind_suggestion_outcomes":
+{ Args: { "p_actor": string,"p_brewery": string }; Returns: Json
                            },
 "get_order_email_status":
 { Args: { "p_brewery": string,"p_order": string }; Returns: Json
@@ -5764,6 +5770,9 @@ isOneToOne: false
 "raise_invoice_question":
 { Args: { "p_body": string,"p_brewery": string,"p_invoice": string,"p_request_id": string }; Returns: Json
                            },
+"read_brewery_typesafe_key":
+{ Args: { "p_actor": string,"p_brewery": string }; Returns: string
+                           },
 "read_integration_tokens":
 { Args: { "p_actor": string,"p_brewery": string,"p_connection": string,"p_provider": string }; Returns: {
               "access_expires_at": string,"access_token": string,"credential_version": number,"refresh_expires_at": string,"refresh_hard_expires_at": string,"refresh_token": string
@@ -5842,6 +5851,9 @@ isOneToOne: false
                            },
 "record_material_count":
 { Args: { "p_bin": string,"p_brewery": string,"p_counted_on": string,"p_lines": Json,"p_location": string,"p_request_id": string,"p_revision"?: string }; Returns: Json
+                           },
+"record_material_kind_suggestion":
+{ Args: { "p_actor": string,"p_brewery": string,"p_category": Database["public"]['Enums']["material_category"],"p_name": string,"p_probability": number }; Returns: undefined
                            },
 "record_pick":
 { Args: { "p_order": string,"p_picks": Json,"p_request_id": string }; Returns: Json
@@ -5992,6 +6004,12 @@ isOneToOne: false
 "set_brewery_quiet_hours":
 { Args: { "p_brewery": string,"p_end": string,"p_installation": string,"p_request_id": string,"p_start": string }; Returns: Json
                            },
+"set_brewery_suggestions_enabled":
+{ Args: { "p_brewery": string,"p_enabled": boolean,"p_request_id": string }; Returns: Json
+                           },
+"set_brewery_typesafe_key":
+{ Args: { "p_actor": string,"p_api_key": string,"p_brewery": string,"p_request_id": string }; Returns: Json
+                           },
 "set_channel_price":
 { Args: { "p_brewery": string,"p_format": string,"p_price_group": string,"p_request_id": string,"p_sale_channel": string,"p_unit_price_cents": number }; Returns: Json
                            },
@@ -6069,6 +6087,11 @@ isOneToOne: false
                            },
 "ship_order":
 { Args: { "p_carrier": string,"p_invoice_timing"?: string,"p_order": string,"p_request_id": string,"p_ship": Json,"p_tracking": string }; Returns: Json
+                           },
+"similar_names":
+{ Args: { "p_brewery": string,"p_exclude"?: string,"p_kind": string,"p_name": string }; Returns: {
+              "id": string,"name": string
+            }[]
                            },
 "snooze_notification":
 { Args: { "p_brewery": string,"p_delivery": string,"p_request_id": string,"p_until": string }; Returns: Json

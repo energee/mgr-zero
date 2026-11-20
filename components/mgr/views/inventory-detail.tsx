@@ -4,12 +4,13 @@ import { E } from "@/components/mgr/e";
 import type { InventoryDetailViewModel, InventoryMovement } from "@/lib/mgr/inventory-detail-view";
 import { formatDateTime } from "@/lib/date-format";
 import { bblFixed } from "@/lib/volume";
+import { HistoryNavigation, type HistoryNavigationProps } from "./history-navigation";
 
 /** `headerAction` is Record movement for this SKU: live links the movement
  *  deep link, or null for a user who may not record one; the inventory leaves
- *  it out and draws it inert. */
-export function InventoryDetailView({ model, headerAction, movementAction, footer }: {
-  model: InventoryDetailViewModel; headerAction?: ReactNode; movementAction?: (movement: InventoryMovement) => ReactNode; footer?: ReactNode;
+ *  it out and draws it inert. `pagination` is the live page's movement pages. */
+export function InventoryDetailView({ model, headerAction, movementAction, footer, pagination }: {
+  model: InventoryDetailViewModel; headerAction?: ReactNode; movementAction?: (movement: InventoryMovement) => ReactNode; footer?: ReactNode; pagination?: HistoryNavigationProps;
 }) {
   return <>
     {E.back("Finished goods", model.sku.name, headerAction !== undefined ? headerAction : E.btn("Record movement"), model.backHref)}
@@ -24,6 +25,7 @@ export function InventoryDetailView({ model, headerAction, movementAction, foote
         <p className="text-xs text-muted-foreground">{formatDateTime(m.created_at, model.timeZone)}{m.note ? ` · ${m.note}` : ""}{m.ref_label ? ` · ${m.ref_label}` : ""}</p>
       </>)}
     </div>) : E.blank("No movements recorded yet")}
+    {pagination && <HistoryNavigation {...pagination} />}
     {footer}
   </>;
 }

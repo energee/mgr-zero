@@ -361,6 +361,7 @@ omitted. They have no roles until they are built.
 | `disconnect_square` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `draft_purchase_order_from_requirements` | Purchasing & materials | ✓ |  | ✓ |  |  |  |
 | `file_compliance_report` | Compliance | ✓ | ✓ |  |  |  |  |
+| `find_similar_names` | Customers | ✓ | ✓ | ✓ | ✓ |  |  |
 | `generate_compliance_report` | Compliance | ✓ | ✓ |  |  |  |  |
 | `get_agent_session` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `get_atp` | Inventory & locations | ✓ | ✓ | ✓ |  |  |  |
@@ -375,6 +376,7 @@ omitted. They have no roles until they are built.
 | `get_brewery` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ |  |  |
 | `get_brewery_ai_model` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `get_brewery_operating_defaults` | Team & brewery settings | ✓ |  |  |  |  |  |
+| `get_brewery_suggestion_settings` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `get_chat_history` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `get_chat_integration_health` | Today & notifications | ✓ |  |  |  |  |  |
 | `get_chat_link_intent` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
@@ -571,6 +573,8 @@ omitted. They have no roles until they are built.
 | `set_brewery_gravity_unit` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `set_brewery_operating_defaults` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `set_brewery_quiet_hours` | Team & brewery settings | ✓ |  |  |  |  |  |
+| `set_brewery_suggestions_enabled` | Team & brewery settings | ✓ |  |  |  |  |  |
+| `set_brewery_typesafe_key` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `set_channel_price` | Catalog & pricing | ✓ | ✓ |  |  |  |  |
 | `set_my_gravity_unit` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `set_notification_destination` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
@@ -834,14 +838,25 @@ omitted field and clear one only when you send it as `null`.
 ### History paging [#history-paging]
 
 `list_orders`, `list_invoices`, `list_movements`, `portal_orders`, `portal_invoices`,
-`list_batch_history`, and `list_packaging_history` return `{ rows, nextCursor }`,
+`list_batch_history`, `list_packaging_history`, and `list_order_changes` return `{ rows, nextCursor }`,
 with rows ordered by `created_at` and `id`, both descending. `nextCursor` is null
 on the last page. Otherwise pass it back as `cursor`, unchanged and with the same
 filters, to read the next page. Keep its timestamp precision; do not convert it
 through a JavaScript `Date`. New records appear when restarting from the newest page.
 
+For numbered paging, `list_orders`, `list_invoices`, `list_movements`, `list_batch_history`,
+`list_packaging_history`, `portal_orders`, and `portal_invoices` also accept
+`page`, an optional integer from **1** through **1000000**. Page **1** is the
+newest page. Send `page` and `limit` with the same filters for each request;
+`page` and `cursor` are mutually exclusive. Numbered mode returns
+`{ rows, nextCursor, total }`, where `total` is the number of matching records
+before pagination, not just the displayed rows. With neither `page` nor
+`cursor`, these queries keep the existing cursor-mode response without `total`.
+Numbered pages reflect the records currently matching the filters, so new
+records can shift page boundaries between requests.
+
 `list_batch_history` requires `status: "completed"` or `status: "cancelled"`;
-each status has its own cursor. Each completed batch carries `og_reading` and
+each status has its own page or cursor and limit. Each completed batch carries `og_reading` and
 `fg_reading`: its first and last gravity readings (`id`, `gravity_plato`),
 each `null` when the batch has none. A batch with one gravity reading has the
 same reading in both. Cancelled batches carry neither. `list_packaging_history` pages closed and

@@ -9,7 +9,7 @@ vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery"
 vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ roles: ["sales"] }) }));
 vi.mock("@/lib/commands/all", () => ({}));
 vi.mock("@/lib/mgr/page-query", () => ({ requirePagePermission: vi.fn(), optionalPageQuery: async () => ({ customer: { name: "Ridgeline Tap Room" } }) }));
-vi.mock("@/components/mgr/query-provider", () => ({ useCommandQuery: vi.fn(() => ({ data: { rows: ordersWorkList.orders, nextCursor: null }, error: null, dataUpdatedAt: 1, refetch: vi.fn() })) }));
+vi.mock("@/components/mgr/query-provider", () => ({ useCommandQuery: vi.fn(() => ({ data: { rows: ordersWorkList.orders, nextCursor: null, total: ordersWorkList.orders.length }, error: null, dataUpdatedAt: 1, refetch: vi.fn() })) }));
 import OrdersPage from "@/app/(app)/orders/page";
 import { OrdersClient } from "@/app/(app)/orders/orders-client";
 import { QueryFeedback } from "@/components/mgr/query-feedback";
@@ -72,7 +72,7 @@ describe("Orders list view loop", () => {
     expect(model.customer).toEqual({ name: "Ridgeline Tap Room" });
   });
 
-  it("offers every status in one Status pick; each keeps the customer and drops the cursor", () => {
+  it("offers every status in one Status pick; each keeps the customer and resets pagination", () => {
     const model = toOrdersListViewProps({ roles: ["sales"], linked: true, status: "picked", customer: "Ridgeline Tap Room", customerId: "c1", orders: [] });
     expect(model.status).toBe("picked");
     expect(model.statusOptions.map((o) => o.label)).toEqual(["All states", "Draft", "Submitted", "Confirmed", "Picked", "Shipped", "Delivered", "Cancelled"]);
@@ -91,7 +91,7 @@ describe("Orders list view loop", () => {
   });
 
   it("builds routable status choices from the live page while preserving and encoding its customer", async () => {
-    const page = await OrdersPage({ searchParams: Promise.resolve({ status: "picked", customerId: "customer & partner", cursor: "older-page" }) });
+    const page = await OrdersPage({ searchParams: Promise.resolve({ status: "picked", customerId: "customer & partner", page: "3" }) });
     const list = OrdersClient(page.props);
     expect(list.props.model.statusOptions).toEqual([
       { value: "all", label: "All states", href: "/orders?customerId=customer+%26+partner" },
@@ -116,7 +116,7 @@ describe("Orders list view loop", () => {
     const page = await OrdersPage({ searchParams: Promise.resolve({ status }) });
     expect(page.props.status).toBe(status);
     const list = OrdersClient(page.props);
-    expect(useCommandQuery).toHaveBeenLastCalledWith("list_orders", { status, customerId: undefined, cursor: undefined });
+    expect(useCommandQuery).toHaveBeenLastCalledWith("list_orders", { status, customerId: undefined, page: 1, limit: 50 });
     expect(list.props.model.status).toBe(status);
     expect(parseOrderStatus(status)).toBe(status);
   });
@@ -135,7 +135,7 @@ describe("Orders list view loop", () => {
     const page = await OrdersPage({ searchParams: Promise.resolve({ status, customerId: "c1" }) });
     expect(page.props.status).toBeUndefined();
     const list = OrdersClient(page.props);
-    expect(useCommandQuery).toHaveBeenLastCalledWith("list_orders", { status: undefined, customerId: "c1", cursor: undefined });
+    expect(useCommandQuery).toHaveBeenLastCalledWith("list_orders", { status: undefined, customerId: "c1", page: 1, limit: 50 });
     expect(list.props.model.status).toBe("all");
     expect(list.props.model.customer?.clearHref).toBe("/orders");
     expect(list.props.model.statusOptions[0]?.href).toBe("/orders?customerId=c1");
@@ -168,13 +168,13 @@ describe("Orders list view loop", () => {
     }
   });
 
-  it("does not treat filtered, older, loading, or failed order lists as a true empty state (#1129)", () => {
+  it("does not treat filtered, later, loading, or failed order lists as a true empty state (#1129)", () => {
     const createAction = createElement("a", { href: "/orders/new" }, "New order");
     const model = toOrdersListViewProps({ roles: ["sales"], orders: [] });
     const cases = [
       { model: { ...model, status: "shipped" as const } },
       { model: { ...model, customer: { name: "Ridgeline" } } },
-      { model, pagination: { firstHref: "/orders" } },
+      { model, pagination: { currentPage: 2 } },
       { model, listStatus: createElement("p", null, "Loading orders") },
       { model, listStatus: createElement("p", null, "Could not load orders") },
     ];

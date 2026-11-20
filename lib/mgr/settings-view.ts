@@ -68,6 +68,24 @@ export function refreshBrewerySettingsValues(previous: BrewerySettingsValues, va
   return refreshed;
 }
 
+/** What Settings may know about the brewery's TypeSafe key (get_brewery_suggestion_settings):
+ *  never the key, at most its last four characters, plus the suggestion switch. */
+export type TypeSafeKeyStatus = {
+  saved: boolean; last4: string | null; enabled: boolean;
+  /** The last 30 days of kind suggestions; the read carries it, a key or switch save does not. */
+  outcomes?: SuggestionOutcomes;
+};
+
+/** How this brewery's kind suggestions turned out (get_material_kind_suggestion_outcomes): names asked,
+ *  names that got a suggestion, and of those saved as a material, how many kept that kind or have another. */
+export type SuggestionOutcomes = { asked: number; suggested: number; kept: number; changed: number };
+
+/** The Settings line for those counts, or null while no name has been asked. */
+export function suggestionOutcomesLine(outcomes: SuggestionOutcomes | undefined): string | null {
+  if (!outcomes || outcomes.asked === 0) return null;
+  return `${outcomes.suggested} of ${outcomes.asked} names got a suggestion · ${outcomes.kept} kept · ${outcomes.changed} changed`;
+}
+
 export type SettingsViewModel = {
   backHref?: string;
   name: string;
@@ -85,6 +103,8 @@ export type SettingsViewModel = {
   aiModels: GatewayModelOption[];
   /** Whether outside agents such as Claude or ChatGPT may connect. */
   agentsEnabled: boolean;
+  /** The TypeSafe key status and the "Suggest kinds for new materials" switch. */
+  suggestions: TypeSafeKeyStatus;
   deployment: string;
   /** Portal fulfillment location id, or null when none is set. */
   warehouseId: string | null;

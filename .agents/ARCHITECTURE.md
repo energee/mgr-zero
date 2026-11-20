@@ -243,7 +243,12 @@ a gap to close, not a convention to trust.
    proves the concrete connection is visible through `ctx.db`, then passes the
    verified actor to a service-only RPC that rechecks current membership and role
    in the same token read/write statement. Integration modules must use this
-   boundary; they never receive a service-client allowlist. `invite_staff` and
+   boundary; they never receive a service-client allowlist. The same boundary
+   holds each brewery's write-only TypeSafe key for Jev suggestions
+   (`set_brewery_typesafe_key`, `get_brewery_typesafe_key_status`,
+   `read_brewery_typesafe_key`, over `private.brewery_typesafe_keys`) and the count of
+   what each suggestion answered (`record_material_kind_suggestion`,
+   `get_material_kind_suggestion_outcomes`, over `private.material_kind_suggestions`). `invite_staff` and
    `invite_customer_user` use `lib/supabase/invites.ts`: the RLS-bound claim RPC
    verifies the current actor and role before Auth, and the completion RPC
    rechecks them. Auth identity is bound by a private trigger in Auth's own

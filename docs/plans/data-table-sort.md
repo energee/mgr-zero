@@ -45,8 +45,8 @@ Cells are `ReactNode`s; TanStack needs a plain value. One pure rule, in order:
 
 ## Tables and exclusions
 
-Sortable (14 tables on 12 screens): Orders, Invoices, Batches (each group) and
-vessels, Finished goods, Formats, Catalog brands; `E.tbl` in format components,
+Sortable (13 tables on 11 screens): Orders, Invoices, Batches (each group) and
+vessels, Formats, Catalog brands; `E.tbl` in format components,
 close packaging run outputs, import preview and result, keg aging, planning
 horizon, packaging planned materials and actuals, run closed outputs, schedule
 packaging run materials, taproom variance, portal invoice lines.
@@ -56,6 +56,8 @@ Excluded, passing `sortable: false`:
   report's order, and staff copy them row by row onto the form.
 - **Price groups** grid: its cells are inline editors and Add-pour buttons, and
   its rows are price groups in their saved order.
+- **Finished goods** register (since #1892): SKUs sit under a heading per
+  brand, and sorting would scatter a brand's rows away from its heading.
 
 Row lists drawn with `E.nav` (Customers, Recipes, Vendors, Purchase orders,
 Packaging runs, Materials, Portal orders, …) have no columns and are out of
@@ -118,7 +120,7 @@ Each task starts with its failing test. Shared proof after each task:
    Accept: vitest green. Depends on: 3, 4. Parallel with 5.
 
 7. **Explicit sort values where a cell is a component.** Pass `sort` for
-   Finished goods Available (`row.atp`), Batches vessel/readings (vessel name),
+   Batches vessel/readings (vessel name),
    Invoices Total (`row.total.value`) and Due (`row.due.value`), and Orders
    Status (`row.status`). Files: `components/mgr/views/finished-goods.tsx`,
    `batches.tsx`, `invoices.tsx`, `orders-list.tsx`.

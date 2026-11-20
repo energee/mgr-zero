@@ -13,8 +13,16 @@ export function RemoveVesselControl({ vessel, ...rest }: { vessel: string; busy?
     warning="A vessel holding beer cannot be deleted. A vessel that has held beer is retired instead: it leaves the cellar and its batch history stays." />;
 }
 
+/** The editable vessel facts under their heading. `fold` closes them behind that heading until it is selected. */
+function Facts({ fold, children }: { fold: boolean; children: ReactNode }) {
+  return fold
+    ? <details className="mt-3"><summary className="cursor-pointer"><h2 className="inline text-base font-semibold">Vessel facts</h2></summary><div className="mt-3 flex flex-col gap-4">{children}</div></details>
+    : <>{E.group("Vessel facts")}{children}</>;
+}
+
 /** `editable` is false for a brewer: the vessel facts read as text, with no Save or Delete (vessels are admin-managed).
  *  A model with no `readings` is New vessel: nothing has happened in it yet, so only the facts are drawn.
+ *  A saved vessel leads with its beer and readings, so an admin's facts form is folded under Vessel facts.
  *  `reason` (vesselReason) says what Save vessel still needs. `actions` (Transfer, Addition, Complete batch for
  *  the open occupancy) sit beside Reading, so they open on this tank (#1508). */
 export function VesselDetailView({ model, onName, onType, onCapacity, messages, submitting = false, reason, editable = true, remove, footer, actions }: {
@@ -29,13 +37,11 @@ export function VesselDetailView({ model, onName, onType, onCapacity, messages, 
     {model.retired && E.info("This vessel is retired. It is out of the cellar and takes no new beer; its batch history stays.")}
     {model.readings && <>
       {model.occupancy ? E.nav(model.occupancy.title, model.occupancy.detail, model.occupancy.warning ? "w" : "", undefined, model.occupancy.href) : E.blank("No open occupancy")}
-      {E.fld("Current reading", model.readings.current)}
       {(model.readingHref || actions) && <div className="flex flex-wrap gap-2">{model.readingHref && E.btn("Reading", "p", model.readingHref)}{actions}</div>}
       {E.ttl("Reading history")}
       {model.readings.history.length ? model.readings.history.map(row => <Fragment key={row.key}>{E.row(row.title, row.detail, row.who)}</Fragment>) : E.blank("No readings yet")}
     </>}
-    {E.group("Vessel facts")}
-    {editable ? <>
+    {editable ? <Facts fold={Boolean(model.readings)}>
       <FieldGroup>
         {E.edit("Name", model.name, "text", undefined, { onChange: onName, disabled: submitting, required: true })}
         {E.pick("Type", model.type, (model.typeOptions.map(type => ({ value: type, label: type }))), { onChange: onType, disabled: submitting })}
@@ -54,7 +60,8 @@ export function VesselDetailView({ model, onName, onType, onCapacity, messages, 
         </div>
         <div className="shrink-0 self-start">{remove}</div>
       </section>}
-    </> : <>
+    </Facts> : <>
+      {E.group("Vessel facts")}
       {E.fld("Name", model.name)}
       {E.fld("Type", model.type)}
       {E.fld("Capacity (bbl)", model.capacity)}

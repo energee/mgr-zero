@@ -6,11 +6,10 @@
 import { Fragment } from "react";
 import { E } from "@/components/mgr/e";
 import { ScopePick } from "@/components/mgr/scope-pick";
-import { HistoryNavigation, type HistoryNavigationProps } from "./history-navigation";
 import type { OrderChangesViewModel } from "@/lib/mgr/order-changes-view";
 
 /** `pagination` is the live page's Newest and More links (historyPage); inventory draws one page. */
-export function OrderChangesView({ model, pagination }: { model: OrderChangesViewModel; pagination?: HistoryNavigationProps }) {
+export function OrderChangesView({ model, pagination }: { model: OrderChangesViewModel; pagination?: { moreHref?: string; firstHref?: string } }) {
   return (
     <>
       {E.back("More", "Changes after confirm", undefined, model.backHref)}
@@ -26,7 +25,10 @@ export function OrderChangesView({ model, pagination }: { model: OrderChangesVie
             {row.href ? E.nav(row.title, row.detail, "", undefined, row.href) : E.row(row.title, row.detail)}
           </Fragment>
         ))}
-      <HistoryNavigation {...pagination} />
+      {(pagination?.firstHref || pagination?.moreHref) && <nav aria-label="History pages" className="flex gap-2">
+        {pagination.firstHref && E.act("Newest", undefined, pagination.firstHref)}
+        {pagination.moreHref && E.act("More", "primary", pagination.moreHref)}
+      </nav>}
     </>
   );
 }

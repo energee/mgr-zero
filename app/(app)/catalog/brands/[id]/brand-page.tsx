@@ -11,6 +11,7 @@
 // The brand form is always writable: page.tsx admits Admin and Sales only.
 "use client";
 
+import { useSimilarNames } from "@/components/mgr/similar-names";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -103,6 +104,7 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
     name: set("name"), alias: set("alias"), style: set("style"), abv: set("abv"), category: set("category"), description: set("description"), hops: set("hops"),
     priceGroup: (id: string) => set("priceGroupId")(id === UNPRICED ? "" : id),
   };
+  const similar = useSimilarNames("brand", brand ?? undefined);
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setValidationAttempted(true);
@@ -123,6 +125,8 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
         controls={controls}
         validationAttempted={validationAttempted}
         nameError={fieldErrors.name}
+        nameBlur={() => similar.check(f.name)}
+        nameNote={similar.note}
         categoryAction={<CatalogCategoriesControl categories={categories} busy={categoryAction.busy} error={categoryAction.error}
           onSave={(name, previousName) => categoryAction.run("save_catalog_category", { name, previousName }, () => {
             // Only a rename follows into the form; Add never changes the brand's selection (#1495).

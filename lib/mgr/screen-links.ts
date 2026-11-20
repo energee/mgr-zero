@@ -50,7 +50,9 @@ export const TAPS: [string | RegExp, string][] = [
   [/^B-\d+/, "Brew day"],
   [/^RUN-\d+/, "Close packaging run"],
   ["Reading", "Fermentation reading"],
-  ["Add reading", "Fermentation reading"],
+  ["Start readings", "Fermentation reading"],
+  // A Cellar tile's Add reading names its tank to a screen reader ("Add reading for FV1").
+  [/^Add reading( for .+)?$/, "Fermentation reading"],
   ["Outbox", "Offline outbox"],
   ["Start", "Brew prep"],
   ["Transfer", "Cellar transfer"],
@@ -166,7 +168,6 @@ export const TAPS: [string | RegExp, string][] = [
   ["Question this invoice", "Question invoice"],
   ["Pay", "Pay invoice"],
   ["You \u00b7 buyer", "Portal Me"],
-  [/^Weekly count · /, "Weekly count"],
   ["Connect Slack", "Chat settings"],
   ["Preview surfaces", "Chat settings"],
   ["Health", "Reauthorization"],

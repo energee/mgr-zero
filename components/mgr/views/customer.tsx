@@ -93,7 +93,7 @@ export function CustomerView({
   footer,
   detail,
   deleteAction,
-  canWrite = true, busy = false, error = null, onSave,
+  canWrite = true, busy = false, error = null, onSave, onNameBlur, nameNote,
 }: {
   model: CustomerViewModel;
   footer?: ReactNode;
@@ -104,6 +104,10 @@ export function CustomerView({
   busy?: boolean;
   error?: string | null;
   onSave?: (values: CustomerEditValues) => void;
+  /** Leaving Customer name, with the typed name; the live page checks for a near-duplicate then. */
+  onNameBlur?: (name: string) => void;
+  /** The near-duplicate warning under Customer name. */
+  nameNote?: ReactNode;
 }) {
   const formId = useId();
   const [values, setValues] = useState(model.editValues);
@@ -125,7 +129,7 @@ export function CustomerView({
             <h2 className="mb-3 font-heading text-xl font-semibold">Account details</h2>
             <div className="flex flex-col gap-4">
               <CustomerAccountFields values={values} controls={{
-                name: { ...controls("name"), onBlur: () => touched.touch(0), error: touched.shown(0) ? nameError : undefined },
+                name: { ...controls("name"), onBlur: () => { touched.touch(0); onNameBlur?.(values.name); }, error: touched.shown(0) ? nameError : undefined, note: nameNote },
                 alias: controls("alias"), type: controls("type"), country: controls("country"), state: controls("state"),
               }} />
               <CustomerLicenseField value={values.licenseNumber} controls={controls("licenseNumber")} />

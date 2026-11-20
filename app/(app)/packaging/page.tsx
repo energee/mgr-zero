@@ -24,7 +24,7 @@ import { ScheduleRunForm } from "./schedule-run-form";
 import { RepackForm, type RepackParent } from "./repack-form";
 import { navTitle } from "@/lib/mgr/nav";
 import { breweryDate } from "@/lib/date-format";
-import { historyPage, pageCursor, type HistoryPage, type HistoryRow } from "@/lib/mgr/history-page";
+import { numberedHistoryPage, pageNumber, pageSize, type NumberedHistoryPage, type HistoryRow } from "@/lib/mgr/history-page";
 
 export const metadata = { title: navTitle("/packaging") };
 
@@ -35,22 +35,23 @@ type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
 type Sku = ScheduleRunData["skus"][number];
 
-export default async function PackagingPage({ searchParams }: { searchParams: Promise<{ repack?: string; schedule?: string; cursor?: string | string[] }> }) {
-  const { repack, schedule, cursor: rawCursor } = await searchParams;
-  const cursor = pageCursor(rawCursor);
+export default async function PackagingPage({ searchParams }: { searchParams: Promise<{ repack?: string; schedule?: string; page?: string | string[]; limit?: string | string[] }> }) {
+  const { repack, schedule, page: rawPage, limit: rawLimit } = await searchParams;
+  const currentPage = pageNumber(rawPage);
+  const limit = pageSize(rawLimit);
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const canRepack = brewery.roles.includes("admin") || brewery.roles.includes("warehouse");
   const [runs, recent, brands, occupancies, ready, skus, locations, bins, parents] = (await Promise.all([
-    runCommand("list_packaging_runs", {}, ctx), runCommand("list_packaging_history", { cursor }, ctx),
+    runCommand("list_packaging_runs", {}, ctx), runCommand("list_packaging_history", { page: currentPage, limit }, ctx),
     runCommand("list_brands", {}, ctx), runCommand("list_occupancies", {}, ctx),
     runCommand("list_occupancies", { readyToPackage: true }, ctx),
     runCommand("list_skus", {}, ctx),
     // Only the repack form needs these; a brewer never sees it.
     canRepack ? runCommand("list_locations", {}, ctx) : [], canRepack ? runCommand("list_bins", {}, ctx) : [],
     canRepack ? runCommand("list_repack_parents", {}, ctx) : [],
-  ])) as [Run[], HistoryPage<Run & HistoryRow>, Brand[], Occupancy[], ReadyTank[], Sku[], Location[], Bin[], RepackParent[]];
-  const page = historyPage(recent, "/packaging", cursor);
+  ])) as [Run[], NumberedHistoryPage<Run & HistoryRow>, Brand[], Occupancy[], ReadyTank[], Sku[], Location[], Bin[], RepackParent[]];
+  const page = numberedHistoryPage(recent, "/packaging", currentPage, limit);
   return <PackagingRunsView
     model={toPackagingRunsViewProps([...runs, ...page.rows], brewery.timeZone, (id) => `/packaging/${id}`)} pagination={page.pagination}
     ready={toReadyToPackage(ready, (id) => `/packaging?schedule=${id}`)}

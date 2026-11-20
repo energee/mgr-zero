@@ -521,7 +521,7 @@ describe("Materials", () => {
     expect(suggested.body.props.model).toMatchObject({ name: "Citra T-90", kind: "", kindSuggestion: "hop" });
     const html = htmlOf(suggested.body);
     expect(html).toContain('id="material-kind-suggestion"');
-    expect(html).toContain("Suggested: Hop. Press Tab to accept.");
+    expect(html).toContain("Suggested: Hop. Press Tab or choose it in the list to accept.");
   });
 
   it("MaterialView shows no suggestion without one, or once a kind is picked", () => {
@@ -545,7 +545,7 @@ describe("Materials", () => {
     expect(form).toMatch(/kindOptions: MATERIAL_CATEGORIES/);
     expect(form).not.toMatch(/const KINDS\b/);
     expect(form).toMatch(/useCommandQuery<\{ category: string \| null \}>\(\s*"suggest_material_category", \{ name: askedName \},\s*!material && askedName !== "" && category === "",?\s*\)/);
-    expect(form).toMatch(/nameBlur: material \? undefined : \(\) => setAskedName\(name\.trim\(\)\)/);
+    expect(form).toMatch(/nameBlur: \(\) => \{ similar\.check\(name\); if \(!material\) setAskedName\(name\.trim\(\)\); \}/);
     expect(form).toMatch(/kindSuggestion: category === "" \? suggestion\.data\?\.category \?\? undefined : undefined/);
     expect(form).toMatch(/setAskedName\(""\)/);
   });

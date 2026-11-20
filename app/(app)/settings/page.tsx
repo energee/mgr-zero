@@ -10,6 +10,8 @@ import "@/lib/commands/all";
 import { PortalFulfillmentForm } from "./portal-fulfillment-form";
 import { SettingsForm, type BrewerySettings } from "./settings-form";
 import { AgentsSettingsForm } from "./agents-settings-form";
+import { SuggestionSettingsForm } from "./suggestion-settings-form";
+import type { TypeSafeKeyStatus } from "@/lib/mgr/settings-view";
 import { AiModelSettingsForm } from "./ai-model-settings-form";
 import { getGatewayLanguageModels } from "@/lib/chat/models";
 import { ReportingBasisForm } from "./reporting-basis-form";
@@ -30,7 +32,7 @@ export default async function SettingsPage() {
   const serverEnv = getServerEnv();
   if (!brewery.roles.includes("admin")) redirect(deniedHref("Settings", ["admin"]));
   const ctx = await buildContext(brewery.id);
-  const [row, locations, team, ai, aiModels, reports, basisCorrections, releaseShares, formats] = await Promise.all([
+  const [row, locations, team, ai, aiModels, reports, basisCorrections, releaseShares, formats, suggestions] = await Promise.all([
     runCommand("get_brewery", {}, ctx) as Promise<BrewerySettings & ReleaseSettings & { portal_fulfillment_location_id: string | null; gravity_unit: GravityUnit; agents_enabled: boolean; pallet_rules: PalletRules }>,
     runCommand("list_locations", {}, ctx) as Promise<{ id: string; name: string; uses: string[] }[]>,
     runCommand("list_team_members", {}, ctx) as Promise<unknown[]>,
@@ -41,6 +43,7 @@ export default async function SettingsPage() {
     runCommand("list_release_shares", {}, ctx) as Promise<ReleaseShareRow[]>,
     // The Pallets section has one column per keg size the brewery packages.
     runCommand("list_formats", { basis: "packaged" }, ctx) as Promise<{ keg_size: string | null }[]>,
+    runCommand("get_brewery_suggestion_settings", {}, ctx) as Promise<TypeSafeKeyStatus>,
   ]);
   // Every location is already in hand for the summary line, so the portal's
   // fulfillment sources come out of that list rather than a second read.
@@ -63,6 +66,7 @@ export default async function SettingsPage() {
         aiModel: ai.model,
         aiModels,
         agentsEnabled: row.agents_enabled,
+        suggestions,
         deployment: serverEnv.dedicated ? "dedicated" : "hosted",
         warehouseId: row.portal_fulfillment_location_id,
         warehouseOptions: warehouses.map(({ id, name }) => ({ id, name })),
@@ -77,6 +81,7 @@ export default async function SettingsPage() {
       fulfillmentForm={<PortalFulfillmentForm key={row.portal_fulfillment_location_id ?? "unconfigured"} locations={warehouses} currentId={row.portal_fulfillment_location_id} />}
       aiModelForm={<AiModelSettingsForm current={ai.model} models={aiModels} />}
       agentsForm={<AgentsSettingsForm current={row.agents_enabled} />}
+      suggestionsForm={<SuggestionSettingsForm status={suggestions} />}
       hrefs={{ water: "/catalog/water-profiles?from=settings", locations: "/locations", team: "/settings/team", accounting: "/settings/accounting", pos: "/settings/pos", chat: "/settings/chat", import: "/settings/import", channels: "/settings/channels" }}
     />
   );

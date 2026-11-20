@@ -78,7 +78,7 @@ export function OrdersView({
   sheet?: ReactNode;
 }) {
   const newOrder = createAction !== undefined ? createAction : E.btn("New order");
-  const emptyAction = model.status === "all" && !model.customer && !pagination?.firstHref ? newOrder : undefined;
+  const emptyAction = model.status === "all" && !model.customer && (pagination?.currentPage ?? 1) === 1 ? newOrder : undefined;
   return (
     <>
       {E.hd("Orders", newOrder)}

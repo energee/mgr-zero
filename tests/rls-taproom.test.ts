@@ -246,7 +246,8 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     cancel_batch: [B,plannedBatch.id,R()], set_recipe_brand: [B,f.recipe.id,BRAND,R()], update_recipe: [B,f.recipe.id,"Renamed recipe",null,R()], reschedule_batch: [B,plannedBatch.id,day,R()],
     cancel_packaging_run: [B,readyRun.id,R()], reschedule_packaging_run: [B,readyRun.id,day,R()],
     schedule_batch: [B,BRAND,f.version.id,day,2,null,R()], schedule_packaging_run: [B,BRAND,day,f.occupancy.id,[{sku_id:SKU,qty_planned:1}],R()], send_purchase_order: [B,draftPo.id,"external",R()], update_purchase_order: [B,draftPo.id,VENDOR,day,[{material_id:MAT,qty_ordered:1}],R()],
-    set_brewery_agents_enabled: [B,true,R()], set_brewery_gravity_unit: [B,"sg",R()], set_brewery_quiet_hours: [B,I,"22:00","07:00",R()], set_portal_fulfillment_source: [B,W,R()], cancel_stock_transfer: [f.transfer.id,"Fixture",R()],
+    similar_names: [B,"vendor","Fixture vendor",null],
+    set_brewery_agents_enabled: [B,true,R()], set_brewery_suggestions_enabled: [B,true,R()], set_brewery_gravity_unit: [B,"sg",R()], set_brewery_quiet_hours: [B,I,"22:00","07:00",R()], set_portal_fulfillment_source: [B,W,R()], cancel_stock_transfer: [f.transfer.id,"Fixture",R()],
     set_qbo_customer_mapping: [B,f.customer.customerId,"qbo-customer",R()], set_qbo_item_mapping: [B,SKU,"qbo-item",R()],
     set_qbo_deposit_mapping: [B,"qbo-deposit",R()], set_qbo_one_way_fee_mapping: [B,"qbo-fee",R()], set_qbo_push_defaults: [B,true,true,R()], start_qbo_push: [B,f.invoice.id,"initial",R()], write_off_invoice: [B,f.invoice.id,"Fixture",R()],
     record_invoice_payment: [B,f.invoice.id,100,day,"check",null,R()], void_invoice_payment: [B,sql(`select id from public.invoice_payments where brewery_id='${B}'`,true)[0],"Fixture",R()],
@@ -387,6 +388,10 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     get_published_pos_menu: [R()], store_cola_label_image: [B,"26001001000999","https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Forged.jpg&filetype=l","data:image/jpeg;base64,/9j/2Q=="],
     provision_brewery: [f.taproom.id,"Fixture","America/New_York",null,R()],
     close_brewery: [B], agent_friction_report: [], prune_agent_history: [], prune_command_requests: [],
+    // The brewery's TypeSafe key: service-only, so a signed-in caller cannot set, read or see it.
+    set_brewery_typesafe_key: [B,f.taproom.id,"fixture-key-1234",R()], get_brewery_typesafe_key_status: [B,f.taproom.id],
+    read_brewery_typesafe_key: [B,f.taproom.id],
+    record_material_kind_suggestion: [B,f.taproom.id,"Fixture hop","hop",0.95], get_material_kind_suggestion_outcomes: [B,f.taproom.id],
   };
   if (existsSync(".env.test.local")) {
     // Admit only this reset's verified probe; every other service RPC still

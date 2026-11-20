@@ -97,7 +97,7 @@ export function PackagingRunsView({ model, ready = [], actions, workHrefs, pagin
   return <>
     {E.hd("Packaging", actions !== undefined ? actions : E.btn("Schedule run"))}
     <WorkKindTabs chips={model.workChips} current={model.workChips[4]} tabs={model.workTabs} hrefs={workHrefs} />
-    {model.empty && ready.length === 0 && !pagination?.firstHref ? E.blank(model.empty) : <>
+    {model.empty && ready.length === 0 && (pagination?.currentPage ?? 1) === 1 ? E.blank(model.empty) : <>
       {ready.length > 0 && <>{E.ttl("Ready to package")}<ReadyTable rows={ready} /></>}
       {model.upcoming.length > 0 && <>{E.ttl("Upcoming")}<UpcomingTable rows={model.upcoming} /></>}
       {model.recent.length > 0 && <>{E.ttl("Recent")}<RecentTable rows={model.recent} /></>}

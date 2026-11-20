@@ -50,17 +50,82 @@ describe("Finished goods view", () => {
     expect(htmlOf(createElement(FinishedGoodsView, { model, movements: { rows: [] } }))).toMatch(unitLabel);
   });
 
-  it("maps each SKU onto a register row with on hand, allocated, available and its links (#942)", () => {
-    const row = (sku: { sku_id: string; name: string }, onHand: string, allocated: string, atp: string, short: boolean) => ({
-      key: sku.sku_id, name: sku.name, onHand, allocated, atp, short,
+  it("maps each SKU onto a register row under its brand, with on hand, allocated, available and its links (#942)", () => {
+    const row = (sku: { sku_id: string; brand: string; format: string }, bbl: string, onHand: string, allocated: string, atp: string, short: boolean) => ({
+      key: sku.sku_id, name: sku.format, group: { brand: sku.brand, onHand: bbl }, onHand, allocated, atp, short,
       href: `/inventory/${sku.sku_id}`, shortfallHref: `/replenishment?sku=${sku.sku_id}#shortfalls`,
       movementHref: `/inventory?recordMovement=1&skuId=${sku.sku_id}`,
     });
     expect(toFinishedGoodsViewProps(finishedGoodsList).rows).toEqual([
-      row(SKU_HAZY, "15", "4", "11", false),
-      row(SKU_PILS, "18", "24", "−6", true),
-      row(SKU_STOUT, "9", "2", "7", false),
+      row(SKU_HAZY, "7.5 bbl", "15", "4", "11", false),
+      row(SKU_PILS, "1.7 bbl", "18", "24", "−6", true),
+      // The fixture stout carries a staff alias, which its heading shows.
+      { ...row(SKU_STOUT, "1.5 bbl", "9", "2", "7", false), group: { brand: `${SKU_STOUT.brand} · Winter #2`, onHand: "1.5 bbl" } },
     ]);
+  });
+
+  it("groups a brand's SKUs under one heading, in brand then SKU order, and totals their barrels on hand", () => {
+    const sku = (id: string, brand: string, format: string, on_hand: number, bbl: number | null) =>
+      ({ id, name: `${brand} · ${format}`, brands: { name: brand }, format_volume: { bbl_per_unit: bbl }, on_hand, atp: on_hand });
+    const rows = toFinishedGoodsViewProps({ skus: [
+      sku("p1", "Pils", "Sixtel", 6, 1 / 6), sku("h2", "Hazy", "Half", 4, 0.5), sku("p2", "Pils", "Case", 10, null), sku("h1", "Hazy", "Case", 10, 0.1),
+    ] }).rows;
+    expect(rows.map((row) => [row.key, row.name, row.group])).toEqual([
+      ["h1", "Case", { brand: "Hazy", onHand: "3 bbl" }],
+      ["h2", "Half", undefined],
+      // One Pils format has no volume, so the brand states no barrel total.
+      ["p2", "Case", { brand: "Pils", onHand: undefined }],
+      ["p1", "Sixtel", undefined],
+    ]);
+  });
+
+  it("heads a brand with its staff alias, as Catalog names it", () => {
+    const { rows } = toFinishedGoodsViewProps({ skus: [{ id: "s1", name: "Hazy · Keg", brands: { name: "Hazy", alias: "Batch 12" }, on_hand: 1, atp: 1 }] });
+    expect(rows[0]).toMatchObject({ name: "Keg", group: { brand: "Hazy · Batch 12" } });
+  });
+
+  it("names a row by its format when the SKU is named after the brand's alias", () => {
+    const { rows } = toFinishedGoodsViewProps({ skus: [{ id: "s1", name: "Reptile #6 · Case", brands: { name: "Bearded Dragon", alias: "Reptile #6" }, on_hand: 1, atp: 1 }] });
+    expect(rows[0]).toMatchObject({ name: "Case", group: { brand: "Bearded Dragon · Reptile #6" } });
+  });
+
+  it("leaves a SKU without a brand ungrouped under its own name", () => {
+    expect(toFinishedGoodsViewProps({ skus: [{ id: "s1", name: "Loose keg", on_hand: 1, atp: 1 }] }).rows[0]).toMatchObject({ name: "Loose keg", group: undefined });
+  });
+
+  it("draws the brand heading once, quiets a zero Allocated, and keeps each row's Record movement off the phone", () => {
+    const sku = (id: string, format: string, atp: number) => ({ id, name: `Hazy · ${format}`, brands: { name: "Hazy" }, on_hand: 5, atp });
+    const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps({ skus: [sku("a", "Case", 5), sku("b", "Half", 3)] }), movements: { rows: [] } }));
+    // Once in the desk table and once in the phone list.
+    expect(html.match(/>Hazy</g)).toHaveLength(2);
+    expect(html.match(/<span class="text-muted-foreground">0<\/span>/g)).toHaveLength(2);
+    expect(html).not.toMatch(/<span class="text-muted-foreground">2<\/span>/);
+    expect(html.match(/<span class="max-md:hidden"><button[^>]*>Record movement<\/button><\/span>/g)).toHaveLength(4);
+  });
+
+  it("lists movements under one heading per day, with the time and a linked source document under each", () => {
+    const row = (key: string, day: string, ref?: { label: string; href?: string }) => ({ key, title: `+1 ${key}`, detail: "Adjustment · Warehouse · Cold", day, time: "10:35 AM", ref, outbound: false });
+    const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps({ skus: [] }), movements: { rows: [
+      row("a", "Mon, Nov 16", { label: "RUN-1006", href: "/packaging/r1" }), row("b", "Mon, Nov 16", { label: "Count Nov 16" }), row("c", "Sun, Nov 15"),
+    ] } }));
+    expect(html.match(/>Mon, Nov 16</g)).toHaveLength(1);
+    expect(html.match(/>Sun, Nov 15</g)).toHaveLength(1);
+    expect(html).toMatch(/<a [^>]*href="\/packaging\/r1"[^>]*>RUN-1006<\/a>/);
+    // A count has no page of its own: its label is text.
+    expect(html).not.toMatch(/<a [^>]*>Count Nov 16/);
+    expect(html).toContain("Count Nov 16");
+    // The row's two-line clamp is lifted, and the time has a phone line of its own.
+    expect(html).toContain("[&amp;_[data-slot=item-description]]:line-clamp-none");
+    expect(html).toMatch(/md:hidden[^>]*>10:35 AM/);
+  });
+
+  it("offers the movement Type filter only when the page supplies one, and names an empty filtered ledger", () => {
+    const model = toFinishedGoodsViewProps({ skus: [] });
+    const type = { value: "loss", options: [{ value: "all", label: "All" }, { value: "loss", label: "Loss" }] };
+    expect(htmlOf(createElement(FinishedGoodsView, { model, movements: { rows: [] } }))).not.toContain("Type");
+    const html = htmlOf(createElement(FinishedGoodsView, { model, movements: { rows: [], type } }));
+    expect(html).toContain("Type");
+    expect(html).toContain("No Loss movements recorded");
   });
 
   it("keeps a known zero available as zero, not a shortfall (#942)", () => {
@@ -76,7 +141,8 @@ describe("Finished goods view", () => {
 
   it("withholds a retired SKU's Record movement, as SKU detail does (#1507)", () => {
     const snapshot = assembleFinishedGoods([{ id: "s1", name: "Retired", active: false }, { id: "s2", name: "Current", active: true }], [{ sku_id: "s1", qty: 2 }, { sku_id: "s2", qty: 3 }], []);
-    expect(toFinishedGoodsViewProps(snapshot).rows.map((row) => row.movementHref)).toEqual([null, "/inventory?recordMovement=1&skuId=s2"]);
+    // Rows come back in name order: Current, then Retired.
+    expect(toFinishedGoodsViewProps(snapshot).rows.map((row) => row.movementHref)).toEqual(["/inventory?recordMovement=1&skuId=s2", null]);
   });
 
   it("each live row opens Record movement on its SKU, only for a user who may record one (#1507)", () => {
@@ -112,7 +178,8 @@ describe("Finished goods view", () => {
     expect(html).toMatch(/>Add SKU in Catalog</);
     expect(html).toMatch(/>Shortfall</);
     expect(html).not.toMatch(/>Review</);
-    expect(html).toContain(SKU_HAZY.name);
+    expect(html).toContain(SKU_HAZY.brand);
+    expect(html).toContain(SKU_HAZY.format);
     expect(html).toContain("−6");
     expect(html).not.toMatch(/href="\/inventory\//);
     expect(html).not.toMatch(/href="\/replenishment/);
@@ -125,7 +192,7 @@ describe("Finished goods view", () => {
       movements: { rows: [] },
       linkRows: true,
     }));
-    expect(html).toMatch(new RegExp(`href="/inventory/${SKU_HAZY.sku_id}"[^>]*>${SKU_HAZY.name}<`));
+    expect(html).toMatch(new RegExp(`href="/inventory/${SKU_HAZY.sku_id}"[^>]*>${SKU_HAZY.format}<`));
     expect(html).toMatch(new RegExp(`href="/replenishment\\?sku=${SKU_PILS.sku_id}#shortfalls"[^>]*>Shortfall<`));
     expect(html).not.toMatch(new RegExp(`/replenishment\\?sku=${SKU_HAZY.sku_id}`));
     expect(html).not.toMatch(/>Review</);
@@ -261,18 +328,16 @@ describe("Reverse movement view", () => {
 });
 
 describe("finished goods brand alias", () => {
-  const aliased = { id: "s-lion", name: "Animal #33 · Case", brands: { name: "White Lion", alias: "Animal #33" }, formats: { name: "Case" }, on_hand: 4, atp: 4 };
+  const aliased = { id: "s-lion", name: "Animal #33 · Case", brands: { name: "White Lion", alias: "Animal #33" }, on_hand: 4, atp: 4 };
 
-  it("names an aliased SKU's row by brand and format, with the alias muted under them", () => {
+  it("heads an aliased brand's rows with the brand and its alias, and names the row by what is left", () => {
     const model = toFinishedGoodsViewProps({ skus: [aliased] });
-    expect(model.rows[0]).toMatchObject({ name: "White Lion · Case", alias: "Animal #33" });
-    expect(htmlOf(createElement(FinishedGoodsView, { model, movements: { rows: [] } })))
-      .toContain('<span class="flex flex-col"><span>White Lion · Case</span><span class="text-xs font-normal text-muted-foreground">Animal #33</span></span>');
+    expect(model.rows[0]).toMatchObject({ name: "Case", group: { brand: "White Lion · Animal #33" } });
+    expect(htmlOf(createElement(FinishedGoodsView, { model, movements: { rows: [] } }))).toContain("White Lion · Animal #33");
   });
 
-  it("keeps a SKU without an alias as skuLabel names it", () => {
+  it("heads a brand without an alias by its name alone", () => {
     const model = toFinishedGoodsViewProps({ skus: [{ ...aliased, brands: { name: "Pils" }, name: "Case" }] });
-    expect(model.rows[0].name).toBe("Pils · Case");
-    expect(model.rows[0].alias).toBeUndefined();
+    expect(model.rows[0]).toMatchObject({ name: "Case", group: { brand: "Pils" } });
   });
 });

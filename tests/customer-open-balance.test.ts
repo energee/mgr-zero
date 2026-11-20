@@ -78,6 +78,6 @@ describe("the Invoices register's customer filter", () => {
 
   it("the live register passes the customer to list_invoices, not the page", () => {
     const src = readFileSync("app/(app)/invoices/page.tsx", "utf8");
-    expect(src).toMatch(/runCommand\("list_invoices", \{ cursor, status, customerId \}/);
+    expect(src).toMatch(/runCommand\("list_invoices", \{ page: currentPage, limit, status, customerId \}/);
   });
 });

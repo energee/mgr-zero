@@ -94,18 +94,18 @@ export function BatchesView({ model, createAction, workHrefs, newVesselHref, com
   return <>
     {E.hd(model.title, createAction !== undefined ? createAction : E.btn("New batch"))}
     <WorkKindTabs chips={model.workChips} current={model.workChips[model.workChipIndex]} tabs={model.workTabs} hrefs={workHrefs} />
-    {model.empty && !completedPagination?.firstHref && !cancelledPagination?.firstHref ? E.blank(model.empty) : <>
+    {model.empty && (completedPagination?.currentPage ?? 1) === 1 && (cancelledPagination?.currentPage ?? 1) === 1 ? E.blank(model.empty) : <>
       {([["Planned", model.planned], ["Active", model.active]] as const).map(([title, rows]) => rows.length ? <Fragment key={title}>
         {E.ttl(title)}
         <GroupTable rows={rows} />
       </Fragment> : null)}
     </>}
-    {(!!model.completed?.length || completedPagination?.firstHref) && <section aria-label="Completed batches" className="grid gap-3">
+    {(!!model.completed?.length || (completedPagination?.currentPage ?? 1) > 1) && <section aria-label="Completed batches" className="grid gap-3">
       {E.ttl("Completed")}
       <GroupTable rows={model.completed ?? []} />
       <HistoryNavigation {...completedPagination} />
     </section>}
-    {(!!model.cancelled?.length || cancelledPagination?.firstHref) && <details open={cancelledOpen} className="rounded border p-3">
+    {(!!model.cancelled?.length || (cancelledPagination?.currentPage ?? 1) > 1) && <details open={cancelledOpen} className="rounded border p-3">
       <summary className="cursor-pointer text-sm font-medium">Cancelled ({model.cancelled?.length ?? 0})</summary>
       <div className="mt-3 grid gap-3">
         <GroupTable rows={model.cancelled ?? []} />

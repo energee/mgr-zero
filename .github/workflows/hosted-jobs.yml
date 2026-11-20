@@ -2,7 +2,8 @@
 #
 # Vercel Hobby cron runs at most once a day, too slow for order confirmations,
 # so this POSTs the existing bearer-authenticated routes instead:
-#   - order email every 5 minutes (each call sends at most ten)
+#   - order email every 5 minutes (each call sends at most ten): retries, since
+#     confirm_order already sends a new confirmation right after it responds
 #   - release digest daily: it queues a brewery's weekly digest only on that brewery's chosen weekday,
 #     and the order email job above sends what it queues
 #   - retention prune daily (#766)

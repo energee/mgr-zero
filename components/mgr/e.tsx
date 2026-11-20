@@ -127,6 +127,8 @@ export type FieldControls = Pick<React.InputHTMLAttributes<HTMLInputElement>, "i
    *  marked invalid; pass `id` too, so the message (`${id}-error`) is linked.
    *  Pass it once the user has left the field (`onBlur`), not while typing. */
   error?: string;
+  /** A line under a text field that is not an error, such as a near-duplicate name warning. An error replaces it. */
+  note?: ReactNode;
 };
 
 /** A picker with nothing to offer says so, and where the missing record is
@@ -355,7 +357,7 @@ export const E = {
   edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[], controls?: FieldControls) => {
     // `error` is drawn under the field (fieldError), never passed to the input.
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { onChange, hideLabel, contextualLabels, compact, error: _error, ...rest } = controls ?? {};
+    const { onChange, hideLabel, contextualLabels, compact, error: _error, note, ...rest } = controls ?? {};
     const error = fieldError(controls);
     const attributes = { ...rest, "aria-invalid": error.invalid, "aria-describedby": error.describedBy };
     if (type === "date") return <><DatePicker label={label} defaultValue={value} value={onChange ? value : undefined} onChange={onChange} disabled={controls?.disabled} required={controls?.required} name={controls?.name} max={controls?.max === undefined ? undefined : String(controls.max)} invalid={error.invalid} aria-describedby={error.describedBy} />{error.message}</>;
@@ -378,7 +380,7 @@ export const E = {
         {suggestions?.length
           ? <SuggestInput suggestions={suggestions} value={value} onChange={onChange} {...field} />
           : <Input {...field} {...(onChange ? { value, onChange: (event) => onChange(event.target.value) } : { defaultValue: value })} />}
-        {error.message}
+        {error.message ?? note}
       </Field>
     );
   },
@@ -416,7 +418,8 @@ export const E = {
    *  words ("No brand yet") keep the link colour and stay underlined, so they read as something to pick and not as
    *  muted text. It draws no label, description, note or error.
    *  `suggestion` is a value the user has not picked yet (a kind guessed from a name): while nothing is picked, the
-   *  trigger shows its label as the muted placeholder with a "Tab" hint, and a plain Tab on the trigger picks it.
+   *  trigger shows its label as the muted placeholder with a "Tab" hint (hidden under a coarse pointer, which has no
+   *  Tab key), a plain Tab on the trigger picks it, and its option in the open list reads "Hop · suggested".
    *  It needs `id`, which names its screen-reader line (`${id}-suggestion`); without an id it is ignored. */
   pick: (label: string, value: string, options: (string | { value: string; label: string; disabled?: boolean })[], controls?: FieldControls & { forward?: boolean; displayValue?: ReactNode; description?: ReactNode; empty?: PickEmpty; inline?: boolean; suggestion?: { value: string; label: string } }) => {
     const empty = controls?.empty && !options.some((o) => (typeof o === "string" ? o : o.value) !== "") ? controls.empty : undefined;
@@ -424,6 +427,7 @@ export const E = {
     const suggestion = controls?.suggestion && controls.id && value === "" ? controls.suggestion : undefined;
     const suggestionId = suggestion ? `${controls?.id}-suggestion` : undefined;
     const error = fieldError(controls);
+    const items = options.map((o) => typeof o === "string" ? { value: o, label: o } : o);
     const select = (
       <Select {...(controls?.onChange ? { value, onValueChange: (next) => controls.onChange?.(next === "__empty_field__" ? "" : next) } : { defaultValue: value })} disabled={controls?.disabled} required={controls?.required} name={controls?.name} form={controls?.form}>
         <SelectTrigger id={controls?.id} aria-label={controls?.["aria-label"] ?? label} aria-describedby={describedBy(error.describedBy, emptyId, suggestionId)} aria-invalid={error.invalid}
@@ -435,9 +439,13 @@ export const E = {
             event.preventDefault();
             controls.onChange?.(accepted);
           } : undefined}
-          className={cn(controls?.forward && "[&_svg:last-child]:hidden", controls?.inline && "inline h-auto! min-h-0! rounded-sm border-0 p-0 align-baseline text-[length:inherit] text-primary whitespace-normal underline-offset-4 hover:underline data-placeholder:text-primary data-placeholder:underline bg-transparent! [&_svg]:hidden *:data-[slot=select-value]:inline")}><SelectValue placeholder={suggestion ? <>{suggestion.label}<span aria-hidden className="ml-2 text-xs">Tab</span></> : options.find((o): o is { value: string; label: string } => typeof o !== "string" && o.value === "")?.label ?? controls?.placeholder}>{controls?.displayValue ?? options.map((o) => typeof o === "string" ? { value: o, label: o } : o).find((o) => o.value === value)?.label}</SelectValue>{controls?.forward ? <DirectionIcon label="Open" /> : null}</SelectTrigger>
-        <SelectContent><SelectGroup>{options.map((o) => typeof o === "string" ? <SelectItem key={o} value={o || "__empty_field__"}>{o}</SelectItem> : <SelectItem key={o.value} value={o.value || "__empty_field__"} disabled={o.disabled}>{o.label}</SelectItem>)}</SelectGroup></SelectContent>
-        {suggestion ? <span id={suggestionId} className="sr-only">Suggested: {suggestion.label}. Press Tab to accept.</span> : null}
+          className={cn(controls?.forward && "[&_svg:last-child]:hidden", controls?.inline && "inline h-auto! min-h-0! rounded-sm border-0 p-0 align-baseline text-[length:inherit] text-primary whitespace-normal underline-offset-4 hover:underline data-placeholder:text-primary data-placeholder:underline bg-transparent! [&_svg]:hidden *:data-[slot=select-value]:inline")}><SelectValue placeholder={suggestion ? <>{suggestion.label}<span aria-hidden className="ml-2 text-xs pointer-coarse:hidden">Tab</span></> : options.find((o): o is { value: string; label: string } => typeof o !== "string" && o.value === "")?.label ?? controls?.placeholder}>{controls?.displayValue ?? items.find((o) => o.value === value)?.label}</SelectValue>{controls?.forward ? <DirectionIcon label="Open" /> : null}</SelectTrigger>
+        <SelectContent><SelectGroup>{items.map((o) => (
+          <SelectItem key={o.value} value={o.value || "__empty_field__"} disabled={o.disabled}>
+            {o.value === suggestion?.value ? <>{o.label}<span className="text-muted-foreground">· suggested</span></> : o.label}
+          </SelectItem>
+        ))}</SelectGroup></SelectContent>
+        {suggestion ? <span id={suggestionId} className="sr-only">Suggested: {suggestion.label}. Press Tab or choose it in the list to accept.</span> : null}
       </Select>
     );
     if (controls?.inline) return select;
@@ -491,15 +499,14 @@ export const E = {
    *  region, so a screen reader hears the change politely. E.info and E.note
    *  default to static notes; only explicit errors use their alert role. */
   polite: (t: React.ReactNode) => (t ? <p className="text-sm text-muted-foreground">{t}</p> : null),
-  /** Status tiles. `actions` sit under a tile's facts; with an `href` too, the facts stay the link.
-   *  `quiet` draws a tile with nothing in it (an empty tank) muted, so the full ones stand out. */
-  tiles: (arr: [React.ReactNode, React.ReactNode, React.ReactNode?, (0 | 1)?, number?, string?, React.ReactNode?, boolean?][]) => (
-    <ItemGroup className="grid grid-cols-2 gap-2 md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]">
-      {arr.map(([n, s, g, w, f, href, actions, quiet], i) => {
+  /** Status tiles. `actions` sit under a tile's facts; with an `href` too, the facts stay the link. `wide` tiles fit a longer facts line. */
+  tiles: (arr: [React.ReactNode, React.ReactNode, React.ReactNode?, (0 | 1)?, number?, string?, React.ReactNode?][], wide = false) => (
+    <ItemGroup className={cn("grid grid-cols-2 gap-2", wide ? "md:grid-cols-[repeat(auto-fill,minmax(210px,1fr))]" : "md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]")}>
+      {arr.map(([n, s, g, w, f, href, actions], i) => {
         const content = <TileContent {...{ n, s, g, w, f }} />;
         const facts = href ? <Link href={href} prefetch={rowLinkPrefetch(href)} className="flex min-w-0 max-w-full flex-col gap-0.5">{content}</Link> : content;
         return (
-          <Item key={i} variant="outline" size="sm" className={cn("min-w-0 flex-col items-start gap-0.5 wrap-anywhere", quiet && "border-dashed text-muted-foreground")} asChild>
+          <Item key={i} variant="outline" size="sm" className="min-w-0 flex-col items-start gap-0.5 wrap-anywhere" asChild>
             {actions ? <div>{facts}{actions}</div> : href ? facts : <button type="button">{content}</button>}
           </Item>
         );

@@ -9,38 +9,38 @@ import { canReverseMovement, movementSourceHref, toInventoryDetailViewProps, typ
 import "@/lib/commands/all";
 import { ReversalForm } from "../reversal-form";
 import { navTitle } from "@/lib/mgr/nav";
-import { historyPage, pageCursor, type HistoryPage } from "@/lib/mgr/history-page";
+import { numberedHistoryPage, pageNumber, pageSize, type NumberedHistoryPage } from "@/lib/mgr/history-page";
 
 type Props = {
-  params: Promise<{ id: string }>; searchParams: Promise<{ cursor?: string; movement?: string }>;
+  params: Promise<{ id: string }>; searchParams: Promise<{ page?: string | string[]; limit?: string | string[]; movement?: string }>;
 };
 
 export async function generateMetadata({ params, searchParams }: Props) {
   const { id } = await params;
-  const { cursor, movement } = await searchParams;
-  await getInventoryDetailPageData(id, cursor, movement);
+  const { page, limit, movement } = await searchParams;
+  await getInventoryDetailPageData(id, pageNumber(page), pageSize(limit), movement);
   return { title: navTitle("/inventory") };
 }
 
-const getInventoryDetailPageData = cache(async function getInventoryDetailPageData(id: string, rawCursor?: string, movement?: string) {
-  const cursor = pageCursor(rawCursor);
+const getInventoryDetailPageData = cache(async function getInventoryDetailPageData(id: string, page: number, limit: number, movement?: string) {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   requirePagePermission(ctx, "get_inventory_sku", "SKU detail");
   const sku = await orNotFound(runPageQuery("get_inventory_sku", { skuId: id }, ctx)) as { id: string; name: string; active: boolean };
   const [onHand, atp, movements] = await Promise.all([
     runPageQuery("get_on_hand", { skuId: id }, ctx), runPageQuery("get_atp", { skuId: id }, ctx),
-    orNotFound(runPageQuery("list_movements", { skuId: id, movementId: movement, cursor }, ctx)),
-  ]) as [{ location_id: string; qty: number; locations: { name: string } | null }[], { qty: number }[], HistoryPage<InventoryMovement>];
-  return { brewery, cursor, sku, onHand, atp, movements };
+    orNotFound(runPageQuery("list_movements", { skuId: id, movementId: movement, page, limit }, ctx)),
+  ]) as [{ location_id: string; qty: number; locations: { name: string } | null }[], { qty: number }[], NumberedHistoryPage<InventoryMovement>];
+  return { brewery, sku, onHand, atp, movements };
 });
 
 export default async function InventoryDetailPage({ params, searchParams }: Props) {
   const { id } = await params;
-  const { cursor: rawCursor, movement } = await searchParams;
-  const { brewery, cursor, sku, onHand, atp, movements } = await getInventoryDetailPageData(id, rawCursor, movement);
+  const { page: rawPage, limit: rawLimit, movement } = await searchParams;
+  const currentPage = pageNumber(rawPage), limit = pageSize(rawLimit);
+  const { brewery, sku, onHand, atp, movements } = await getInventoryDetailPageData(id, currentPage, limit, movement);
   const href = `/inventory/${id}`;
-  const page = historyPage(movements, href, cursor, { movement });
+  const page = numberedHistoryPage(movements, href, currentPage, limit, { movement });
   const canMove = brewery.roles.includes("admin") || brewery.roles.includes("warehouse");
   return <InventoryDetailView model={toInventoryDetailViewProps({ sku, onHand, atp, movements: page.rows, backHref: "/inventory", timeZone: brewery.timeZone })}
     // Finished goods' Record movement, opened on this SKU (#1507).
@@ -52,5 +52,6 @@ export default async function InventoryDetailPage({ params, searchParams }: Prop
       // Corrected where it was made: open the document it came from.
       : movementSourceHref(m) ? E.act(m.ref_label, "primary", movementSourceHref(m))
       : <span className="max-w-40 text-xs text-muted-foreground">{m.type === "depletion" ? "Count/depletion correction unavailable" : "Correct through the original workflow"}</span>}
-    footer={<div className="flex gap-2">{movement && E.btn("All movements", "g", href)}{page.pagination.firstHref && E.btn("Newest movements", "g", page.pagination.firstHref)}{page.pagination.moreHref && E.btn("Older movements", "g", page.pagination.moreHref)}</div>} />;
+    pagination={page.pagination}
+    footer={movement && E.btn("All movements", "g", href)} />;
 }

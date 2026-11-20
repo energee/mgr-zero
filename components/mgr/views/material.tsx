@@ -13,7 +13,7 @@ import { Fragment } from "react";
 type Controls = Partial<Record<"name" | "kind" | "baseUnits" | "purchaseUnit" | "soldBy" | "unit" | "defaultVendorId" | "extractPotential" | "alphaAcid", (value: string) => void>> & {
   lotTracked?: (value: boolean) => void;
   active?: (value: boolean) => void;
-  /** Leaving Material name; Add material asks for a suggested kind then. */
+  /** Leaving Material name; the live form checks for a near-duplicate, and Add material asks for a suggested kind. */
   nameBlur?: () => void;
 };
 
@@ -46,9 +46,11 @@ const UNIT_LABELS: Record<string, string> = {
   ml: "Milliliters (mL)",
 };
 
-export function MaterialView({ model, controls = {}, messages, footer }: {
+export function MaterialView({ model, controls = {}, messages, footer, nameNote }: {
   model: MaterialViewModel;
   controls?: Controls;
+  /** The near-duplicate warning under Material name. */
+  nameNote?: ReactNode;
   messages?: ReactNode;
   footer?: ReactNode;
 }) {
@@ -72,7 +74,7 @@ export function MaterialView({ model, controls = {}, messages, footer }: {
 
   return (
     <>
-      {E.edit("Material name", model.name, "text", undefined, { onChange: controls.name, required: Boolean(controls.name), onBlur: controls.nameBlur })}
+      {E.edit("Material name", model.name, "text", undefined, { onChange: controls.name, required: Boolean(controls.name), onBlur: controls.nameBlur, note: nameNote })}
       {pick("Kind", model.kind, kindOptions, controls.kind, "Select kind", {
         id: "material-kind",
         suggestion: model.kindSuggestion ? { value: model.kindSuggestion, label: sentenceCase(model.kindSuggestion) } : undefined,

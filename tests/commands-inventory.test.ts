@@ -98,6 +98,23 @@ describe("inventory commands", () => {
       .eq("brewery_id", ctx.breweryId).eq("sku_id", sku.id)).count).toBe(before);
   });
 
+  it("list_movements keeps one movement type when asked", async () => {
+    const brand = (await runCommand("upsert_brand", { name: "Typed ledger" }, ctx)) as EntityWithId;
+    const format = (await runCommand("upsert_format", {
+      name: "Typed ledger case", basis: "packaged", packageType: "can", unitsPerCase: 24, bblPerUnit: 0.01,
+    }, ctx)) as EntityWithId;
+    const sku = (await runCommand("create_sku", { brandId: brand.id, formatId: format.id, name: "Typed ledger case" }, ctx)) as EntityWithId;
+    const location = (await runCommand("create_location", { name: "Typed ledger warehouse", uses: ["warehouse"] }, ctx)) as EntityWithId;
+    const [bin] = (await runCommand("list_bins", { locationId: location.id }, ctx)) as EntityWithId[];
+    await runCommand("record_movement", { skuId: sku.id, locationId: location.id, binId: bin.id, qty: 5, type: "opening_balance" }, ctx);
+    await runCommand("record_movement", { skuId: sku.id, locationId: location.id, binId: bin.id, qty: -1, type: "loss" }, ctx);
+
+    const types = async (type?: string) => ((await runCommand("list_movements", { skuId: sku.id, type }, ctx)) as { rows: { type: string }[] }).rows.map((row) => row.type);
+    expect((await types()).sort()).toEqual(["loss", "opening_balance"]);
+    expect(await types("loss")).toEqual(["loss"]);
+    await expect(runCommand("list_movements", { type: "not_a_type" }, ctx)).rejects.toMatchObject({ code: "invalid_input" });
+  });
+
   it("keeps a referenced SKU, location, and bin legible after edits and blocks new movement on the inactive SKU", async () => {
     const brand = (await runCommand("upsert_brand", { name: "Archive history" }, ctx)) as EntityWithId;
     const format = (await runCommand("upsert_format", {

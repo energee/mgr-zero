@@ -4,10 +4,12 @@
 
 import type { ComponentProps } from "react";
 import { CustomerView } from "@/components/mgr/views/customer";
+import { useSimilarNames } from "@/components/mgr/similar-names";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { upsertCustomerInput } from "./customer-form";
 
 export function CustomerDetailForm({ customerId, ...props }: ComponentProps<typeof CustomerView> & { customerId: string }) {
   const { busy, error, run } = useCommandAction();
-  return <CustomerView {...props} busy={busy} error={error} onSave={values => { void run("upsert_customer", upsertCustomerInput(values, customerId)); }} />;
+  const similar = useSimilarNames("customer", { id: customerId, name: props.model.name });
+  return <CustomerView {...props} busy={busy} error={error} onNameBlur={similar.check} nameNote={similar.note} onSave={values => { void run("upsert_customer", upsertCustomerInput(values, customerId)); }} />;
 }
