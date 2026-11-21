@@ -27,12 +27,16 @@ type Entry<Row> = { row: Row; values: SortValue[] };
 const noSubscribe = () => () => {};
 /** A sortable column's state for its header: its direction and the click. */
 type ColumnSortControl = { sorted: false | SortDirection; toggle: () => void };
+/** The sort a table opens with when none is saved: a column index and direction. */
+export type DefaultSort = { column: number; desc: boolean };
 
 /** The rows in the chosen order, and each column's sort control (undefined
  *  when that column cannot sort). Before a sort is chosen the rows keep the
- *  order they came in, so the server render is unchanged. `sortValue` must be
+ *  order they came in, so the server render is unchanged — unless the table
+ *  names a `defaultSort`: then that column's arrow shows from the first paint,
+ *  and clicks only flip direction, since there is no unsorted order to return to. `sortValue` must be
  *  stable (module scope): the rows' sort values are memoized on it. */
-export function useSortedRows<Row>(headers: ReactNode[], rows: Row[], sortValue: (row: Row, column: number) => SortValue, sortable = true) {
+export function useSortedRows<Row>(headers: ReactNode[], rows: Row[], sortValue: (row: Row, column: number) => SortValue, sortable = true, defaultSort?: DefaultSort) {
   const count = headers.length;
   const data = useMemo(() => rows.map((row) => ({ row, values: Array.from({ length: count }, (_, i) => sortValue(row, i)) })), [rows, count, sortValue]);
   const texts = headers.map((header) => String(cellSortValue(header) ?? ""));
@@ -53,7 +57,12 @@ export function useSortedRows<Row>(headers: ReactNode[], rows: Row[], sortValue:
   const saved = useSyncExternalStore(noSubscribe, () => JSON.stringify(readSavedSort(storageKey())), () => "[]");
   // A click is kept here too, so sorting still works when storage is blocked.
   const [chosen, setChosen] = useState<SortingState>();
-  const sorting = useMemo(() => chosen ?? (JSON.parse(saved) as SortingState).filter((sort) => sortableIds.split(",").includes(sort.id)), [chosen, saved, sortableIds]);
+  const defaultColumn = defaultSort && String(defaultSort.column);
+  const defaultDesc = defaultSort?.desc;
+  const sorting = useMemo(() => {
+    const kept = chosen ?? (JSON.parse(saved) as SortingState).filter((sort) => sortableIds.split(",").includes(sort.id));
+    return kept.length || defaultColumn === undefined ? kept : [{ id: defaultColumn, desc: Boolean(defaultDesc) }];
+  }, [chosen, saved, sortableIds, defaultColumn, defaultDesc]);
 
   const table = useTable({
     features,
@@ -68,6 +77,7 @@ export function useSortedRows<Row>(headers: ReactNode[], rows: Row[], sortValue:
     // Clicks go ascending, descending, then back to the default order.
     sortDescFirst: false,
     enableMultiSort: false,
+    enableSortingRemoval: !defaultSort,
   });
   return {
     rows: table.getRowModel().rows.map((row) => row.original.row),

@@ -321,11 +321,12 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, brewer
 
-Recipes, alphabetical, with the brand each one brews and its latest version; optionally only those whose name contains q
+Recipes, alphabetical unless sorted newest first, with the brand each one brews, when it was added (created_at) and its latest version; optionally only those whose name contains q
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `q` | string | no |
+| `sort` | name or newest | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
