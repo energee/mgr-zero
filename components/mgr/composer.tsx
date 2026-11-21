@@ -16,7 +16,7 @@ const ComposerConversation = lazy(() => import("@/components/mgr/composer-conver
 export const isComposerShortcut = (event: { key?: string; metaKey?: boolean; ctrlKey?: boolean }) =>
   event.key?.toLowerCase() === "k" && Boolean(event.metaKey || event.ctrlKey);
 
-export function Composer({ roles, chatConfigured }: { roles: readonly StaffRole[]; chatConfigured: boolean }) {
+export function Composer({ roles, chatConfigured, askMgr }: { roles: readonly StaffRole[]; chatConfigured: boolean; askMgr: boolean }) {
   const expectedContext = useCommandContext();
   const breweryId = expectedContext.breweryId ?? "";
   const isMobile = useIsMobile();
@@ -83,11 +83,15 @@ export function Composer({ roles, chatConfigured }: { roles: readonly StaffRole[
   // notice about one set aside or an outbox that could not be read (#1512).
   const openOutbox = outboxEntries.length > 0 || outboxNotice !== null ? () => setOutboxOpen(true) : undefined;
 
+  // Ask MGR is super-admin only (/api/chat refuses others). Everyone keeps the
+  // outbox flush above, and the panel shows while saved readings wait.
+  if (!askMgr && !openOutbox) return null;
+
   return <ComposerPanelView open={open} onOpenChange={changeOpen}>
     {/* Keep a started conversation mounted when closed: drafts and streams survive. */}
     {hasOpened && <ComposerLoadBoundary fallback={<ComposerUnavailableView failed outboxCount={outboxEntries.length} onOutbox={openOutbox}>{outbox}</ComposerUnavailableView>}>
       <Suspense fallback={<ComposerUnavailableView outboxCount={outboxEntries.length} onOutbox={openOutbox}>{outbox}</ComposerUnavailableView>}>
-        <ComposerConversation chatConfigured={chatConfigured} open={open} onOpenChange={changeOpen} focusRequest={focusRequest} outboxCount={outboxEntries.length} onOutbox={openOutbox}>{outbox}</ComposerConversation>
+        <ComposerConversation chatConfigured={chatConfigured && askMgr} open={open} onOpenChange={changeOpen} focusRequest={focusRequest} outboxCount={outboxEntries.length} onOutbox={openOutbox}>{outbox}</ComposerConversation>
       </Suspense>
     </ComposerLoadBoundary>}
   </ComposerPanelView>;

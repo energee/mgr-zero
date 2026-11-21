@@ -8,6 +8,17 @@ Status: **open, owner action required**. Owner: Ted. Tracks
 Per the #311 decision of 2026-10-11, this gate is **deferred past the pilot**.
 Run it when Ask MGR is brought into scope, not before.
 
+Ask MGR answers only super admins: a platform-wide flag in the user's auth
+`app_metadata`, which only the service role can write (brewery admins cannot
+grant it). `/api/chat` refuses everyone else with 403, and the header hides the
+button. Grant it with SQL on the target database, then sign out and back in
+so the session carries it:
+
+```sql
+update auth.users set raw_app_meta_data = raw_app_meta_data || '{"superadmin":true}'
+where email = '<operator email>';
+```
+
 Every hosted step below is the owner's: AI Gateway billing, model choice,
 environment variables, and deployments. An agent may only read the result
 afterwards. Never paste keys, tokens, or full request headers into the issue.

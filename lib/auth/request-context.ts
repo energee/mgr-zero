@@ -10,6 +10,8 @@ export interface RequestIdentity {
   userId: string;
   /** From the session claims; the Me sheet prints it. */
   email: string | null;
+  /** Platform-wide MGR operator, set only through auth app_metadata (service role); gates Ask MGR. */
+  superadmin: boolean;
 }
 
 export interface StaffMembership {
@@ -89,7 +91,9 @@ export function createRequestAuthContext(createClient: RequestClientFactory = cr
     // An agent token in a cookie is refused: only the bearer path applies agent limits.
     if (error || typeof userId !== "string" || data?.claims.client_id) return null;
     const email = data?.claims.email;
-    return { userId, email: typeof email === "string" ? email : null };
+    // app_metadata, never user_metadata: a user can write their own user_metadata.
+    const superadmin = data?.claims.app_metadata?.superadmin === true;
+    return { userId, email: typeof email === "string" ? email : null, superadmin };
   })());
   const getStaffMemberships = () => (staffMemberships ??= (async () => {
     const requestIdentity = await getIdentity();
