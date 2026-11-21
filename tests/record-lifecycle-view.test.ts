@@ -47,9 +47,16 @@ describe("record lifecycle availability (#1311)", () => {
   const lifecycleNote = (html: string, pattern: RegExp) =>
     (html.match(/<p[^>]*role="note"[^>]*>[\s\S]*?<\/p>|<[^>]*role="note"[^>]*>[\s\S]*?<\/div><\/div>/g) ?? []).map(note => note.replace(/<[^>]+>/g, "").trim()).find(note => pattern.test(note));
 
-  it.each(["Brand", "Water profiles", "Locations"])("%s explains unsupported lifecycle actions in one sentence, without a fake removal control", name => {
-    const html = screenHtml(name);
+  it("Brand explains unsupported lifecycle actions in one sentence, without a fake removal control", () => {
+    const html = screenHtml("Brand");
     expect(lifecycleNote(html, /cannot be deleted or archived/)).toMatch(/^[^.]+\.$/);
+    expect(html).not.toMatch(/<button[^>]*>\s*(Delete|Archive)\s*<\/button>/);
+  });
+
+  // Their one-sentence rule is the page's intro, so it sits behind the title's ⓘ (E.help) rather than in a box.
+  it.each(["Water profiles", "Locations"])("%s keeps its lifecycle rule behind the title's ⓘ, without a fake removal control", name => {
+    const html = screenHtml(name);
+    expect(html).toMatch(/<\/h1><button[^>]*aria-label="About this page"/);
     expect(html).not.toMatch(/<button[^>]*>\s*(Delete|Archive)\s*<\/button>/);
   });
 
