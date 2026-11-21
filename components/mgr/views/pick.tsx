@@ -28,7 +28,7 @@ export function PickView({ model, footer, quantities, onQuantity, onShort, onPri
       {E.row(line.name, <>Ordered {line.ordered}{line.available && ` · ${line.available}`}</>,
         // Short stacks under the count on a phone so the row stays narrow; it sits left of the count from md up.
         <div className="flex flex-col items-end gap-1 md:flex-row-reverse md:items-center md:gap-2">
-          <div className="w-32"><OrderQuantity id={`pick-${line.key}`} label={`${line.group ? `${line.group} ` : ""}${line.name} quantity`} value={quantities?.[line.key] ?? line.qty} max={line.ordered} error={line.error} onChange={onQuantity && (value => onQuantity(line.key, value))} /></div>
+          <div className="w-32 pointer-coarse:w-38"><OrderQuantity id={`pick-${line.key}`} label={`${line.group ? `${line.group} ` : ""}${line.name} quantity`} value={quantities?.[line.key] ?? line.qty} max={line.ordered} error={line.error} onChange={onQuantity && (value => onQuantity(line.key, value))} /></div>
           {line.tone === "w" && <Button type="button" size="sm" variant="outline" onClick={() => onShort?.(line.key)}>Short</Button>}
         </div>)}
     </Fragment>)}

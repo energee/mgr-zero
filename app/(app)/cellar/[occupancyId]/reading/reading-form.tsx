@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { useCommandContext } from "@/lib/brewery-provider";
 import { Button } from "@/components/ui/button";
 import { CommandForm } from "@/components/mgr/command-form";
+import { E } from "@/components/mgr/e";
 import { FermentationReadingActionsView, FermentationReadingView, type FermentationReadingIdentity, type FermentationReadingValues } from "@/components/mgr/views/fermentation-reading";
 import { command } from "@/lib/commands/client";
 import {
@@ -201,7 +202,7 @@ export function ReadingForm({ occupancyId, identity, unit, timeZone, roles, prio
       onOpenChange={setOpen}
       title="Reading"
       trigger={<Button size="sm">Reading</Button>}
-      footer={<FermentationReadingActionsView formId={formId} values={values} unit={unit} recovery={recovery} busy={submitting} next={Boolean(nextHref)} onFix={startFix} onDiscard={discardAttempt} />}
+      footer={E.pin(<FermentationReadingActionsView formId={formId} values={values} unit={unit} recovery={recovery} busy={submitting} next={Boolean(nextHref)} onFix={startFix} onDiscard={discardAttempt} />)}
     >
       <FermentationReadingView
         formId={formId}

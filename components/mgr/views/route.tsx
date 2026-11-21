@@ -37,7 +37,7 @@ export function RouteView({ model, controls, busy = false, error, onSave, onDepa
       {(model.stops ?? []).map(row => {
         const selected = row.key in value.selection;
         return <div key={row.key}>{E.row(
-          <label className="flex items-center gap-3"><input type="checkbox" className="size-4 shrink-0 accent-primary" aria-label={row.title} checked={selected} disabled={busy || row.locked} onChange={event => change({ selection: toggleRouteStop(value.selection, row.key, event.target.checked) })} />{row.title}</label>,
+          <label className="flex items-center gap-3 pointer-coarse:min-h-12"><input type="checkbox" className="size-4 shrink-0 accent-primary" aria-label={row.title} checked={selected} disabled={busy || row.locked} onChange={event => change({ selection: toggleRouteStop(value.selection, row.key, event.target.checked) })} />{row.title}</label>,
           selected ? "stop " + value.selection[row.key] + (row.locked ? " · delivered" : "") : row.detail,
           selected ? E.edit("Stop number for " + row.title, String(value.selection[row.key]), "number", undefined, { onChange: (nextValue: string) => change({ selection: { ...value.selection, [row.key]: Number(nextValue) } }), disabled: busy || row.locked, required: true, min: "1", step: "1", hideLabel: true }) : "",
           row.warning && !selected ? "w" : "",

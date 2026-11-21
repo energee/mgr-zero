@@ -100,6 +100,8 @@ const TAP_ROW = "has-[[data-tap]]:cursor-pointer has-[[data-tap]]:select-none ha
 /** Opt in for primary row navigation, never a destructive action. Translation
  *  would make the pressed link its cover's containing block instead of the row. */
 export const ROW_LINK_COVER = "after:absolute after:inset-0 active:not-aria-[haspopup]:translate-none";
+/** A small text link's tap area, padded out to 48px tall without moving the text (the Switch does the same). */
+export const TOUCH_HIT = "relative after:absolute after:-inset-x-3 after:-inset-y-4";
 
 /** Keys the fields itself, so callers pass bare elements. The index is the
  *  identity because a field group is a fixed, ordered list — never reordered,
@@ -115,7 +117,7 @@ const fieldGrid = (fields: React.ReactNode[], className: string) => (
 /** What a live adapter passes to make a field its own: an onChange, or none
  *  with `disabled` for a read-out that must not look editable. Fixtures pass
  *  nothing and draw a default value. */
-export type FieldControls = Pick<React.InputHTMLAttributes<HTMLInputElement>, "id" | "name" | "disabled" | "required" | "readOnly" | "min" | "max" | "step" | "minLength" | "maxLength" | "pattern" | "placeholder" | "autoComplete" | "inputMode" | "aria-label" | "aria-invalid" | "aria-describedby" | "form" | "onBlur"> & {
+export type FieldControls = Pick<React.InputHTMLAttributes<HTMLInputElement>, "id" | "name" | "disabled" | "required" | "readOnly" | "min" | "max" | "step" | "minLength" | "maxLength" | "pattern" | "placeholder" | "autoComplete" | "autoFocus" | "inputMode" | "aria-label" | "aria-invalid" | "aria-describedby" | "form" | "onBlur"> & {
   onChange?: (value: string) => void;
   /** Inline row controls already have visible context. */
   hideLabel?: boolean;
@@ -182,7 +184,7 @@ export const E = {
   back: (to: React.ReactNode, title: React.ReactNode, action?: React.ReactNode, href = "#", screen?: string) => {
     const head = (
       <div className="flex flex-col gap-1">
-        <Link href={href} prefetch={rowLinkPrefetch(href)} data-to={screen} className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Icon icon={ArrowLeft01Icon} />{to}</Link>
+        <Link href={href} prefetch={rowLinkPrefetch(href)} data-to={screen} className={cn("inline-flex items-center gap-1 text-xs text-muted-foreground", TOUCH_HIT)}><Icon icon={ArrowLeft01Icon} />{to}</Link>
         <h1 className="text-lg font-semibold">{title}</h1>
       </div>
     );
@@ -362,10 +364,11 @@ export const E = {
     const attributes = { ...rest, "aria-invalid": error.invalid, "aria-describedby": error.describedBy };
     if (type === "date") return <><DatePicker label={label} defaultValue={value} value={onChange ? value : undefined} onChange={onChange} disabled={controls?.disabled} required={controls?.required} name={controls?.name} max={controls?.max === undefined ? undefined : String(controls.max)} invalid={error.invalid} aria-describedby={error.describedBy} />{error.message}</>;
     // A whole number (a contract quantity, an overdue threshold) is counted,
-    // not typed: the same −/+ stepper Weekly count uses.
+    // not typed: the same −/+ stepper Weekly count uses. Under its own label on
+    // a phone the stepper fills the field, like the text fields around it.
     if (type === "number") {
       return (
-        <Field data-disabled={attributes.disabled} data-invalid={attributes["aria-invalid"]}>
+        <Field data-disabled={attributes.disabled} data-invalid={attributes["aria-invalid"]} className={hideLabel || compact ? undefined : "max-md:[&_[data-slot=button-group]]:w-full"}>
           {!hideLabel && <FieldLabel htmlFor={attributes.id} className={compact ? "font-normal text-muted-foreground text-xs" : undefined}>{label}</FieldLabel>}
           {E.stq(Number(value) || 0, label, { ...attributes, value, onChange, contextualLabels, compact, step: controls?.step ?? "any", required: controls?.required ?? false })}
           {error.message}
