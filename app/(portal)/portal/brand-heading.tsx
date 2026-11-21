@@ -52,7 +52,7 @@ function LiveBrandHeading({ brand, scope, thumbClass: size, order, ...heading }:
   // Until it loads (or after a failed load, with Retry) the thumbnail is not a button; no copy after all draws none.
   let thumb: ReactNode;
   if (!brand.hasLabel || image.src === null) thumb = undefined;
-  else if (image.src) thumb = <button type="button" className="block" aria-label={`Show ${brand.name}`} onClick={() => setOpen(true)}><ColaLabelImageView compact className={size} label={name} src={image.src} /></button>;
+  else if (image.src) thumb = <button type="button" className="block shrink-0" aria-label={`Show ${brand.name}`} onClick={() => setOpen(true)}><ColaLabelImageView compact className={size} label={name} src={image.src} /></button>;
   else thumb = <ColaLabelImageView compact className={size} label={name} error={image.error} busy={image.busy} load={load} />;
   return <div ref={container}>
     <BrandHeading {...heading} thumb={thumb} onOpen={() => setOpen(true)} />

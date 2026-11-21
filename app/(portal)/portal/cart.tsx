@@ -91,8 +91,8 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource, brands, 
   const ready = !recovery.error;
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
-  // ponytail: "Ship with" is not saved with the cart, so a reload ships stock now again; save it with the working cart if buyers lose it.
-  const [shipWith, setShipWith] = useState("");
+  // ponytail: "Ship with" is not saved with the cart, so a reload ships everything on its own date again; save it with the working cart if buyers lose it.
+  const [shipWith, setShipWith] = useState<Record<string, string>>({});
   const [review, setReview] = useState(false);
   // One quote per order the cart becomes (shipGroups), in ship order.
   const [quotes, setQuotes] = useState<QuotedOrder[] | null>(null);
@@ -114,9 +114,9 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource, brands, 
   const unavailable = (lines ?? []).filter(l => !items.some(i => i.skuId === l.skuId));
   const subtotal = (lines ?? []).reduce((n, l) => n + (items.find(i => i.skuId === l.skuId)?.unitPriceCents ?? 0) * l.qty, 0);
 
-  // The cart as the orders it becomes: stock ships now on the buyer's date, unless
-  // they chose to ship it with a pre-order date, and each pre-order ship date is
-  // its own order on that date.
+  // The cart as the orders it becomes: stock ships now on the buyer's date and each
+  // pre-order ship date is its own order on that date, unless the buyer chose to
+  // ship one with a later pre-order.
   const orders = shipGroups(catalog, shipWith).map(group => ({
     shipsFrom: group.shipsFrom,
     requestedShipDate: group.shipsFrom || effectiveRequestedDate(fields.requestedShipDate ?? "", group.items) || null,
@@ -227,11 +227,11 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource, brands, 
   shopModel.subtotal = unavailable.length ? "Unavailable for the pending request" : money(subtotal);
   return <>
     <ShopView model={shopModel} section={section}
-      brandHeading={(group, { anchor, order }) => <PortalBrandHeading order={order} name={group.product} alias={group.alias} facts={group.facts} card thumbClass="aspect-[3/2] h-auto w-full [&>img]:object-cover" anchor={anchor} brand={group.brand} scope={scope} />} quantities={qty} locked={locked} disabled={disabled} preparing={busy}
+      brandHeading={(group, { anchor, order }) => <PortalBrandHeading order={order} name={group.product} alias={group.alias} facts={group.facts} card thumbClass="aspect-[3/2] h-auto w-24 shrink-0 md:w-full [&>img]:object-cover" anchor={anchor} brand={group.brand} scope={scope} />} quantities={qty} locked={locked} disabled={disabled} preparing={busy}
       controls={{
         quantity: (id, value) => setQty(prev => ({ ...prev, [id]: value })),
         offer: (id, value) => setOffers(prev => ({ ...prev, [id]: value })),
-        shipWith: setShipWith,
+        shipWith: (from, shipsFrom) => setShipWith(prev => ({ ...prev, [from]: shipsFrom })),
         shipTo: shipToId => setFields(prev => ({ ...prev, shipToId })),
         requestedDate: value => setFields(prev => ({ ...prev, requestedShipDate: value || null })),
         po: poNumber => setFields(prev => ({ ...prev, poNumber })),
@@ -249,7 +249,8 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource, brands, 
         {removed.length ? E.info(`Removed unavailable or unpriced items: ${removed.join(", ")}. Review the remaining quantities.`, "alert") : null}
         {initial?.releasesClosed?.length ? E.info(`The release you chose has closed for ${initial.releasesClosed.join(", ")}. Check where each now orders from and the requested date.`, "alert") : null}
         {!lines && E.info("Enter whole quantities of zero or more.", "alert")}
-        {missingInput && E.info(missingInput, "alert")}
+        {/* An empty cart is where every buyer starts, so it is a hint; a cart with lines and no ship-to is an alert. */}
+        {missingInput && (lines?.length ? E.info(missingInput, "alert") : E.note(missingInput))}
         {unavailable.length > 0 && E.info(`Pending request contains packages no longer in the catalog: ${unavailable.map(line => `${line.skuId} × ${line.qty}`).join(", ")}. Retry retains the original quantities.`, "alert")}
         {feedback}
       </>} />

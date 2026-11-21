@@ -1,6 +1,6 @@
-// components/mgr/views/pallet-fit.tsx — the advisory Pallet fit block: per
-// package group, how full each pallet unit is, as text and a segmented bar
-// (one segment per unit, the last filled to its share). The portal order
+// components/mgr/views/pallet-fit.tsx — the advisory Layers block: per
+// package group, how full each layer is, as text and a segmented bar
+// (one segment per layer, the last filled to its share). The portal order
 // summary, Review order and the staff Order page draw it from palletFit
 // (lib/mgr/pallet-fit.ts). Nothing here warns or blocks.
 import type { PalletFitGroup } from "@/lib/mgr/pallet-fit";
@@ -11,8 +11,8 @@ const MAX_SEGMENTS = 12;
 export function PalletFitBlock({ groups }: { groups: PalletFitGroup[] }) {
   if (!groups.length) return null;
   return (
-    <section aria-label="Pallet fit" className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium text-muted-foreground">Pallet fit</h2>
+    <section aria-label="Layers" className="flex flex-col gap-2">
+      <h2 className="text-sm font-medium text-muted-foreground">Layers</h2>
       <ul className="flex flex-col gap-2.5">
         {groups.map((group) => {
           const units = group.full + (group.remainder ? 1 : 0);
@@ -34,7 +34,7 @@ export function PalletFitBlock({ groups }: { groups: PalletFitGroup[] }) {
           );
         })}
       </ul>
-      <p className="text-xs text-muted-foreground">How many fill each layer or pallet, as the brewery loads. A guide only.</p>
+      <p className="text-xs text-muted-foreground">How many fill a layer, as the brewery loads. A guide only.</p>
     </section>
   );
 }

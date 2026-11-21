@@ -27,7 +27,7 @@ export function PortalOrderView({
 }) {
   return (
     <>
-      {E.back("Orders", model.title, undefined, model.backHref)}
+      {E.back("Order history", model.title, undefined, model.backHref)}
       {E.fld("Status", model.status)}
       {model.shipTo ? E.fld("Ship-to", model.shipTo) : null}
       {model.requested ? E.fld("Requested", model.requested) : null}

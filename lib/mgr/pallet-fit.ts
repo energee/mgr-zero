@@ -29,7 +29,7 @@ export type PalletFitGroup = {
   remainder: number;
   /** How many more fill that partial unit. */
   toFill: number;
-  /** "2 full ✓", "1 full + 3 · 7 to fill", or "3 · 7 to fill". */
+  /** "2 full ✓", "1 full + 3 of 10", or "3 of 10". */
   text: string;
 };
 
@@ -40,9 +40,9 @@ function packageLabel(line: PalletLine): string {
   return line.unitsPerCase && line.unitsPerCase > 1 ? `Cases of ${line.unitsPerCase} ${line.packageType}s` : `${line.packageType[0].toUpperCase()}${line.packageType.slice(1)}s`;
 }
 
-function fitText(full: number, remainder: number, toFill: number): string {
+function fitText(full: number, remainder: number, fit: number): string {
   if (!remainder) return `${full} full ✓`;
-  return `${full ? `${full} full + ` : ""}${remainder} · ${toFill} to fill`;
+  return `${full ? `${full} full + ` : ""}${remainder} of ${fit}`;
 }
 
 /** Per package group with a pallet fit, in first-line order: how many, how many
@@ -64,7 +64,7 @@ export function palletFit(lines: PalletLine[]): PalletFitGroup[] {
     const toFill = remainder ? fit - remainder : 0;
     // One package with two fits: name the fit so the two rows read apart.
     const named = labels.filter((l) => l === label).length > 1 ? `${label} (${fit} a unit)` : label;
-    return { key, label: named, count, fit, full, remainder, toFill, text: fitText(full, remainder, toFill) };
+    return { key, label: named, count, fit, full, remainder, toFill, text: fitText(full, remainder, fit) };
   });
 }
 
@@ -93,6 +93,10 @@ export const DEFAULT_PALLET_RULES: PalletRules = { maxLb: 2500, maxHeightIn: 60,
 /** A barrel of beer at 1.010, in pounds: the weight used when a batch has no gravity reading. */
 export const BEER_LB_PER_BBL = 261.3;
 
+/** Answers tableKegLayers has worked out, per table and then per set of rows, so the
+ *  screen's many counts of nearly the same order (room left, Fill the pallet) each solve only what is new. */
+const layerMemos = new WeakMap<Record<string, number>[], Map<string, Map<string, number>>>();
+
 /** Fewest keg layers for the kegs, where a layer holds what one row of the
  *  table allows. Each size's own pallet fit is also a row, so a size the
  *  table leaves out still loads. */
@@ -105,8 +109,13 @@ function tableKegLayers(kegs: PalletLine[], table: Record<string, number>[]): nu
     count.set(size, (count.get(size) ?? 0) + l.qty);
   }
   const sizes = [...count.keys()];
-  const memo = new Map<string, number>();
-  // ponytail: tries every row at every step, remembered by what is left; fine for the hundred or so kegs an order holds.
+  // The added rows and the order of sizes decide what a remembered answer means.
+  const shape = JSON.stringify([sizes, rows.slice(table.length)]);
+  const memos = layerMemos.get(table) ?? new Map<string, Map<string, number>>();
+  layerMemos.set(table, memos);
+  const memo = memos.get(shape) ?? new Map<string, number>();
+  memos.set(shape, memo);
+  // ponytail: tries every row at every step, remembered by what is left; the memory lasts as long as the table and is never trimmed, fine for the few hundred kegs an order holds.
   const need = (left: number[]): number => {
     if (left.every((n) => n <= 0)) return 0;
     const key = left.join();
@@ -205,11 +214,17 @@ export function palletLoad(lines: PalletLine[], kinds: PalletLine[] = lines, rul
     const label = packageLabel(kind);
     if (!kind.palletFit || seen.has(label)) return [];
     seen.add(label);
+    const fits = (more: number) => palletCount([...lines, { ...kind, qty: more }], rules) === pallets;
+    // More units never need fewer pallets, so the most that fit is found by doubling until one does not, then halving the gap.
     let more = 0;
-    // A pallet holds at most a few hundred of anything, so counting up is cheap.
-    while (more < ROOM_STOP && palletCount([...lines, { ...kind, qty: more + 1 }], rules) === pallets) more++;
-    // A package that adds neither weight nor height has no measurable room.
-    if (more === ROOM_STOP) { unmeasured = true; return []; }
+    let over = 1;
+    while (over < ROOM_STOP && fits(over)) { more = over; over *= 2; }
+    if (over >= ROOM_STOP) {
+      over = ROOM_STOP;
+      // A package that adds neither weight nor height has no measurable room.
+      if (fits(over)) { unmeasured = true; return []; }
+    }
+    while (over - more > 1) { const mid = (more + over) >> 1; if (fits(mid)) more = mid; else over = mid; }
     return more ? [{ label, more }] : [];
   });
   const full = !room.length && !unmeasured;

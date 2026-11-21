@@ -29,7 +29,7 @@ describe("Shop view", () => {
     expect(model.groups[2]?.items[0]).toMatchObject({ name: "⅙ bbl keg", price: "$62.00", qty: 0 });
     expect(model.source).toBe("Warehouse");
     expect(model.shipToLine).toBe("Main · Sep 9, 2026");
-    expect(toShopViewProps({ ...ridgelineShop, requestedDate: "" }).shipToLine).toBe("Main");
+    expect(toShopViewProps({ ...ridgelineShop, requestedDate: "" }).shipToLine).toBe("Main · as soon as possible");
     expect(model.subtotal).toBe("$828.00");
     expect(model.chargesLine).toBe("Keg deposits & fees added at review");
   });
@@ -117,11 +117,11 @@ describe("Review order view", () => {
   });
 
   it("shows the cart's pallet fit, quoted or not", () => {
-    const expected = [["½ bbl kegs", "4 · 4 to fill"], ["Cases of 24 cans", "6 · 4 to fill"]];
+    const expected = [["½ bbl kegs", "4 of 8"], ["Cases of 24 cans", "6 of 10"]];
     expect(toReviewOrderViewProps(ridgelineReviewOrder).palletFit?.map((g) => [g.label, g.text])).toEqual(expected);
     expect(toReviewOrderViewProps({ ...ridgelineReviewOrder, quote: undefined }).palletFit?.map((g) => [g.label, g.text])).toEqual(expected);
     const html = htmlOf(createElement(ReviewOrderView, { model: toReviewOrderViewProps(ridgelineReviewOrder) }));
-    expect(html).toMatch(/Pallet fit/);
+    expect(html).toMatch(/Layers/);
     expect(html).toMatch(/Cases of 24 cans/);
   });
 
@@ -241,9 +241,10 @@ describe("Shop order summary", () => {
 
   it("lists only lines in the cart, each with its amount and the release it ships from", () => {
     const summary = toShopViewProps({ ...ridgelineShop, catalog: [{ ...stout, qty: 2, offer: "r1" }, { ...pils, qty: 16 }, bottle] }).summary;
+    // By brand, as the catalog lists them; a stock release's date is said on its line.
     expect(summary.lines).toEqual([
-      { key: "s1", name: "Stout · ⅙ bbl keg", detail: "2 × $62.00 · from the Dec 4, 2026 release", amount: "$124.00", anchor: "brand-stout" },
-      { key: "s2", name: "Pils · ⅙ bbl keg", detail: "16 × $60.00", amount: "$960.00", anchor: "brand-pils" },
+      { key: "s2", name: "Pils · ⅙ bbl keg", brand: "Pils", pack: "⅙ bbl keg", qty: 16, each: "× $60.00", detail: "16 × $60.00", amount: "$960.00", anchor: "brand-pils" },
+      { key: "s1", name: "Stout · ⅙ bbl keg", brand: "Stout", pack: "⅙ bbl keg", qty: 2, each: "× $62.00 · from the Dec 4, 2026 release", detail: "2 × $62.00 · from the Dec 4, 2026 release", amount: "$124.00", anchor: "brand-stout" },
     ]);
     expect(summary.items).toBe("18 items");
     expect(summary.shipsOn).toBe("Ships Dec 4, 2026");
@@ -251,17 +252,24 @@ describe("Shop order summary", () => {
 
   it("adds pallet fit across brands of one package, and hints when a unit is nearly full", () => {
     const summary = toShopViewProps({ ...ridgelineShop, catalog: [{ ...stout, qty: 2 }, { ...pils, qty: 16 }, { ...bottle, qty: 5 }] }).summary;
-    expect(summary.palletFit.map((g) => [g.label, g.text])).toEqual([["⅙ bbl kegs", "18 · 2 to fill"]]);
+    expect(summary.palletFit.map((g) => [g.label, g.text])).toEqual([["⅙ bbl kegs", "18 of 20"]]);
     expect(summary.palletHint).toBe("⅙ bbl kegs 2 short of full");
     expect(summary.shipsOn).toBeUndefined();
     expect(toShopViewProps({ ...ridgelineShop, catalog: [{ ...pils, qty: 10 }] }).summary.palletHint).toBeUndefined();
   });
 
-  it("draws the pallet fit block in the summary", () => {
+  it("draws the layers block in the summary", () => {
     const html = htmlOf(createElement(ShopView, { model: toShopViewProps({ ...ridgelineShop, catalog: [{ ...stout, qty: 25 }] }) }));
-    expect(html).toMatch(/Pallet fit/);
+    expect(html).toMatch(/Layers/);
     expect(html).toMatch(/⅙ bbl kegs/);
-    expect(html).toMatch(/1 full \+ 5 · 15 to fill/);
+    expect(html).toMatch(/1 full \+ 5 of 20/);
+  });
+
+  it("lists a brand once in the summary, with its packages under it", () => {
+    const html = htmlOf(createElement(ShopView, { model: toShopViewProps({ ...ridgelineShop, catalog: [{ ...pils, qty: 2 }, { ...bottle, qty: 5, formatName: "12 oz bottle" }] }) }));
+    const summary = html.slice(html.indexOf("Your order"));
+    expect(summary.match(/href="#brand-pils"/g)).toHaveLength(1);
+    expect(summary).toMatch(/⅙ bbl keg · × \$60\.00[\s\S]*12 oz bottle · × \$18\.00/);
   });
 });
 
@@ -347,10 +355,14 @@ describe("Shop Pre-order page", () => {
   it("draws Pre-order on its own page, and keeps it off Order", () => {
     const model = shop([sku("1", "Pils", { releases: [batch] }), sku("2", "Stout")], [{ brand_name: "Saison", planned_week: "2026-12-14", listed: false }]);
     const page = htmlOf(createElement(ShopView, { model, section: "pre-order", footer: null }));
-    expect(page).toMatch(/<h1[^>]*>Pre-order<\/h1>[\s\S]*Pils[\s\S]*From Dec 4, 2026[\s\S]*Planned for the week of Dec 14/);
+    expect(page).toMatch(/<h1[^>]*>Pre-order<\/h1>[\s\S]*Ships Dec 4, 2026[\s\S]*Pils[\s\S]*Planned for the week of Dec 14/);
+    // The heading says when the beer ships, so its rows do not repeat it; they say only that little is left.
+    expect(page).not.toMatch(/From Dec 4, 2026/);
+    const scarce = htmlOf(createElement(ShopView, { model: shop([sku("1", "Pils", { releases: [{ ...batch, badge: "low" }] })]), section: "pre-order", footer: null }));
+    expect(scarce).toMatch(/>Few left<\/p>/);
     expect(page).not.toMatch(/Stout/);
     const order = htmlOf(createElement(ShopView, { model, footer: null }));
-    expect(order).toMatch(/<h1[^>]*>Order<\/h1>[\s\S]*Stout/);
+    expect(order).toMatch(/<h1[^>]*>Order now<\/h1>[\s\S]*Stout/);
     expect(order).not.toMatch(/From Dec 4, 2026|Planned for the week/);
   });
 
@@ -394,7 +406,8 @@ describe("Shop ship dates, limits and suggestions", () => {
     const html = htmlOf(createElement(ShopView, { model: toShopViewProps({ ...ridgelineShop, catalog: cart }) }));
     expect(html).toMatch(/Ships now<\/span><span[^>]*>\$300\.00[\s\S]*Ships Dec 9, 2026<\/span><span[^>]*>\$300\.00[\s\S]*Ships Dec 16, 2026/);
     const one = htmlOf(createElement(ShopView, { model: toShopViewProps({ ...ridgelineShop, catalog: [cart[0]] }) }));
-    expect(one).not.toMatch(/Ships now/);
+    // One order still says when it ships; its subtotal is the cart's, said once below.
+    expect(one).toMatch(/Ships now<\/span><\/h3>/);
   });
 
   it("lists pre-orders by ship date, each date heading its beers, with the buyer's limit on the batch", () => {
@@ -431,7 +444,8 @@ describe("Shop ship dates, limits and suggestions", () => {
     // Each ship date is its own order, so each has its own button: the buyer fills only the weeks they order.
     expect(model.preOrder?.suggested).toEqual(["2026-12-09", "2026-12-16"]);
     const html = htmlOf(createElement(ShopView, { model, section: "pre-order", footer: null }));
-    expect(html).toMatch(/Based on your recent orders[\s\S]*Ships Dec 9, 2026[\s\S]*Use suggested quantities[\s\S]*Ships Dec 16, 2026[\s\S]*Use suggested quantities/);
+    // What a suggestion is based on reads beside its button.
+    expect(html).toMatch(/Ships Dec 9, 2026[\s\S]*Use suggested quantities[\s\S]*Based on your recent orders[\s\S]*Ships Dec 16, 2026[\s\S]*Use suggested quantities[\s\S]*Based on your recent orders/);
     expect(html.match(/Use suggested quantities/g)).toHaveLength(2);
     expect(toShopViewProps({ ...ridgelineShop, catalog, suggested: [], share: null }).preOrder?.suggestedNote).toBeUndefined();
   });
@@ -477,20 +491,40 @@ describe("Shop ship dates, limits and suggestions", () => {
     expect(full.summary.pallet).toBe("1 full pallet ✓");
     expect(full.preOrder?.fillable).toEqual([]);
   });
+  it("gives a summary line its quantity apart from its price, and draws the panel's stepper and remove button", () => {
+    const model = toShopViewProps({ ...ridgelineShop, catalog: [half(5)] });
+    const line = model.summary.lines[0];
+    expect(line.qty).toBe(5);
+    expect(line.each).toMatch(/^× \$/);
+    expect(line.detail).toBe(`5 ${line.each}`);
+    const html = htmlOf(createElement(ShopView, { model, section: "pre-order" }));
+    for (const action of ["Decrease", "Increase", "Remove"]) expect(html).toContain(`aria-label="${action} ${line.brand} ${line.pack}"`);
+  });
   it("ships stock beer with a pre-order date when the buyer chooses to", () => {
     const stock = item("s", "Stock Stout", 2, { badge: "in", palletFit: 8, palletFitMixed: 6, bblPerUnit: 0.5, packagingLb: 29.35, heightIn: 23.5 });
     const cart = [stock, half(5), later];
-    const groups = (shipWith?: string) => shipGroups(cart, shipWith).map((g) => [g.shipsFrom, g.items.map((i) => i.skuId)]);
+    const groups = (shipWith?: Record<string, string>) => shipGroups(cart, shipWith).map((g) => [g.shipsFrom, g.items.map((i) => i.skuId)]);
     expect(groups()).toEqual([["", ["s"]], ["2026-12-09", ["h"]], ["2026-12-16", ["l"]]]);
-    expect(groups("2026-12-09")).toEqual([["2026-12-09", ["h", "s"]], ["2026-12-16", ["l"]]]);
+    expect(groups({ "": "2026-12-09" })).toEqual([["2026-12-09", ["h", "s"]], ["2026-12-16", ["l"]]]);
+    // An earlier pre-order can wait for a later one, and beer that joined it moves on with it. Beer never moves earlier.
+    expect(groups({ "2026-12-09": "2026-12-16" })).toEqual([["", ["s"]], ["2026-12-16", ["l", "h"]]]);
+    expect(groups({ "": "2026-12-09", "2026-12-09": "2026-12-16" })).toEqual([["2026-12-16", ["l", "h", "s"]]]);
+    expect(groups({ "2026-12-16": "2026-12-09" })).toEqual(groups());
+    const held = toShopViewProps({ ...ridgelineShop, catalog: cart, shipWith: { "2026-12-09": "2026-12-16" } }).summary;
+    // The held order keeps each week's lines and subtotal apart; nothing is summed.
+    const apart = toShopViewProps({ ...ridgelineShop, catalog: cart }).summary.shipments.map((s) => s.subtotal);
+    expect(held.shipments[0].parts.map((p) => [p.title, p.subtotal, p.shipWith?.label, p.shipWith?.value])).toEqual([["Stock beer", apart[0], "Ship stock beer", ""]]);
+    expect(held.shipments[1].parts.map((p) => [p.title, p.subtotal, p.lines.map((l) => l.key), p.shipWith?.value])).toEqual([["Dec 9, 2026 pre-order", apart[1], ["h"], "2026-12-16"], ["Dec 16, 2026 pre-order", apart[2], ["l"], undefined]]);
+    expect(held.shipments[1].parts[0].shipWith?.options).toEqual([{ value: "", label: "On Dec 9, 2026" }, { value: "2026-12-16", label: "With the Dec 16, 2026 pre-order" }]);
+    expect(held.orderOf).toEqual({ now: "now", "2026-12-09": "2026-12-16", "2026-12-16": "2026-12-16" });
     // A date with no order in the cart changes nothing: the stock beer ships now.
-    expect(shipGroups([stock], "2026-12-09").map((g) => g.shipsFrom)).toEqual([""]);
-    const model = toShopViewProps({ ...ridgelineShop, catalog: cart, shipWith: "2026-12-09" });
+    expect(shipGroups([stock], { "": "2026-12-09" }).map((g) => g.shipsFrom)).toEqual([""]);
+    const model = toShopViewProps({ ...ridgelineShop, catalog: cart, shipWith: { "": "2026-12-09" } });
     expect(model.summary.shipments.map((s) => s.key)).toEqual(["2026-12-09", "2026-12-16"]);
-    expect(model.summary.shipWith).toEqual({ value: "2026-12-09", options: [{ value: "", label: "Now" }, { value: "2026-12-09", label: "Dec 9, 2026" }, { value: "2026-12-16", label: "Dec 16, 2026" }] });
-    expect(toShopViewProps({ ...ridgelineShop, catalog: [half(5)] }).summary.shipWith).toBeUndefined();
+    expect(model.summary.shipments[0].parts[0].shipWith).toEqual({ from: "", label: "Ship stock beer", value: "2026-12-09", options: [{ value: "", label: "Now" }, { value: "2026-12-09", label: "With the Dec 9, 2026 pre-order" }, { value: "2026-12-16", label: "With the Dec 16, 2026 pre-order" }] });
+    expect(toShopViewProps({ ...ridgelineShop, catalog: [half(5)] }).summary.shipments[0].parts[0].shipWith).toBeUndefined();
     // The two stock kegs count toward the pallet's weight, so the pre-order halves stop at 13 (15 kegs, 2,400 lb); the stock kegs are not topped up.
-    expect(fillPallet(cart, "2026-12-09", undefined, "2026-12-09")).toEqual({ h: 13 });
+    expect(fillPallet(cart, "2026-12-09", undefined, { "": "2026-12-09" })).toEqual({ h: 13 });
     expect(fillPallet(cart, "2026-12-09")).toEqual({ h: 15 });
   });
   it("counts the order's lines with no pallet fit toward the batch limit", () => {

@@ -91,8 +91,8 @@ export type ShopSnapshot = {
   brands?: PortalBrand[];
   /** portal_release_share; null or absent when the buyer has no ceiling. */
   share?: ShopShare | null;
-  /** Cart state: the pre-order ship date the stock lines ship with; "" or absent ships them now. */
-  shipWith?: string;
+  /** Cart state, "Ship with": for stock ("") or a pre-order ship date, the later ship date its lines wait for. Absent ships them on their own. */
+  shipWith?: Record<string, string>;
   /** get_portal_account palletRules: how the brewery stacks a pallet; absent uses the defaults. */
   palletRules?: PalletRules;
   /** portal_suggested_order: the buyer's usual quantities of the open batch releases. */
@@ -117,14 +117,32 @@ export type ShopItemView = {
   /** Where this line orders from: "" is packaged stock, else a release id. */
   offers: { value: string; label: string }[];
   offer: string;
+  /** The line under the row: where it orders from when the heading above does not say, or that little is left. */
+  note?: string;
 };
 
-/** One cart line in the order summary ("Brand · Format", the brand's alias apart); `anchor` is its brand heading on Shop. */
-export type ShopSummaryLine = LineLabel & { key: string; detail: string; amount: string; anchor: string };
+/** One cart line in the order summary ("Brand · Format", the brand's alias apart); `anchor` is its brand heading on Shop.
+ *  The summary lists a brand once with its packages under it, so the line also carries the two apart. */
+export type ShopSummaryLine = LineLabel & {
+  key: string; brand: string; pack: string; amount: string; anchor: string;
+  /** Units ordered, and "× $60.00" (with its stock release, if any): the panel draws them apart, around its stepper. */
+  qty: number; each: string;
+  /** The two as one text: "30 × $60.00". */
+  detail: string;
+};
+
+/** Whether beer ships on its own (`from`: "" for stock, else its ship date; value "") or waits for a later pre-order (value: that date). */
+export type ShipWithChoice = { from: string; label: string; value: string; options: { value: string; label: string }[] };
+
+/** One week's beer on an order: stock ("Stock beer") or one pre-order ship date, with its lines, its subtotal and,
+ *  when a later order in the cart could take it, the "Ship with" choice. */
+export type ShipmentPart = { from: string; title: string; subtotal: string; lines: ShopSummaryLine[]; shipWith?: ShipWithChoice };
 
 /** The cart lines that ship together and become one order: stock ("Ships now") or one ship date. */
 export type ShopShipment = {
   key: string; title: string; lines: ShopSummaryLine[]; subtotal: string; palletFit: PalletFitGroup[];
+  /** The order's lines by the week they come from (stock first), each with its own subtotal: more than one when beer waits for this order. */
+  parts: ShipmentPart[];
   /** The pallets this order needs and the room left on them (palletLoad); absent when no line has a pallet fit. */
   pallet?: string;
 };
@@ -134,8 +152,8 @@ export type ShopSummary = {
   lines: ShopSummaryLine[];
   /** The same lines as the orders they become, stock first and then by ship date. */
   shipments: ShopShipment[];
-  /** "Ship with": which order the stock lines join ("" ships them now, else a pre-order ship date). Present while the cart holds both stock beer and a pre-order date. */
-  shipWith?: { value: string; options: { value: string; label: string }[] };
+  /** Which order ("now" or a ship date) each ship date's lines ended up on, so the catalog can point at it. */
+  orderOf: Record<string, string>;
   /** "10 items": the cart's units, read beside the subtotal on the phone bar. */
   items: string;
   /** "Ships Dec 4, 2026" when a release line sets the date; "3 orders" when the cart splits. */
@@ -224,7 +242,7 @@ export function shopCartTotals(catalog: ShopCatalogItem[], depositCentsPerKeg = 
 
 // The Shop shows no stock badge (tests/mgr-screens.test.ts); a release says
 // when it ships and whether little or nothing is left.
-const RELEASE_BADGE: Record<string, string> = { low: " · few left", out: " · sold out" };
+const RELEASE_LEFT: Record<string, string> = { low: "Few left", out: "Sold out" };
 
 /** A line's offers: "From stock" (value "") when the SKU is orderable from
  *  stock, then each open release. */
@@ -232,7 +250,7 @@ function offersOf(item: ShopCatalogItem) {
   const stock = item.badge == null ? [] : [{ value: "", label: "From stock" }];
   return [...stock, ...(item.releases ?? []).map((r) => ({
     value: r.releaseId,
-    label: `From ${formatDate(r.shipsFrom)}${r.ordersCloseOn ? ` · order by ${formatDate(r.ordersCloseOn)}` : ""}${RELEASE_BADGE[r.badge] ?? ""}`,
+    label: `From ${formatDate(r.shipsFrom)}${r.ordersCloseOn ? ` · order by ${formatDate(r.ordersCloseOn)}` : ""}${RELEASE_LEFT[r.badge] ? ` · ${RELEASE_LEFT[r.badge].toLowerCase()}` : ""}`,
   }))];
 }
 
@@ -246,16 +264,21 @@ export function chosenOffer(item: ShopCatalogItem): string {
 /** The release a cart line orders from, or undefined for stock. */
 const chosenRelease = (item: ShopCatalogItem) => item.releases?.find((r) => r.releaseId === chosenOffer(item));
 
+/** When a cart line ships on its own: its planned-batch ship date, or "" (now) for stock and stock releases. */
+const ownShipDate = (item: ShopCatalogItem) => { const release = chosenRelease(item); return release?.fromBatch ? release.shipsFrom : ""; };
+
 /** The cart as the orders it becomes: lines with a quantity, grouped by ship
  *  date. Stock and stock releases ship now (shipsFrom ""); each planned-batch
- *  ship date is its own order, so nobody's beer waits for a later one. Stock
- *  first, then by date. */
-export function shipGroups<T extends ShopCatalogItem>(catalog: T[], shipWith = ""): { shipsFrom: string; items: T[] }[] {
-  const groups = Map.groupBy(catalog.filter((i) => i.qty > 0), (i) => { const release = chosenRelease(i); return release?.fromBatch ? release.shipsFrom : ""; });
-  // "Ship with": the buyer's stock lines join a pre-order date's order, when the cart has both.
-  const stock = groups.get("");
-  const joined = shipWith ? groups.get(shipWith) : undefined;
-  if (stock && joined) { joined.push(...stock); groups.delete(""); }
+ *  ship date is its own order, so nobody's beer waits for a later one unless
+ *  the buyer chose that (`shipWith`). Stock first, then by date. */
+export function shipGroups<T extends ShopCatalogItem>(catalog: T[], shipWith: Record<string, string> = {}): { shipsFrom: string; items: T[] }[] {
+  const groups = Map.groupBy(catalog.filter((i) => i.qty > 0), ownShipDate);
+  // "Ship with": an order's lines join a later date's order, when the cart has both. Earliest first, so beer that joined an order moves on with it.
+  for (const from of [...groups.keys()].sort()) {
+    const to = shipWith[from] ?? "";
+    const joined = to > from ? groups.get(to) : undefined;
+    if (joined) { joined.push(...groups.get(from)!); groups.delete(from); }
+  }
   return [...groups].map(([shipsFrom, items]) => ({ shipsFrom, items })).sort((a, b) => a.shipsFrom.localeCompare(b.shipsFrom));
 }
 
@@ -343,7 +366,7 @@ const FILL_STOP = 1000;
  *  one unit at a time, the one that has grown least for its size first, until
  *  one more of anything would need another pallet or pass the buyer's limit
  *  on its batch. */
-export function fillPallet(catalog: ShopCatalogItem[], shipsFrom: string, rules: PalletRules = DEFAULT_PALLET_RULES, shipWith = ""): Record<string, number> {
+export function fillPallet(catalog: ShopCatalogItem[], shipsFrom: string, rules: PalletRules = DEFAULT_PALLET_RULES, shipWith: Record<string, string> = {}): Record<string, number> {
   // Every line of the order counts toward weight and the batch limit; only lines with a pallet fit grow.
   const order = shipGroups(catalog, shipWith).find((g) => g.shipsFrom === shipsFrom)?.items ?? [];
   // Stock beer shipped with a pre-order counts toward its pallets but is not topped up: the portal does not know how much stock is left.
@@ -370,32 +393,45 @@ export function fillPallet(catalog: ShopCatalogItem[], shipsFrom: string, rules:
 }
 
 /** The cart lines, unit count, ship date and pallet fit the summary shows. */
-function shopSummary(catalog: ShopCatalogItem[], floor: string, rules: PalletRules, shipWith: string): ShopSummary {
-  const inCart = catalog.filter((i) => i.qty > 0);
+function shopSummary(catalog: ShopCatalogItem[], floor: string, rules: PalletRules, shipWith: Record<string, string>): ShopSummary {
+  // Listed as the catalog lists them: by brand, then package.
+  const inCart = catalog.filter((i) => i.qty > 0).sort((a, b) => a.product.localeCompare(b.product) || packageRank(a) - packageRank(b) || a.name.localeCompare(b.name));
   const groups = cartPalletFit(inCart);
   // Room is reported for every package the buyer can order, not only the ones in the cart.
   const kinds = catalog.map((i) => palletLine(i));
   const pallet = (items: ShopCatalogItem[]) => palletLoad(items.map((i) => palletLine(i)), kinds, rules)?.text;
   const line = (i: ShopCatalogItem): ShopSummaryLine => {
     const release = chosenRelease(i);
+    // A pre-order's date heads its order, so only a stock release's date is said on the line.
+    const each = `× ${money(i.unitPriceCents)}${release && !release.fromBatch ? ` · from the ${formatDate(release.shipsFrom)} release` : ""}`;
     return {
       key: i.skuId,
       ...cartLineLabel(i),
-      detail: `${i.qty} × ${money(i.unitPriceCents)}${release ? ` · from the ${formatDate(release.shipsFrom)} release` : ""}`,
+      brand: i.product,
+      pack: i.formatName ?? packageName(i.product, i.name),
+      qty: i.qty, each, detail: `${i.qty} ${each}`,
       amount: money(i.qty * i.unitPriceCents),
       anchor: brandAnchor(i.product),
     };
   };
-  // The choice is offered while the cart holds both stock beer and a pre-order date.
+  // Beer can wait for any later pre-order date the cart holds; the choice sits in the order the beer is on.
   const dates = shipGroups(inCart).map((g) => g.shipsFrom);
-  const preOrderDates = dates.filter(Boolean);
-  const chosenDate = preOrderDates.includes(shipWith) ? shipWith : "";
-  const shipWithChoice = dates.includes("") && preOrderDates.length
-    ? { value: chosenDate, options: [{ value: "", label: "Now" }, ...preOrderDates.map((date) => ({ value: date, label: formatDate(date) }))] }
-    : undefined;
-  const shipments = shipGroups(inCart, shipWith).map(({ shipsFrom, items }) => ({
+  const choice = (from: string): ShipWithChoice => {
+    const later = dates.filter((date) => date > from);
+    return {
+      from, label: from ? `Ship ${formatDate(from)} beer` : "Ship stock beer", value: later.includes(shipWith[from] ?? "") ? shipWith[from] : "",
+      options: [{ value: "", label: from ? `On ${formatDate(from)}` : "Now" }, ...later.map((date) => ({ value: date, label: `With the ${formatDate(date)} pre-order` }))],
+    };
+  };
+  const orders = shipGroups(inCart, shipWith);
+  const amount = (items: ShopCatalogItem[]) => money(items.reduce((n, i) => n + i.qty * i.unitPriceCents, 0));
+  const shipments = orders.map(({ shipsFrom, items }) => ({
     key: shipsFrom || "now", title: shipsFrom ? `Ships ${formatDate(shipsFrom)}` : "Ships now", lines: items.map(line),
-    subtotal: money(items.reduce((n, i) => n + i.qty * i.unitPriceCents, 0)), palletFit: cartPalletFit(items), pallet: pallet(items),
+    subtotal: amount(items), palletFit: cartPalletFit(items), pallet: pallet(items),
+    parts: [...Map.groupBy(items, ownShipDate)].sort(([a], [b]) => a.localeCompare(b)).map(([from, own]) => ({
+      from, title: from ? `${formatDate(from)} pre-order` : "Stock beer", subtotal: amount(own), lines: own.map(line),
+      ...(from < dates.at(-1)! ? { shipWith: choice(from) } : {}),
+    })),
   }));
   return {
     lines: inCart.map(line),
@@ -403,7 +439,7 @@ function shopSummary(catalog: ShopCatalogItem[], floor: string, rules: PalletRul
     items: plural(inCart.reduce((n, i) => n + i.qty, 0), "item"),
     shipsOn: shipments.length > 1 ? plural(shipments.length, "order") : floor ? `Ships ${formatDate(floor)}` : undefined,
     palletFit: groups,
-    ...(shipWithChoice ? { shipWith: shipWithChoice } : {}),
+    orderOf: Object.fromEntries(orders.flatMap(({ shipsFrom, items }) => items.map((i) => [ownShipDate(i) || "now", shipsFrom || "now"]))),
     pallet: shipments.length === 1 ? shipments[0].pallet : undefined,
     palletHint: palletHint(groups),
   };
@@ -450,7 +486,7 @@ export function toShopViewProps({
   share,
   suggested = [],
   palletRules = DEFAULT_PALLET_RULES,
-  shipWith = "",
+  shipWith = {},
 }: ShopSnapshot): ShopViewModel {
   const rank = new Map(catalog.map((i) => [i.skuId, packageRank(i)]));
   type Entry = { item: ShopCatalogItem; row: ShopItemView };
@@ -481,6 +517,7 @@ export function toShopViewProps({
   const preOrderRows: Entry[] = [];
   /** Each pre-order brand's soonest release: its ship date heads the brand and carries the buyer's limit on that batch. */
   const soonest = new Map<string, ShopRelease>();
+  const releaseOf = new Map<string, ShopRelease>();
   for (const item of catalog) {
     const chosen = chosenOffer(item);
     const offers = offersOf(item);
@@ -490,11 +527,12 @@ export function toShopViewProps({
     // A SKU with no offer at all still shows in the catalog, as it always has.
     if (stock.length || !offers.length) {
       const active = !fromBatch.has(chosen);
-      catalogRows.push({ item, row: { ...base, key: item.skuId, offers: stock, offer: active ? chosen : stock[0].value, active, qty: active ? item.qty : 0 } });
+      catalogRows.push({ item, row: { ...base, key: item.skuId, offers: stock, offer: active ? chosen : stock[0].value, active, qty: active ? item.qty : 0, ...(stock.length === 1 && stock[0].value ? { note: stock[0].label } : {}) } });
     }
     for (const release of (item.releases ?? []).filter((r) => r.fromBatch)) {
       const first = soonest.get(item.product);
       if (!first || release.shipsFrom < first.shipsFrom) soonest.set(item.product, release);
+      releaseOf.set(release.releaseId, release);
     }
     for (const offer of offers.filter((o) => fromBatch.has(o.value))) {
       const active = chosen === offer.value;
@@ -509,6 +547,8 @@ export function toShopViewProps({
     const until = release.limitLiftsOn ? ` until ${formatMonthDay(release.limitLiftsOn)}` : "";
     return {
       ...group, shipsFrom: release.shipsFrom,
+      // The heading says when the brand's soonest release ships, so its rows say only that little is left; a later release names its own dates.
+      items: group.items.map((row) => { const own = releaseOf.get(row.offer)!; return { ...row, note: own.shipsFrom === release.shipsFrom && own.ordersCloseOn === release.ordersCloseOn ? RELEASE_LEFT[own.badge] : row.offers[0].label }; }),
       ships: `Ships ${formatDate(release.shipsFrom)}${release.ordersCloseOn ? ` · order by ${formatDate(release.ordersCloseOn)}` : ""}`,
       ...(release.limitLeftBbl == null ? {} : { limit: release.limitLeftBbl > 0 ? `You can order ${bbl(release.limitLeftBbl)} bbl more of this batch${until}` : `You have reached your limit on this batch${until}` }),
     };
@@ -527,7 +567,7 @@ export function toShopViewProps({
     groups,
     empty: catalog.length === 0 ? { title: "Nothing listed for wholesale yet" } : undefined,
     source: source.name,
-    shipToLine: `${shipTo?.label ?? "Ship-to"}${requestedDate ? ` · ${formatDate(requestedDate)}` : ""}`,
+    shipToLine: `${shipTo?.label ?? "Ship-to"} · ${requestedDate ? formatDate(requestedDate) : "as soon as possible"}`,
     chargesLine: "Keg deposits & fees added at review",
     depositInfo: "Tax is not included. The brewery confirms final invoice amounts and the requested delivery date.",
     shipToId,

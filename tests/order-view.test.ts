@@ -20,10 +20,10 @@ describe("Order pallet fit", () => {
   it("adds every line's package into pallet units while the order can still change, and draws the block", () => {
     // 4 + 3 sixtels across two brands; the third line's format has no fit.
     const model = toOrderViewProps(withFits);
-    expect(model.palletFit.map((g) => [g.label, g.text])).toEqual([["⅙ bbl kegs", "7 · 13 to fill"]]);
+    expect(model.palletFit.map((g) => [g.label, g.text])).toEqual([["⅙ bbl kegs", "7 of 20"]]);
     const html = renderToStaticMarkup(createElement(OrderView, { model }));
-    expect(html).toContain("Pallet fit");
-    expect(html).toContain("7 · 13 to fill");
+    expect(html).toContain("Layers");
+    expect(html).toContain("7 of 20");
   });
 
   it("drops the block once the order has shipped or was cancelled, and when no format has a fit", () => {

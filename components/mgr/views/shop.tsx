@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { OrderQuantity } from "./new-order";
 import { OrderSummary } from "./order-summary";
@@ -18,8 +18,8 @@ export type ShopControls = {
   suggest?: (shipsFrom: string) => void;
   /** Tops up one ship date's order until its pallets are full. */
   fill?: (shipsFrom: string) => void;
-  /** Which order the stock lines ship with: "" for now, else a pre-order ship date in the cart. */
-  shipWith?: (shipsFrom: string) => void;
+  /** "Ship with": the beer shipping `from` ("" for stock, else its ship date) waits for the order on `shipsFrom`; "" ships it on its own. */
+  shipWith?: (from: string, shipsFrom: string) => void;
 };
 
 /** The catalog, with the order summary beside it from md up (a sticky panel)
@@ -40,9 +40,24 @@ export function ShopView({ model, footer, controls = {}, quantities, locked = fa
 }) {
   // A focused quantity field means the phone keyboard is up: the bar steps aside.
   const [typing, setTyping] = useState(false);
+  // The order panel follows the catalog: it scrolls to the order (Ships now, or a ship date) of the brand being read or edited.
+  const catalog = useRef<HTMLDivElement>(null);
+  const showOrder = (from: Element | null) => {
+    const key = from?.closest<HTMLElement>("[data-order]")?.dataset.order;
+    const order = key ? document.querySelector(`aside [data-shipment="${key}"]`) : null;
+    const list = order?.parentElement;
+    // Only the panel's own list moves, so the order's ship date sits at its top; the page stays put.
+    if (order && list) list.scrollTop += order.getBoundingClientRect().top - list.getBoundingClientRect().top;
+  };
+  useEffect(() => {
+    // A brand counts as being read once it reaches the top quarter of the window.
+    const observer = new IntersectionObserver(entries => { for (const entry of entries) if (entry.isIntersecting) showOrder(entry.target); }, { rootMargin: "0px 0px -75% 0px" });
+    catalog.current?.querySelectorAll("[data-order]").forEach(band => observer.observe(band));
+    return () => observer.disconnect();
+  }, [section, model.groups.length, model.preOrder?.groups.length]);
   /** A brand's packages, each with its price and quantity, then the brand's amount in the order. Drawn under the heading and again in the brand's sheet. */
   const rows = (group: ShopGroupView) => <div className="flex min-w-0 flex-col">
-    {/* Several offers are an inline pick beside the price. A lone release reads as its own line under the row, so its dates are never cut short; stock alone needs no words. */}
+    {/* Several offers are an inline pick beside the price. A row's note reads as its own line under it, so its dates are never cut short; stock alone needs no words. */}
     {group.items.map(item => <Fragment key={item.key}>
       {E.row(item.name, item.offers.length > 1
         ? <>{item.price} · {E.pick(`${item.name} · order from`, item.offer, item.offers, { inline: true, onChange: controls.offer && (value => controls.offer?.(item.skuId, value)) })}</>
@@ -51,7 +66,7 @@ export function ShopView({ model, footer, controls = {}, quantities, locked = fa
         // A cart holds one offer per SKU: a quantity typed in the other page's row moves the SKU to this row's offer.
         if (!item.active) controls.offer?.(item.skuId, item.offer);
         controls.quantity?.(item.skuId, value);
-      })} />, "", undefined, item.offers.length === 1 && item.offer ? <p className="text-sm text-muted-foreground">{item.offers[0].label}</p> : undefined)}
+      })} />, "", undefined, item.note ? <p className="text-sm text-muted-foreground">{item.note}</p> : undefined)}
     </Fragment>)}
     {group.limit ? <p className="mt-1 text-sm text-muted-foreground">{group.limit}</p> : null}
     {group.total ? <p className="mt-1 text-sm font-medium">In your order · {group.total}</p> : null}
@@ -59,16 +74,20 @@ export function ShopView({ model, footer, controls = {}, quantities, locked = fa
   /** A page's brands, one band each. Pre-order brands are listed by ship date, each date heading the brands that ship on it. */
   const brands = (groups: ShopGroupView[]) => <div className="flex flex-col">{groups.map((group, index) => {
     const anchor = brandAnchor(group.product);
+    const startsDate = group.ships && group.ships !== groups[index - 1]?.ships;
     return <Fragment key={group.product}>
       {/* Each ship date is its own order, so each has its own suggestion to take or leave. */}
-      {group.ships && group.ships !== groups[index - 1]?.ships ? <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+      {/* The date stays at the top while its beers scroll under it; the negative offset and matching padding cover the page's own top padding. */}
+      {startsDate ? <div className="sticky -top-4 z-10 flex flex-wrap items-baseline justify-between gap-x-3 bg-background pb-1 pt-4 md:-top-6 md:pt-6">
         {E.group(group.ships)}
         <span className="flex flex-wrap gap-x-2">
           {group.shipsFrom && model.preOrder?.suggested.includes(group.shipsFrom) ? E.btn("Use suggested quantities", "g", undefined, controls.suggest && (() => controls.suggest?.(group.shipsFrom!))) : null}
           {group.shipsFrom && model.preOrder?.fillable.includes(group.shipsFrom) ? E.btn("Fill the pallet", "g", undefined, controls.fill && (() => controls.fill?.(group.shipsFrom!))) : null}
         </span>
       </div> : null}
-      <section className="grid gap-x-6 gap-y-2 border-t py-4 first:border-t-0 first:pt-0 @lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] @lg:items-start">
+      {/* What the suggestion is based on, beside its button. */}
+      {startsDate && group.shipsFrom && model.preOrder?.suggestedNote && model.preOrder.suggested.includes(group.shipsFrom) ? <p className="text-xs text-muted-foreground">{model.preOrder.suggestedNote}</p> : null}
+      <section data-order={model.summary.orderOf[group.shipsFrom ?? "now"] ?? group.shipsFrom ?? "now"} className="grid gap-x-6 gap-y-2 border-t py-4 first:border-t-0 first:pt-0 @lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] @lg:items-start">
       {brandHeading ? brandHeading(group, { anchor, order: <fieldset disabled={locked} className="contents">{rows(group)}</fieldset> }) : <BrandHeading name={group.product} alias={group.alias} facts={group.facts} anchor={anchor} card />}
       {rows(group)}
       </section>
@@ -76,19 +95,18 @@ export function ShopView({ model, footer, controls = {}, quantities, locked = fa
   })}</div>;
   let body: ReactNode;
   if (section === "pre-order") body = model.preOrder ? <>
-    {E.polite("Beer the brewery has planned and opened for ordering ahead. Each ship date becomes its own order, and the brewery confirms each pre-order.")}
+    {E.polite("Order ahead from planned batches. Each ship date becomes its own order, which the brewery confirms.")}
     {model.preOrder.note ? <p className="text-sm text-muted-foreground">{model.preOrder.note}</p> : null}
-    {model.preOrder.suggestedNote ? <p className="text-sm text-muted-foreground"><span className="font-medium text-foreground">Suggested quantities.</span> {model.preOrder.suggestedNote}</p> : null}
     {brands(model.preOrder.groups)}
     {model.preOrder.planned.map(row => <Fragment key={row.key}>{E.row(row.title, row.detail)}</Fragment>)}
   </> : E.blank({ title: "Nothing open for pre-order yet" });
   else if (model.empty) body = E.blank(model.empty);
   else body = model.groups.length ? brands(model.groups) : E.blank({ title: "Nothing available to ship now" });
   return <>
-    {E.hd(section === "pre-order" ? "Pre-order" : "Order")}
+    {E.hd(section === "pre-order" ? "Pre-order" : "Order now")}
     <div className="flex flex-col gap-3 md:grid md:grid-cols-[minmax(0,1fr)_20rem] md:items-start md:gap-8">
-      <div className="@container flex min-w-0 flex-col gap-3">
-        <fieldset disabled={locked} className="contents" onFocusCapture={event => setTyping(event.target instanceof HTMLInputElement)} onBlurCapture={() => setTyping(false)}>
+      <div ref={catalog} className="@container flex min-w-0 flex-col gap-3">
+        <fieldset disabled={locked} className="contents" onFocusCapture={event => { setTyping(event.target instanceof HTMLInputElement); showOrder(event.target); }} onBlurCapture={() => setTyping(false)}>
           {body}
         </fieldset>
       </div>

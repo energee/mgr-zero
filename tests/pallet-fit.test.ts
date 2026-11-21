@@ -16,10 +16,10 @@ describe("palletFit", () => {
     ]);
   });
 
-  it("names full units, the partial one, and what fills it", () => {
+  it("names full units and how far the partial one is filled", () => {
     expect(palletFit([caseOf24(13), half(3)])).toEqual([
-      { key: "can|24|10", label: "Cases of 24 cans", count: 13, fit: 10, full: 1, remainder: 3, toFill: 7, text: "1 full + 3 · 7 to fill" },
-      { key: "keg|half_bbl|8", label: "½ bbl kegs", count: 3, fit: 8, full: 0, remainder: 3, toFill: 5, text: "3 · 5 to fill" },
+      { key: "can|24|10", label: "Cases of 24 cans", count: 13, fit: 10, full: 1, remainder: 3, toFill: 7, text: "1 full + 3 of 10" },
+      { key: "keg|half_bbl|8", label: "½ bbl kegs", count: 3, fit: 8, full: 0, remainder: 3, toFill: 5, text: "3 of 8" },
     ]);
   });
 
@@ -29,8 +29,8 @@ describe("palletFit", () => {
 
   it("keeps one package with two different fits apart, and tells the groups apart", () => {
     expect(palletFit([sixtel(5, 20), sixtel(5, 16)]).map((g) => [g.label, g.text])).toEqual([
-      ["⅙ bbl kegs (20 a unit)", "5 · 15 to fill"],
-      ["⅙ bbl kegs (16 a unit)", "5 · 11 to fill"],
+      ["⅙ bbl kegs (20 a unit)", "5 of 20"],
+      ["⅙ bbl kegs (16 a unit)", "5 of 16"],
     ]);
   });
 });
@@ -114,5 +114,22 @@ describe("pallet rules form", () => {
     const command = palletRulesCommand({ ...saved, maxLb: "2200", kegLayers: [{ half_bbl: "8", sixth_bbl: "" }, { half_bbl: "0", sixth_bbl: "20" }] }, saved);
     expect(command.reason).toBeNull();
     expect(command.input).toEqual({ maxLb: 2200, maxHeightIn: 60, palletHeightIn: 5.5, kegLayers: [{ half_bbl: 8 }, { sixth_bbl: 20 }] });
+  });
+});
+
+describe("pallet advice on a large order", () => {
+  const table = () => [[8, 0], [6, 6], [6, 0], [5, 2], [4, 6], [3, 10], [2, 12], [1, 14], [0, 20]].map(([h, s]) => ({ half_bbl: h, sixth_bbl: s }));
+  const order = [half(120), sixtel(200), caseOf24(100)];
+  it("reports room after about one solve of the keg layers, not one per unit counted", () => {
+    // Each fresh table starts with nothing remembered, so the two timings compare like with like.
+    let start = performance.now();
+    const pallets = palletCount(order, { ...DEFAULT_PALLET_RULES, kegLayers: table() });
+    const oneSolve = performance.now() - start;
+    start = performance.now();
+    const load = palletLoad(order, order, { ...DEFAULT_PALLET_RULES, kegLayers: table() });
+    const withRoom = performance.now() - start;
+    expect(load?.pallets).toBe(pallets);
+    // Counting up one unit at a time re-solved the layers dozens of times; the cart froze on every keystroke.
+    expect(withRoom).toBeLessThan(15 * oneSolve + 100);
   });
 });

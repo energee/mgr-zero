@@ -56,10 +56,13 @@ describe("portal cart messages (#904)", () => {
   }
   afterEach(() => { vi.unstubAllGlobals(); });
 
-  it("announces quantity and missing-input validation, and the removed-items change, as alerts", () => {
+  it("announces quantity validation and the removed-items change as alerts, and an empty cart as a hint", () => {
     const invalid = alerts(render("1.5"));
     expect(invalid).toContain("Enter whole quantities of zero or more.");
     expect(invalid).toContain("Removed unavailable or unpriced items: Old IPA");
-    expect(alerts(render("0"))).toContain("Before saving or reviewing this order, enter a quantity above zero.");
+    // Every buyer starts with an empty cart, so what it still needs is said quietly.
+    const empty = render("0");
+    expect(empty).toContain("Before saving or reviewing this order, enter a quantity above zero.");
+    expect(alerts(empty)).not.toContain("Before saving or reviewing this order");
   });
 });

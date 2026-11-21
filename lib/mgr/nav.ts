@@ -117,9 +117,9 @@ export const UNLISTED_NAV: readonly NavItem[] = [
 ];
 
 export const PORTAL_NAV: readonly NavItem[] = [
-  { label: "Order", href: "/portal", icon: ShoppingCart01Icon },
+  { label: "Order now", href: "/portal", icon: ShoppingCart01Icon },
   { label: "Pre-order", href: "/portal/pre-order", icon: Calendar03Icon },
-  { label: "Orders", href: "/portal/orders", icon: Package01Icon },
+  { label: "Order history", href: "/portal/orders", icon: Package01Icon },
   { label: "Invoices", href: "/portal/invoices", icon: Invoice01Icon },
   { label: "Account", href: "/portal/account", icon: UserCircleIcon },
 ];

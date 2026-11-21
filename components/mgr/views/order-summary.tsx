@@ -14,7 +14,7 @@ import { CommandForm } from "@/components/mgr/command-form";
 import { DatePicker } from "@/components/mgr/date-picker";
 import { PalletFitBlock } from "./pallet-fit";
 import { BrandedName } from "./branded-name";
-import type { ShopSummaryLine, ShopViewModel } from "@/lib/mgr/shop-view";
+import type { ShopViewModel } from "@/lib/mgr/shop-view";
 import type { ShopControls } from "./shop";
 
 type SummaryProps = { model: ShopViewModel; controls: ShopControls; locked: boolean; disabled: boolean; preparing: boolean };
@@ -39,46 +39,69 @@ function DeliveryDetails({ model, controls, locked }: Omit<SummaryProps, "disabl
     </CommandForm>);
 }
 
-/** What the panel and the sheet both list. `onLine` runs when a line is tapped (the sheet closes first).
- *  A cart that ships on more than one date lists each order it becomes, with its own subtotal and pallet fit. */
-function SummaryBody({ model, controls, locked, onLine }: Omit<SummaryProps, "disabled" | "preparing"> & { onLine?: () => void }) {
+/** The cart as the orders it becomes, each under its ship date: a brand once with its packages under it, then
+ *  that order's pallets and layers. An order holding more than one week's beer lists each week apart with its own subtotal.
+ *  Every line has a remove button, undone from the note it leaves; `steppers` (the md+ panel) adds − and + around the quantity. `onLine` runs when a brand is tapped (the sheet closes first). */
+function SummaryLines({ model, controls, locked, onLine, steppers }: Omit<SummaryProps, "disabled" | "preparing"> & { onLine?: () => void; steppers?: boolean }) {
   const { summary } = model;
+  // The last line removed here, offered back until it is in the cart again.
+  const [removed, setRemoved] = useState<{ key: string; name: string; qty: number } | null>(null);
+  const undo = removed && !summary.lines.some(line => line.key === removed.key) ? removed : null;
+  const tap = { type: "button", variant: "ghost", size: "icon", className: "size-7 shrink-0", disabled: locked, "data-preview-action": true } as const;
   const split = summary.shipments.length > 1;
-  const list = (lines: ShopSummaryLine[]) => <ul className="flex flex-col divide-y">
-    {lines.map(line => <li key={line.key}>
-      <a href={`#${line.anchor}`} data-to="Shop" onClick={onLine} className="flex items-start justify-between gap-3 py-2 text-sm">
-        <span className="min-w-0"><span className="block font-medium"><BrandedName name={line.name} alias={line.alias} /></span><span className="block text-xs text-muted-foreground">{line.detail}</span></span>
-        <span className="shrink-0 tabular-nums">{line.amount}</span>
-      </a>
-    </li>)}
-  </ul>;
-  return <div className="flex flex-col gap-1">
-    {summary.shipWith ? <fieldset disabled={locked}>{E.pick("Ship stock beer", summary.shipWith.value, summary.shipWith.options, { onChange: controls.shipWith })}</fieldset> : null}
-    {!summary.lines.length ? <p className="py-2 text-sm text-muted-foreground">Nothing in your order yet.</p>
-      : split ? summary.shipments.map(shipment => <section key={shipment.key} aria-label={shipment.title} className="flex flex-col">
-        <h3 className="flex justify-between gap-3 pt-2 text-sm font-semibold"><span>{shipment.title}</span><span className="tabular-nums">{shipment.subtotal}</span></h3>
-        {list(shipment.lines)}
-        {shipment.palletFit.length ? <div className="pb-2"><PalletFitBlock groups={shipment.palletFit} /></div> : null}
-        {shipment.pallet ? <p className="pb-2 text-sm">{shipment.pallet}</p> : null}
-      </section>)
-      : list(summary.lines)}
-    {E.fld("Items subtotal", <span className="font-medium tabular-nums">{model.subtotal}</span>)}
+  return <>{undo ? <p role="status" className="flex items-center justify-between gap-3 text-sm text-muted-foreground">Removed {undo.name}<Button type="button" variant="ghost" size="sm" disabled={locked} onClick={() => controls.quantity?.(undo.key, String(undo.qty))}>Undo</Button></p> : null}{!summary.lines.length ? <p className="py-2 text-sm text-muted-foreground">Nothing in your order yet.</p> : summary.shipments.map(shipment => <section key={shipment.key} aria-label={shipment.title} data-shipment={shipment.key} className="flex flex-col">
+    <h3 className="flex justify-between gap-3 pt-2 text-sm font-semibold"><span>{shipment.title}</span>{split && shipment.parts.length === 1 ? <span className="tabular-nums">{shipment.subtotal}</span> : null}</h3>
+    {shipment.parts.map(({ from, title, subtotal, lines, shipWith }) => <div key={from} className="flex flex-col">
+    {shipment.parts.length > 1 ? <h4 className="flex justify-between gap-3 pt-2 text-sm font-medium"><span>{title}</span><span className="tabular-nums">{subtotal}</span></h4> : null}
+    {shipWith ? <fieldset disabled={locked}>{E.pick(shipWith.label, shipWith.value, shipWith.options, { onChange: date => controls.shipWith?.(from, date) })}</fieldset> : null}
+    <ul className="flex flex-col divide-y">
+      {[...Map.groupBy(lines, line => line.anchor)].map(([anchor, lines]) => <li key={anchor} className="flex flex-col gap-0.5 py-2 text-sm">
+        <a href={`#${anchor}`} data-to="Shop" onClick={onLine} className="font-medium"><BrandedName name={lines[0].brand} alias={lines[0].alias} /></a>
+        {lines.map(line => <span key={line.key} className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+          <span className="min-w-0 flex-1">{line.pack} · {steppers ? line.each : line.detail}</span>
+          {/* ponytail: − and + only; typing a quantity stays in the catalog, since a line cleared to retype would vanish at 0. */}
+          {steppers ? <span className="flex shrink-0 items-center rounded-lg bg-muted text-foreground">
+            <Button {...tap} aria-label={`Decrease ${line.brand} ${line.pack}`} onClick={() => controls.quantity?.(line.key, String(line.qty - 1))}>−</Button>
+            <span className="min-w-6 text-center text-sm tabular-nums">{line.qty}</span>
+            <Button {...tap} aria-label={`Increase ${line.brand} ${line.pack}`} onClick={() => controls.quantity?.(line.key, String(line.qty + 1))}>+</Button>
+          </span> : null}
+          <span className="shrink-0 text-sm tabular-nums text-foreground">{line.amount}</span>
+          <Button {...tap} aria-label={`Remove ${line.brand} ${line.pack}`} onClick={() => { setRemoved({ key: line.key, name: `${line.brand} ${line.pack}`, qty: line.qty }); controls.quantity?.(line.key, "0"); }}>×</Button>
+        </span>)}
+      </li>)}
+    </ul>
+    </div>)}
+    {shipment.pallet ? <p className="pb-2 text-sm">{shipment.pallet}</p> : null}
+    {shipment.palletFit.length ? <div className="pb-2"><PalletFitBlock groups={shipment.palletFit} /></div> : null}
+  </section>)}</>;
+}
+
+/** The fine print under the lines: what Review adds, and where the order ships from. */
+function SummaryNotes({ model }: { model: ShopViewModel }) {
+  return <>
     <p className="text-sm text-muted-foreground">{model.chargesLine}</p>
     <p className="text-xs text-muted-foreground">{model.depositInfo}</p>
     {E.row("Ships from", model.source)}
-    <DeliveryDetails model={model} controls={controls} locked={locked} />
     {model.shipsFromNote ? E.note(model.shipsFromNote) : null}
-    {summary.palletFit.length && !split ? <div className="pt-2"><PalletFitBlock groups={summary.palletFit} /></div> : null}
-    {summary.pallet ? <p className="text-sm">{summary.pallet}</p> : null}
-  </div>;
+  </>;
 }
 
-/** The md+ panel: sticky beside the catalog, with the order's actions and messages. */
+const subtotal = (model: ShopViewModel) => E.fld("Items subtotal", <span className="font-medium tabular-nums">{model.subtotal}</span>);
+
+/** The md+ panel: sticky beside the catalog and short enough to fit the window under the page heading. The lines and fine print
+ *  scroll; the subtotal, delivery details, messages and the order's actions stay in view under them. */
 function OrderSummaryPanel({ model, controls, locked, disabled, preparing, messages }: SummaryProps & { messages?: ReactNode }) {
   return <aside aria-label="Your order" className="hidden self-start md:sticky md:top-0 md:block">
-    <div className="flex flex-col gap-3 rounded-xl border p-4">
+    <div className="flex max-h-[calc(100dvh-8rem)] flex-col gap-3 rounded-xl border p-4">
       <h2 className="text-base font-semibold">Your order</h2>
-      <SummaryBody model={model} controls={controls} locked={locked} />
+      <div className="-mr-2 flex min-h-0 flex-col gap-1 overflow-y-auto pr-2">
+        <SummaryLines model={model} controls={controls} locked={locked} steppers />
+        <SummaryNotes model={model} />
+      </div>
+      <div className="flex flex-col gap-1">
+        {subtotal(model)}
+        <DeliveryDetails model={model} controls={controls} locked={locked} />
+      </div>
       {messages}
       <ReviewButton className="w-full" disabled={disabled} preparing={preparing} onClick={controls.review} />
       <Button type="button" variant="ghost" className="w-full" disabled={disabled} onClick={controls.saveDraft}>Save draft</Button>
@@ -105,7 +128,12 @@ function OrderSummaryBar({ model, controls, locked, disabled, preparing, typing 
         <ReviewButton className="w-full" disabled={disabled} preparing={preparing} onClick={review} />
         <Button type="button" variant="ghost" className="w-full" disabled={disabled} onClick={() => { setOpen(false); controls.saveDraft?.(); }}>Save draft</Button>
       </div>}>
-      <SummaryBody model={model} controls={controls} locked={locked} onLine={() => setOpen(false)} />
+      <div className="flex flex-col gap-1">
+        <SummaryLines model={model} controls={controls} locked={locked} onLine={() => setOpen(false)} />
+        {subtotal(model)}
+        <SummaryNotes model={model} />
+        <DeliveryDetails model={model} controls={controls} locked={locked} />
+      </div>
     </CommandForm>
     <ReviewButton className="shrink-0" disabled={disabled} preparing={preparing} onClick={review} />
   </section>;

@@ -51,14 +51,14 @@ describe("activeTab", () => {
     expect(activeTab(STAFF_NAV, "/")?.label).toBe("Today");
     expect(activeTab(STAFF_NAV, "/orders/abc")?.label).toBe("Work");
     expect(activeTab(STAFF_NAV, "/settings/team")?.label).toBe("More");
-    expect(activeTab(PORTAL_NAV, "/portal/orders/1")?.label).toBe("Orders");
-    expect(activeTab(PORTAL_NAV, "/portal")?.label).toBe("Order");
+    expect(activeTab(PORTAL_NAV, "/portal/orders/1")?.label).toBe("Order history");
+    expect(activeTab(PORTAL_NAV, "/portal")?.label).toBe("Order now");
     expect(activeTab(PORTAL_NAV, "/portal/pre-order")?.label).toBe("Pre-order");
     expect(activeTab(PORTAL_NAV, "/portal/account")?.label).toBe("Account");
   });
 
   it("includes Account on the portal shell", () => {
-    expect(PORTAL_NAV.map((t) => t.label)).toEqual(["Order", "Pre-order", "Orders", "Invoices", "Account"]);
+    expect(PORTAL_NAV.map((t) => t.label)).toEqual(["Order now", "Pre-order", "Order history", "Invoices", "Account"]);
   });
   it("returns undefined off the map", () => {
     expect(activeTab(STAFF_NAV, "/nowhere")).toBeUndefined();
