@@ -243,15 +243,10 @@
   }
 }
 
-/* On a phone card a quiet action names itself (Find COLA), so its column
-   label beside it is dropped. A role with no action sees words, which keep it. */
-[data-slot="item"] dl > div:has(> dd [data-quiet-action] [data-row-action]) > dt {
-  display: none;
-}
-
-/* A phone card's fact marked data-card-bare (Catalog's style) reads without
-   its column label, since the value names itself. */
-[data-slot="item"] dl > div:has(> dd > [data-card-bare]) > dt {
+/* A phone card drops a fact's column label when the value names itself: a
+   quiet action (Find COLA), or a value marked data-card-bare (Catalog's style).
+   A role with no action sees words, which keep their label. */
+[data-slot="item"] dl > div:has(> dd [data-quiet-action] [data-row-action], > dd > [data-card-bare]) > dt {
   display: none;
 }
 
