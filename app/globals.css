@@ -243,6 +243,24 @@
   }
 }
 
+/* On a phone card a quiet action names itself (Find COLA), so its column
+   label beside it is dropped. A role with no action sees words, which keep it. */
+[data-slot="item"] dl > div:has(> dd [data-quiet-action] [data-row-action]) > dt {
+  display: none;
+}
+
+/* A phone card's fact marked data-card-bare (Catalog's style) reads without
+   its column label, since the value names itself. */
+[data-slot="item"] dl > div:has(> dd > [data-card-bare]) > dt {
+  display: none;
+}
+
+/* A phone card's fact marked data-card-end (Catalog's COLA) sits at the right
+   end of its line, the same place on every card. */
+[data-slot="item"] dl > div:has(> dd > [data-card-end]) {
+  margin-left: auto;
+}
+
 /* A quiet field (a Price groups cell) reads as a number in its table: it
    takes the field fill when its row is hovered or focused. Touch has no
    hover, so there it keeps the fill. The extra attribute outranks the fill

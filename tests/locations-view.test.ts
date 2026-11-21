@@ -158,9 +158,10 @@ describe("Location detail", () => {
     expect(html).toContain(BINS_NOTE);
   });
 
-  it("the read-only detail explains bins above its Bins section (#1148)", () => {
+  it("the read-only detail explains bins behind the title's ⓘ, not in a box (#1148)", () => {
     const html = htmlOf(createElement(LocationView, { model: toLocationViewProps(locationTaproom), readOnly: true }));
-    expect(html).toContain(BINS_NOTE);
+    expect(html).toMatch(/<\/h1><button[^>]*aria-label="About this page"/);
+    expect(html).not.toContain(BINS_NOTE);
   });
 
   it("the inventory drawing paints the same location fields the live dialog mounts", () => {

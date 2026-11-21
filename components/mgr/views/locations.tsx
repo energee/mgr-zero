@@ -27,8 +27,7 @@ export function LocationsView({
 }) {
   return (
     <>
-      {E.back(backLabel, "Locations", createAction !== undefined ? createAction : E.btn("Add location"), model.backHref)}
-      {E.info("Locations cannot be deleted or archived; an admin can rename one or change its uses.")}
+      {E.back(backLabel, "Locations", createAction !== undefined ? createAction : E.btn("Add location"), model.backHref, undefined, E.help("Locations cannot be deleted or archived; an admin can rename one or change its uses."))}
       {model.empty
         ? E.blank(model.empty)
         : model.rows.map((row) => (

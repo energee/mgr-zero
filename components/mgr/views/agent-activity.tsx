@@ -9,8 +9,7 @@ export function AgentActivityView({ rows, backHref }: {
   backHref?: string;
 }) {
   return <>
-    {E.back("Settings", "Agent activity", undefined, backHref)}
-    {E.info("What agents and Ask MGR did here. It records names and outcomes, never what was read or typed, and lasts 90 days.")}
+    {E.back("Settings", "Agent activity", undefined, backHref, undefined, E.help("What agents and Ask MGR did here. It records names and outcomes, never what was read or typed, and lasts 90 days."))}
     {rows.length
       ? rows.map(row => <div key={row.id}>{E.nav(row.title, row.detail, "", undefined, row.href, "Agent session")}</div>)
       : E.blank("No agent activity yet.")}
