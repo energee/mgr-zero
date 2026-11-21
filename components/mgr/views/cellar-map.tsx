@@ -21,12 +21,12 @@ import type { CellarMapViewModel } from "@/lib/mgr/cellar-map-view";
 
 type Tile = CellarMapViewModel["tiles"][number];
 
-/** A tank's reading link, one quiet word on the ABV line: Add reading, or a muted ✓ Today once it has today's reading. Either opens Reading, so a second reading stays one tap away. `linkClassName` styles the link; without it (a tile) the word gets a 48px tap area. */
+/** A tank's reading link, one quiet word on the ABV line: Add reading, or a muted ✓ Today once it has today's reading. Either opens Reading, so a second reading stays one tap away. `linkClassName` styles the link; without it (a tile) the word gets a 48px tap area on a touch screen, reaching down, away from the tank's own link. */
 const readingLink = (tile: Tile, linkClassName?: string): ReactNode => {
   const label = tile.readToday
     ? <><span aria-hidden="true">✓ </span>Today<span className="sr-only">: read. Add another reading for {tile.name}</span></>
     : <>Add reading<span className="sr-only"> for {tile.name}</span></>;
-  const className = cn("whitespace-nowrap text-sm", tile.readToday ? "text-muted-foreground" : "text-primary", linkClassName ?? TOUCH_HIT);
+  const className = cn("whitespace-nowrap text-sm", tile.readToday ? "text-muted-foreground" : "text-primary", linkClassName ?? cn(TOUCH_HIT, "pointer-coarse:after:-top-0.5 pointer-coarse:after:-bottom-6.5"));
   return tile.readingHref
     ? <Link href={tile.readingHref} prefetch={rowLinkPrefetch(tile.readingHref)} data-tap data-to="Fermentation reading" className={className}>{label}</Link>
     : <span className={className}>{label}</span>;

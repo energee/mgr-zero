@@ -309,7 +309,9 @@
    to the shadcn data-slot hooks so components/ui stays untouched. A button is
    matched by its class, not its slot: a trigger rendered asChild (a sheet,
    dialog or pagination link) swaps the button's data-slot. Tab strips and
-   fold-out lines (<summary>) take the same floor. */
+   fold-out lines (<summary>) take the same floor. A button or tab strip
+   inside a field, and a calendar's month arrows, keep their own size: the
+   field is already 48px, and the arrows must line up with the month name. */
 @media (pointer: coarse) {
   .group\/button,
   [data-slot="input"],
@@ -331,6 +333,12 @@
   .group\/button[data-variant="irreversible"],
   .group\/button[data-variant="destructive"] {
     min-height: 56px;
+  }
+  .group\/button[data-slot="input-group-button"],
+  [data-slot="input-group"] [data-slot="tabs-list"],
+  .group\/button[class*="rdp-button_"] {
+    min-height: 0;
+    min-width: 0;
   }
 }
 

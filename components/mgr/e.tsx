@@ -100,8 +100,9 @@ const TAP_ROW = "has-[[data-tap]]:cursor-pointer has-[[data-tap]]:select-none ha
 /** Opt in for primary row navigation, never a destructive action. Translation
  *  would make the pressed link its cover's containing block instead of the row. */
 export const ROW_LINK_COVER = "after:absolute after:inset-0 active:not-aria-[haspopup]:translate-none";
-/** A small text link's tap area, padded out to 48px tall without moving the text (the Switch does the same). */
-export const TOUCH_HIT = "relative after:absolute after:-inset-x-3 after:-inset-y-4";
+/** A small text link's tap area on a touch screen, widened without moving the text (the Switch does the same).
+ *  The caller adds the vertical reach, toward the side with no other link or text to cover. */
+export const TOUCH_HIT = "relative pointer-coarse:after:absolute pointer-coarse:after:-inset-x-3";
 
 /** Keys the fields itself, so callers pass bare elements. The index is the
  *  identity because a field group is a fixed, ordered list — never reordered,
@@ -184,7 +185,7 @@ export const E = {
   back: (to: React.ReactNode, title: React.ReactNode, action?: React.ReactNode, href = "#", screen?: string) => {
     const head = (
       <div className="flex flex-col gap-1">
-        <Link href={href} prefetch={rowLinkPrefetch(href)} data-to={screen} className={cn("inline-flex items-center gap-1 text-xs text-muted-foreground", TOUCH_HIT)}><Icon icon={ArrowLeft01Icon} />{to}</Link>
+        <Link href={href} prefetch={rowLinkPrefetch(href)} data-to={screen} className={cn("inline-flex items-center gap-1 text-xs text-muted-foreground", TOUCH_HIT, "pointer-coarse:after:-top-4 pointer-coarse:after:-bottom-1")}><Icon icon={ArrowLeft01Icon} />{to}</Link>
         <h1 className="text-lg font-semibold">{title}</h1>
       </div>
     );
@@ -318,9 +319,10 @@ export const E = {
     </ToggleGroup>
   ),
   /** Commit; CommandForm lifts this out of the scroll region so the verb stays on the phone.
-   *  Stacked on the phone, right-aligned on the desk — same as CommandFormFooter. */
-  pin: (t: React.ReactNode) => (
-    <div data-pin className="flex flex-col gap-2 md:flex-row md:justify-end">
+   *  Stacked on the phone, right-aligned on the desk — same as CommandFormFooter.
+   *  `className` adjusts the row for one form (READING_PIN). */
+  pin: (t: React.ReactNode, className?: string) => (
+    <div data-pin className={cn("flex flex-col gap-2 md:flex-row md:justify-end", className)}>
       {t}
     </div>
   ),

@@ -76,7 +76,7 @@ export function FermentationReadingView({
           {E.edit(`Observed at (${timeZone})`, values.observedAt, "datetime-local", undefined, { ...field("observedAt"), id: "fr-observed", step: "1", required: true })}
         </details>
         {/* Each prior value is its field's placeholder: a reference, never a typed value (#1508).
-            A live sheet opens on Temperature, the one required value; an inventory frame takes no focus. */}
+            A live sheet opens on Temperature, the first value to type; an inventory frame takes no focus. */}
         {E.edit("Temperature (°F)", values.tempF, "number", undefined, { ...field("tempF"), id: "fr-temp", autoFocus: Boolean(onChange), required: true, ...READING_BOUNDS.tempF, placeholder: prior?.tempF && `Prior ${prior.tempF}`, error: values.tempF ? errors.tempF : undefined })}
         <div className="flex flex-col gap-2">
           {/* A phone's decimal keypad has no minus key, and a negative °P is valid, so °P gets the full keyboard. */}
@@ -94,6 +94,10 @@ export function FermentationReadingView({
     </form>
   );
 }
+
+/** E.pin's class for these actions: on a desk row the "Still needed" line sits on its own line above the two buttons,
+ *  not squeezed between them. */
+export const READING_PIN = "md:flex-wrap md:[&>p]:order-first md:[&>p]:basis-full md:[&>p]:text-right";
 
 /** `next` adds Save and next tank, a second submit named "next" that saves and opens the next occupied tank's reading
  *  in the Cellar map's tile order (#1508); the caller passes it only when such a tank exists. */
