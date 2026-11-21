@@ -94,7 +94,7 @@ import { CustomersView } from "@/components/mgr/views/customers";
 import { DeniedView } from "@/components/mgr/views/denied";
 import { EntryView } from "@/components/mgr/views/entry";
 import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
-import { FermentationReadingActionsView, FermentationReadingView, readingIdentity } from "@/components/mgr/views/fermentation-reading";
+import { FermentationReadingActionsView, FermentationReadingView, READING_PIN, readingIdentity } from "@/components/mgr/views/fermentation-reading";
 import { FirstRunView } from "@/components/mgr/views/first-run";
 import { AccountingFixture, CatalogCategoriesFixture, ConfirmDeliveryFixture, FormatFixture, ReceiptFixture, RefusedReturnFixture, ResetPasswordFixture, RouteErrorFixture, TransferDetailFixture, WeeklyCountFixture } from "@/components/mgr/fixture-adapters";
 import { FormatView } from "@/components/mgr/views/format";
@@ -1938,7 +1938,7 @@ export const SCREENS: Screen[] = [
       const values = { observedAt: "2026-09-10T08:10:00", tempF: "68.2", gravity: "1.019", ph: "", note: "" };
       return <>
         <FermentationReadingView formId={formId} values={values} identity={readingIdentity({ vessel_name: "FV3", batch_no: 416, brand_name: "Hazy IPA" })} unit="sg" timeZone="America/New_York" prior={{ tempF: "67.8", gravity: "1.021", ph: "4.21" }} />
-        {E.pin(<FermentationReadingActionsView formId={formId} values={values} unit="sg" next />)}
+        {E.pin(<FermentationReadingActionsView formId={formId} values={values} unit="sg" next />, READING_PIN)}
       </>;
     })(),
   },
