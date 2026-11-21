@@ -1,5 +1,5 @@
 // lib/mgr/recipes-view.ts — view-model for the Recipes list. Each row is a
-// recipe's name and its brand (null: none yet), one RecordTable column each,
+// recipe's name, its brand (null: none yet) and the day it was added, one RecordTable column each,
 // and whether its sheet has been written: a recipe saved by name alone is not
 // written yet. The list never names a version. `backHref`, `createHref` and
 // `waterProfilesHref` are the live destinations of the More back, New recipe
@@ -13,6 +13,8 @@ export type RecipesRowView = {
   /** False until the recipe's sheet has been saved once (list_recipes' latest_version is null). */
   written: boolean;
   brand: string | null;
+  /** The day the recipe was added, printed ("Nov 3, 2026") so the Added header sorts it as a date. */
+  added: string;
   href: string;
 };
 
@@ -28,7 +30,7 @@ export type RecipesSnapshot = {
   backHref?: string;
   createHref?: string;
   waterProfilesHref?: string;
-  recipes: { id: string; name: string; brand?: string | null; latest_version: number | null }[];
+  recipes: { id: string; name: string; brand?: string | null; latest_version: number | null; added: string }[];
   /** A search is on, so an empty list means no match, not no recipes. */
   filtered?: boolean;
 };
@@ -43,6 +45,6 @@ export function toRecipesViewProps(s: RecipesSnapshot): RecipesViewModel {
     createHref,
     waterProfilesHref,
     empty: recipes.length > 0 ? undefined : s.filtered ? NO_MATCH : NO_RECIPES,
-    rows: recipes.map((r) => ({ key: r.id, name: r.name, written: r.latest_version !== null, brand: r.brand ?? null, href: `/recipes/${r.id}` })),
+    rows: recipes.map((r) => ({ key: r.id, name: r.name, written: r.latest_version !== null, brand: r.brand ?? null, added: r.added, href: `/recipes/${r.id}` })),
   };
 }

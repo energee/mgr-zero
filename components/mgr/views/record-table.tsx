@@ -17,7 +17,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from "@/components/ui/item";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
-import { SortHead, useSortedRows } from "@/components/mgr/sort-head";
+import { SortHead, useSortedRows, type DefaultSort } from "@/components/mgr/sort-head";
 import { cellSortValue, PRINTED_DATE, unwrapLazy, type SortValue } from "@/lib/mgr/table-sort";
 import { rowLinkPrefetch } from "@/lib/mgr/row-link-prefetch";
 import { cn } from "@/lib/utils";
@@ -94,7 +94,7 @@ function name(row: RecordTableRow) {
       : <Button variant="link" type="button" data-tap data-to={row.to} className={cn(cls, "h-auto p-0 text-foreground")}>{row.cells[0]}</Button>;
 }
 
-export function RecordTable({ headers, align, rows: given, sortable = true }: {
+export function RecordTable({ headers, align, rows: given, sortable = true, defaultSort }: {
   headers: ReactNode[];
   /** Per column of the table, header and cells alike: "l" for text, "r" for
    *  numbers. The phone list starts every value at the left. */
@@ -102,8 +102,10 @@ export function RecordTable({ headers, align, rows: given, sortable = true }: {
   rows: RecordTableRow[];
   /** False keeps the rows in the given order with plain headers. */
   sortable?: boolean;
+  /** The column the table opens sorted by until a header is clicked; its arrow shows from the first paint. */
+  defaultSort?: DefaultSort;
 }) {
-  const { rows, columns } = useSortedRows(headers, given, recordSortValue, sortable);
+  const { rows, columns } = useSortedRows(headers, given, recordSortValue, sortable, defaultSort);
   return (
     <>
       <div className="hidden md:block">

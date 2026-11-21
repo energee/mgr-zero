@@ -89,6 +89,17 @@ it("draws a header with text cells as a sort button, unsorted until clicked", ()
   }
 });
 
+it("draws a default sort as that header's arrow and orders the rows by it on the first paint", () => {
+  const out = renderToStaticMarkup(createElement(RecordTable, {
+    headers: ["Name", "Added"], align: ["l", "l"], defaultSort: { column: 1, desc: true },
+    rows: [{ key: "a", cells: ["Old", "Aug 18, 2026"] }, { key: "b", cells: ["New", "Nov 12, 2026"] }],
+  }));
+  const [name, added] = heads(out);
+  expect(name).toContain('aria-sort="none"');
+  expect(added).toContain('aria-sort="descending"');
+  expect(out.indexOf("New")).toBeLessThan(out.indexOf("Old"));
+});
+
 it("gives a column with nothing to sort (empty or component cells) a plain header", () => {
   const Comp = () => createElement("span", null, "3 kegs");
   const out = heads(renderToStaticMarkup(createElement(RecordTable, {
