@@ -236,7 +236,7 @@ it("passes the Customers search to list_customers and keeps ?missingEmail in the
   expect(html).toContain('name="missingEmail" value="1"');
 });
 it.each([
-  ["list_recipes", RecipesPage, { q: "west" }, "No recipes match"],
+  ["list_recipes", RecipesPage, { q: "west", sort: "newest" }, "No recipes match"],
   ["list_vendors_and_contracts", VendorsPage, { q: "west" }, "No vendors match"],
   ["list_materials", MaterialsPage, { includeInactive: true, q: "west" }, "No materials match"],
 ] as const)("passes the search to %s and says nothing matches", async (name, Page, input, empty) => {

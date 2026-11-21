@@ -125,6 +125,14 @@ describe("recipes and immutable versions", () => {
     expect(await names("nothing")).toEqual([]);
   });
 
+  it("list_recipes sort newest lists the most recently added recipe first, alphabetical by default", async () => {
+    const own = await makeStaffCtx((await makeBrewery()).id, "brewer");
+    for (const name of ["Bock", "Amber", "Cream ale"]) await runCommand("create_recipe", { name }, own);
+    const names = async (input: object) => ((await runCommand("list_recipes", input, own)) as { name: string }[]).map((r) => r.name);
+    expect(await names({ sort: "newest" })).toEqual(["Cream ale", "Amber", "Bock"]);
+    expect(await names({})).toEqual(["Amber", "Bock", "Cream ale"]);
+  });
+
   it("list_recipes q treats * as literal text (#1029)", async () => {
     const own = await makeStaffCtx((await makeBrewery()).id, "brewer");
     for (const name of ["Plain Pils", "Star*Gazer"]) await runCommand("create_recipe", { name }, own);

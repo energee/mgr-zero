@@ -210,12 +210,16 @@ defineCommand({
 // Each recipe carries its latest version (id and number): schedule_batch names
 // a *version*, so the batch picker needs it without a get_recipe per recipe.
 defineQuery({
-  name: "list_recipes", description: "Recipes, alphabetical, with the brand each one brews and its latest version; optionally only those whose name contains q",
-  input: z.object({ q: z.string().trim().max(100).optional().describe("Only recipes whose name contains this text") }), roles: ["admin", "brewer"],
+  name: "list_recipes", description: "Recipes, alphabetical unless sorted newest first, with the brand each one brews, when it was added (created_at) and its latest version; optionally only those whose name contains q",
+  input: z.object({
+    q: z.string().trim().max(100).optional().describe("Only recipes whose name contains this text"),
+    sort: z.enum(["name", "newest"]).optional().describe("newest: most recently added first; default name"),
+  }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {
     let query = ctx.db.from("recipes").select("id, name, brand_id, note, created_at").eq("brewery_id", ctx.breweryId);
     if (i.q) query = query.regexIMatch("name", escapeRegex(i.q));
-    const recipes = (await unwrap(query.order("name"))) ?? [];
+    if (i.sort === "newest") query = query.order("created_at", { ascending: false });
+    const recipes = (await unwrap(query.order("name"))) ?? []; // name orders the list, or breaks ties in newest
     if (recipes.length === 0) return [];
     const versions = (await unwrap(ctx.db.from("recipe_versions").select("id, recipe_id, version")
       .in("recipe_id", recipes.map((r) => r.id as string)).order("version", { ascending: false }))) ?? [];

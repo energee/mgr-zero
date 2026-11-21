@@ -237,9 +237,9 @@ const recipeBrandOptions = [{ id: "hazy", name: "Hazy IPA" }, { id: "pils", name
 /** list_recipes rows, drawn by the live adapter: two written recipes, and one saved by name with no sheet yet. */
 export const recipesList: RecipesSnapshot = {
   recipes: [
-    { id: "hazy", name: "Hazy IPA", brand: "Hazy IPA", latest_version: 4 },
-    { id: "pils", name: "Pils", brand: "Pils", latest_version: 3 },
-    { id: "saison", name: "Farmhouse saison", brand: null, latest_version: null },
+    { id: "saison", name: "Farmhouse saison", brand: null, latest_version: null, added: "Nov 12, 2026" },
+    { id: "hazy", name: "Hazy IPA", brand: "Hazy IPA", latest_version: 4, added: "Oct 2, 2026" },
+    { id: "pils", name: "Pils", brand: "Pils", latest_version: 3, added: "Aug 18, 2026" },
   ],
 };
 
