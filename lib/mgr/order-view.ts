@@ -3,6 +3,7 @@ import { sentenceCase } from "./labels";
 // inventory mock and for get_order. Mapping lives here so the page does not
 // compose a second E.* tree. It also owns the order's price summary: line
 // amounts and the before-tax order amount, from the order's own frozen facts.
+import { lineLabel, type BrandedSku } from "./brand-lines";
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { shipToLine } from "./ship-to-view";
@@ -12,10 +13,14 @@ import { stagedQty } from "./put-back-view";
 import type { OrderCogs } from "@/lib/commands/orders";
 import type { PriceSummaryModel } from "@/components/mgr/views/price-summary";
 import { plural } from "./plural";
+import { palletFit, type PalletFitGroup } from "./pallet-fit";
 
 export type OrderLineView = {
   key: string;
+  /** "Brand · Format" (lineLabel), or the SKU name when the read has no brand and format. */
   name: string;
+  /** The brand's alias, drawn muted under the name. */
+  alias?: string;
   /** Display quantities: a decimal stays a decimal, null reads "Not recorded" (never 0). */
   ordered: string;
   picked: string;
@@ -68,7 +73,13 @@ export type OrderViewModel = {
   kegCharges: { key: string; name: string; detail: string; amount: string }[];
   /** `by` names the actor when the page passed actorNames. */
   events: { key: string; at: string; event: string; by?: string; detail: string }[];
+  /** Advisory pallet units of the ordered lines, for loading. Empty once shipped
+   *  or cancelled (nothing is left to load), or when no format has a fit. */
+  palletFit: PalletFitGroup[];
 };
+
+/** get_order's SKU on a line: BrandedSku, whose format also carries its package facts and pallet fit (absent reads as no fit). */
+type OrderLineSku = (NonNullable<BrandedSku> & { formats?: { name: string; package_type?: string | null; keg_size?: string | null; units_per_case?: number | null; pallet_fit?: number | null } | null }) | null;
 
 export type OrderSnapshot = {
   backHref?: string;
@@ -108,7 +119,8 @@ export type OrderSnapshot = {
     short_reason?: string | null;
     /** A one-way keg line's channel fee, set when the line is saved and fixed once the order is submitted (order_lines.one_way_fee_cents). */
     one_way_fee_cents?: number | null;
-    skus: { name: string } | null;
+    /** A brand and format read name the line (lineLabel); formats also carries the package facts and pallet fit get_order embeds. */
+    skus: OrderLineSku;
   }[];
   /** order_deposit_lines, one per returnable keg line. */
   deposits?: { order_line_id: string; description: string; qty_ordered: number; unit_price_cents: number; amount_cents: number }[];
@@ -217,7 +229,7 @@ function restockNoteFor(order: OrderSnapshot["order"], lines: OrderSnapshot["lin
   if (!order.needs_restock) return undefined;
   const bits = lines.flatMap((l) => {
     const extra = stagedQty(order.status, l);
-    return extra > 0 ? [`${extra} ${l.skus?.name ?? "line"}`] : [];
+    return extra > 0 ? [`${extra} ${lineLabel(l.skus).name}`] : [];
   });
   if (!bits.length) return "Staged beer stayed on the floor after this order changed.";
   return `Put back ${bits.join(", ")}. They stayed staged after the order changed.`;
@@ -255,8 +267,8 @@ function emailStatusLine(statuses: NonNullable<OrderSnapshot["emailStatuses"]>):
  *  fixture snapshot through this same function. */
 export function toOrderViewProps({ order, lines, events, atp, locations, deliveryOutcome, invoice, backHref, timeZone, cogs, deposits, actorNames, emailStatuses }: OrderSnapshot): OrderViewModel {
   const atpMap = new Map(atp.map((a) => [a.sku_id, Number(a.qty)]));
-  const skuNames = new Map(lines.map((l) => [l.sku_id, l.skus?.name ?? "line"]));
-  const lineNames = new Map(lines.map((l) => [l.id, l.skus?.name ?? "Line"]));
+  const skuNames = new Map(lines.map((l) => [l.sku_id, lineLabel(l.skus).name]));
+  const lineNames = new Map(lines.map((l) => [l.id, lineLabel(l.skus).name]));
   const source = order.from_location_id ? locations?.find((l) => l.id === order.from_location_id)?.name : undefined;
   const state = shownState(order.status, order.needs_restock, deliveryOutcome ?? null, Boolean(order.pickup));
   const shipTo = order.pickup ? "Pickup" : order.ship_tos ? shipToLine(order.ship_tos) : undefined;
@@ -296,7 +308,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, deliver
       const qtyAtp = atpMap.get(l.sku_id);
       return {
         key: l.id,
-        name: l.skus?.name ?? "Line",
+        ...lineLabel(l.skus),
         ordered: qtyText(ordered),
         picked: qtyText(picked),
         shipped: qtyText(shipped),
@@ -310,7 +322,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, deliver
     kegCharges: [
       ...(deposits ?? []).map((d) => ({ key: `deposit-${d.order_line_id}`, name: `${d.description} · ${lineNames.get(d.order_line_id) ?? "Line"}`,
         detail: `${Number(d.qty_ordered)} × ${money(d.unit_price_cents)} · captured on the order`, amount: money(Number(d.amount_cents)) })),
-      ...lines.filter((l) => l.one_way_fee_cents).map((l) => ({ key: `fee-${l.id}`, name: `One-way keg fee · ${l.skus?.name ?? "Line"}`,
+      ...lines.filter((l) => l.one_way_fee_cents).map((l) => ({ key: `fee-${l.id}`, name: `One-way keg fee · ${lineLabel(l.skus).name}`,
         detail: `${Number(l.qty_ordered)} × ${money(l.one_way_fee_cents!)} · captured on the order`, amount: money(orderLineCents(l.qty_ordered, l.one_way_fee_cents!)) })),
     ],
     events: events.map((e) => {
@@ -333,5 +345,9 @@ export function toOrderViewProps({ order, lines, events, atp, locations, deliver
         detail,
       };
     }),
+    palletFit: order.status === "shipped" || order.status === "cancelled" ? [] : palletFit(lines.map((l) => {
+      const f = l.skus?.formats;
+      return { qty: Number(l.qty_ordered), packageType: f?.package_type ?? null, kegSize: f?.keg_size ?? null, unitsPerCase: f?.units_per_case ?? null, palletFit: f?.pallet_fit ?? null };
+    })),
   };
 }

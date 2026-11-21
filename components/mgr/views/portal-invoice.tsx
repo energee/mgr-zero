@@ -3,6 +3,7 @@
 // payment control without an active submission target.
 import { type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { BrandedName } from "@/components/mgr/views/branded-name";
 import { portalInvoiceStatusTone, type PortalInvoiceViewModel } from "@/lib/mgr/portal-invoice-view";
 
 export type PortalInvoiceVariant = "pay" | "unavailable" | "paid";
@@ -49,7 +50,7 @@ export function PortalInvoiceView({
             {model.due ? E.row("Due", model.due) : null}
           </>
         ) : null}
-      {E.tbl(["Item", "Qty", "Amount"], model.lines.map((l) => [l.item, l.qty, l.amount]), ["l", "r", "r"])}
+      {E.tbl(["Item", "Qty", "Amount"], model.lines.map((l) => [<BrandedName key="item" name={l.item} alias={l.alias} />, l.qty, l.amount]), ["l", "r", "r"])}
       {kind === "pay" ? (
         <>
           {E.info("Pay by card or bank transfer through QuickBooks. You will not need an account.")}

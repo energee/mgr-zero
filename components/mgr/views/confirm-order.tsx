@@ -46,7 +46,7 @@ export function ConfirmOrderView({
         ? E.pick("Fulfillment source", model.fulfillmentSource ?? "", fulfillmentOptions)
         : model.fulfillmentSource ? E.fld("Fulfillment source", model.fulfillmentSource) : null}
       {model.lines.map((line, i) => (
-        <Fragment key={line.key}>{startsGroup(model.lines, i) ? E.group(line.group) : null}{E.row(line.name, line.detail, <div className="w-32"><OrderQuantity label={`${line.group ? `${line.group} ` : ""}${line.name} quantity`} value={quantities?.[line.key] ?? line.qty} readOnly={readOnly} onChange={onQuantity && (value => onQuantity(line.key, value))} /></div>, line.tone ?? "")}</Fragment>
+        <Fragment key={line.key}>{startsGroup(model.lines, i) ? <>{E.group(line.group)}{line.alias ? <p className="-mt-1 text-xs text-muted-foreground">{line.alias}</p> : null}</> : null}{E.row(line.name, line.detail, <div className="w-32"><OrderQuantity label={`${line.group ? `${line.group} ` : ""}${line.name} quantity`} value={quantities?.[line.key] ?? line.qty} readOnly={readOnly} onChange={onQuantity && (value => onQuantity(line.key, value))} /></div>, line.tone ?? "")}</Fragment>
       ))}
       {model.shortageNote ? E.note(model.shortageNote) : null}
       {complianceNote ? E.note(complianceNote) : null}

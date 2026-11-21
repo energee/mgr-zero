@@ -3,6 +3,7 @@
 // picked stock transfer (locations spec Decision 4). save_route writes the
 // header and replaces the stops in one RPC; confirm_delivery stays in
 // orders.ts (Program 1) and stamps transfer stops without invoicing.
+import { lineLabel, type BrandedSku } from "@/lib/mgr/brand-lines";
 import { z } from "zod";
 import { docNo, trfNo } from "@/lib/mgr/doc-no";
 import { hasAnyRole } from "@/lib/mgr/roles";
@@ -108,7 +109,7 @@ defineQuery({
 });
 
 defineQuery({
-  name: "get_delivery_stop", description: "One delivery stop: route, ship-to or destination, its lines (shipped or picked quantities), invoice timing, whether it is signed, and the names that signed earlier deliveries to its ship-to, newest first",
+  name: "get_delivery_stop", description: "One delivery stop: route, ship-to or destination, its lines (shipped or picked quantities; an order line is named Brand · Format with its brand's alias apart), invoice timing, whether it is signed, and the names that signed earlier deliveries to its ship-to, newest first",
   roles: [...READ],
   input: z.object({ deliveryId: z.string().uuid().describe("The delivery stop to read") }),
   handler: async (ctx, i) => {
@@ -121,7 +122,7 @@ defineQuery({
     if (shipments) {
       const shipToId = shipments.orders.ship_to_id;
       const [lines, invoice, signed] = await Promise.all([
-        rows<{ id: string; qty_shipped: number; qty_refused: number; skus: { name: string } | null }>(ctx.db.from("order_lines").select("id, qty_shipped, qty_refused, skus(name)").eq("order_id", shipments.orders.id).gt("qty_shipped", 0)),
+        rows<{ id: string; qty_shipped: number; qty_refused: number; skus: BrandedSku }>(ctx.db.from("order_lines").select("id, qty_shipped, qty_refused, skus(name, brands(name, alias), formats(name))").eq("order_id", shipments.orders.id).gt("qty_shipped", 0)),
         unwrap(ctx.db.from("invoices").select("id, invoice_no").eq("shipment_id", shipments.id).eq("kind", "invoice").maybeSingle()),
         // Received by suggestions (#1505): the latest signatures at this ship-to; 50 is ample for a handful of names.
         shipToId ? rows<{ signed_by: string }>(ctx.db.from("deliveries").select("signed_by, shipments!inner(orders!inner(ship_to_id))")
@@ -129,7 +130,7 @@ defineQuery({
           .order("delivered_at", { ascending: false }).limit(50)) : [],
       ]);
       const signers = [...new Set(signed.map((d) => d.signed_by))];
-      return { delivery, lines: lines.map((l) => ({ id: l.id, name: l.skus?.name ?? "Line", qty: Number(l.qty_shipped), refused: Number(l.qty_refused) })), invoice, signers };
+      return { delivery, lines: lines.map((l) => ({ id: l.id, ...lineLabel(l.skus), qty: Number(l.qty_shipped), refused: Number(l.qty_refused) })), invoice, signers };
     }
     const picked = await rows<{ id: string; qty_picked: number | null; skus: { name: string } | null; materials: { name: string } | null; keg_pools: { name: string } | null }>(
       ctx.db.from("stock_transfer_lines").select("id, qty_picked, skus(name), materials(name), keg_pools(name)").eq("transfer_id", stock_transfers!.id));

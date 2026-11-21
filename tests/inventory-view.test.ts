@@ -326,3 +326,18 @@ describe("Reverse movement view", () => {
     expect(body.props.model).toEqual(toReverseMovementViewProps(reverseMovementAdjustment));
   });
 });
+
+describe("finished goods brand alias", () => {
+  const aliased = { id: "s-lion", name: "Animal #33 · Case", brands: { name: "White Lion", alias: "Animal #33" }, on_hand: 4, atp: 4 };
+
+  it("heads an aliased brand's rows with the brand and its alias, and names the row by what is left", () => {
+    const model = toFinishedGoodsViewProps({ skus: [aliased] });
+    expect(model.rows[0]).toMatchObject({ name: "Case", group: { brand: "White Lion · Animal #33" } });
+    expect(htmlOf(createElement(FinishedGoodsView, { model, movements: { rows: [] } }))).toContain("White Lion · Animal #33");
+  });
+
+  it("heads a brand without an alias by its name alone", () => {
+    const model = toFinishedGoodsViewProps({ skus: [{ ...aliased, brands: { name: "Pils" }, name: "Case" }] });
+    expect(model.rows[0]).toMatchObject({ name: "Case", group: { brand: "Pils" } });
+  });
+});

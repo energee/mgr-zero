@@ -135,7 +135,7 @@ export function BrandView({
             // Staff-only: list_brands and SKU search match it; Catalog notes it under the name, pickers beside it. Never on the portal, Square or SKU names.
             <div className="flex min-w-0 flex-col gap-2">
               {E.edit("Alias", model.alias, "text", undefined, { id: "brand-alias", onChange: controls.alias, "aria-describedby": "brand-alias-help" })}
-              <FieldDescription id="brand-alias-help">An informal name staff use, such as a series number. Search finds it; buyers never see it.</FieldDescription>
+              <FieldDescription id="brand-alias-help">An informal name, such as a series number. Search finds it; buyers see it under the brand name in the portal.</FieldDescription>
             </div>,
           )}
           {/* Four short facts share a row once the column is wide enough, two by

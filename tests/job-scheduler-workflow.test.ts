@@ -13,8 +13,9 @@ type Workflow = { on: { schedule: { cron: string }[]; workflow_dispatch?: unknow
 const workflow = load(readFileSync(".github/workflows/hosted-jobs.yml", "utf8")) as Workflow;
 
 describe("hosted jobs workflow", () => {
-  it("runs order email every 5 minutes, retention daily and agent friction weekly, and can be run by hand", () => {
-    expect(workflow.on.schedule.map((s) => s.cron)).toEqual(["*/5 * * * *", "17 7 * * *", "41 8 * * 1"]);
+  it("runs order email every 5 minutes, retention and the release digest daily and agent friction weekly, and can be run by hand", () => {
+    expect(workflow.on.schedule.map((s) => s.cron)).toEqual(["*/5 * * * *", "17 7 * * *", "41 8 * * 1", "7 13 * * *"]);
+    expect(workflow.jobs["release-digest"].if).toContain("'7 13 * * *'");
     expect(workflow.jobs["agent-friction"].if).toContain("'41 8 * * 1'");
     expect(workflow.on).toHaveProperty("workflow_dispatch");
     expect(workflow.jobs["order-email"].if).toContain("'*/5 * * * *'");
@@ -24,6 +25,8 @@ describe("hosted jobs workflow", () => {
   it("POSTs each route with its own secret and fails the run on a non-2xx", () => {
     for (const [job, path, secret] of [
       ["order-email", "/api/email/jobs/deliver", "ORDER_EMAIL_JOB_SECRET"],
+      // The digest only queues mail for the order email job, so it shares that job's secret.
+      ["release-digest", "/api/email/jobs/digest", "ORDER_EMAIL_JOB_SECRET"],
       ["retention", "/api/retention/jobs/prune", "RETENTION_JOB_SECRET"],
       ["agent-friction", "/api/agents/jobs/friction", "AGENT_FRICTION_JOB_SECRET"],
     ] as const) {

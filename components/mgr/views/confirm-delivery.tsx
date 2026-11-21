@@ -5,6 +5,7 @@
 
 import { Fragment, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { BrandedName } from "@/components/mgr/views/branded-name";
 import { CommandFormFooter } from "@/components/mgr/command-form";
 import { IRREVERSIBLE } from "@/components/mgr/irreversible-submit";
 import { deliveryOutcomeState, type ConfirmDeliveryViewModel } from "@/lib/mgr/confirm-delivery-view";
@@ -55,7 +56,7 @@ export function ConfirmDeliveryView({
       {missingAddress.length > 0 && E.note(`${missingAddress.join(" · ")}. Confirm the destination before travelling.`, "alert")}
       {E.fld("Invoice timing", model.invoiceTiming)}
       {model.lines.map((row) => (
-        <Fragment key={row.key}>{E.row(row.title, "", row.qty)}</Fragment>
+        <Fragment key={row.key}>{E.row(<BrandedName name={row.title} alias={row.alias} />, "", row.qty)}</Fragment>
       ))}
       {readout ? <DeliveryReadoutView state={readout} /> : action ?? <DeliveryOutcomeForm lines={model.lines} initialSignedBy={model.receivedBy} receivedSuggestions={model.receivedSuggestions} />}
     </>

@@ -80,6 +80,16 @@ describe("portal offers", () => {
     expect(quote.lines.find((l) => l.skuId === sku.skuId)).toMatchObject({ releaseId: r.id });
   });
 
+  it("says which releases come from a planned batch, for the Shop Pre-order section", async () => {
+    const sku = await pricedSku("Planned Pils", 40);
+    const stock = await release({ lines: [{ skuId: sku.skuId, qty: 5 }] });
+    const planned = await release({ batchId: await planBatch(sku.brandId), shipsFrom: "2030-01-16", lines: [{ skuId: sku.skuId, qty: 30 }] });
+    const items = await runCommand("portal_catalog", {}, buyer) as { skuId: string; releases: { releaseId: string; fromBatch: boolean }[] }[];
+    const offers = items.find((i) => i.skuId === sku.skuId)!.releases;
+    expect(offers.find((o) => o.releaseId === stock.id)).toMatchObject({ fromBatch: false });
+    expect(offers.find((o) => o.releaseId === planned.id)).toMatchObject({ fromBatch: true });
+  });
+
   it("lowers the stock badge by what a stock release still claims", async () => {
     const sku = await pricedSku("Claimed Kolsch", 25);
     expect((await badges()).get(sku.skuId)).toBe("in");

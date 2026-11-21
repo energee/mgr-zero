@@ -4,6 +4,8 @@
 # so this POSTs the existing bearer-authenticated routes instead:
 #   - order email every 5 minutes (each call sends at most ten): retries, since
 #     confirm_order already sends a new confirmation right after it responds
+#   - release digest daily: it queues a brewery's weekly digest only on that brewery's chosen weekday,
+#     and the order email job above sends what it queues
 #   - retention prune daily (#766)
 #   - agent friction report weekly, which rewrites the "Agent friction" issue (#1766)
 # GitHub may delay or skip a scheduled run under load; the next run catches up.
@@ -19,6 +21,7 @@ on:
     - cron: '*/5 * * * *'
     - cron: '17 7 * * *'
     - cron: '41 8 * * 1'
+    - cron: '7 13 * * *'
   workflow_dispatch:
 
 permissions: {}
@@ -38,6 +41,18 @@ jobs:
         run: |
           [ -n "$MGR_URL" ] || { echo "::error::MGR_URL repository variable is required"; exit 1; }
           curl -sS --fail-with-body --location --max-redirs 0 --max-time 240 -X POST "$MGR_URL/api/email/jobs/deliver" -H "Authorization: Bearer $SECRET"
+
+  release-digest:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '7 13 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Queue the weekly release digest
+        env:
+          SECRET: ${{ secrets.ORDER_EMAIL_JOB_SECRET }}
+        run: |
+          [ -n "$MGR_URL" ] || { echo "::error::MGR_URL repository variable is required"; exit 1; }
+          curl -sS --fail-with-body --location --max-redirs 0 --max-time 240 -X POST "$MGR_URL/api/email/jobs/digest" -H "Authorization: Bearer $SECRET"
 
   retention:
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '17 7 * * *'

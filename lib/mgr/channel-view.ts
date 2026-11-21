@@ -27,6 +27,8 @@ export type ChannelViewModel = {
   taxHint?: string;
   /** The one-way keg fee in dollars ("10.00"); blank or 0 bills none. */
   oneWayKegFee: string;
+  /** Whether the channel's orders ship on pallets; false turns pallet advice off for its portal buyers. */
+  pallets: boolean;
 };
 
 export type ChannelSnapshot = {
@@ -34,10 +36,12 @@ export type ChannelSnapshot = {
   name: string;
   tax_treatment: string;
   one_way_keg_fee_cents: number;
+  /** Absent reads as true. */
+  pallets?: boolean;
 };
 
 /** Map one list_sale_channels row onto ChannelView. */
-export function toChannelViewProps({ name, tax_treatment, one_way_keg_fee_cents }: ChannelSnapshot): ChannelViewModel {
+export function toChannelViewProps({ name, tax_treatment, one_way_keg_fee_cents, pallets = true }: ChannelSnapshot): ChannelViewModel {
   const label = sentenceCase(tax_treatment);
   const taxIndex = CHANNEL_TAX_TREATMENTS.indexOf(label);
   return {
@@ -46,6 +50,7 @@ export function toChannelViewProps({ name, tax_treatment, one_way_keg_fee_cents 
     taxIndex: taxIndex < 0 ? 0 : taxIndex,
     taxHint: TAX_TREATMENT_HINTS[tax_treatment as TaxTreatment],
     oneWayKegFee: dollarsInput(one_way_keg_fee_cents),
+    pallets,
   };
 }
 

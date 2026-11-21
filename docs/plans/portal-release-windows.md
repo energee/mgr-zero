@@ -121,6 +121,10 @@ submit refuses a line on it. Stock offers are unchanged.
 
 ## Phase B: per-customer allocations (PR 2)
 
+**Superseded 2026-11-19 by `docs/plans/release-pool-and-ceilings.md`:** a batch
+release is now a pool in barrels, and customers have ceilings, not reserved
+amounts.
+
 **Deferred: owner does not need fairness between customers (2026-11-18).**
 Decision 11's release delay covers deprioritizing a customer. The design below
 is kept for reference only.

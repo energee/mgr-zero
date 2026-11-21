@@ -1,5 +1,6 @@
 "use client";
 
+import { lineLabel } from "@/lib/mgr/brand-lines";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCommandAction } from "@/lib/commands/use-command-form";
@@ -49,7 +50,7 @@ export function shipmentSourceNeeds(lines: ShippingSnapshot["lines"], qtys: Reco
   return lines.flatMap(line => {
     const quantity = Number(qtys[line.id]);
     if (!(quantity > 0)) return [];
-    const name = line.skus?.name ?? "Line";
+    const { name } = lineLabel(line.skus);
     const rows = allocations[line.id] ?? [];
     const missing: string[] = [];
     if (!available.stock.some(stock => stock.stock_id === line.sku_id)) missing.push(`recorded stock of ${name} in a bin at the ship-from location`);
@@ -90,7 +91,7 @@ export function ShipForm({ snapshot, available }: { snapshot: ShippingSnapshot; 
   // A pickup order ships invoiced now (ship_order refuses on_delivery for it); the model says which.
   const model = toShipViewProps(proposed);
   const sources = <ShipmentSourcesView lines={snapshot.lines.map(line => ({
-    key: line.id, name: line.skus?.name ?? "Line", qty: Number(qtys[line.id]),
+    key: line.id, name: lineLabel(line.skus).name, qty: Number(qtys[line.id]),
     options: available.stock.filter(stock => stock.stock_id === line.sku_id).map(stock => ({
       key: `${stock.bin_id}:${stock.lot_id ?? ""}`,
       label: `${available.bins.find(bin => bin.id === stock.bin_id)?.name ?? stock.bin_id} · ${stock.lot_code ?? "Untracked / legacy stock"} · ${stock.qty} available`,

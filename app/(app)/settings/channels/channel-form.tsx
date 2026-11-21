@@ -1,7 +1,7 @@
 // app/(app)/settings/channels/channel-form.tsx — CommandForm (bottom sheet on
 // phone, dialog on desk) over upsert_sale_channel. Doubles as create (no
 // `channel` prop, titled Add channel) and edit (`channel` pre-fills name,
-// treatment and one-way keg fee, the title names the saved channel, and the
+// treatment, one-way keg fee and pallets, the title names the saved channel, and the
 // input carries `id`).
 "use client";
 
@@ -13,13 +13,14 @@ import { useCommandAction } from "@/lib/commands/use-command-form";
 import { toChannelViewProps } from "@/lib/mgr/channel-view";
 import { dollarsInput, toCents } from "@/lib/mgr/money";
 
-export type SaleChannelEditData = { id: string; name: string; taxTreatment: string; oneWayKegFeeCents: number };
+export type SaleChannelEditData = { id: string; name: string; taxTreatment: string; oneWayKegFeeCents: number; pallets: boolean };
 
 export function ChannelForm({ channel }: { channel?: SaleChannelEditData }) {
   const isEdit = !!channel;
   const [name, setName] = useState(channel?.name ?? "");
   const [taxTreatment, setTaxTreatment] = useState<string>(channel?.taxTreatment ?? "taxable");
   const [fee, setFee] = useState(dollarsInput(channel?.oneWayKegFeeCents ?? 0));
+  const [pallets, setPallets] = useState(channel?.pallets ?? true);
   const [open, setOpenState] = useState(false);
   const action = useCommandAction();
   const nameError = action.error && action.failure?.code === "duplicate_channel_name" ? action.error : null;
@@ -29,6 +30,7 @@ export function ChannelForm({ channel }: { channel?: SaleChannelEditData }) {
     setName(channel?.name ?? "");
     setTaxTreatment(channel?.taxTreatment ?? "taxable");
     setFee(dollarsInput(channel?.oneWayKegFeeCents ?? 0));
+    setPallets(channel?.pallets ?? true);
     action.setError(null);
   }
 
@@ -37,7 +39,7 @@ export function ChannelForm({ channel }: { channel?: SaleChannelEditData }) {
     event.stopPropagation();
     if (action.busy || !name.trim()) return;
     await action.run("upsert_sale_channel", {
-      ...(isEdit ? { id: channel.id } : {}), name: name.trim(), taxTreatment, oneWayKegFeeCents: toCents(fee) ?? 0,
+      ...(isEdit ? { id: channel.id } : {}), name: name.trim(), taxTreatment, oneWayKegFeeCents: toCents(fee) ?? 0, pallets,
     }, () => setOpen(false), { target: channel?.id });
   }
 
@@ -54,13 +56,14 @@ export function ChannelForm({ channel }: { channel?: SaleChannelEditData }) {
     >
       <form onSubmit={submit} className="flex flex-col gap-4">
         <ChannelView
-          model={{ ...toChannelViewProps({ id: channel?.id ?? "", name, tax_treatment: taxTreatment, one_way_keg_fee_cents: 0 }), oneWayKegFee: fee }}
+          model={{ ...toChannelViewProps({ id: channel?.id ?? "", name, tax_treatment: taxTreatment, one_way_keg_fee_cents: 0, pallets }), oneWayKegFee: fee }}
           nameError={nameError}
           submitting={action.busy}
           controls={{
             name: value => { setName(value); action.setError(null); },
             taxTreatment: setTaxTreatment,
             oneWayKegFee: setFee,
+            pallets: setPallets,
           }}
           messages={<CommandFormMessage error={nameError ? null : action.error} />}
           footer={save => <CommandFormFooter>{save}</CommandFormFooter>}

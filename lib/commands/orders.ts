@@ -358,14 +358,14 @@ defineQuery({
 });
 
 defineQuery({
-  name: "get_order", description: "One order with lines (each SKU with its brand name and staff alias, and format name), keg deposits, events, shipment with its invoice, brewery ATP, and on-hand stock at its fulfillment source",
+  name: "get_order", description: "One order with lines (each SKU with its brand name and staff alias, and format name, package facts and pallet fit), keg deposits, events, shipment with its invoice, brewery ATP, and on-hand stock at its fulfillment source",
   roles: [...readRoles],
   input: z.object({ orderId: z.string().uuid() }),
   handler: async (ctx, i) => {
     const [order, lines, events, shipment, deposits] = await Promise.all([
       unwrap(ctx.db.from("orders").select("*, customers(name), sale_channels(name), ship_tos(label, country, city, state)")
         .eq("brewery_id", ctx.breweryId).eq("id", i.orderId).single()),
-      completeRows("Order lines", start => ctx.db.from("order_lines").select("*, skus(name, brands(name, alias), formats(name))", { count: "exact" })
+      completeRows("Order lines", start => ctx.db.from("order_lines").select("*, skus(name, brands(name, alias), formats(name, package_type, keg_size, units_per_case, pallet_fit))", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).eq("order_id", i.orderId).order("sku_id").range(start, start + PAGE_SIZE - 1)),
       unwrap(ctx.db.from("order_events").select().eq("order_id", i.orderId).order("created_at")),
       unwrap(ctx.db.from("shipments").select("*, deliveries(outcome), invoices(id, invoice_no)").eq("order_id", i.orderId).maybeSingle()),

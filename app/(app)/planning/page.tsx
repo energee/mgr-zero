@@ -14,7 +14,7 @@ import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toPlanningViewProps, type MaterialRequirementSnapshot } from "@/lib/mgr/planning-view";
-import type { ReleaseBatchRow, ReleaseRow } from "@/lib/mgr/release-view";
+import { releaseDefaultsOf, type ReleaseBatchRow, type ReleaseRow } from "@/lib/mgr/release-view";
 import { ReleaseForm } from "../catalog/release-form";
 import { breweryDate } from "@/lib/date-format";
 import "@/lib/commands/all";
@@ -26,15 +26,16 @@ export const metadata = { title: navTitle("/planning") };
 export default async function PlanningPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [gaps, batches] = await Promise.all([
+  const [gaps, batches, settings] = await Promise.all([
     runCommand("get_material_requirements", { shortOnly: true }, ctx) as Promise<MaterialRequirementSnapshot[]>,
     runCommand("list_release_batches", {}, ctx) as Promise<ReleaseBatchRow[]>,
+    runCommand("get_brewery", {}, ctx) as Promise<Parameters<typeof releaseDefaultsOf>[0]>,
   ]);
   const batchIds = [...new Set(batches.map((b) => b.batch_id))];
   const releases = batchIds.length ? await runCommand("list_releases", { batchIds, open: true }, ctx) as ReleaseRow[] : [];
   const canDraft = brewery.roles.includes("admin") || brewery.roles.includes("warehouse");
 
-  return <PlanningView model={toPlanningViewProps({ requirements: gaps, batches, releases, today: breweryDate(brewery.timeZone), backHref: "/more", roles: brewery.roles })}
+  return <PlanningView model={toPlanningViewProps({ requirements: gaps, batches, releases, releaseDefaults: releaseDefaultsOf(settings), today: breweryDate(brewery.timeZone), backHref: "/more", roles: brewery.roles })}
     groupAction={canDraft ? (group) => <DraftButton materialIds={group.draftIds} /> : null}
     releaseAction={(batch) => <ReleaseForm title={`Release for ordering · ${batch.title}`} forms={[batch.form]} />} />;
 }

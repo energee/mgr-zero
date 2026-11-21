@@ -5,6 +5,7 @@ import { E } from "@/components/mgr/e";
 import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { OrderQuantity } from "./new-order";
+import { BrandedName } from "@/components/mgr/views/branded-name";
 import type { ShipViewModel } from "@/lib/mgr/ship-view";
 
 export function ShipView({ model, sources, footer, tape, invoiceTiming, quantities, onQuantity, reasons, onReason, carrier = "", tracking = "", onCarrier, onTracking, onInvoiceTiming, messages, submitting = false, reason }: {
@@ -22,7 +23,7 @@ export function ShipView({ model, sources, footer, tape, invoiceTiming, quantiti
   return <>
     {E.back(model.backTo, model.title, undefined, model.backHref)}
     {E.fld("Fulfillment source", model.fulfillmentSource)}
-    {model.lines.map(line => <div key={line.key}>{E.row(line.name, line.detail,
+    {model.lines.map(line => <div key={line.key}>{E.row(<BrandedName name={line.name} alias={line.alias} />, line.detail,
       <OrderQuantity label={`${line.name} shipped quantity`} value={quantities?.[line.key] ?? line.qty} max={line.picked} step="0.01" required onChange={onQuantity && (value => onQuantity(line.key, value))} />, line.tone ?? "")}
       {line.tone === "w" && E.edit("Reason · required", reasons?.[line.key] ?? line.shortReason ?? "", "text", undefined, {
         required: true, placeholder: "Why this line ships short", "aria-label": `${line.name} shortage reason`,

@@ -19,7 +19,7 @@ export function PortalOrdersView({
 }) {
   return (
     <>
-      {E.hd("Orders")}
+      {E.hd("Order history")}
       {model.empty
         ? E.blank(model.empty)
         : model.rows.map((row) => (

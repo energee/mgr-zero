@@ -42,7 +42,7 @@ export default async function ChannelsPage() {
         if (!c || (!canEdit && !row.deletable)) return null;
         return (
           <span className="flex items-center gap-2">
-            {canEdit && <ChannelForm channel={{ id: c.id, name: c.name, taxTreatment: c.tax_treatment, oneWayKegFeeCents: c.one_way_keg_fee_cents }} />}
+            {canEdit && <ChannelForm channel={{ id: c.id, name: c.name, taxTreatment: c.tax_treatment, oneWayKegFeeCents: c.one_way_keg_fee_cents, pallets: c.pallets ?? true }} />}
             {row.deletable && <DeleteCommandButton control={DeleteChannelControl} command="delete_sale_channel" input={{ channelId: c.id }} name={c.name} redirect="/settings/channels" />}
           </span>
         );

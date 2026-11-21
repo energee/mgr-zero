@@ -236,7 +236,7 @@ defineQuery({
 
 defineQuery({
   // Brewers read SKUs too: the packaging pages pick the SKU a run fills.
-  name: "list_skus", description: "SKUs with their brand (name and staff-only alias) and format, alphabetical; saleChannelId keeps only SKUs active and priced on that channel; packageType keeps only SKUs whose format is that package; unmapped keeps only those with no QuickBooks id in the connected company",
+  name: "list_skus", description: "SKUs with their brand (name and alias) and format, alphabetical; saleChannelId keeps only SKUs active and priced on that channel; packageType keeps only SKUs whose format is that package; unmapped keeps only those with no QuickBooks id in the connected company",
   input: z.object({
     saleChannelId: z.string().uuid().optional().describe("Keep only SKUs a wholesale order on this sale channel can price"),
     active: z.boolean().optional().describe("Keep only active or inactive SKUs when supplied"),

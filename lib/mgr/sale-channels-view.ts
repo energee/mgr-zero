@@ -45,6 +45,8 @@ export type SaleChannelsSnapshot = {
     system_code: string | null;
     /** Fee per one-way keg on the channel's wholesale orders; 0 bills none. */
     one_way_keg_fee_cents: number;
+    /** Whether the channel's orders ship on pallets; absent reads as true. */
+    pallets?: boolean;
     /** Inventory: movement count on the nav. Live omits this. */
     movements?: number;
   }[];
