@@ -8,8 +8,7 @@ import type { WaterProfilesViewModel } from "@/lib/mgr/water-profiles-view";
 export function WaterProfilesView({ model, createAction, profileActions }: { model: WaterProfilesViewModel; createAction?: ReactNode; profileActions?: Record<string, ReactNode> }) {
   return (
     <>
-      {E.back(model.backLabel ?? "Catalog", "Water profiles", createAction !== undefined ? createAction : E.btn("Add water profile"), model.backHref)}
-      {E.info("Water profiles cannot be deleted or archived; edit a mistaken one instead.")}
+      {E.back(model.backLabel ?? "Catalog", "Water profiles", createAction !== undefined ? createAction : E.btn("Add water profile"), model.backHref, undefined, E.help("Water profiles cannot be deleted or archived; edit a mistaken one instead."))}
       {model.empty ? E.blank(model.empty) : model.rows.map((row) => <div key={row.key}>{E.row(row.title, row.detail, profileActions ? profileActions[row.key] : E.act("Edit"))}</div>)}
     </>
   );

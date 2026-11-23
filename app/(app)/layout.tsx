@@ -38,7 +38,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           brand={brewery.name}
           items={navFor(shippedNav(STAFF_NAV), brewery.roles)}
           sidebarOpen={sidebarOpen}
-          composer={<Composer key={`${identity!.userId}:${brewery.id}:${roleScope}`} roles={brewery.roles} chatConfigured={isChatConfigured()} />}
+          composer={<Composer key={`${identity!.userId}:${brewery.id}:${roleScope}`} roles={brewery.roles} chatConfigured={isChatConfigured()} askMgr={identity!.superadmin} />}
           headerRight={
             <>
               {!onlyRoles(brewery.roles, ["taproom"]) && <SearchSheet roles={brewery.roles} />}

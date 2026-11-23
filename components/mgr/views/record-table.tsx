@@ -17,7 +17,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from "@/components/ui/item";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
-import { SortHead, useSortedRows } from "@/components/mgr/sort-head";
+import { SortHead, useSortedRows, type DefaultSort } from "@/components/mgr/sort-head";
 import { cellSortValue, PRINTED_DATE, unwrapLazy, type SortValue } from "@/lib/mgr/table-sort";
 import { rowLinkPrefetch } from "@/lib/mgr/row-link-prefetch";
 import { cn } from "@/lib/utils";
@@ -94,7 +94,7 @@ function name(row: RecordTableRow) {
       : <Button variant="link" type="button" data-tap data-to={row.to} className={cn(cls, "h-auto p-0 text-foreground")}>{row.cells[0]}</Button>;
 }
 
-export function RecordTable({ headers, align, rows: given, sortable = true }: {
+export function RecordTable({ headers, align, rows: given, sortable = true, defaultSort, noteBeside }: {
   headers: ReactNode[];
   /** Per column of the table, header and cells alike: "l" for text, "r" for
    *  numbers. The phone list starts every value at the left. */
@@ -102,8 +102,12 @@ export function RecordTable({ headers, align, rows: given, sortable = true }: {
   rows: RecordTableRow[];
   /** False keeps the rows in the given order with plain headers. */
   sortable?: boolean;
+  /** The column the table opens sorted by until a header is clicked; its arrow shows from the first paint. */
+  defaultSort?: DefaultSort;
+  /** Phone cards: a short note (Catalog's alias) rides the name's line, wrapping under it only when the line is full. */
+  noteBeside?: boolean;
 }) {
-  const { rows, columns } = useSortedRows(headers, given, recordSortValue, sortable);
+  const { rows, columns } = useSortedRows(headers, given, recordSortValue, sortable, defaultSort);
   return (
     <>
       <div className="hidden md:block">
@@ -147,8 +151,11 @@ export function RecordTable({ headers, align, rows: given, sortable = true }: {
             <Item role="listitem" className="relative px-0">
               {row.media && <ItemMedia className="self-start">{row.media}</ItemMedia>}
               <ItemContent className="min-w-0">
-                <ItemTitle className="min-w-0 max-w-full line-clamp-none wrap-anywhere">{name(row)}</ItemTitle>
-                {row.note && <ItemDescription className="break-words">{row.note}</ItemDescription>}
+                {/* With noteBeside the note shares the name's line; otherwise the wrapper adds no box and the note sits under it. */}
+                <div className={noteBeside && row.note ? "flex flex-wrap items-baseline gap-x-2" : "contents"}>
+                  <ItemTitle className="min-w-0 max-w-full line-clamp-none wrap-anywhere">{name(row)}</ItemTitle>
+                  {row.note && <ItemDescription className="break-words">{row.note}</ItemDescription>}
+                </div>
                 <dl className="flex flex-wrap gap-x-4 gap-y-0.5 text-sm">
                   {row.cells.slice(1).map((cell, i) => said(cell) && (
                     // A compact card (#1516): the facts flow side by side on one
