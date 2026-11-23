@@ -89,9 +89,8 @@ export function ChatPersonalPreferencesView({ preferences, canSetQuietHours = tr
     start: preferences.quietStart?.slice(0, 5) ?? "", end: preferences.quietEnd?.slice(0, 5) ?? "", timezone: preferences.timezone,
   });
   return <>
-    {E.back(back, "My notification preferences", undefined, backHref)}
+    {E.back(back, "My notification preferences", undefined, backHref, undefined, E.help("These switches change only your personal Slack reminders. Your MGR work and assignments stay the same."))}
     {preferences.link ? E.row(`Slack user ${preferences.link.external_user_id}`, "Linked to your MGR account", <Button variant="outline" disabled={busy} onClick={onUnlink}>Unlink my Slack</Button>) : howToLink}
-    {E.info("These switches change only your personal Slack reminders. Your MGR work and assignments stay the same.")}
     <SettingsSaveStatus busy={busy} saved={saved} error={error} />
     {preferences.preferences.map(({ reason, enabled, personalDestinationId }) => {
       const label = NOTIFICATION_REASON_LABEL[reason];

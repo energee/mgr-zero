@@ -60,12 +60,12 @@ export function LocationView({
 }) {
   return (
     <>
-      {E.back("Locations", model.name, headerAction, model.backHref)}
+      {/* Read-only, the bins note is the page's ⓘ; editing, LocationFields shows it beside the fields. */}
+      {E.back("Locations", model.name, headerAction, model.backHref, undefined, readOnly ? E.help(BINS_NOTE) : undefined)}
       {readOnly ? (
         <>
           {E.fld("Uses", model.usesLabel)}
           {E.fld("Timezone", model.timezone)}
-          {E.info(BINS_NOTE)}
         </>
       ) : (
         <>

@@ -89,6 +89,14 @@ it("draws a header with text cells as a sort button, unsorted until clicked", ()
   }
 });
 
+it("noteBeside puts the phone card's note on the name's line, and leaves it under the name otherwise", () => {
+  const card = (noteBeside?: boolean) => renderToStaticMarkup(createElement(RecordTable, {
+    headers: ["Brand", "Style"], align: ["l", "l"], noteBeside, rows: [{ key: "a", cells: ["Llama", "IPA"], note: "Animal #25" }],
+  })).split('role="listitem"')[1];
+  expect(card(true)).toMatch(/<div class="flex flex-wrap items-baseline[^"]*"><div[^>]*data-slot="item-title"[^]*Llama[^]*<p[^>]*data-slot="item-description"[^>]*>Animal #25<\/p><\/div>/);
+  expect(card()).not.toContain("flex flex-wrap items-baseline");
+});
+
 it("draws a default sort as that header's arrow and orders the rows by it on the first paint", () => {
   const out = renderToStaticMarkup(createElement(RecordTable, {
     headers: ["Name", "Added"], align: ["l", "l"], defaultSort: { column: 1, desc: true },

@@ -12,8 +12,7 @@ export function ConnectedAgentsView({ agents, remove, error, backHref, proposals
   proposalsHref?: string;
 }) {
   return <>
-    {E.back("Today", "Agents", undefined, backHref)}
-    {E.info("Agents connected to your account act as you. Removing one stops it at once.")}
+    {E.back("Today", "Agents", undefined, backHref, undefined, E.help("Agents connected to your account act as you. Removing one stops it at once."))}
     {error && E.note(error, "alert")}
     {E.nav("Changes to approve", navAbout("Changes to approve"), "", undefined, proposalsHref)}
     {agents.length ? agents.map(agent => <form key={agent.clientId} action={remove}>

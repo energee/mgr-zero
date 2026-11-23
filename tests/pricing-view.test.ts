@@ -163,10 +163,10 @@ describe("Price groups view", () => {
     expect(noChannels).not.toMatch(/role="tablist"/);
   });
 
-  it("explains the grid once, above it, in one line", () => {
+  it("explains the grid behind the title's ⓘ, not in a box above it", () => {
     const html = htmlOf(createElement(PriceGroupsView, { model: toPriceGroupsViewProps(pricingGrid) }));
-    expect(html.match(/data-slot="alert"/g)?.length ?? 0).toBe(1);
-    expect(html).toMatch(/the cell where they meet is the price/);
+    expect(html.match(/data-slot="alert"/g)?.length ?? 0).toBe(0);
+    expect(html).toMatch(/<\/h1><button[^>]*aria-label="About this page"/);
     expect(html).not.toMatch(/one table per sale channel/);
   });
 
