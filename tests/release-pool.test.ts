@@ -135,6 +135,20 @@ describe("customer ceiling", () => {
   });
 });
 
+describe("ceiling on a batch released for two ship dates", () => {
+  it("lifts each release on its own ship date, so an earlier one cannot lift a later one's ceiling", async () => {
+    const capped = await makeBuyer("Two-date buyer");
+    await admin.from("customers").update({ release_share_pct: 25 }).eq("id", capped.customerId);
+    const b = await beer("Two Date Tripel");
+    const release = async (skuId: string, shipsFrom: string) =>
+      ((await runCommand("release_sku", { batchId: b.batchId, wholesaleBbl: 6, shipsFrom, lines: [{ skuId }] }, salesCtx)) as { releases: Release[] }).releases.find((r) => r.sku_id === skuId)!.id;
+    const [keg, cases] = [await release(b.kegId, "2030-01-16"), await release(b.caseId, day(10))];
+    // The cases ship inside the 14-day window, so they are open; one of them on the order must not open the kegs.
+    await expect(submit(capped, [{ skuId: b.kegId, qty: 4, releaseId: keg }, { skuId: b.caseId, qty: 1, releaseId: cases }])).rejects.toThrow(/limit on Two Date Tripel is 1.5 bbl/);
+    await expect(submit(capped, [{ skuId: b.caseId, qty: 5, releaseId: cases }])).resolves.toMatchObject({ order_id: expect.any(String) });
+  });
+});
+
 describe("calculated share", () => {
   it("is each customer's part of recent purchases, counting stock barrels for more, up to the maximum", async () => {
     const other = (await makeBrewery()).id;
@@ -234,6 +248,16 @@ describe("weekly digest", () => {
       // The key is the Monday of the week, so a changed digest day cannot send a second digest that week.
       const monday = new Date(Date.parse(`${today}T12:00:00Z`) - ((digestDay + 6) % 7) * 864e5).toISOString().slice(0, 10);
       expect(rows[0]).toMatchObject({ digest_week: monday, today, new_this_week: true, ships_from: "2030-01-16" });
+      // A customer who sees releases a week late still reads one as new the week it opens to them.
+      sql(`update public.releases set released_at = now() - interval '8 days' where id in ('${r.keg}', '${r.case}')`, true);
+      expect((await mine())[0]).toMatchObject({ new_this_week: false });
+      await admin.from("customers").update({ release_delay_days: 7 }).eq("id", reader.customerId);
+      expect((await mine())[0]).toMatchObject({ new_this_week: true });
+      // The day after the digest day makes up a missed run, under the digest day's own week.
+      const yesterdayDow = (digestDay + 6) % 7;
+      await runCommand("set_release_defaults", { openPct: 75, orderByDays: 7, capLiftDays: 14, shareWindowDays: null, stockMultiplier: 2, maxSharePct: 50, digestDay: yesterdayDow }, admin2);
+      const yesterdaysMonday = new Date(Date.parse(`${today}T12:00:00Z`) - (1 + (yesterdayDow + 6) % 7) * 864e5).toISOString().slice(0, 10);
+      expect((await mine())[0]).toMatchObject({ digest_week: yesterdaysMonday, today });
       // Another weekday: nothing again.
       await runCommand("set_release_defaults", { openPct: 75, orderByDays: 7, capLiftDays: 14, shareWindowDays: null, stockMultiplier: 2, maxSharePct: 50, digestDay: (digestDay + 1) % 7 }, admin2);
       expect(await mine()).toEqual([]);

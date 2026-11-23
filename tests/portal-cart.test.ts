@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("react", async importOriginal => ({ ...await importOriginal<typeof import("react")>(), useSyncExternalStore: () => true }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 import { Cart, submissionFailureMessage } from "@/app/(portal)/portal/cart";
-import { cartActionsDisabled, cartMissingInput, planDraftSync, workingCartKey } from "@/lib/portal-cart";
+import { cartActionsDisabled, cartMissingInput, planDraftSync, unsentQty, workingCartKey } from "@/lib/portal-cart";
 
 describe("portal cart recovery", () => {
   it("does not claim an order is still a draft when submission may have committed", () => {
@@ -14,6 +14,13 @@ describe("portal cart recovery", () => {
       "Order saved, but submission could not be confirmed (network failed). View the order status before retrying, or contact the brewery.",
     );
     expect(submissionFailureMessage("network failed", null)).toBe("network failed");
+  });
+});
+
+describe("portal cart split across orders", () => {
+  it("keeps what one order did not send, so a retried order never drops the orders after it", () => {
+    expect(unsentQty({ a: "2", b: "3", c: "0" }, [{ skuId: "a" }])).toEqual({ b: "3" });
+    expect(unsentQty({ a: "2" }, [{ skuId: "a" }])).toEqual({});
   });
 });
 

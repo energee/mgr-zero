@@ -4,8 +4,8 @@
 # so this POSTs the existing bearer-authenticated routes instead:
 #   - order email every 5 minutes (each call sends at most ten): retries, since
 #     confirm_order already sends a new confirmation right after it responds
-#   - release digest daily: it queues a brewery's weekly digest only on that brewery's chosen weekday,
-#     and the order email job above sends what it queues
+#   - release digest daily: it queues a brewery's weekly digest on that brewery's chosen weekday, or the
+#     day after to make up a missed run, and the order email job above sends what it queues
 #   - retention prune daily (#766)
 #   - agent friction report weekly, which rewrites the "Agent friction" issue (#1766)
 # GitHub may delay or skip a scheduled run under load; the next run catches up.

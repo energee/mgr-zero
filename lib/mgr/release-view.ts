@@ -31,6 +31,8 @@ export const releaseDefaultsOf = (brewery: { release_open_pct: number; release_o
 
 /** An ISO date moved by whole days. */
 export const shiftDays = (iso: string, days: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+/** The least a calculated ceiling can be, in percent of a pool: the floor private.release_shares applies. */
+export const SHARE_FLOOR_PCT = 5;
 /** Barrels as text: at most two decimals, none when whole. */
 export const bbl = (value: number) => String(Math.round(value * 100) / 100);
 

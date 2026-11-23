@@ -358,7 +358,7 @@ defineQuery({
 });
 
 defineQuery({
-  name: "get_order", description: "One order with lines (each SKU with its brand name and staff alias, and format name, package facts and pallet fit), keg deposits, events, shipment with its invoice, brewery ATP, and on-hand stock at its fulfillment source",
+  name: "get_order", description: "One order with lines (each SKU with its brand name and alias, and format name, package facts and pallet fit), keg deposits, events, shipment with its invoice, brewery ATP, and on-hand stock at its fulfillment source",
   roles: [...readRoles],
   input: z.object({ orderId: z.string().uuid() }),
   handler: async (ctx, i) => {
@@ -452,7 +452,7 @@ defineCommand({
 });
 
 defineQuery({
-  name: "daily_pick_sheet", description: "Confirmed/picked orders grouped by requested ship date with lines (each SKU with its brand name and staff alias, and format name)",
+  name: "daily_pick_sheet", description: "Confirmed/picked orders grouped by requested ship date with lines (each SKU with its brand name and alias, and format name)",
   roles: [...readRoles],
   input: z.object({ date: isoDate.optional().describe("Only orders requested to ship on this day") }),
   // Paged past PostgREST's 1000-row cap (#759); without a date this is every

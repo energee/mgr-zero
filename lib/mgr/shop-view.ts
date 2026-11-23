@@ -12,7 +12,7 @@ import { lineLabel, type LineLabel } from "./brand-lines";
 import { brandTagline, type PortalBrand } from "./brand-reference-view";
 import { plural } from "./plural";
 import { KEG_SIZES } from "./enums";
-import { bbl } from "./release-view";
+import { bbl, SHARE_FLOOR_PCT } from "./release-view";
 
 /** One open release of a SKU, as portal_catalog returns it. */
 export type ShopRelease = {
@@ -211,7 +211,7 @@ export type ShopViewModel = {
   };
 };
 
-/** The id a Shop brand heading carries, so Coming up can link to it. Slugs the name because the catalog groups by brand name. */
+/** The id a Shop brand heading carries, so a link can scroll to it. Slugs the name because the catalog groups by brand name. */
 export const brandAnchor = (product: string) => `brand-${product.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
 
 /** Package label under a brand title: strip a duplicated `Brand · ` prefix. */
@@ -276,7 +276,8 @@ export function shipGroups<T extends ShopCatalogItem>(catalog: T[], shipWith: Re
   // "Ship with": an order's lines join a later date's order, when the cart has both. Earliest first, so beer that joined an order moves on with it.
   for (const from of [...groups.keys()].sort()) {
     const to = shipWith[from] ?? "";
-    const joined = to > from ? groups.get(to) : undefined;
+    // A stock release with its own date cannot ship before it.
+    const joined = to > from && to >= shipsFromFloor(groups.get(from)!) ? groups.get(to) : undefined;
     if (joined) { joined.push(...groups.get(from)!); groups.delete(from); }
   }
   return [...groups].map(([shipsFrom, items]) => ({ shipsFrom, items })).sort((a, b) => a.shipsFrom.localeCompare(b.shipsFrom));
@@ -348,6 +349,11 @@ export function effectiveRequestedDate(requested: string, catalog: ShopCatalogIt
   return floor > requested ? floor : requested;
 }
 
+/** The date one order of the cart (a shipGroups group) asks for. A cart that is a single order keeps the buyer's
+ *  date, as does what ships now. In a split cart each pre-order ships on its own date, so none waits for another. */
+export const orderRequestedDate = (group: { shipsFrom: string; items: ShopCatalogItem[] }, single: boolean, requested: string): string =>
+  single || !group.shipsFrom ? effectiveRequestedDate(requested, group.items) : group.shipsFrom;
+
 /** A unit weighs its beer (by the chosen release's batch gravity, or 1.010) plus its packaging. */
 const palletLine = (i: ShopCatalogItem, qty = i.qty): PalletLine =>
   ({ qty, packageType: i.packageType ?? null, kegSize: i.kegSize ?? null, unitsPerCase: i.unitsPerCase ?? null, palletFit: i.palletFit ?? null, palletFitMixed: i.palletFitMixed ?? null,
@@ -377,15 +383,16 @@ export function fillPallet(catalog: ShopCatalogItem[], shipsFrom: string, rules:
   const overLimit = (item: ShopCatalogItem) => {
     const release = chosenRelease(item);
     if (release?.limitLeftBbl == null || !release.bblPerUnit) return false;
-    // A batch's packages share one limit in barrels.
-    const used = order.filter((i) => i.product === item.product).reduce((n, i) => n + qty.get(i.skuId)! * (chosenRelease(i)?.bblPerUnit ?? 0), 0);
+    // A batch's packages share one limit in barrels; the same beer from another batch on this order has its own.
+    const used = order.filter((i) => i.product === item.product && chosenRelease(i)?.shipsFrom === release.shipsFrom).reduce((n, i) => n + qty.get(i.skuId)! * (chosenRelease(i)?.bblPerUnit ?? 0), 0);
     return used + release.bblPerUnit > release.limitLeftBbl + 1e-9;
   };
   const growth = (item: ShopCatalogItem) => (qty.get(item.skuId)! - item.qty) / item.qty;
   // A package that adds neither weight nor height never fills a pallet; past FILL_STOP units there is nothing sound to offer.
   for (let added = 0; ; added++) {
     if (added === FILL_STOP) return {};
-    const next = items.filter((i) => !overLimit(i) && count(i) === pallets).sort((a, b) => growth(a) - growth(b))[0];
+    // ponytail: the buyer is not told how much of a release is left, so one marked few left is never topped up; send the barrels left with the catalog to fill it exactly.
+    const next = items.filter((i) => chosenRelease(i)?.badge !== "low" && !overLimit(i) && count(i) === pallets).sort((a, b) => growth(a) - growth(b))[0];
     if (!next) break;
     qty.set(next.skuId, qty.get(next.skuId)! + 1);
   }
@@ -415,9 +422,12 @@ function shopSummary(catalog: ShopCatalogItem[], floor: string, rules: PalletRul
     };
   };
   // Beer can wait for any later pre-order date the cart holds; the choice sits in the order the beer is on.
-  const dates = shipGroups(inCart).map((g) => g.shipsFrom);
+  const apart = shipGroups(inCart);
+  const dates = apart.map((g) => g.shipsFrom);
+  const floorOf = new Map(apart.map((g) => [g.shipsFrom, shipsFromFloor(g.items)]));
   const choice = (from: string): ShipWithChoice => {
-    const later = dates.filter((date) => date > from);
+    // Only dates this beer can ship on: later than its own, and not before a stock release in it ships.
+    const later = dates.filter((date) => date > from && date >= floorOf.get(from)!);
     return {
       from, label: from ? `Ship ${formatDate(from)} beer` : "Ship stock beer", value: later.includes(shipWith[from] ?? "") ? shipWith[from] : "",
       options: [{ value: "", label: from ? `On ${formatDate(from)}` : "Now" }, ...later.map((date) => ({ value: date, label: `With the ${formatDate(date)} pre-order` }))],
@@ -428,10 +438,10 @@ function shopSummary(catalog: ShopCatalogItem[], floor: string, rules: PalletRul
   const shipments = orders.map(({ shipsFrom, items }) => ({
     key: shipsFrom || "now", title: shipsFrom ? `Ships ${formatDate(shipsFrom)}` : "Ships now", lines: items.map(line),
     subtotal: amount(items), palletFit: cartPalletFit(items), pallet: pallet(items),
-    parts: [...Map.groupBy(items, ownShipDate)].sort(([a], [b]) => a.localeCompare(b)).map(([from, own]) => ({
-      from, title: from ? `${formatDate(from)} pre-order` : "Stock beer", subtotal: amount(own), lines: own.map(line),
-      ...(from < dates.at(-1)! ? { shipWith: choice(from) } : {}),
-    })),
+    parts: [...Map.groupBy(items, ownShipDate)].sort(([a], [b]) => a.localeCompare(b)).map(([from, own]) => {
+      const shipWith = choice(from);
+      return { from, title: from ? `${formatDate(from)} pre-order` : "Stock beer", subtotal: amount(own), lines: own.map(line), ...(shipWith.options.length > 1 ? { shipWith } : {}) };
+    }),
   }));
   return {
     lines: inCart.map(line),
@@ -447,7 +457,8 @@ function shopSummary(catalog: ShopCatalogItem[], floor: string, rules: PalletRul
 
 /** The Pre-order page's line about the buyer's ceiling: its size, what buying from stock added, and when it lifts. */
 function shareNote(share: ShopShare): string {
-  const earned = share.basePct == null ? 0 : Math.round((share.pct - share.basePct) * 10) / 10;
+  // A share at the minimum was raised to it, not earned by buying stock.
+  const earned = share.basePct == null || share.pct <= SHARE_FLOOR_PCT ? 0 : Math.round((share.pct - share.basePct) * 10) / 10;
   return `You can order up to ${Math.round(share.pct * 10) / 10}% of each new release${earned > 0 ? `, including +${earned}% for buying from stock` : ""}. The limit lifts ${plural(share.liftDays, "day")} before a beer ships; after that, what is left is open to everyone.`;
 }
 

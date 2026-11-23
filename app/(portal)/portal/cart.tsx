@@ -8,14 +8,14 @@ import { E } from "@/components/mgr/e";
 import { ShopView } from "@/components/mgr/views/shop";
 import { PortalBrandHeading } from "./brand-heading";
 import { ReviewOrderView } from "@/components/mgr/views/review-order";
-import { chosenOffer, effectiveRequestedDate, fillPallet, fitSuggestions, shipGroups, suggestionShipsFrom, toShopViewProps, type ShopRelease, type ShopSnapshot } from "@/lib/mgr/shop-view";
+import { chosenOffer, effectiveRequestedDate, fillPallet, fitSuggestions, orderRequestedDate, shipGroups, suggestionShipsFrom, toShopViewProps, type ShopRelease, type ShopSnapshot } from "@/lib/mgr/shop-view";
 import { plural } from "@/lib/mgr/plural";
 import { toQuotedReviewOrderViewProps, type PortalQuote } from "@/lib/mgr/review-order-view";
 import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 import { command, CommandResponseError } from "@/lib/commands/client";
 import { defaultShipToId } from "@/lib/order-form-rules";
 import { money } from "@/lib/mgr/money";
-import { cartActionsDisabled, cartLines, cartMissingInput, planDraftSync, portalAttemptKey, restorePortalAttempt, executePortalAttempt, clearWorkingCart, restoreWorkingCart, saveWorkingCart, type PortalAttempt, type PortalScope, type PortalFields } from "@/lib/portal-cart";
+import { cartActionsDisabled, cartLines, cartMissingInput, planDraftSync, unsentQty, portalAttemptKey, restorePortalAttempt, executePortalAttempt, clearWorkingCart, restoreWorkingCart, saveWorkingCart, type PortalAttempt, type PortalScope, type PortalFields } from "@/lib/portal-cart";
 import { canRetireCommandFailure } from "@/lib/commands/failure";
 
 /** A portal_catalog row: badge is the stock offer (null: not orderable from stock), releases the release offers;
@@ -80,19 +80,19 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource, brands, 
   // The offer each line orders from: a release id, or "" for packaged stock.
   const [offers, setOffers] = useState<Record<string, string>>(opening.offers);
   const removed = initial?.removed ?? working?.removed ?? [];
-  const untouched = useRef({ fields, qty, offers });
+  // "Ship with" choices: an order's ship date ("" for stock) to the later date it ships with. Saved with the working cart.
+  const [shipWith, setShipWith] = useState<Record<string, string>>(working?.shipWith ?? {});
+  const untouched = useRef({ fields, qty, offers, shipWith });
   useEffect(() => {
     // Save edits only: re-saving the restored cart would restart its 7-day clock on every visit.
-    if (!keepWorking || (fields === untouched.current.fields && qty === untouched.current.qty && offers === untouched.current.offers)) return;
-    saveWorkingCart(() => localStorage, scope, { fields, qty, offers }, items);
-  }, [keepWorking, scope, fields, qty, offers, items]);
+    if (!keepWorking || (fields === untouched.current.fields && qty === untouched.current.qty && offers === untouched.current.offers && shipWith === untouched.current.shipWith)) return;
+    saveWorkingCart(() => localStorage, scope, { fields, qty, offers, shipWith }, items);
+  }, [keepWorking, scope, fields, qty, offers, shipWith, items]);
   const [draftId, setDraftId] = useState<string | null>(recovery.attempt && "orderId" in recovery.attempt.input ? recovery.attempt.input.orderId ?? null : initial?.draftId ?? null);
   const [attempt, setAttempt] = useState<PortalAttempt | null>(recovery.attempt);
   const ready = !recovery.error;
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
-  // ponytail: "Ship with" is not saved with the cart, so a reload ships everything on its own date again; save it with the working cart if buyers lose it.
-  const [shipWith, setShipWith] = useState<Record<string, string>>({});
   const [review, setReview] = useState(false);
   // One quote per order the cart becomes (shipGroups), in ship order.
   const [quotes, setQuotes] = useState<QuotedOrder[] | null>(null);
@@ -117,15 +117,20 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource, brands, 
   // The cart as the orders it becomes: stock ships now on the buyer's date and each
   // pre-order ship date is its own order on that date, unless the buyer chose to
   // ship one with a later pre-order.
-  const orders = shipGroups(catalog, shipWith).map(group => ({
+  // A "Ship with" choice ends when the order it named leaves the cart, so it cannot come back unseen if that date is ordered again.
+  const dates = new Set(shipGroups(catalog).map(group => group.shipsFrom));
+  if (Object.values(shipWith).some(to => to && !dates.has(to))) setShipWith(Object.fromEntries(Object.entries(shipWith).filter(([, to]) => dates.has(to))));
+  const groups = shipGroups(catalog, shipWith);
+  const orders = groups.map(group => ({
     shipsFrom: group.shipsFrom,
-    requestedShipDate: group.shipsFrom || effectiveRequestedDate(fields.requestedShipDate ?? "", group.items) || null,
+    requestedShipDate: orderRequestedDate(group, groups.length === 1, fields.requestedShipDate ?? "") || null,
     lines: group.items.map(item => { const releaseId = chosenOffer(item); return { skuId: item.skuId, qty: item.qty, ...(releaseId ? { releaseId } : {}) }; }),
   }));
 
   /** Save draft keeps the whole cart as one draft. Submit places each quoted
    *  order in turn; one that fails leaves it and the orders after it in the
-   *  cart. A pending request (`attempt`) is retried alone. While an order is
+   *  cart. A pending request (`attempt`) is retried alone; when it was one order of a
+   *  split cart, the lines it did not send stay in the cart to be reviewed again. While an order is
    *  being placed, the browser-saved cart holds only the orders after it, so
    *  a lost response or a reload never drops them and never keeps lines that
    *  may already be ordered. */
@@ -154,9 +159,9 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource, brands, 
             active = { scope, purpose, fields: snapshot, command: plan.command, requestId: crypto.randomUUID(), input: { ...snapshot, ...identity, ...(plan.command === "portal_update_draft_order" ? { orderId: plan.orderId } : {}) } };
           }
         }
-        // What is still unsent once this order is staged: the orders after it.
-        const ordered = new Set(order?.lines.map(line => line.skuId));
-        const rest = order ? Object.fromEntries(Object.entries(left).filter(([skuId]) => !ordered.has(skuId))) : {};
+        // What is still unsent once this order is staged: the orders after it. A retried submit sent only its own request's lines.
+        const sent = order?.lines ?? (purpose === "submit" ? active.fields.lines : null);
+        const rest = sent ? unsentQty(left, sent) : {};
         // A draft being submitted still holds every line until its order is placed, so the rest is saved only after.
         const fromDraft = Boolean(order && draftId && index === 0);
         const keepRest = Object.keys(rest).length > 0 && !fromDraft;
@@ -168,26 +173,32 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource, brands, 
           // behind would reopen elsewhere as unsent and invite a duplicate order. The
           // orders after it are unsent, so they stay. `!initial`, not `keepWorking`: a request
           // recovered after a reload came from a new cart too; a later order of a split cart has saved its rest.
-          if (keepRest) saveWorkingCart(() => localStorage, scope, { fields, qty: rest, offers }, items);
-          else if (!initial || index > 0) clearWorkingCart(() => localStorage, scope);
+          if (keepRest) saveWorkingCart(() => localStorage, scope, { fields, qty: rest, offers, shipWith }, items);
+          // A retry was staged once already: what the browser cart holds now is the unsent rest.
+          else if (!attempt && (!initial || index > 0)) clearWorkingCart(() => localStorage, scope);
         });
         setAttempt(null); active = null; placed += 1;
         // The cart on screen is left alone until the run ends: changing it here would re-save lines already ordered.
-        if (order) left = rest;
+        if (sent) left = rest;
         if (fromDraft) {
           // The draft is now that order: the orders after it are new, and are an unsent cart until staged.
           setDraftId(null);
-          if (Object.keys(rest).length) saveWorkingCart(() => localStorage, scope, { fields, qty: rest, offers }, items);
+          if (Object.keys(rest).length) saveWorkingCart(() => localStorage, scope, { fields, qty: rest, offers, shipWith }, items);
         }
       }
-      router.push(placed > 1 ? "/portal/orders" : `/portal/orders/${id}`);
+      if (attempt && Object.keys(left).length) {
+        // The retried order was one of several: the rest was never sent, so it stays as a new cart to review.
+        setDraftId(null); setQty(left); setReview(false); setQuotes(null);
+        saveWorkingCart(() => localStorage, scope, { fields, qty: left, offers, shipWith }, items);
+        setError("1 order placed; the rest of the cart was not. Review it to place it.");
+      } else router.push(placed > 1 ? "/portal/orders" : `/portal/orders/${id}`);
     } catch (err) {
       // Only a definitive first refusal can unlock edits; a later refusal
       // cannot disprove an earlier uncertain success.
       if (err instanceof CommandResponseError && canRetireCommandFailure(err.status, active?.requestId === attempt?.requestId, err.code)) {
         // A definitive refusal proves no order exists, so the unlocked cart is kept again.
         // After an order of a split cart was placed, what is left is a new cart even when it began as a draft.
-        try { sessionStorage.removeItem(portalAttemptKey(scope)); setAttempt(null); if (keepWorking || placed) saveWorkingCart(() => localStorage, scope, { fields, qty: left, offers }, items); }
+        try { sessionStorage.removeItem(portalAttemptKey(scope)); setAttempt(null); if (keepWorking || placed) saveWorkingCart(() => localStorage, scope, { fields, qty: left, offers, shipWith }, items); }
         catch { /* Keep the exact attempt if storage cannot retire it. */ }
         // The orders already placed leave the cart; the refused one and those after it stay to be fixed.
         if (placed) setQty(left);

@@ -145,7 +145,6 @@ import { PortalInvoiceView } from "@/components/mgr/views/portal-invoice";
 import { PortalInvoicesView } from "@/components/mgr/views/portal-invoices";
 import { PortalMeView } from "@/components/mgr/views/portal-me";
 import { PortalOrderView } from "@/components/mgr/views/portal-order";
-import { ComingUpView } from "@/components/mgr/views/coming-up";
 import { PortalOrdersView } from "@/components/mgr/views/portal-orders";
 import { PriceGroupView } from "@/components/mgr/views/price-group";
 import { PriceGroupsView } from "@/components/mgr/views/price-groups";
@@ -220,7 +219,7 @@ import {
   runClosedHazy, scheduleBatchHazy, vesselFv3, vesselNew,
 } from "@/lib/mgr/fixtures/production";
 import { PICK_SHEET_DATE_CHIPS, pickSheet } from "@/lib/mgr/fixtures/pick-sheet";
-import { ridgelineComingUp, ridgelineReviewOrder, ridgelineShop } from "@/lib/mgr/fixtures/portal";
+import { ridgelineReviewOrder, ridgelineShop } from "@/lib/mgr/fixtures/portal";
 import { portalAccountRidgeline, portalMeRidgeline } from "@/lib/mgr/fixtures/portal-account";
 import { portalInvoicePaid, portalInvoiceUnpaid, portalInvoicesRidgeline } from "@/lib/mgr/fixtures/portal-invoices";
 import { portalOrderChangedAfterConfirm, portalOrdersList } from "@/lib/mgr/fixtures/portal-orders";
@@ -291,7 +290,6 @@ import { toPortalInvoiceViewProps } from "@/lib/mgr/portal-invoice-view";
 import { toPortalInvoicesViewProps } from "@/lib/mgr/portal-invoices-view";
 import { toPortalMeViewProps } from "@/lib/mgr/portal-me-view";
 import { toPortalOrderViewProps } from "@/lib/mgr/portal-order-view";
-import { toComingUpViewProps } from "@/lib/mgr/coming-up-view";
 import { toPortalOrdersViewProps } from "@/lib/mgr/portal-orders-view";
 import { toPriceGroupViewProps } from "@/lib/mgr/price-group-view";
 import { toPriceGroupsViewProps } from "@/lib/mgr/price-groups-view";
@@ -891,7 +889,7 @@ export const SCREENS: Screen[] = [
     reads: "get_bin_on_hand · get_atp · get_inventory_value · list_movements",
     writes: "none [SKU creation happens on its own surface]",
     states: [["uncosted", "units without receipt cost are counted but not valued"], ["permission", "Admin, Sales and Warehouse may view"], ["value", "inventory value shows only for Admin and Sales"], ["short", "a negative Available says Shortfall and links to the competing orders"], ["empty", "no finished goods yet: header actions and the taproom count pointer remain"]],
-    spec: "The Beer landing's Finished goods row opens this list. SKUs sit under a heading per brand, which names the brand with its staff alias and states the brand's barrels on hand; the rows keep that order and do not sort. On hand, allocated and available sit in aligned columns on the desk and as labeled values on the phone, and a zero allocated is quiet; the SKU name opens SKU detail, and Shortfall under a negative Available opens the shortfall. The header holds the page actions, which share lines on a phone. Record movement is for Admin and Warehouse; for them each active SKU's row also ends with Record movement on the desk, which opens the form with that SKU chosen. A phone leaves the row button out and reaches it through SKU detail. Record taproom count points to the existing Weekly count for taproom stock, not a general finished-goods count. Add SKU in Catalog is for Admin and Sales and opens Catalog, where SKUs are made. Inventory value uses frozen packaging-close cost and separately counts units without cost. The same view draws recent signed movement rows under a heading per day, each with its facts, its time and its source document, which links when the document has a page. Type narrows the rows to one movement type. The live page adds numbered pages; the fixture supplies synthetic rows, an inert Type and no pager.",
+    spec: "The Beer landing's Finished goods row opens this list. SKUs sit under a heading per brand, which names the brand with its alias and states the brand's barrels on hand; the rows keep that order and do not sort. On hand, allocated and available sit in aligned columns on the desk and as labeled values on the phone, and a zero allocated is quiet; the SKU name opens SKU detail, and Shortfall under a negative Available opens the shortfall. The header holds the page actions, which share lines on a phone. Record movement is for Admin and Warehouse; for them each active SKU's row also ends with Record movement on the desk, which opens the form with that SKU chosen. A phone leaves the row button out and reaches it through SKU detail. Record taproom count points to the existing Weekly count for taproom stock, not a general finished-goods count. Add SKU in Catalog is for Admin and Sales and opens Catalog, where SKUs are made. Inventory value uses frozen packaging-close cost and separately counts units without cost. The same view draws recent signed movement rows under a heading per day, each with its facts, its time and its source document, which links when the document has a page. Type narrows the rows to one movement type. The live page adds numbered pages; the fixture supplies synthetic rows, an inert Type and no pager.",
     body: <FinishedGoodsView model={toFinishedGoodsViewProps(finishedGoodsList)} movements={finishedGoodsMovements} />,
   },
   {
@@ -1160,7 +1158,7 @@ export const SCREENS: Screen[] = [
     reads: "get_order",
     writes: "record_pick · resolve_short_pick",
     states: [["permission", "warehouse or admin required", 1], ["short pick", "a line below ordered opens the Short pick frame", 1], ["partly picked", "reopened after a short count · counted lines start at what was picked"], ["short stock", "the source holds less than ordered · Ordered says Only N available · the count still starts at ordered", 1], ["invalid count", "blank, negative, above ordered or exponent notation · named under the field · Done picking says why it waits", 1], ["concurrent", "another picker changed qty"], ["cancelled", "staged · restock now", 1], ["offline", "queue whole pick set once"]],
-    spec: "2 taps from Today: Pick → Done picking (all-as-ordered only). The sheet is just the order: one row per SKU under its package format heading, grouped by format then brand name, under the customer and ship date. Each row names the product with its ordered amount and holds the count field, so the whole line fits a phone. Brands keep their staff aliases. Shortage is not a chip here: entering a count below ordered opens Short pick.",
+    spec: "2 taps from Today: Pick → Done picking (all-as-ordered only). The sheet is just the order: one row per SKU under its package format heading, grouped by format then brand name, under the customer and ship date. Each row names the product with its ordered amount and holds the count field, so the whole line fits a phone. Brands keep their aliases, muted under the brand. Shortage is not a chip here: entering a count below ordered opens Short pick.",
     to: { "16 oz case": "SKU detail" },
     body: <PickView model={toPickViewProps(orderPick)} />,
   },
@@ -1753,19 +1751,6 @@ export const SCREENS: Screen[] = [
     states: [["open for pre-order", "packages released from a planned batch, one band per brand like Shop, each From Dec 4 · order by Nov 27 · few left or sold out"], ["by ship date", "soonest first; each date heads the beers that ship on it: Ships Oct 9, 2026 · order by Oct 2, 2026"], ["your limit", "a buyer with a limit sees its size and what buying from stock added, and under each beer the barrels of that batch still open to them and the day the limit lifts"], ["suggested", "Use suggested quantities beside a ship date fills in an order for that date, following the buyer's recent orders with the newest counting most · the package's usual when the style is new to them · close to full layers is rounded up · never above their limit or what is left · a line at the top says what it is based on · they review and submit"], ["fill the pallet", "each order's summary says the pallets it needs and the room left: 1 pallet. Room for 3 more ½ bbl kegs or 30 more cases · Fill the pallet beside a ship date tops up the beers already in that order until another unit would need another pallet or pass the buyer's limit"], ["ship stock beer", "shown while the order holds both stock beer and a pre-order · Now keeps stock beer as its own order · a pre-order ship date puts it on that order, on that date and counted toward its pallets · Fill the pallet does not top up stock beer"], ["ship with a later pre-order", "a cart with more than one pre-order ship date shows a choice per earlier date, like Ship Dec 2, 2026 beer · On Dec 2, 2026 keeps it as its own order · a later pre-order holds that beer for the later order, with one pallet count · each week keeps its own lines and subtotal under that order · beer never moves to an earlier date"], ["not open yet", "planned beers not released yet: Planned for the week of … · not open for pre-order yet, or not yet listed when the buyer has no package for it"], ["one cart", "the same order summary as Shop · the cart becomes one order per ship date: Ships now for stock, then each date, each with its own subtotal and pallet fit"], ["both ways", "a package offered from stock and from a planned batch has a row on each page; an order holds one offer per SKU, so a quantity typed on one page moves it from the other"], ["nothing planned", "Nothing open for pre-order yet"]],
     spec: "Its own portal tab, after Order. The Shop page drawn with its Pre-order list: the same loader, cart, order summary and Review; a new cart is kept in the browser, so it carries between Order and Pre-order. Submitting places one order per ship date, so no beer waits for a later one; Review lists each order and one button places them all. Only what staff released from a planned batch can be ordered. Nothing else about the batch is shown: no volume, recipe, tank, lot, or exact brew day.",
     body: <ShopView model={toShopViewProps(ridgelineShop)} section="pre-order" />,
-  },
-  {
-    step: 6,
-    slice: 1,
-    portal: "Order now",
-    name: "Coming up",
-    to: { "Hazy IPA": "Shop", "Pils": "Shop", "Saison": "Shop" },
-    job: "See what the brewery plans to brew next and jump to that brand on Shop",
-    reads: "portal_schedule [planned batches as brand + expected week and whether the brand is on the buyer's list; a definer view scoped to the buyer's brewery, no customer policy on batches]",
-    writes: "none",
-    states: [["nothing planned", "check back; the brewery has not scheduled a batch"], ["brand not listed", "row shows the brand with no package to order; ask the brewery", 1]],
-    spec: "Planned batches (not yet brewed, planned this week or later) as one row per brand and expected week, soonest first. A brand row opens Shop scrolled to that brand; a brand with nothing listed for wholesale still appears so the buyer can ask. Nothing else about the batch is shown: no volume, recipe, tank, lot, or exact day. Reached from Shop; not a nav tab.",
-    body: <ComingUpView model={toComingUpViewProps(ridgelineComingUp)} />,
   },
   {
     step: 6,

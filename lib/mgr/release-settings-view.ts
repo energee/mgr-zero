@@ -3,6 +3,7 @@
 // defaults as form text, the set_release_defaults payload with the reason it
 // is withheld, and how one customer's ceiling reads.
 import { submitReason } from "./submit-reason";
+import { SHARE_FLOOR_PCT } from "./release-view";
 
 /** The release columns of get_brewery. */
 export type ReleaseSettings = {
@@ -59,13 +60,14 @@ export type ReleaseShareRow = { customer_id: string; customer_name: string; manu
 
 const pct = (value: number) => `${Math.round(value * 10) / 10}%`;
 
-/** How a customer's ceiling reads: "18% · 15% from purchases, +3% from stock",
+/** How a customer's ceiling reads: "18% · 15% from purchases, +3% from stock", "5% · the minimum (0.9% of purchases)",
  *  "25% · set on the customer", or "No limit". A calculated ceiling under the
  *  customer's plain share was held to the maximum, or outweighed by others' stock purchases. */
 export function releaseShareLine(row: Pick<ReleaseShareRow, "manual_pct" | "base_pct" | "pct">): string {
   if (row.pct == null) return "No limit";
   if (row.manual_pct != null) return `${pct(row.pct)} · set on the customer`;
   if (row.base_pct == null) return pct(row.pct);
+  if (row.pct <= SHARE_FLOOR_PCT && row.base_pct < row.pct) return `${pct(row.pct)} · the minimum (${pct(row.base_pct)} of purchases)`;
   const fromStock = row.pct - row.base_pct;
   return fromStock >= 0.05 ? `${pct(row.pct)} · ${pct(row.base_pct)} from purchases, +${pct(fromStock)} from stock` : `${pct(row.pct)} · ${pct(row.base_pct)} of purchases before stock is weighed`;
 }

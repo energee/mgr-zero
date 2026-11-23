@@ -115,7 +115,8 @@ function OrderSummaryPanel({ model, controls, locked, disabled, preparing, messa
 function OrderSummaryBar({ model, controls, locked, disabled, preparing, typing }: SummaryProps & { typing: boolean }) {
   const [open, setOpen] = useState(false);
   const { summary } = model;
-  if (!summary.lines.length || typing) return null;
+  // An open sheet stays up when its last line is removed, so Undo is still there.
+  if ((!summary.lines.length && !open) || typing) return null;
   const facts = [summary.shipsOn, summary.palletHint].filter(Boolean).join(" · ");
   const review = () => { setOpen(false); controls.review?.(); };
   return <section aria-label="Order summary" className="sticky -bottom-4 z-10 -mx-4 flex items-center gap-3 border-t bg-background px-4 py-2 md:hidden">

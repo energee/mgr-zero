@@ -38,6 +38,7 @@ describe("release settings", () => {
   it("says where a customer's limit comes from", () => {
     expect(releaseShareLine({ manual_pct: null, base_pct: 15, pct: 18 })).toBe("18% · 15% from purchases, +3% from stock");
     expect(releaseShareLine({ manual_pct: 25, base_pct: 31, pct: 25 })).toBe("25% · set on the customer");
+    expect(releaseShareLine({ manual_pct: null, base_pct: 0.9, pct: 5 })).toBe("5% · the minimum (0.9% of purchases)");
     // Held to the maximum, or outweighed by others' stock purchases.
     expect(releaseShareLine({ manual_pct: null, base_pct: 62, pct: 50 })).toBe("50% · 62% of purchases before stock is weighed");
     expect(releaseShareLine({ manual_pct: null, base_pct: null, pct: null })).toBe("No limit");

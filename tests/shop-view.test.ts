@@ -10,7 +10,7 @@ import { ShopView } from "../components/mgr/views/shop";
 import { BrandHeading } from "../components/mgr/views/brand-heading";
 import { ridgelineReviewOrder, ridgelineShop } from "../lib/mgr/fixtures/portal";
 import { toQuotedReviewOrderViewProps, toReviewOrderViewProps } from "../lib/mgr/review-order-view";
-import { effectiveRequestedDate, fillPallet, fitSuggestions, shipGroups, toShopViewProps, type ShopCatalogItem } from "../lib/mgr/shop-view";
+import { effectiveRequestedDate, fillPallet, fitSuggestions, orderRequestedDate, shipGroups, toShopViewProps, type ShopCatalogItem } from "../lib/mgr/shop-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 
@@ -426,6 +426,8 @@ describe("Shop ship dates, limits and suggestions", () => {
     // A typed limit earns nothing from stock, and a buyer with none gets no note.
     expect(toShopViewProps({ ...ridgelineShop, catalog, share: { pct: 25, basePct: null, manual: true, liftDays: 14 } }).preOrder?.note).toMatch(/^You can order up to 25% of each new release\. /);
     expect(toShopViewProps({ ...ridgelineShop, catalog, share: null }).preOrder?.note).toBeUndefined();
+    // A share raised to the 5% minimum was not earned by buying stock.
+    expect(toShopViewProps({ ...ridgelineShop, catalog, share: { pct: 5, basePct: 0.9, manual: false, liftDays: 14 } }).preOrder?.note).toMatch(/^You can order up to 5% of each new release\. /);
     const html = htmlOf(createElement(ShopView, { model, section: "pre-order", footer: null }));
     // One heading for the two beers that ship Dec 9.
     expect(html.match(/Ships Dec 9, 2026/g)).toHaveLength(1);
@@ -526,6 +528,28 @@ describe("Shop ship dates, limits and suggestions", () => {
     // The two stock kegs count toward the pallet's weight, so the pre-order halves stop at 13 (15 kegs, 2,400 lb); the stock kegs are not topped up.
     expect(fillPallet(cart, "2026-12-09", undefined, { "": "2026-12-09" })).toEqual({ h: 13 });
     expect(fillPallet(cart, "2026-12-09")).toEqual({ h: 15 });
+  });
+  it("counts only the same batch toward a limit, and leaves a release with few left alone", () => {
+    // The same beer from an earlier batch, held for this order, is not this batch's barrels.
+    const earlier = item("e", "Hazy", 4, { name: "Loose", formatName: "Loose", packageType: "can", kegSize: null, releases: [rel("r-e", "2026-12-02", { bblPerUnit: 0.5 })] });
+    expect(fillPallet([half(2, { limitLeftBbl: 3 }), earlier], "2026-12-09", undefined, { "2026-12-02": "2026-12-09" })).toEqual({ h: 6 });
+    // The buyer cannot see how much of a release is left, so one marked few left is not topped up.
+    expect(fillPallet([half(2, { badge: "low" })], "2026-12-09")).toEqual({});
+  });
+  it("neither offers nor applies a ship date before a stock release ships", () => {
+    const dated = item("d", "Dated Dubbel", 2, { badge: "in", releases: [rel("r-d", "2026-12-12", { fromBatch: false })], offer: "r-d" });
+    const cart = [dated, half(5), later];
+    expect(shipGroups(cart, { "": "2026-12-09" }).map((g) => g.shipsFrom)).toEqual(["", "2026-12-09", "2026-12-16"]);
+    expect(shipGroups(cart, { "": "2026-12-16" }).map((g) => g.shipsFrom)).toEqual(["2026-12-09", "2026-12-16"]);
+    expect(toShopViewProps({ ...ridgelineShop, catalog: cart }).summary.shipments[0].parts[0].shipWith?.options.map((o) => o.value)).toEqual(["", "2026-12-16"]);
+  });
+  it("keeps the buyer's later date on a cart that is one order, and ships a split cart's pre-orders on their own dates", () => {
+    const [only] = shipGroups([half(5)]);
+    expect(orderRequestedDate(only, true, "2026-12-20")).toBe("2026-12-20");
+    expect(orderRequestedDate(only, true, "2026-12-01")).toBe("2026-12-09");
+    expect(orderRequestedDate(only, false, "2026-12-20")).toBe("2026-12-09");
+    const [stock] = shipGroups([item("s", "Stock Stout", 2, { badge: "in" })]);
+    expect(orderRequestedDate(stock, false, "2026-12-20")).toBe("2026-12-20");
   });
   it("counts the order's lines with no pallet fit toward the batch limit", () => {
     const loose = item("x", "Hazy", 10, { name: "Loose", formatName: "Loose", packageType: "can", kegSize: null, releases: [rel("r-x", "2026-12-09", { bblPerUnit: 0.1 })] });

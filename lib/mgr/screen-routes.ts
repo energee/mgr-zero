@@ -167,7 +167,6 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Edit release", file: "app/(app)/catalog/brands/[id]/page.tsx" },
   { name: "Shop", file: "app/(portal)/portal/page.tsx" },
   { name: "Pre-order", file: "app/(portal)/portal/pre-order/page.tsx" },
-  { name: "Coming up", file: "app/(portal)/portal/coming-up/page.tsx" },
   { name: "Review order", file: "app/(portal)/portal/cart.tsx" },
   { name: "Order history", file: "app/(portal)/portal/orders/page.tsx" },
   { name: "Order detail", file: "app/(portal)/portal/orders/[id]/page.tsx" },

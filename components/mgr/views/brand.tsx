@@ -132,7 +132,7 @@ export function BrandView({
         <section aria-label="Brand details" className="flex min-w-0 flex-col gap-4">
           {E.cols(
             <RegistryInput label="Brand name" value={model.name} onChange={controls.name} required id="brand-name" error={nameError} onBlur={nameBlur} note={nameNote} />,
-            // Staff-only: list_brands and SKU search match it; Catalog notes it under the name, pickers beside it. Never on the portal, Square or SKU names.
+            // list_brands and SKU search match it; Catalog and the portal note it under the name, pickers beside it. Never on Square or SKU names.
             <div className="flex min-w-0 flex-col gap-2">
               {E.edit("Alias", model.alias, "text", undefined, { id: "brand-alias", onChange: controls.alias, "aria-describedby": "brand-alias-help" })}
               <FieldDescription id="brand-alias-help">An informal name, such as a series number. Search finds it; buyers see it under the brand name in the portal.</FieldDescription>

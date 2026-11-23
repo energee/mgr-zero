@@ -229,7 +229,7 @@ defineQuery({
   handler: async (ctx, i) => ({ dataUrl: await unwrap(ctx.db.rpc("portal_cola_label_image", { p_customer: requireCustomer(ctx), p_brand: i.brandId })) as string | null }),
 });
 
-// Coming up: upcoming planned batches as brand + expected week (Monday), soonest
+// Pre-order's planned list: upcoming planned batches as brand + expected week (Monday), soonest
 // first, and whether the brand has a package on the buyer's list. The
 // portal_schedule view exposes nothing else about a batch.
 defineQuery({
