@@ -13,8 +13,19 @@ export function customerStateReason(values: Pick<CustomerEditValues, "country" |
 /** The stored values the shared Customer detail form edits and saves. state is
  *  "" outside the US (the form draws it for a US customer only); alias "" is none.
  *  releaseDelayDays is the Release delay field's text; the create dialog has no
- *  such field and leaves it undefined, so a new customer starts at 0. */
-export type CustomerEditValues = { name: string; alias: string; type: string; country: string; state: string; saleChannelId: string; licenseNumber: string; paymentTerms: string; taxTreatment: string; releaseDelayDays?: string };
+ *  such field and leaves it undefined, so a new customer starts at 0.
+ *  releaseSharePct is the Release share field's text, "" for none; the create
+ *  dialog leaves it undefined too. */
+export type CustomerEditValues = { name: string; alias: string; type: string; country: string; state: string; saleChannelId: string; licenseNumber: string; paymentTerms: string; taxTreatment: string; releaseDelayDays?: string; releaseSharePct?: string };
+
+/** The note under Release share (%). */
+export const RELEASE_SHARE_HELP = "The most of each batch's wholesale barrels this customer can pre-order until limits lift. Blank = no typed limit.";
+
+/** Why a typed release share cannot be saved: blank, or above 0 up to 100 with at most two decimals. */
+export function releaseShareError(text: string): string | undefined {
+  const value = text.trim();
+  return value === "" || (/^\d+(\.\d{1,2})?$/.test(value) && Number(value) > 0 && Number(value) <= 100) ? undefined : "Enter a percent above 0 up to 100, or leave it blank.";
+}
 
 /** The note under Release delay (days). */
 export const RELEASE_DELAY_HELP = "Releases appear for this customer this many days after they open. 0 = right away.";
@@ -70,6 +81,7 @@ export type CustomerSnapshot = {
     sale_channels: { name: string } | null;
     tax_treatment?: string | null;
     release_delay_days?: number;
+    release_share_pct?: number | null;
   };
   shipTos: { label: string }[];
   /** list_sale_channels rows. */
@@ -108,6 +120,7 @@ export function toCustomerViewProps({
       name: customer.name, alias: customer.alias ?? "", type: customer.type, country: customer.country, state: customer.state ?? "", saleChannelId: customer.sale_channel_id,
       licenseNumber: customer.license_no ?? "", paymentTerms: customer.payment_terms ?? "net30", taxTreatment: customer.tax_treatment ?? "",
       releaseDelayDays: String(customer.release_delay_days ?? 0),
+      releaseSharePct: customer.release_share_pct == null ? "" : String(Number(customer.release_share_pct)),
     },
     shipTos: shipTos.map((s) => s.label).join(" · ") || "none",
     portalUsers: (portalUsers ?? []).map((u) => ({ key: u.userId, email: u.email })),

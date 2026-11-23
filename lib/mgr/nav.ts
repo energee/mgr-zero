@@ -12,7 +12,7 @@
 // (tests/nav-ready-links.test.ts checks every rendered fragment against the
 // page sources). Flip `planned` off when the area's route or section ships.
 import {
-  BeerIcon, Home01Icon, Invoice01Icon, Package01Icon, Settings01Icon, ShoppingCart01Icon, UserCircleIcon,
+  BeerIcon, Calendar03Icon, Home01Icon, Invoice01Icon, Package01Icon, Settings01Icon, ShoppingCart01Icon, UserCircleIcon,
 } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@/components/mgr/icon";
 import type { StaffRole } from "@/lib/commands/registry";
@@ -117,8 +117,9 @@ export const UNLISTED_NAV: readonly NavItem[] = [
 ];
 
 export const PORTAL_NAV: readonly NavItem[] = [
-  { label: "Order", href: "/portal", icon: ShoppingCart01Icon },
-  { label: "Orders", href: "/portal/orders", icon: Package01Icon },
+  { label: "Order now", href: "/portal", icon: ShoppingCart01Icon },
+  { label: "Pre-order", href: "/portal/pre-order", icon: Calendar03Icon },
+  { label: "Order history", href: "/portal/orders", icon: Package01Icon },
   { label: "Invoices", href: "/portal/invoices", icon: Invoice01Icon },
   { label: "Account", href: "/portal/account", icon: UserCircleIcon },
 ];

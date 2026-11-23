@@ -8,7 +8,7 @@ export default function PortalNotFound() {
   return (
     <NotFoundView
       message="There is nothing at this address for your account. It may have been removed, or the link may be wrong."
-      backLabel="Back to Orders"
+      backLabel="Back to Order history"
       backHref="/portal/orders"
     />
   );

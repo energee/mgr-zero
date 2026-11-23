@@ -198,7 +198,7 @@ describe("Catalog view", () => {
     // What the alias is for stays visible while typing (#1131).
     expect(html).not.toContain('placeholder="Staff only"');
     expect(html).toMatch(/<input[^>]*aria-describedby="brand-alias-help"/);
-    expect(html).toMatch(/id="brand-alias-help"[^>]*>An informal name staff use, such as a series number\./);
+    expect(html).toMatch(/id="brand-alias-help"[^>]*>An informal name, such as a series number\. Search finds it; buyers see it under the brand name in the portal\./);
   });
 
   // #965: inventory and live draw the same Water profiles row, with no invented count.
@@ -853,6 +853,13 @@ describe("Format view", () => {
     expect(html).not.toMatch(/Basis|New SKU, then Pour,/);
     expect(html).toMatch(/Can body/);
     expect(html).not.toMatch(/→/);
+  });
+
+  it("offers Pallet fit only to Admin, with what it means", () => {
+    expect(htmlOf(createElement(FormatView, { model: toFormatViewProps(formatCan) }))).not.toMatch(/Pallet fit/);
+    const html = htmlOf(createElement(FormatView, { model: toFormatViewProps(formatCan), canSetPalletFit: true }));
+    expect(html).toMatch(/Pallet fit/);
+    expect(html).toContain("How many of this package fill one layer or pallet the way you load. Leave blank to skip. Advisory only.");
   });
 
   it("the Format inventory record is FormatView through its fixture adapter", () => {

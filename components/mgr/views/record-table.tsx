@@ -36,7 +36,7 @@ export type RecordTableRow = {
    *  packaging runs). Sorting would scatter the groups, so use it with
    *  sortable={false}. */
   heading?: ReactNode;
-  /** A secondary line under the name, such as a brand's staff-only alias. */
+  /** A secondary line under the name, such as a brand's alias. */
   note?: ReactNode;
   /** A fixed-size thumbnail before the name, such as a brand's COLA label.
    *  An element here needs a key for the same reason a cell does (#1137). */

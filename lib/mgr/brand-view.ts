@@ -28,7 +28,7 @@ export type BrandViewModel = {
   /** Missing COLA, price group (or Unpriced), category, active SKU count; none on a new brand. */
   badges: BrandBadge[];
   name: string;
-  /** Staff-only informal name; "" when none. */
+  /** Informal name, such as a series number, shown to staff and to portal buyers; "" when none. */
   alias: string;
   style: string;
   styleOptions: string[];

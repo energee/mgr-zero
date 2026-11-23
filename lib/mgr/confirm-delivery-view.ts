@@ -2,7 +2,8 @@
 import type { ShipToSnapshot } from "./ship-to-view";
 import { submitReason } from "./submit-reason";
 
-export type ConfirmDeliveryLineView = { key: string; title: string; qty: string };
+/** A delivered line: title "Brand · Format" (lineLabel), alias the brand's alias, muted under it. */
+export type ConfirmDeliveryLineView = { key: string; title: string; alias?: string; qty: string };
 
 export type ConfirmDeliveryViewModel = {
   backHref?: string;

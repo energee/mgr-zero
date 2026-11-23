@@ -46,6 +46,10 @@ function requestBindings() {
     if (name === "get_gravity_unit") return { effective: "plato" };
     if (name === "list_movements") return { rows: [], nextCursor: null, total: 0 };
     if (name === "portal_catalog") return [];
+    if (name === "portal_brands") return [];
+    // The Shop page's other reads: planned batches, the buyer's limit and their usual order.
+    if (name === "portal_schedule" || name === "portal_suggested_order") return [];
+    if (name === "portal_release_share") return null;
     if (name === "get_portal_account") return { shipTos: [], membership: { userId: "actor" }, fulfillmentSource: null };
     if (name.startsWith("list_")) return [];
     throw new CommandError("record not found", 404, "not_found");

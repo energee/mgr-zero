@@ -62,8 +62,11 @@ export function CommandForm({
   container,
   children,
   previewAction,
+  wide = false,
 }: {
   open: boolean;
+  /** A two-column body (the portal brand sheet): a wider dialog from sm up. The phone sheet is unchanged. */
+  wide?: boolean;
   /** Where the sheet or dialog portals to; the screen explorer keeps it inside its box. */
   container?: HTMLElement | null;
   /** Keeps this inventory picker and its dismissal controls inside the explorer. */
@@ -126,7 +129,7 @@ export function CommandForm({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent {...returnFocus} showCloseButton={false} className="flex max-h-[90svh] flex-col overflow-hidden sm:max-w-md" data-preview-action={previewAction || undefined}>
+      <DialogContent {...returnFocus} showCloseButton={false} className={cn("flex max-h-[90svh] flex-col overflow-hidden", wide ? "sm:max-w-3xl" : "sm:max-w-md")} data-preview-action={previewAction || undefined}>
         <DialogHeader className="shrink-0">
           <DialogTitle className="min-w-0 pr-8 [overflow-wrap:anywhere]">{title}</DialogTitle>
         </DialogHeader>

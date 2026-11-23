@@ -173,7 +173,7 @@ describe("Planning view", () => {
 
 
 describe("Planning release rows (portal releases)", () => {
-  const batch = (batchId: string, batchNo: number): ReleaseBatchRow => ({ batch_id: batchId, batch_no: batchNo, sku_id: `${batchId}-keg`, units: 40, needed_by: "2026-12-04", skus: { name: "Stout · ⅙ bbl keg", brands: { name: "Stout" } } });
+  const batch = (batchId: string, batchNo: number): ReleaseBatchRow => ({ batch_id: batchId, batch_no: batchNo, sku_id: `${batchId}-keg`, planned_bbl: 10, wholesale_bbl: null, needed_by: "2026-12-04", skus: { name: "Stout · ⅙ bbl keg", brands: { name: "Stout" } } });
   const released: ReleaseRow = { id: "r1", batch_id: "b1", batch_no: 12, sku_id: "b1-keg", sku_name: "Stout · ⅙ bbl keg", qty: 40, ships_from: "2026-12-04", orders_close_on: null, withdrawn_at: null, ready_on: "2026-12-04", open: true, cancelled: false, confirmed: 0, preordered: 0, remaining: 40 };
   const snapshot = { requirements: [], batches: [batch("b1", 12), batch("b2", 13)], releases: [released] };
 

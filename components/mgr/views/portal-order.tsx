@@ -3,7 +3,9 @@
 // Live passes footer as the Reorder link; inventory draws the unlabeled button.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import type { PortalOrderViewModel } from "@/lib/mgr/portal-order-view";
+import { BrandHeading } from "@/components/mgr/views/brand-heading";
+import { startsGroup } from "@/lib/mgr/brand-lines";
+import type { PortalOrderLineView, PortalOrderViewModel } from "@/lib/mgr/portal-order-view";
 
 export function PortalOrderView({
   model,
@@ -11,8 +13,11 @@ export function PortalOrderView({
   linkRows,
   reorderHref,
   continueHref,
+  brandHeading,
 }: {
   model: PortalOrderViewModel;
+  /** The live page's brand heading: BrandHeading with the label and reference sheet. Absent draws the plain BrandHeading. */
+  brandHeading?: (line: PortalOrderLineView) => ReactNode;
   /** Live: Reorder with href. Inventory draws E.btn when model.reorder. */
   footer?: ReactNode;
   /** Live: the invoice row is a link. Inventory leaves the tap unlabeled. */
@@ -22,14 +27,15 @@ export function PortalOrderView({
 }) {
   return (
     <>
-      {E.back("Orders", model.title, undefined, model.backHref)}
+      {E.back("Order history", model.title, undefined, model.backHref)}
       {E.fld("Status", model.status)}
       {model.shipTo ? E.fld("Ship-to", model.shipTo) : null}
       {model.requested ? E.fld("Requested", model.requested) : null}
       {model.po ? E.fld("Your PO", model.po) : null}
       {model.note ? E.fld("Note", model.note) : null}
-      {model.lines.map((line) => (
+      {model.lines.map((line, i) => (
         <Fragment key={line.key}>
+          {startsGroup(model.lines, i) ? (brandHeading ? brandHeading(line) : <BrandHeading name={line.group!} alias={line.alias} />) : null}
           {E.row(line.name, line.detail, line.amount, line.warning ? "w" : "")}
         </Fragment>
       ))}

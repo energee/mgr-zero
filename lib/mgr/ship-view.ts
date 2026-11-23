@@ -1,11 +1,15 @@
 // lib/mgr/ship-view.ts — view-model for Ship (invoice now and on delivery).
 import { docNo } from "./doc-no";
+import { lineLabel, type BrandedSku } from "./brand-lines";
 import { saleVolume } from "@/lib/volume";
 import { stateOrCountry } from "./ship-to-view";
 
 export type ShipLineView = {
   key: string;
+  /** "Brand · Format" (lineLabel), or the SKU name. */
   name: string;
+  /** The brand's alias, muted under the name. */
+  alias?: string;
   detail: string;
   qty: number;
   picked: number;
@@ -44,7 +48,7 @@ export type ShipSnapshot = {
     qty_shipped: number | null;
     bbl_per_unit?: number;
     short_reason?: string | null;
-    skus: { name: string } | null;
+    skus: BrandedSku;
   }[];
   locations: { id: string; name: string }[];
   invoiceTiming?: "now" | "on_delivery";
@@ -65,17 +69,17 @@ export function toShipViewProps({ order, lines, locations, invoiceTiming: asked 
   for (const l of lines) {
     const qty = shipOf(l);
     if (qty <= 0) continue;
-    const name = l.skus?.name ?? "Line";
+    const { name } = lineLabel(l.skus);
     tape.push([`−${qty} ${name} · removed for sale${dest ? ` · ships to ${dest}` : ""}`, saleVolume(qty, l.bbl_per_unit)]);
   }
   for (const line of lines) {
     const released = pickedOf(line) - shipOf(line);
-    if (released > 0) tape.push([`${released} ${line.skus?.name ?? "Line"} released · restock`, ""]);
+    if (released > 0) tape.push([`${released} ${lineLabel(line.skus).name} released · restock`, ""]);
   }
   tape.push(invoiceTiming === "on_delivery"
     ? ["invoice number", "deferred to delivery"]
     : ["invoice number", "assigned on commit"]);
-  const shortNameWord = (short?.skus?.name ?? "line").split("·")[0]?.trim() ?? "line";
+  const shortNameWord = (short ? lineLabel(short.skus).name : "line").split("·")[0]?.trim() ?? "line";
   return {
     backTo: docNo("ORD", order.order_no, "Order"),
     backHref,
@@ -87,7 +91,7 @@ export function toShipViewProps({ order, lines, locations, invoiceTiming: asked 
       const qty = shipOf(l);
       return {
         key: l.id,
-        name: l.skus?.name ?? "Line",
+        ...lineLabel(l.skus),
         detail: anyShort ? `ordered ${ordered} · picked ${picked}` : `picked ${picked}`,
         qty,
         picked,
