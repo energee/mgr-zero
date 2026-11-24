@@ -6,10 +6,10 @@ import type { PendingInvitation, TeamMember } from "@/lib/commands/invites";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { getRequestIdentity } from "@/lib/auth/request-context";
 import { deniedHref } from "@/lib/mgr/denied";
-import { toPendingInvitationRows, toTeamMemberRow } from "@/lib/mgr/team-view";
+import { toInvitedMemberRows, toPendingInvitationRows, toTeamMemberRow } from "@/lib/mgr/team-view";
 import "@/lib/commands/all";
 import { InviteForm } from "./invite-form";
-import { InvitationActions } from "./invitation-actions";
+import { InvitationActions, InvitedMemberActions } from "./invitation-actions";
 import { MemberForm } from "./member-form";
 import { navTitle } from "@/lib/mgr/nav";
 
@@ -23,15 +23,19 @@ export default async function TeamPage() {
     runCommand("list_team_members", {}, ctx) as Promise<TeamMember[]>,
     runCommand("list_pending_invitations", {}, ctx) as Promise<PendingInvitation[]>,
   ]);
+  const joined = members.filter((m) => !m.invited);
   return (
     <TeamView
       model={{
         backHref: "/settings",
-        rows: members.map((member) => toTeamMemberRow(member, identity?.userId)),
-        invitations: toPendingInvitationRows(invitations, brewery.timeZone),
+        rows: joined.map((member) => toTeamMemberRow(member, identity?.userId)),
+        invitations: [...toInvitedMemberRows(members, brewery.timeZone), ...toPendingInvitationRows(invitations, brewery.timeZone)],
       }}
-      memberActions={Object.fromEntries(members.filter(m => m.userId !== identity?.userId).map(m => [m.userId, <MemberForm key={m.userId} member={m} />]))}
-      invitationActions={Object.fromEntries(invitations.map(i => [i.id, <InvitationActions key={i.id} inviteId={i.id} email={i.email} />]))}
+      memberActions={Object.fromEntries(joined.filter(m => m.userId !== identity?.userId).map(m => [m.userId, <MemberForm key={m.userId} member={m} />]))}
+      invitationActions={{
+        ...Object.fromEntries(members.filter(m => m.invited).map(m => [m.userId, <InvitedMemberActions key={m.userId} userId={m.userId} email={m.email} />])),
+        ...Object.fromEntries(invitations.map(i => [i.id, <InvitationActions key={i.id} inviteId={i.id} email={i.email} />])),
+      }}
       createAction={<InviteForm />}
     />
   );
