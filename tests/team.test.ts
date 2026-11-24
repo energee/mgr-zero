@@ -1,14 +1,15 @@
 // tests/team.test.ts — Team roster with profile names and email fallback, one
 // member's roles changed in one write, a membership ended in one write. The
 // brewery never loses its last admin; nobody removes themselves; only admins
-// write; the Auth user survives a revoke (re-invite is the compensation).
+// write; the Auth user survives a revoke (re-invite is the compensation). A
+// new-account invitee stays invited until first sign-in, and only they can be resent.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, makeBrewery, makeStaff, makeStaffCtx } from "./helpers";
+import { admin, makeBrewery, makeStaff, makeStaffCtx, sql } from "./helpers";
 import { runCommand, type StaffRole } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 type Ctx = Awaited<ReturnType<typeof makeStaffCtx>>;
-type Member = { userId: string; email: string; name: string; roles: StaffRole[] };
+type Member = { userId: string; email: string; name: string; roles: StaffRole[]; invited: boolean };
 let b: { id: string }, adminCtx: Ctx, sales: Ctx;
 
 beforeAll(async () => {
@@ -83,6 +84,28 @@ describe("team", () => {
     await expect(runCommand("update_staff_role", { userId: lastAdmin.userId, roles: ["sales"] }, lastAdmin)).rejects.toThrow(/admin/);
     const members = await roster(lastAdmin);
     expect(members.find((m) => m.userId === lastAdmin.userId)?.roles).toEqual(["admin", "sales"]);
+  });
+
+  it("marks a new-account invitee as invited until their first sign-in, and resends only to them", async () => {
+    const brewery = await makeBrewery();
+    const owner = await makeStaffCtx(brewery.id, "admin");
+    const address = `${crypto.randomUUID()}@test.local`;
+    const { userId } = await runCommand("invite_staff", { email: address, role: "admin" }, owner) as { userId: string };
+    const member = await makeStaff(brewery.id, "warehouse");
+    const rows = await roster(owner);
+    expect(rows.find((m) => m.userId === userId)?.invited).toBe(true);
+    expect(rows.find((m) => m.userId === member.id)?.invited).toBe(false);
+
+    const sent = sql(`select invited_at from auth.users where id = '${userId}'`)[0];
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    await runCommand("resend_staff_invite", { userId }, owner);
+    expect(sql(`select invited_at > '${sent}'::timestamptz from auth.users where id = '${userId}'`)).toEqual(["t"]);
+    await expect(runCommand("resend_staff_invite", { userId: member.id }, owner)).rejects.toThrow(/no pending invitation/);
+    await expect(runCommand("resend_staff_invite", { userId }, await makeStaffCtx(brewery.id, "sales"))).rejects.toThrow(/permission denied/);
+    await expect(runCommand("resend_staff_invite", { userId }, await makeStaffCtx((await makeBrewery()).id, "admin"))).rejects.toThrow(/no pending invitation/);
+
+    sql(`update auth.users set last_sign_in_at = now() where id = '${userId}'`);
+    expect((await roster(owner)).find((m) => m.userId === userId)?.invited).toBe(false);
   });
 
   it("revokes a membership but never self or the last admin, and keeps the Auth user", async () => {

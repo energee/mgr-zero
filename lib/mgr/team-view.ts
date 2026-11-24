@@ -1,5 +1,5 @@
 // lib/mgr/team-view.ts — view-model for Team (list_team_members and
-// list_pending_invitations).
+// list_pending_invitations). Members still `invited` are drawn as pending invitations.
 import type { PendingInvitation, TeamMember } from "@/lib/commands/invites";
 import { formatDate } from "@/lib/date-format";
 import { sentenceCase, staffRolesLabel } from "@/lib/mgr/labels";
@@ -31,3 +31,8 @@ export type TeamViewModel = {
 /** The sent day is the brewery's calendar day, like every timestamp on screen. */
 export const toPendingInvitationRows = (invitations: PendingInvitation[], timeZone: string): PendingInvitationRowView[] =>
   invitations.map((i) => ({ key: i.id, email: i.email, detail: `${sentenceCase(i.role)} · Sent ${formatDate(i.createdAt, timeZone)}` }));
+
+/** A new-account invitee is a member who has not signed in yet; Team shows them beside the
+ *  existing-account invitations, sent on the day their membership was created. */
+export const toInvitedMemberRows = (members: TeamMember[], timeZone: string): PendingInvitationRowView[] =>
+  members.filter((m) => m.invited).map((m) => ({ key: m.userId, email: m.email, detail: `${staffRolesLabel(m.roles)} · Sent ${formatDate(m.createdAt, timeZone)}` }));

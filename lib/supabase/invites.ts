@@ -61,3 +61,14 @@ async function invite(ctx: Ctx, input: InviteInput, execution: CommandExecution,
 
 export const inviteStaff = (ctx: Ctx, input: { email: string; role: StaffRole }, execution: CommandExecution, hooks: Hooks = {}) => invite(ctx, input, execution, hooks);
 export const inviteCustomerUser = (ctx: Ctx, input: { email: string; customerId: string }, execution: CommandExecution, hooks: Hooks = {}) => invite(ctx, input, execution, hooks);
+
+/** Auth re-sends the invite email to an account that has not confirmed yet and keeps its metadata.
+ *  list_team_members scopes the lookup to this brewery and to members who never signed in. */
+export async function resendStaffInvite(ctx: Ctx, userId: string) {
+  const rows = (await unwrap(ctx.db.rpc("list_team_members", { p_brewery: ctx.breweryId })))!;
+  const member = rows.find((row) => row.user_id === userId && row.invited);
+  if (!member) throw new CommandError("This person has no pending invitation. They may have signed in already.", 409, "no_pending_invite");
+  const { error } = await createAdminClient().auth.admin.inviteUserByEmail(member.email);
+  if (error) throw inviteAuthFailure(error);
+  return { userId };
+}
