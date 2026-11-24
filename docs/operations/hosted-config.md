@@ -39,6 +39,14 @@ ports 3000 and 3002, under `/auth/confirm`. Restart the relevant local Supabase
 stack after changing its redirect allowlist. Hosted Auth needs its own approved
 origin and invitation template when deployment is configured.
 
+Hosted Auth does not read `supabase/templates/invite.html`. Copy it into the
+hosted invite template (`mailer_templates_invite_content`) by hand. The stock
+template links to `{{ .ConfirmationURL }}`, which signs the person in through
+a URL fragment the server never sees. The person then lands on `/login`
+instead of `/accept`, and never sets a password. Keep the hosted Site URL
+free of a trailing slash: the template appends `/auth/confirm` to it. Both
+were set on 2026-11-23 after staff reported that invites did not let them in.
+
 Passwordless and password-recovery emails use the configured `APP_URL`, never
 the incoming request's Origin. Hosted Auth's Site URL and redirect allowlist
 must use the approved exact origin and `/auth/confirm` callback, without wildcard
