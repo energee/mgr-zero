@@ -137,7 +137,7 @@ it("clears every sheet error on close: secondary actions share the form's slot, 
     expect(src(p), p).not.toContain("useCommandAction(");
     expect(src(p), p).toContain("form.run(");
   }
-  expect(src("settings/team/invite-form.tsx")).toContain("if (!next) action.setError(null)");
+  expect(src("settings/team/invite-form.tsx")).toMatch(/if \(next\) \{[^}]*\} else action\.setError\(null\)/);
   expect(src("inventory/movement-form.tsx")).toMatch(/reset: \(\) => \{ setStockError\(null\);/);
 });
 

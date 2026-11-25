@@ -112,6 +112,13 @@ it("reports a sent invitation in a neutral status line that matches the dialog n
   expect(src).toContain("Invitation pending. They see it in Invitations the next time they sign in.");
 });
 
+it("keeps the sent email while the sheet closes, so the empty-email error never flashes", () => {
+  const src = readFileSync("app/(app)/settings/team/invite-form.tsx", "utf8");
+  const success = src.slice(src.indexOf("await action.run("), src.indexOf("<CommandForm"));
+  expect(success).not.toContain('setEmail("")');
+  expect(src).toMatch(/if \(next\) \{[^}]*setEmail\(""\)/);
+});
+
 it("locks both membership actions during either pending write and retains errors", () => {
   const html = renderToStaticMarkup(createElement(TeamMemberView, { name: "Actual Brewer <actual@example.com>", savedRoles: ["brewer"], removing: true, error: "Cannot remove the last admin" }));
   expect(html).toContain("Cannot remove the last admin");
