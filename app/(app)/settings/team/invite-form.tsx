@@ -30,7 +30,7 @@ export function InviteForm({ customerId }: { customerId?: string }) {
   }
   return <>
     <div role="status">{E.polite(sent)}</div>
-    <CommandForm open={open} onOpenChange={next => { if (!action.busy) { setOpen(next); if (next) { setSent(null); setEmail(""); setRole("warehouse"); } if (!next) action.setError(null); } }} title={title} trigger={<Button variant="outline">{title}</Button>}>
+    <CommandForm open={open} onOpenChange={next => { if (!action.busy) { setOpen(next); if (next) { setSent(null); setEmail(""); setRole("warehouse"); } else action.setError(null); } }} title={title} trigger={<Button variant="outline">{title}</Button>}>
       <InviteView buyer={Boolean(customerId)} email={email} role={role} onEmailChange={setEmail} onRoleChange={setRole} onSubmit={submit} busy={action.busy} error={action.error} emailError={action.fieldErrors.email} />
     </CommandForm>
   </>;
