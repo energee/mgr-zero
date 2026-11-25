@@ -21,7 +21,8 @@ export function InviteForm({ customerId }: { customerId?: string }) {
     const input = customerId ? { email, customerId } : { email, role };
     await action.run(name, input, data => {
       const pending = (data as { state?: string } | null)?.state === "pending_consent";
-      setEmail(""); setRole("warehouse"); setOpen(false);
+      // Fields clear on the next open: an empty email here would show its error while the sheet closes.
+      setOpen(false);
       setSent(pending
         ? "Invitation pending. They see it in Invitations the next time they sign in."
         : "Invite sent. The recipient can set their name and password from the email.");
@@ -29,7 +30,7 @@ export function InviteForm({ customerId }: { customerId?: string }) {
   }
   return <>
     <div role="status">{E.polite(sent)}</div>
-    <CommandForm open={open} onOpenChange={next => { if (!action.busy) { setOpen(next); if (next) setSent(null); if (!next) action.setError(null); } }} title={title} trigger={<Button variant="outline">{title}</Button>}>
+    <CommandForm open={open} onOpenChange={next => { if (!action.busy) { setOpen(next); if (next) { setSent(null); setEmail(""); setRole("warehouse"); } if (!next) action.setError(null); } }} title={title} trigger={<Button variant="outline">{title}</Button>}>
       <InviteView buyer={Boolean(customerId)} email={email} role={role} onEmailChange={setEmail} onRoleChange={setRole} onSubmit={submit} busy={action.busy} error={action.error} emailError={action.fieldErrors.email} />
     </CommandForm>
   </>;
