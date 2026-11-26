@@ -27,3 +27,8 @@ it("registers all three with local Auth", () => {
     expect(config).toContain(`content_path = "./supabase/templates/${name}.html"`);
   }
 });
+
+it("shows the MGR mark from a PNG the app serves, since mail clients do not render SVG", () => {
+  expect(read("invite")).toContain('src="{{ .SiteURL }}/email/mgr-mark.png"');
+  expect(readFileSync("public/email/mgr-mark.png").subarray(1, 4).toString()).toBe("PNG");
+});

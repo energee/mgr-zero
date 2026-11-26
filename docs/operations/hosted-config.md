@@ -43,7 +43,10 @@ Hosted Auth does not read `supabase/templates/`. Copy each file into its
 hosted template by hand: `invite.html` to `mailer_templates_invite_content`,
 `recovery.html` to `mailer_templates_recovery_content`, and `magic_link.html`
 to `mailer_templates_magic_link_content`. The three share one layout; only
-the copy between the `<!-- copy -->` markers differs. The stock invite
+the copy between the `<!-- copy -->` markers differs. Each shows the MGR
+mark from `{{ .SiteURL }}/email/mgr-mark.png` (`public/email/`, a PNG of
+`app/icon.svg`, because mail clients do not render SVG), so deploy the app
+before copying a template that uses it. The stock invite
 template links to `{{ .ConfirmationURL }}`, which signs the person in through
 a URL fragment the server never sees. The person then lands on `/login`
 instead of `/accept`, and never sets a password. Keep the hosted Site URL
