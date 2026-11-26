@@ -39,8 +39,11 @@ ports 3000 and 3002, under `/auth/confirm`. Restart the relevant local Supabase
 stack after changing its redirect allowlist. Hosted Auth needs its own approved
 origin and invitation template when deployment is configured.
 
-Hosted Auth does not read `supabase/templates/invite.html`. Copy it into the
-hosted invite template (`mailer_templates_invite_content`) by hand. The stock
+Hosted Auth does not read `supabase/templates/`. Copy each file into its
+hosted template by hand: `invite.html` to `mailer_templates_invite_content`,
+`recovery.html` to `mailer_templates_recovery_content`, and `magic_link.html`
+to `mailer_templates_magic_link_content`. The three share one layout; only
+the copy between the `<!-- copy -->` markers differs. The stock invite
 template links to `{{ .ConfirmationURL }}`, which signs the person in through
 a URL fragment the server never sees. The person then lands on `/login`
 instead of `/accept`, and never sets a password. Keep the hosted Site URL
