@@ -319,23 +319,39 @@
 
 /* Pointer size, not viewport, chooses target height (plan §5): every control
    is ≥48px under a coarse pointer, and the primary action is ≥56px. Applied
-   to the shadcn data-slot hooks so components/ui stays untouched. */
+   to the shadcn data-slot hooks so components/ui stays untouched. A button is
+   matched by its class, not its slot: a trigger rendered asChild (a sheet,
+   dialog or pagination link) swaps the button's data-slot. Tab strips and
+   fold-out lines (<summary>) take the same floor. A button or tab strip
+   inside a field, and a calendar's month arrows, keep their own size: the
+   field is already 48px, and the arrows must line up with the month name. */
 @media (pointer: coarse) {
-  [data-slot="button"],
+  .group\/button,
   [data-slot="input"],
   [data-slot="input-group"],
   [data-slot="select-trigger"],
   [data-slot="toggle-group-item"],
-  [data-slot="item"] {
+  [data-slot="item"],
+  [data-slot="tabs-list"],
+  summary {
     min-height: 48px;
   }
-  [data-slot="button"][data-size^="icon"] {
+  summary {
+    align-content: center;
+  }
+  .group\/button[data-size^="icon"] {
     min-width: 48px;
   }
-  [data-slot="button"][data-variant="default"],
-  [data-slot="button"][data-variant="irreversible"],
-  [data-slot="button"][data-variant="destructive"] {
+  .group\/button[data-variant="default"],
+  .group\/button[data-variant="irreversible"],
+  .group\/button[data-variant="destructive"] {
     min-height: 56px;
+  }
+  .group\/button[data-slot="input-group-button"],
+  [data-slot="input-group"] [data-slot="tabs-list"],
+  .group\/button[class*="rdp-button_"] {
+    min-height: 0;
+    min-width: 0;
   }
 }
 
