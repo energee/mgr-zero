@@ -4,6 +4,12 @@ Status: **not signed off**. Owner: Ted. Tracks [#311](https://github.com/energee
 Supersedes [2026-09-14](release-readiness-2026-09-14.md); the connected-job table there still applies.
 Read-only evidence from the Vercel CLI and Supabase Management API. No hosted setting was changed.
 
+> **Superseded in part.** Two readings below no longer hold.
+> Public signup is now disabled on Production (`disable_signup: true`; #467 closed 2026-09-25).
+> There is no Preview Supabase project: `ugzhwxzictzvrzlacjmv` no longer exists and none will be recreated (owner decision 2026-11-12, #1616, PR #1825).
+> The Signups row, Decision 2 and the Preview repoint action are history.
+> Current state is in [`pilot-gate-status.md`](pilot-gate-status.md).
+
 Reviewed `main`: `eec7ada59745a3dc0ccf8271102f0f6166080242` (after #406, #408, #409; #407 pending CI).
 
 ## Environment separation (resolved for Preview 2026-09-18; see Actions)
