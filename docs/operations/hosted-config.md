@@ -39,13 +39,24 @@ ports 3000 and 3002, under `/auth/confirm`. Restart the relevant local Supabase
 stack after changing its redirect allowlist. Hosted Auth needs its own approved
 origin and invitation template when deployment is configured.
 
-Hosted Auth does not read `supabase/templates/invite.html`. Copy it into the
-hosted invite template (`mailer_templates_invite_content`) by hand. The stock
+Hosted Auth does not read `supabase/templates/`. Copy each file into its
+hosted template by hand: `invite.html` to `mailer_templates_invite_content`,
+`recovery.html` to `mailer_templates_recovery_content`, and `magic_link.html`
+to `mailer_templates_magic_link_content`. The three share one layout; only
+the copy between the `<!-- copy -->` markers differs. Each shows the MGR
+mark from `{{ .SiteURL }}/email/mgr-mark.png` (`public/email/`, a PNG of
+`app/icon.svg`, because mail clients do not render SVG), so deploy the app
+before copying a template that uses it. The stock invite
 template links to `{{ .ConfirmationURL }}`, which signs the person in through
 a URL fragment the server never sees. The person then lands on `/login`
 instead of `/accept`, and never sets a password. Keep the hosted Site URL
 free of a trailing slash: the template appends `/auth/confirm` to it. Both
 were set on 2026-11-23 after staff reported that invites did not let them in.
+
+Emailed links last 24 hours: `otp_expiry` in `supabase/config.toml` and
+`mailer_otp_exp` on hosted Auth are both 86400. The reset and sign-in emails
+state that limit, so change the setting and the wording together. An invite
+uses the same limit; at one hour, invites opened the next day had expired.
 
 Passwordless and password-recovery emails use the configured `APP_URL`, never
 the incoming request's Origin. Hosted Auth's Site URL and redirect allowlist
