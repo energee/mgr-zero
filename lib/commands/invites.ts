@@ -22,16 +22,25 @@ defineCommand({
   handler: async (ctx, input, execution) => (await import("@/lib/supabase/invites")).inviteCustomerUser(ctx, input, execution),
 });
 
-export type TeamMember = { userId: string; email: string; name: string; roles: StaffRole[]; createdAt: string };
+/** `invited`: sent a new-account invitation and never signed in; Team lists them as pending. */
+export type TeamMember = { userId: string; email: string; name: string; roles: StaffRole[]; createdAt: string; invited: boolean };
 
 defineQuery({
-  name: "list_team_members", description: "Staff roster for the brewery: user id, name as `Profile name <email>` (the email alone when no profile name is saved), email and roles",
+  name: "list_team_members", description: "Staff roster for the brewery: user id, name as `Profile name <email>` (the email alone when no profile name is saved), email, roles, and whether they were invited and have not signed in yet",
   input: z.object({}), roles: ["admin", "sales", "warehouse"],
   handler: async (ctx): Promise<TeamMember[]> => {
     // A table-returning RPC returns an array, including [] for an empty roster.
     const rows = (await unwrap(ctx.db.rpc("list_team_members", { p_brewery: ctx.breweryId })))!;
-    return rows.map((r) => ({ userId: r.user_id, email: r.email, name: r.name, roles: r.roles, createdAt: r.created_at }));
+    return rows.map((r) => ({ userId: r.user_id, email: r.email, name: r.name, roles: r.roles, createdAt: r.created_at, invited: r.invited }));
   },
+});
+
+defineCommand({
+  name: "resend_staff_invite", agentHidden: true,
+  description: "Email a new-account staff invitation again (admin), for a member who was invited and has not signed in yet; existing-account invitations use resend_account_invitation",
+  compensation: "Nothing to reverse; the earlier email's link stops working. Use revoke_staff to withdraw access.",
+  input: z.object({ userId: z.string().uuid() }), roles: ["admin"],
+  handler: async (ctx, input) => (await import("@/lib/supabase/invites")).resendStaffInvite(ctx, input.userId),
 });
 
 defineCommand({

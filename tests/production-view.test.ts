@@ -582,12 +582,12 @@ describe("Recipes view", () => {
   it("maps live list_recipes onto Recipe and Brand columns, without inventing a style or naming a version", () => {
     const model = toRecipesViewProps({
       recipes: [
-        { id: "r1", name: "Hazy IPA", brand: null, latest_version: 1 },
-        { id: "r2", name: "Stout", brand: "Stout", latest_version: null },
+        { id: "r1", name: "Hazy IPA", brand: null, latest_version: 1, added: "Oct 1, 2026" },
+        { id: "r2", name: "Stout", brand: "Stout", latest_version: null, added: "Oct 2, 2026" },
       ],
     });
-    expect(model.rows[0]).toEqual({ key: "r1", name: "Hazy IPA", written: true, brand: null, href: "/recipes/r1" });
-    expect(model.rows[1]).toEqual({ key: "r2", name: "Stout", written: false, brand: "Stout", href: "/recipes/r2" });
+    expect(model.rows[0]).toEqual({ key: "r1", name: "Hazy IPA", written: true, brand: null, added: "Oct 1, 2026", href: "/recipes/r1" });
+    expect(model.rows[1]).toEqual({ key: "r2", name: "Stout", written: false, brand: "Stout", added: "Oct 2, 2026", href: "/recipes/r2" });
     const html = htmlOf(createElement(RecipesView, { model, linkRows: true }));
     expect(html).toContain('href="/recipes/r1"');
     expect(html).toContain('href="/recipes/r2"');
@@ -598,13 +598,21 @@ describe("Recipes view", () => {
   it("draws the recipes through RecordTable, a recipe not written yet in the warning style", () => {
     const html = htmlOf(createElement(RecipesView, { model: toRecipesViewProps(recipesList) }));
     expect(html).toContain("<table");
-    for (const header of ["Recipe", "Brand"]) expect(html).toMatch(new RegExp(`<th[^>]*>[\\s\\S]*?${header}[\\s\\S]*?</th>`));
+    for (const header of ["Recipe", "Brand", "Added"]) expect(html).toMatch(new RegExp(`<th[^>]*>[\\s\\S]*?${header}[\\s\\S]*?</th>`));
     // The list names no version: a written recipe says nothing more, and one with no saved sheet says so under its name.
     expect(html).not.toMatch(/version|>v\d+</i);
     expect(html).toMatch(/class="text-warning-foreground"[^>]*>Not written yet</);
     expect(html.match(/Not written yet/g)).toHaveLength(2); // the table row and the phone card, for the one unwritten recipe
     expect(html).toContain("No brand yet");
     expect(html).toMatch(/data-to="Recipe"[^>]*>Farmhouse saison</);
+  });
+
+  it("shows the day each recipe was added, so the Added header sorts by it", () => {
+    const model = toRecipesViewProps({ recipes: [{ id: "r1", name: "Pils", brand: null, latest_version: 1, added: "Nov 3, 2026" }] });
+    expect(model.rows[0].added).toBe("Nov 3, 2026");
+    expect(htmlOf(createElement(RecipesView, { model }))).toContain("Nov 3, 2026");
+    // Newest first is the list's order, so the Added header says so before any click.
+    expect(htmlOf(createElement(RecipesView, { model }))).toMatch(/aria-sort="descending"[^]*?Added/);
   });
 
   it("links Water profiles, the catalog a recipe picks its water from (#1140, #1205)", () => {
@@ -621,8 +629,8 @@ describe("Recipes view", () => {
 
   it("draws the inventory list through the live adapter, a recipe not written yet included", () => {
     const { rows } = toRecipesViewProps(recipesList);
-    expect(rows.map((r) => r.brand)).toEqual(["Hazy IPA", "Pils", null]);
-    expect(rows[2]).toMatchObject({ name: "Farmhouse saison", written: false });
+    expect(rows.map((r) => r.brand)).toEqual([null, "Hazy IPA", "Pils"]); // newest first, as the live page lists them
+    expect(rows[0]).toMatchObject({ name: "Farmhouse saison", written: false });
     expect(htmlOf(screen("Recipes").body)).not.toMatch(/15 bbl · updated/);
   });
 

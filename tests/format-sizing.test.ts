@@ -58,3 +58,27 @@ it("sends no package type rather than an empty one the enum refuses (#447)", () 
   expect(model.packageType).toBe("");
   expect(formatCommandInput({ ...model, name: "Renamed" }, undefined).packageType).toBeUndefined();
 });
+
+describe("pallet fit (Admin only, advisory)", () => {
+  const saved = { id: "half", name: "Half keg", basis: "packaged" as const, package_type: "keg", keg_size: "half_bbl", units_per_case: null, bbl_per_unit: 0.5, pallet_fit: 8 };
+  it("reads the saved fit and sends it only when it changed: a number, or null when cleared", () => {
+    const model = toFormatViewProps({ format: saved });
+    expect(model.palletFit).toBe("8");
+    expect(formatCommandInput({ ...model, name: "Half" }, saved)).not.toHaveProperty("palletFit");
+    expect(formatCommandInput({ ...model, palletFit: "6" }, saved)).toMatchObject({ palletFit: 6 });
+    expect(formatCommandInput({ ...model, palletFit: "" }, saved)).toMatchObject({ palletFit: null });
+  });
+  it("sends the fit when mixed the same way", () => {
+    const model = toFormatViewProps({ format: { ...saved, pallet_fit_mixed: 6 } });
+    expect(model.palletFitMixed).toBe("6");
+    expect(formatCommandInput(model, { ...saved, pallet_fit_mixed: 6 })).not.toHaveProperty("palletFitMixed");
+    expect(formatCommandInput({ ...model, palletFitMixed: "" }, { ...saved, pallet_fit_mixed: 6 })).toMatchObject({ palletFitMixed: null });
+    expect(formatCommandInput({ ...toFormatViewProps({ format: saved }), palletFitMixed: "6" }, saved)).toMatchObject({ palletFitMixed: 6 });
+  });
+  it("a new format sends a fit only when one was entered", () => {
+    const model = toFormatViewProps({ format: { id: "new", name: "", basis: "packaged", package_type: "keg", keg_size: "half_bbl", bbl_per_unit: null } });
+    expect(model.palletFit).toBe("");
+    expect(formatCommandInput(model)).not.toHaveProperty("palletFit");
+    expect(formatCommandInput({ ...model, palletFit: "8" })).toMatchObject({ palletFit: 8 });
+  });
+});

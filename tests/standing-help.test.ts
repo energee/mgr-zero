@@ -65,7 +65,7 @@ describe("standing help removed where a field error already names the limit (#15
 describe("one line where the help ran to a paragraph (#1518)", () => {
   it("each alias note is one line that still says who sees it", () => {
     const brand = text(createElement(BrandView, { model: toBrandViewProps(brandHazy) }));
-    expect(brand).toContain("An informal name staff use, such as a series number. Search finds it; buyers never see it.");
+    expect(brand).toContain("An informal name, such as a series number. Search finds it; buyers see it under the brand name in the portal.");
     expect(CUSTOMER_ALIAS_HELP).toBe("Another name staff know this customer by. Search finds it; buyers never see it.");
     expect(text(createElement(CustomerView, { model: toCustomerViewProps(customerRidgeline) }))).toContain(CUSTOMER_ALIAS_HELP);
   });

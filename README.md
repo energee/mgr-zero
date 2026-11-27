@@ -338,7 +338,7 @@ Operator procedures live in `docs/operations/`:
 - [Hosted release checklist](docs/operations/release-checklist.md) — approvals, environment separation, advisors, smoke tests, rollback evidence.
 - [Hosted configuration](docs/operations/hosted-config.md) — function region, QuickBooks credentials, `MGR_DEDICATED`, invitation-only signup, recovery redirects.
 - [Slack notifications](docs/operations/slack-setup.md) — environment, Chat SDK database login, manifest, secret rotation, cleanup job.
-- [Buyer order-confirmation email](docs/operations/order-email-worker.md) — delivery worker, schedule, failure log categories, retries.
+- [Buyer order-confirmation email](docs/operations/order-email-worker.md) — delivery worker, weekly release digest job, schedule, failure log categories, retries.
 - [Data retention and closing a brewery](docs/operations/brewery-retention.md) — command-record prune job, brewery export and close.
 - [E2E runners](docs/operations/e2e-runners.md) — `bun run test:e2e` and the mobile command-surface regression.
 - [Outside agents on hosted](docs/operations/agent-hosted-setup.md) — signing keys, access token hook, OAuth server, checks, and how to undo.

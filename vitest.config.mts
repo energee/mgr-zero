@@ -168,7 +168,8 @@ const pureTests = [
   "tests/row-link-prefetch.test.ts",
   "tests/client-bundle-imports.test.ts",
   "tests/guide-anchors.test.ts",
-  "tests/api-backlog-empty.test.ts"
+  "tests/api-backlog-empty.test.ts",
+  "tests/auth-email-templates.test.ts"
 ];
 
 export default defineConfig({

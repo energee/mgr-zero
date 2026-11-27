@@ -21,7 +21,7 @@ import { sentenceCase } from "@/lib/mgr/labels";
 import { WATER_PROFILES_CAPTION } from "@/lib/mgr/water-profiles-view";
 import { FormatsView, type FormatsViewModel } from "@/components/mgr/views/formats";
 import { RecordTable } from "@/components/mgr/views/record-table";
-import { COLA_SLOT, ColaLabelImageView } from "@/components/mgr/views/cola-label-image";
+import { ColaLabelImageView } from "@/components/mgr/views/cola-label-image";
 
 /** A link row; href null (live, not openable) draws it plain, undefined an inert tap. */
 const navRow = (title: string, subtitle: ReactNode, href: string | null | undefined) =>
@@ -30,15 +30,17 @@ const navRow = (title: string, subtitle: ReactNode, href: string | null | undefi
 const TTB_LINK = { target: "_blank", rel: "noopener noreferrer" };
 
 /** The COLA cell stays quiet about the usual case. An approved COLA is a
- *  check in a solid green disc that opens TTB's record, with its date as the label; one saved
+ *  bare check in the success color that opens TTB's record (inline, so it
+ *  sits on the text baseline beside its label), with its date as the label; one saved
  *  without a date reads On file. A brand with none offers Find COLA, which
  *  rests as plain text until its row is reached (app/globals.css). A role with
- *  no action keeps the words, so its cell is never blank. */
+ *  no action keeps the words, so its cell is never blank. The column sits at
+ *  the table's right edge, and data-card-end pins it to the right of a phone card (app/globals.css). */
 const colaCell = (brand: CatalogBrandView, findCola: Record<string, ReactNode> | null | undefined): ReactNode => !brand.colaHref
-  ? <span key="cola" data-quiet-action>{findCola === undefined ? E.act("Find COLA") : findCola?.[brand.key] ?? brand.cola}</span>
+  ? <span key="cola" data-quiet-action data-card-end>{findCola === undefined ? E.act("Find COLA") : findCola?.[brand.key] ?? brand.cola}</span>
   : brand.cola === COLA_APPROVED
-    ? <a key="cola" href={brand.colaHref} {...TTB_LINK} title={sentenceCase(brand.colaNote ?? "")} aria-label={`COLA ${brand.colaNote}; open on TTB`} className="inline-flex size-6 items-center justify-center rounded-full bg-success-foreground text-success hover:opacity-80"><Icon icon={Tick02Icon} className="[&_*]:stroke-2" /></a>
-    : <a key="cola" href={brand.colaHref} {...TTB_LINK} title={sentenceCase(brand.colaNote ?? "")} className="text-muted-foreground underline underline-offset-4">{brand.cola}</a>;
+    ? <a key="cola" href={brand.colaHref} {...TTB_LINK} title={sentenceCase(brand.colaNote ?? "")} aria-label={`COLA ${brand.colaNote}; open on TTB`} data-card-end className="inline-block text-success-foreground hover:opacity-70"><Icon icon={Tick02Icon} className="inline size-5 align-middle [&_*]:stroke-2" /></a>
+    : <a key="cola" href={brand.colaHref} {...TTB_LINK} title={sentenceCase(brand.colaNote ?? "")} data-card-end className="text-muted-foreground underline underline-offset-4">{brand.cola}</a>;
 
 /** A saved label's thumbnail. With the full image it opens larger on hover,
  *  beside its approval date and TTB's record; it sits above the row's link so
@@ -91,23 +93,24 @@ export function CatalogView({
   const firstBrand = !model.showControls;
   return (
     <>
-      {E.back("More", "Catalog", firstBrand ? null : <div className="flex flex-wrap gap-2">
+      {/* Both actions keep their own width, so they share the title's line on a phone. */}
+      {E.back("More", "Catalog", firstBrand ? null : <div className="flex flex-wrap gap-2 *:w-fit">
         {colaAction !== undefined ? colaAction : E.btn("Bulk process COLAs", "g")}
         {brandAction}
-      </div>, model.backHref)}
-      {E.info("Catalog holds your brands, formats, and SKUs. Save a brand, then turn on its formats under Sells as to create the SKUs you sell.")}
+      </div>, model.backHref, undefined, E.help("Catalog holds your brands, formats, and SKUs. Save a brand, then turn on its formats under Sells as to create the SKUs you sell."))}
       {model.showControls && controls}
       {model.empty
         ? E.blank(model.empty, undefined, firstBrand ? brandAction : undefined)
         : <RecordTable
           headers={["Brand", "Style", "ABV", "SKUs", "COLA"]}
-          align={["l", "l", "r", "r", "l"]}
+          noteBeside
+          align={["l", "l", "r", "r", "r"]}
           rows={model.brands.map((brand) => ({
             key: brand.key,
-            cells: [brand.name, brand.style, brand.abv, brand.skus, colaCell(brand, findCola)],
-            // Every row leads with the same slot, so names line up; a brand without a label leaves it blank.
-            // Keyed, because the rows cross to the client RecordTable in an array prop (#1137).
-            media: brand.image ? labelMedia(brand.image, images?.[brand.key] ?? <ColaLabelImageView label={`${brand.name} · COLA ${brand.image.ttbId}`} compact />, previews?.[brand.key]) : <div key="media" className={COLA_SLOT} aria-hidden />,
+            // A style names itself on a phone card, so data-card-bare drops its Style label there (app/globals.css).
+            cells: [brand.name, <span key="style" data-card-bare>{brand.style}</span>, brand.abv, brand.skus, colaCell(brand, findCola)],
+            // A brand with a label leads with its thumbnail; one without reserves no space, so its name starts at the left.
+            media: brand.image ? labelMedia(brand.image, images?.[brand.key] ?? <ColaLabelImageView label={`${brand.name} · COLA ${brand.image.ttbId}`} compact />, previews?.[brand.key]) : undefined,
             // A style or ABV that is not set sorts last, not as the words.
             sort: [brand.name, brand.style === NOT_SET ? null : brand.style, brand.abv === NOT_SET ? null : brand.abv, brand.skus, brand.cola],
             note: brand.alias,

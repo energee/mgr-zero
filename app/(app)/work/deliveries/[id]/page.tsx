@@ -30,7 +30,8 @@ type Stop = {
     shipments: { invoice_timing: "now" | "on_delivery"; orders: { order_no: number | null; customers: { name: string } | null; ship_tos: ShipToSnapshot | null } } | null;
     stock_transfers: { transfer_no: number | null; to_location: { name: string } | null } | null;
   };
-  lines: { id: string; name: string; qty: number; refused?: number }[];
+  /** name is "Brand · Format" for an order line, alias its brand's alias (get_delivery_stop). */
+  lines: { id: string; name: string; alias?: string; qty: number; refused?: number }[];
   invoice: { id: string; invoice_no: number | null } | null;
   signers: string[];
 };
@@ -74,7 +75,7 @@ export default async function DeliveryStopPage({ params }: { params: Promise<{ i
         invoiceTiming: timing,
         lines: lines.map((l) => {
           const refused = transfer && delivery.outcome === "refused" ? l.qty : (l.refused ?? 0);
-          return { key: l.id, title: l.name, qty: delivery.delivered_at ? `${l.qty - refused} accepted · ${refused} refused` : String(l.qty) };
+          return { key: l.id, title: l.name, alias: l.alias, qty: delivery.delivered_at ? `${l.qty - refused} accepted · ${refused} refused` : String(l.qty) };
         }),
       }}
       readout={readout}

@@ -48,7 +48,6 @@ export const GUIDE_ANCHORS: Record<string, string> = {
   "/more": `${STAFF}#navigation`,
   "/denied": `${STAFF}#no-access`,
   "/portal": `${PORTAL}#shop`,
-  "/portal/coming-up": `${PORTAL}#shop`,
   "/portal/orders": `${PORTAL}#orders`,
   "/portal/invoices": `${PORTAL}#invoices`,
   "/portal/account": `${PORTAL}#account`,

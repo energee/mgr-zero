@@ -267,3 +267,10 @@ describe("Confirm delivery", () => {
     expect(transfer).not.toContain("Fictional Lane");
   });
 });
+
+describe("Confirm delivery brand alias", () => {
+  it("draws a line's brand alias muted under its name", () => {
+    const model = { ...confirmDeliveryStop1, lines: [{ key: "g", title: "Masai Giraffe · Sixtel", alias: "Animal #31", qty: "4" }] };
+    expect(htmlOf(createElement(ConfirmDeliveryView, { model }))).toContain('<span>Masai Giraffe · Sixtel</span><span class="text-xs font-normal text-muted-foreground">Animal #31</span>');
+  });
+});

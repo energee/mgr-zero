@@ -82,13 +82,16 @@ describe("Pick view", () => {
     const aliased = { name: "Copper Kite · Case", brands: { name: "Copper Kite", alias: "Field Notes #14" }, formats: { name: "Case" } };
     const model = toPickViewProps({ ...orderPick, lines: [at("a", sku("Hazy", "Half"), 4, null), at("b", sku("Pils", "Case"), 10, 7), at("c", aliased, 2, null)] });
     expect(model.lines.map((l) => [l.key, l.group, l.name, l.ordered, l.qty, l.tone])).toEqual([
-      ["c", "Case", "Copper Kite · Field Notes #14", 2, 2, "ok"],
+      ["c", "Case", "Copper Kite", 2, 2, "ok"],
       ["b", "Case", "Pils", 10, 7, "w"],
       ["a", "Half", "Hazy", 4, 4, "ok"],
     ]);
     const markup = html(createElement(PickView, { model }));
     expect([...markup.matchAll(/<h2[^>]*>([^<]*)<\/h2>/g)].map((m) => m[1])).toEqual(["Case", "Half"]);
     expect(markup).toContain("Ordered 10");
+    // The brand's alias sits muted under the brand.
+    expect(model.lines[0].alias).toBe("Field Notes #14");
+    expect(markup).toContain('<span class="flex flex-col"><span>Copper Kite</span><span class="text-xs font-normal text-muted-foreground">Field Notes #14</span></span>');
   });
 
   // A phone is narrower than four columns and a stepper: each line is a row
@@ -143,6 +146,13 @@ describe("Pick view", () => {
 });
 
 describe("Ship view", () => {
+  it("names a line by brand and format with the brand's alias apart, and draws the alias muted", () => {
+    const giraffe = { name: "Animal #31 · Sixtel", brands: { name: "Masai Giraffe", alias: "Animal #31" }, formats: { name: "Sixtel" } };
+    const model = toShipViewProps({ ...orderShipOnDelivery, lines: [{ ...orderShipOnDelivery.lines[0], skus: giraffe }] });
+    expect(model.lines[0]).toMatchObject({ name: "Masai Giraffe · Sixtel", alias: "Animal #31" });
+    expect(model.tape[0][0]).toContain("Masai Giraffe · Sixtel");
+    expect(html(createElement(ShipView, { model }))).toContain('<span>Masai Giraffe · Sixtel</span><span class="text-xs font-normal text-muted-foreground">Animal #31</span>');
+  });
   it("preserves exact SKU names without inventing units or barrel volumes", () => {
     const model = toShipViewProps({ ...orderShipOnDelivery, lines: [{ ...orderShipOnDelivery.lines[0], skus: { name: "Hazy special can" }, bbl_per_unit: undefined }] });
     expect(model.tape[0][0]).toContain("−4 Hazy special can");

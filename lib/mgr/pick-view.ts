@@ -9,8 +9,10 @@ export type PickLineView = {
   key: string;
   /** Format heading; lines arrive grouped by it (brand-lines.ts). */
   group?: string;
-  /** Brand with its alias, or the SKU name when it has no brand and format. */
+  /** The brand, or the SKU name when it has no brand and format. */
   name: string;
+  /** The brand's alias, muted under the brand. */
+  alias?: string;
   qty: number;
   /** qty_ordered: record_pick refuses a pick above it (#471), so the field caps here. */
   ordered: number;

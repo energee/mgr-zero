@@ -84,11 +84,13 @@ const workingCartSchema = z.object({
   // The name is kept so a package later removed from the catalog can still be named in the notice.
   // offer is the chosen release id ("" or absent: packaged stock).
   lines: z.array(z.object({ skuId: z.string(), name: z.string(), qty: z.string(), offer: z.string().optional() })),
+  // The buyer's "Ship with" choices: an order's ship date ("" for stock) to the later date it ships with.
+  shipWith: z.record(z.string(), z.string()).optional(),
 });
-export function saveWorkingCart(storage: CartStorage, scope: PortalScope, cart: { fields: WorkingFields; qty: Record<string, string>; offers?: Record<string, string> }, items: { skuId: string; name: string }[], now = Date.now()) {
+export function saveWorkingCart(storage: CartStorage, scope: PortalScope, cart: { fields: WorkingFields; qty: Record<string, string>; offers?: Record<string, string>; shipWith?: Record<string, string> }, items: { skuId: string; name: string }[], now = Date.now()) {
   const { shipToId, poNumber, note, requestedShipDate } = cart.fields;
   const lines = Object.entries(cart.qty).filter(([, qty]) => qty.trim()).map(([skuId, qty]) => ({ skuId, qty, name: items.find(i => i.skuId === skuId)?.name ?? skuId, ...(cart.offers?.[skuId] ? { offer: cart.offers[skuId] } : {}) }));
-  try { storage().setItem(workingCartKey(scope), JSON.stringify({ savedAt: now, fields: { shipToId, poNumber, note, requestedShipDate }, lines })); }
+  try { storage().setItem(workingCartKey(scope), JSON.stringify({ savedAt: now, fields: { shipToId, poNumber, note, requestedShipDate }, lines, shipWith: cart.shipWith })); }
   catch { /* Full, blocked or missing storage: the cart stays in memory only. */ }
 }
 export function clearWorkingCart(storage: CartStorage, scope: PortalScope) {
@@ -114,6 +116,7 @@ export function restoreWorkingCart(storage: CartStorage, scope: PortalScope, ite
     fields: { ...saved.fields, shipToId: shipTos.some(s => s.id === saved.fields.shipToId) ? saved.fields.shipToId : defaultShipToId(shipTos) },
     qty: Object.fromEntries(kept.map(l => [l.skuId, l.qty])),
     offers: Object.fromEntries(kept.flatMap(l => l.offer ? [[l.skuId, l.offer]] : [])),
+    shipWith: saved.shipWith ?? {},
     removed: saved.lines.filter(l => !available.has(l.skuId)).map(l => l.name),
   };
 }
@@ -126,6 +129,12 @@ export function cartLines(qty: Record<string, string>) {
     if (value > 0) lines.push({ skuId, qty: value });
   }
   return lines;
+}
+/** The quantities one order did not send: what stays in the cart once it is placed. Entries without a
+ *  positive quantity are dropped, so an empty result means nothing is left to order. */
+export function unsentQty(qty: Record<string, string>, sent: { skuId: string }[]): Record<string, string> {
+  const gone = new Set(sent.map(line => line.skuId));
+  return Object.fromEntries(Object.entries(qty).filter(([skuId, raw]) => !gone.has(skuId) && Number(raw) > 0));
 }
 export type PortalSavedOrder = {
   order: { id: string; status: string; ship_to_id: string | null; po_number: string | null; note: string | null; requested_ship_date: string | null };

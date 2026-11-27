@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -181,17 +182,22 @@ export const E = {
    *  `action` is the same list-create slot `hd` takes; `href` is where the
    *  arrow goes on a live page (fixtures leave it "#"). `screen` names the
    *  destination screen when the parent's title is not its screen name
-   *  ("Packaging" is the Packaging runs screen), as `link` does. */
-  back: (to: React.ReactNode, title: React.ReactNode, action?: React.ReactNode, href = "#", screen?: string) => {
+   *  ("Packaging" is the Packaging runs screen), as `link` does. `help` (E.help)
+   *  sits beside the title, outside the h1, so the heading reads as the title alone.
+   *  The action shares the title's line when it fits; a full-width E.btn wraps under it on a phone. */
+  back: (to: React.ReactNode, title: React.ReactNode, action?: React.ReactNode, href = "#", screen?: string, help?: React.ReactNode) => {
     const head = (
       <div className="flex flex-col gap-1">
         <Link href={href} prefetch={rowLinkPrefetch(href)} data-to={screen} className={cn("inline-flex items-center gap-1 text-xs text-muted-foreground", TOUCH_HIT, "pointer-coarse:after:-top-4 pointer-coarse:after:-bottom-1")}><Icon icon={ArrowLeft01Icon} />{to}</Link>
-        <h1 className="text-lg font-semibold">{title}</h1>
+        <div className="flex items-center gap-1">
+          <h1 className="text-lg font-semibold">{title}</h1>
+          {help}
+        </div>
       </div>
     );
     if (!action) return head;
     return (
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-wrap items-end justify-between gap-2 md:flex-row md:items-center">
         {head}
         {action}
       </div>
@@ -493,6 +499,17 @@ export const E = {
           even them up, so a two-line note reads as a narrow block in a wide card. */}
       <AlertDescription className="text-pretty text-warning-foreground">{t}</AlertDescription>
     </Alert>
+  ),
+  /** A page's standing introduction, for E.back's `help`: an ⓘ beside the title
+   *  whose text opens in a popover, so it takes no line of its own. Contextual
+   *  notes and warnings stay E.info / E.note, always in view. */
+  help: (t: React.ReactNode) => (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="icon-sm" type="button" aria-label="About this page" className="text-muted-foreground" data-preview-action><Icon icon={InformationCircleIcon} /></Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="text-pretty">{t}</PopoverContent>
+    </Popover>
   ),
   info: (t: React.ReactNode, role: "note" | "alert" = "note") => (
     <Alert role={role} className="border-info-foreground/40 bg-info text-info-foreground">

@@ -1,5 +1,9 @@
 # Program 15 — Composer preview and offline outbox Implementation Plan
 
+> **`aiExposed` removed.** PR #1785 deleted the `aiExposed` flag and `listTools({ aiOnly })`.
+> Ask MGR now reads its operations through `lib/agent/operations.ts`, and a definition opts out with `agentHidden`.
+> Mentions of either below are history.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Typed (or spoken-later) intent becomes a **server** preview of one registered command. Commit is an explicit click with the same `requestId` + `previewToken`. Offline, only commands marked eligible queue locally. Voice is deferred.

@@ -2,7 +2,7 @@ import { formatDate } from "@/lib/date-format";
 import type { StaffRole } from "@/lib/commands/registry";
 import type { EmptyState } from "./empty-state";
 import { canOpen } from "./nav";
-import { batchReleaseForms, type ReleaseBatchRow, type ReleaseForm, type ReleaseRow } from "./release-view";
+import { batchReleaseForms, type ReleaseBatchRow, type ReleaseDefaults, type ReleaseForm, type ReleaseRow } from "./release-view";
 import { hasAnyRole } from "./roles";
 
 export type MaterialRequirementSnapshot = {
@@ -41,6 +41,8 @@ export type PlanningSnapshot = {
   batches?: ReleaseBatchRow[];
   /** list_releases({ open: true }) for those batches, to mark a batch Released. */
   releases?: ReleaseRow[];
+  /** The brewery's release defaults, which prefill each batch's form. */
+  releaseDefaults?: ReleaseDefaults;
 };
 
 /** A planned batch's release row: Released once every package it projects has
@@ -131,7 +133,7 @@ export function toPlanningViewProps(snapshot: PlanningSnapshot): PlanningViewMod
     : SETUP_LINKS.map((link) => ({ title: link.title, detail: link.detail }));
   // The inventory (no roles) draws the verb, inert; live, only admin and sales release.
   const canRelease = !roles || hasAnyRole(roles, ["admin", "sales"]);
-  const releaseBatches = snapshot.batches && batchReleaseForms(snapshot.batches, snapshot.releases).map(({ title, detail, released, ...form }) => ({
+  const releaseBatches = snapshot.batches && batchReleaseForms(snapshot.batches, snapshot.releases, snapshot.releaseDefaults).map(({ title, detail, released, ...form }) => ({
     key: form.key, title, detail, released, canRelease, form,
   }));
   return {

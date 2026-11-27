@@ -91,9 +91,9 @@ describe("E.tbl column alignment", () => {
     });
   });
 
-  it("renders the Catalog brand table with text and COLA left and counts right", () => {
+  it("renders the Catalog brand table with text left, and counts and COLA right at the table's edge", () => {
     const html = renderToStaticMarkup(createElement(CatalogView, { model: toCatalogViewProps(catalogBrands) }));
-    expectAlignment(html, ["l", "l", "r", "r", "l"]);
+    expectAlignment(html, ["l", "l", "r", "r", "r"]);
   });
 
   it("keeps import results and original preview row numbers with text results left", () => {

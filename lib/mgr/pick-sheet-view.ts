@@ -23,7 +23,8 @@ export type PickSheetRowView = {
 };
 
 /** One SKU's ordered quantity across a date's orders. */
-export type PickSheetTotalView = { key: string; group?: string; name: string; qty: number };
+/** One SKU's total on a ship date: group is its format, name its brand, alias the brand's alias. */
+export type PickSheetTotalView = { key: string; group?: string; name: string; alias?: string; qty: number };
 
 export type PickSheetGroupView = {
   key: string;

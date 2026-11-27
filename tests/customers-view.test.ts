@@ -11,7 +11,7 @@ import { ListControls } from "../components/mgr/list-controls";
 import { ShipToView } from "../components/mgr/views/ship-to";
 import { customerRidgeline, customersList, shipToMain } from "../lib/mgr/fixtures/customers";
 import { ALS, RIDGELINE } from "../lib/mgr/fixtures/demo";
-import { releaseDelayError, toCustomerViewProps } from "../lib/mgr/customer-view";
+import { releaseDelayError, releaseShareError, toCustomerViewProps } from "../lib/mgr/customer-view";
 import { upsertCustomerInput } from "../app/(app)/customers/customer-form";
 import { CUSTOMER_TYPES } from "../lib/mgr/enums";
 import { toCustomersViewProps } from "../lib/mgr/customers-view";
@@ -293,6 +293,20 @@ it("a ship-to reads as one address line; missing parts drop out and a foreign on
   // The short form (city and state only) the order, portal and delivery screens use.
   expect(shipToAddress({ country: "US", city: "Columbus", state: "OH" })).toBe("Columbus, OH");
   expect(shipToAddress({ country: "JP", city: null, state: null })).toBe("Japan");
+});
+
+describe("Release share (%)", () => {
+  it("seeds the field from the customer, saves a number, and removes the typed share when blank", () => {
+    const model = toCustomerViewProps({ ...customerRidgeline, customer: { ...customerRidgeline.customer, release_share_pct: 25 } });
+    expect(model.editValues.releaseSharePct).toBe("25");
+    expect(toCustomerViewProps(customerRidgeline).editValues.releaseSharePct).toBe("");
+    expect(upsertCustomerInput({ ...model.editValues, releaseSharePct: "12.5" }, "c1")).toMatchObject({ releaseSharePct: 12.5 });
+    expect(upsertCustomerInput({ ...model.editValues, releaseSharePct: "" }, "c1")).toMatchObject({ releaseSharePct: null });
+    // The create dialog has no field: the input leaves it out.
+    expect(upsertCustomerInput({ ...model.editValues, releaseSharePct: undefined })).not.toHaveProperty("releaseSharePct");
+    for (const ok of ["", "0.5", "100"]) expect(releaseShareError(ok)).toBeUndefined();
+    for (const bad of ["0", "101", "-5", "1.234", "half"]) expect(releaseShareError(bad)).toMatch(/above 0 up to 100/);
+  });
 });
 
 describe("Release delay (days)", () => {

@@ -2,12 +2,14 @@
 import { formatDate } from "@/lib/date-format";
 import { brandLabel, byBrand, type BrandedSku } from "./brand-lines";
 import { docNo } from "./doc-no";
-import type { ReleaseRow } from "./release-view";
+import { bbl, type ReleaseRow } from "./release-view";
 
 export type ConfirmOrderLineView = {
   key: string;
   /** Brand heading; lines arrive grouped by it (brand-lines.ts). */
   group?: string;
+  /** The brand's alias, muted under the brand heading. */
+  alias?: string;
   /** Format under the brand, or the SKU name when it has no brand and format. */
   name: string;
   /** qty_ordered; Confirm order edits it in place. */
@@ -59,7 +61,9 @@ function releaseFlags(release: ReleaseRow | undefined, requested: string | null)
     release.withdrawn_at ? "Release withdrawn" : "",
     release.cancelled ? "Release closed: batch cancelled" : "",
     release.ready_on && requested && release.ready_on > requested ? `Slipped: batch ready ${formatDate(release.ready_on)}` : "",
-    ordered > release.qty ? `Over release: ${ordered} ordered of ${release.qty}` : "",
+    release.qty != null && ordered > release.qty ? `Over release: ${ordered} ordered of ${release.qty}` : "",
+    // The batch's pool was lowered under what is ordered across its packages.
+    release.pool_bbl != null && (release.pool_left_bbl ?? 0) < 0 ? `Over pool: batch is ${bbl(-(release.pool_left_bbl ?? 0))} bbl over its ${bbl(release.pool_bbl)} bbl` : "",
   ].filter(Boolean);
 }
 

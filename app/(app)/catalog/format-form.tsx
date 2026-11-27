@@ -11,8 +11,10 @@ import { useCommandForm } from "@/lib/commands/use-command-form";
 import { validFormatRows } from "@/lib/format-edit-rules";
 import { formatCommandInput, formatControls, formatNameError, formatSizing, toFormatViewProps, type FormatSnapshot, type FormatViewModel } from "@/lib/mgr/format-view";
 
-/** `takenNames`: the other packaged formats' names, so Create is withheld for one already used. */
-export function FormatForm({ format, materials, contents, deleteAction, canCompose = false, componentOptions = [], takenNames = [] }: { format?: FormatSnapshot["format"]; materials?: ReactNode; contents?: ReactNode; deleteAction?: ReactNode; canCompose?: boolean; componentOptions?: { id: string; name: string }[]; takenNames?: readonly string[] } = {}) {
+/** `takenNames`: the other packaged formats' names, so Create is withheld for one already used.
+ *  `canSetPalletFit`: the caller is Admin, the only role that sets a pallet fit; a composed
+ *  format is created without one (create_composed_format takes none) and gets it on edit. */
+export function FormatForm({ format, materials, contents, deleteAction, canCompose = false, componentOptions = [], takenNames = [], canSetPalletFit = false }: { format?: FormatSnapshot["format"]; materials?: ReactNode; contents?: ReactNode; deleteAction?: ReactNode; canCompose?: boolean; componentOptions?: { id: string; name: string }[]; takenNames?: readonly string[]; canSetPalletFit?: boolean } = {}) {
   const router = useRouter();
   const formId = useId();
   const initial = toFormatViewProps({ format: format ? { ...format, composed: format.composed || canCompose } : { id: "new", name: "", basis: "packaged", package_type: "keg", keg_size: "half_bbl", bbl_per_unit: null } });
@@ -31,7 +33,7 @@ export function FormatForm({ format, materials, contents, deleteAction, canCompo
   });
   const controls = formatControls(model, patch);
   return <CommandForm open={form.open} onOpenChange={next => { if (!form.submitting) form.setOpen(next); }} title={format ? "Edit format" : "New format"} trigger={<Button variant="outline">{format ? "Edit format" : "New format"}</Button>}>
-    <FormatView formId={formId} model={model} controls={controls} editing={Boolean(format)} canCompose={!format || canCompose} materials={materials} contents={contents} deleteAction={deleteAction}
+    <FormatView formId={formId} model={model} controls={controls} editing={Boolean(format)} canSetPalletFit={canSetPalletFit && !creatingComposed} canCompose={!format || canCompose} materials={materials} contents={contents} deleteAction={deleteAction}
       componentOptions={componentOptions} componentRows={components} onComponentRowsChange={setComponents}
       onSubmit={event => { if (!valid) { event.preventDefault(); return; } void form.submit(event); }}
       nameError={taken ?? form.fieldErrors.name}

@@ -35,4 +35,14 @@ export const settingsDemo: SettingsViewModel = {
   locations: "Warehouse · Taproom",
   team: "3 members · 1 pending invite",
   units: toUnitsViewProps(unitsPlato),
+  releases: { openPct: "75", orderByDays: "7", capLiftDays: "14", digestDay: "1", shareWindowDays: "90", stockMultiplier: "2", maxSharePct: "50" },
+  pallets: {
+    sizes: ["half_bbl", "sixth_bbl"],
+    values: { maxLb: "2500", maxHeightIn: "60", palletHeightIn: "5.5", kegLayers: [{ half_bbl: "8" }, { half_bbl: "6", sixth_bbl: "6" }, { half_bbl: "3", sixth_bbl: "10" }, { sixth_bbl: "20" }] },
+  },
+  releaseShares: [
+    { customer_id: "00000000-0000-4000-8000-0000000000c1", customer_name: "Ridgeline Taphouse", manual_pct: null, base_pct: 15, pct: 18 },
+    { customer_id: "00000000-0000-4000-8000-0000000000c2", customer_name: "Harbor Bottle Shop", manual_pct: 25, base_pct: 31, pct: 25 },
+    { customer_id: "00000000-0000-4000-8000-0000000000c3", customer_name: "Corner Deli", manual_pct: null, base_pct: null, pct: null },
+  ],
 };

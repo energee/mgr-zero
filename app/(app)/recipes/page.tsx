@@ -1,5 +1,6 @@
-// app/(app)/recipes/page.tsx — More › Recipes: recipes alphabetical
-// (list_recipes), each with its brand and whether it is written yet, the name opening
+// app/(app)/recipes/page.tsx — More › Recipes: recipes newest first
+// (list_recipes sort newest), each with its brand, the day it was added and whether it is
+// written yet; a header click re-sorts by Recipe, Brand or Added. The name opens
 // its own recipe page; the back goes to More, New recipe links to /recipes/new and
 // the Water profiles row to /catalog/water-profiles?from=recipes, whose back
 // then returns here.
@@ -14,10 +15,11 @@ import "@/lib/commands/all";
 import { ListControls } from "@/components/mgr/list-controls";
 import { listParams, searchQuery } from "@/lib/mgr/list-params";
 import { navTitle } from "@/lib/mgr/nav";
+import { formatDate } from "@/lib/date-format";
 
 export const metadata = { title: navTitle("/recipes") };
 
-type Recipe = { id: string; name: string; brand_id: string | null; note: string | null; latest_version: number | null };
+type Recipe = { id: string; name: string; brand_id: string | null; note: string | null; latest_version: number | null; created_at: string };
 type Brand = { id: string; name: string };
 
 const recipesParams = z.object({ q: searchQuery });
@@ -27,7 +29,7 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const [recipes, brands] = (await Promise.all([
-    runCommand("list_recipes", params, ctx), runCommand("list_brands", {}, ctx),
+    runCommand("list_recipes", { ...params, sort: "newest" }, ctx), runCommand("list_brands", {}, ctx),
   ])) as [Recipe[], Brand[]];
   const brandName = (id: string | null) => (id ? brands.find((b) => b.id === id)?.name ?? "—" : null);
 
@@ -37,7 +39,7 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
         backHref: "/more",
         createHref: "/recipes/new",
         waterProfilesHref: "/catalog/water-profiles?from=recipes",
-        recipes: recipes.map((r) => ({ id: r.id, name: r.name, brand: brandName(r.brand_id), latest_version: r.latest_version })),
+        recipes: recipes.map((r) => ({ id: r.id, name: r.name, brand: brandName(r.brand_id), latest_version: r.latest_version, added: formatDate(r.created_at, brewery.timeZone) })),
         filtered: Boolean(params.q),
       })}
       linkRows
