@@ -235,8 +235,9 @@ secure_password_change = false
 max_frequency = "1s"
 # Number of characters used in the email OTP.
 otp_length = 6
-# Number of seconds before the email OTP expires (defaults to 1 hour).
-otp_expiry = 3600
+# Seconds before an emailed link expires. 24 hours, so an invite opened the next day still works;
+# the reset and sign-in emails state this limit. Hosted Auth must match (mailer_otp_exp).
+otp_expiry = 86400
 
 # Use a production-ready SMTP server
 # [auth.email.smtp]
@@ -248,10 +249,19 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
-# Uncomment to customize email template
+# The three Auth emails MGR sends share one layout (tests/auth-email-templates.test.ts).
+# Hosted Auth does not read these files: see docs/operations/hosted-config.md.
 [auth.email.template.invite]
 subject = "You have been invited"
 content_path = "./supabase/templates/invite.html"
+
+[auth.email.template.recovery]
+subject = "Reset your password"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.magic_link]
+subject = "Your sign-in link"
+content_path = "./supabase/templates/magic_link.html"
 
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]

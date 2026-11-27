@@ -147,7 +147,7 @@ jobs:
 
       - name: Run dream
         if: steps.window.outputs.new == 'true'
-        uses: anthropics/claude-code-action@4fa93a88de49bbef68b10eb15aabedf28ca0e1ed # v1
+        uses: anthropics/claude-code-action@469588f42e6b1e94cd14ad09dccfeaec772ce0fd # v1
         env:
           GH_TOKEN: ${{ github.token }}
         with:

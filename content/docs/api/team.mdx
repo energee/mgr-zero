@@ -9,10 +9,12 @@ Every operation in this reference lists the roles allowed to call it. Staff
 roles never grant customer-portal membership. Revoking a brewery membership
 ends its access without deleting the history that member wrote.
 
-`list_team_members` returns `{ userId, name, email, roles, createdAt }` for each
+`list_team_members` returns `{ userId, name, email, roles, createdAt, invited }` for each
 member. `name` is the saved Auth profile full name with the account email beside
 it, as `Profile name <email>`, or the full email address alone when no nonblank
 name is saved. Profile names are display-only and never grant permissions.
+`invited` is `true` for a member sent a new-account invitation who has not signed
+in yet, and `false` from their first sign-in on.
 `update_staff_role` replaces a member's roles with the nonempty `roles` array
 in its input; duplicate values are removed and the response uses enum order.
 Removing `admin` is a demotion even when other roles remain, and is refused
@@ -45,12 +47,18 @@ an invitation still `pending_consent`.
 `list_pending_invitations` returns the brewery's staff invitations still
 `pending_consent` and not expired: `{ id, email, role, createdAt }`, oldest
 first. A new-account invitation never appears: its membership is granted
-when the Auth invitation is sent. `resend_account_invitation` takes the
+when the Auth invitation is sent; until that person first signs in, they appear in
+`list_team_members` with `invited: true`. `resend_account_invitation` takes the
 `inviteId` of a `pending_consent` invitation. It revokes that invitation and
 returns `{ inviteId }` for a new one with the same email and role, sent by
 the caller, with a fresh seven-day consent window. Only the new invitation
 can be accepted. Replaying the same request ID returns the same new
 `inviteId`.
+
+`resend_staff_invite` takes the `userId` of a member whose `invited` is `true`. It
+sends that person's Auth invitation email again and returns `{ userId }`. Any other
+`userId` is refused with `409 no_pending_invite`. Only an admin may call it.
+`revoke_staff` ends such a membership.
 
 `provision_brewery` omits `breweryId`; authenticated callers send name, a valid
 timezone, and optional `ttb`. One transaction creates the brewery and first
@@ -671,7 +679,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Staff roster for the brewery: user id, name as `Profile name <email>` (the email alone when no profile name is saved), email and roles
+Staff roster for the brewery: user id, name as `Profile name <email>` (the email alone when no profile name is saved), email, roles, and whether they were invited and have not signed in yet
 
 Takes no input.
 
@@ -755,6 +763,23 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "resend_account_invitation", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "inviteId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## resend_staff_invite [#resend_staff_invite]
+
+`command` · admin
+
+Email a new-account staff invitation again (admin), for a member who was invited and has not signed in yet; existing-account invitations use resend_account_invitation
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `userId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "resend_staff_invite", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "userId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 ## retire_pos_location_mapping [#retire_pos_location_mapping]
