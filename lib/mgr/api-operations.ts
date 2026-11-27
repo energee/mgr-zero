@@ -33,7 +33,7 @@ export const API_AREAS = [
   { slug: "compliance", title: "Compliance", match: /(compliance|reporting_basis|brand_approval|cola|state_registration|state_license|list_lots|trace_lot|trace_material_lot|loss)/ },
   { slug: "purchasing", title: "Purchasing & materials", match: /^(?!.*packaging_).*(purchase_order|purchase_receipt|receipt_bill|qbo_purchase_account|vendor|material)/ },
   { slug: "production", title: "Production", match: /^(?!get_brand_recipe_cost$)(?!list_release_batches$).*(batch|brew_day|brew_record|cellar|vessel|fermentation|recipe|water_profile)/ },
-  { slug: "catalog", title: "Catalog & pricing", match: /^(?!get_inventory_sku$)(?!set_pos_price_override$).*(product|sku|brand|price|catalog_categor|sale_channel|sales_channel|_releases?$|release_batches)/ },
+  { slug: "catalog", title: "Catalog & pricing", match: /^(?!get_inventory_sku$)(?!set_pos_price_override$).*(product|sku|brand|price|catalog_categor|sale_channel|sales_channel|_releases?$|release_batches|release_shares|release_defaults|pallet_rules)/ },
   { slug: "packaging", title: "Packaging", match: /(packaging_|format|repack|occupanc)/ },
   { slug: "taproom", title: "Taproom & kegs", match: /(keg|taproom|_taps|tap_history|replenishment)/ },
   { slug: "delivery", title: "Delivery & routes", match: /(route|delivery|shipment|depart|refused)/ },

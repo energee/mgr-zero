@@ -27,7 +27,7 @@ import type { KegPoolOption } from "@/lib/mgr/sku-view";
 import { brandAbvError } from "@/lib/mgr/brand-abv";
 import { SkuEditForm } from "../../sku-form";
 import { EditReleaseForm, ReleaseForm, WithdrawRelease } from "../../release-form";
-import { skuReleaseForms, type ReleaseBatchRow, type ReleaseRow } from "@/lib/mgr/release-view";
+import { skuReleaseForms, type ReleaseBatchRow, type ReleaseDefaults, type ReleaseRow } from "@/lib/mgr/release-view";
 import { ApprovalForm, RegistrationForm } from "./compliance-forms";
 import { ColaImage } from "../../cola-image";
 
@@ -37,11 +37,13 @@ export type BrandRow = Omit<BrandSnapshot["brand"], "skus"> & { skus: BrandSku[]
 /** The Sells as reads; a format's package_type tells SkuEditForm whether it takes a keg pool. */
 export type SellsReads = Omit<NonNullable<BrandSnapshot["sells"]>, "formats"> & { formats: (NonNullable<BrandSnapshot["sells"]>["formats"][number] & { package_type: string | null })[] };
 
-export function BrandPage({ brand, styles, categories, priceGroups, compliance, cost, sells, pools, canSell, canManageFormats, canPrice, releaseBatches = [], today }: {
+export function BrandPage({ brand, styles, categories, priceGroups, compliance, cost, sells, pools, canSell, canManageFormats, canPrice, releaseBatches = [], releaseDefaults, today }: {
   brand: BrandRow | null; styles: string[]; categories: string[]; priceGroups: BrandSnapshot["priceGroups"]; compliance: BrandSnapshot["compliance"]; cost: BrandSnapshot["cost"];
   sells?: SellsReads; pools: KegPoolOption[]; canSell: boolean; canManageFormats: boolean; canPrice: boolean;
   /** list_release_batches for the brand's SKUs: the planned batches a release can draw on. */
   releaseBatches?: ReleaseBatchRow[];
+  /** The brewery's release defaults, which prefill a batch release's pool and order-by date. */
+  releaseDefaults?: ReleaseDefaults;
   /** The brewery's day; a stock release ships from it. */
   today: string;
 }) {
@@ -91,7 +93,7 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
     const releases = sells?.releases ?? [];
     return <>
       <SkuEditForm sku={sku} formatName={row.name} packageType={format?.package_type} pools={pools} />
-      {row.on ? <ReleaseForm title={`Release for ordering · ${sku.name}`} triggerLabel="Release" forms={skuReleaseForms(sku, releaseBatches, today, releases)} /> : null}
+      {row.on ? <ReleaseForm title={`Release for ordering · ${sku.name}`} triggerLabel="Release" forms={skuReleaseForms(sku, releaseBatches, today, releases, releaseDefaults)} /> : null}
     </>;
   }
   function releaseActions(key: string) {

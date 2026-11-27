@@ -227,6 +227,7 @@ Create or update a customer account: its sale channel decides its prices and whe
 | `paymentTerms` | due_on_receipt or net15 or net30 | no |
 | `taxTreatment` | taxable or export or vessel_supplies or research or transfer_in_bond | no |
 | `releaseDelayDays` | integer | no |
+| `releaseSharePct` | number or null | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

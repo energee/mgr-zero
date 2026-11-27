@@ -15,7 +15,7 @@ import { plural } from "./plural";
 export type CatalogBrandView = {
   key: string;
   name: string;
-  /** Staff-only informal name, drawn under the name; absent when the brand has none. */
+  /** Informal name, drawn under the name; portal buyers see it too. Absent when the brand has none. */
   alias?: string;
   /** "Not set" when the brand has no style. */
   style: string;

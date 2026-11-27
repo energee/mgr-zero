@@ -1,8 +1,10 @@
-// The email job has no user session. Its service access is limited to delivery leases/results.
+// The email job has no user session. Its service access is limited to delivery
+// leases/results and to reading and queuing the weekly release digest.
 import "server-only";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { readOrderEmailEnv } from "@/lib/env/server-parser";
+import { readAppUrl, readOrderEmailEnv } from "@/lib/env/server-parser";
+import { queueReleaseDigests } from "./digest";
 import { EmailProviderError, orderEmailSchema, sendOrderEmail } from "./transport";
 
 // `to` is only required, not re-validated: Auth already accepted the address
@@ -13,6 +15,14 @@ const leasesSchema = z.array(z.object({
   lease_expires_at: z.string().datetime({ offset: true }), retry_before: z.string().datetime({ offset: true }),
   payload: orderEmailSchema,
 }));
+
+/** Queues today's weekly release digests (./digest) with the job's service client. A missing APP_URL fails before any read. */
+export async function runReleaseDigest() {
+  let portalUrl: string;
+  try { portalUrl = readAppUrl(); }
+  catch (error) { console.error("Release digest failure", { stage: "configuration" }); throw error; }
+  return queueReleaseDigests(createAdminClient(), portalUrl);
+}
 
 /** Logs fixed categories/stages and validated delivery UUIDs. Transport decides retryability;
  * the job retains generic outcome codes and the RPC enforces the saved retry window and lease. */

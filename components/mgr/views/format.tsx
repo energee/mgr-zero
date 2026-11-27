@@ -19,8 +19,10 @@ function FormatSelect({ label, value, options, onChange }: { label: string; valu
   return E.pick(label, value, choices, { onChange, displayValue: choices.find(option => option.value === value)?.label });
 }
 
-export function FormatView({ model, createAction, controls = {}, messages, footer, onSubmit, materials, contents, editing = false, canCompose = !editing, componentOptions = [], componentRows = NO_ROWS, onComponentRowsChange = () => {}, deleteAction, formId, nameError }: {
+export function FormatView({ model, createAction, controls = {}, messages, footer, onSubmit, materials, contents, editing = false, canCompose = !editing, componentOptions = [], componentRows = NO_ROWS, onComponentRowsChange = () => {}, deleteAction, formId, nameError, canSetPalletFit = false }: {
   model: FormatViewModel;
+  /** Admin only: the advisory Pallet fit field. */
+  canSetPalletFit?: boolean;
   /** Live: the name is taken, by another format or the save's refusal. Opens the name field. */
   nameError?: string;
   createAction?: ReactNode;
@@ -67,6 +69,22 @@ export function FormatView({ model, createAction, controls = {}, messages, foote
         <FormatRowsView kind="components" rows={componentRows} options={componentOptions} valid={validFormatRows(componentRows, componentOptions.map(o => o.id), false)} onChange={onComponentRowsChange} confirmClear={false} onConfirmClear={() => {}} />
         <p className="text-xs text-muted-foreground">Choose packages with their own volume; packages already built from contents cannot be nested. Create format saves the format and its contents together. Volume is derived from the saved contents.</p>
       </section>}
+      {canSetPalletFit && <div className="flex flex-col gap-1">
+        {E.edit("Pallet fit", model.palletFit, "number", undefined, { onChange: controls.palletFit, min: 1, step: 1, id: `${id}-pallet-fit`, "aria-describedby": `${id}-pallet-fit-help` })}
+        <p id={`${id}-pallet-fit-help`} className="text-xs text-muted-foreground">How many of this package fill one layer or pallet the way you load. Leave blank to skip. Advisory only.</p>
+      </div>}
+      {canSetPalletFit && model.packageType === "keg" && <div className="flex flex-col gap-1">
+        {E.edit("Fit when mixed", model.palletFitMixed, "number", undefined, { onChange: controls.palletFitMixed, min: 1, step: 1, id: `${id}-pallet-fit-mixed`, "aria-describedby": `${id}-pallet-fit-mixed-help` })}
+        <p id={`${id}-pallet-fit-mixed-help`} className="text-xs text-muted-foreground">How many fill a layer shared with another keg size, such as 6 half kegs beside sixtels. Leave blank to use the pallet fit.</p>
+      </div>}
+      {canSetPalletFit && <div className="flex flex-col gap-1">
+        {E.edit("Packaging weight (lb)", model.packagingLb, "number", undefined, { onChange: controls.packagingLb, min: 0, step: 0.1, id: `${id}-packaging-lb`, "aria-describedby": `${id}-packaging-lb-help` })}
+        <p id={`${id}-packaging-lb-help`} className="text-xs text-muted-foreground">What the empty package adds: a keg shell, or the cans and cardboard. {model.beerLb ? `The beer in it weighs about ${model.beerLb} lb. ` : ""}The portal adds the two for the weight of a pallet.</p>
+      </div>}
+      {canSetPalletFit && <div className="flex flex-col gap-1">
+        {E.edit("Height (in)", model.heightIn, "number", undefined, { onChange: controls.heightIn, min: 0, step: 0.1, id: `${id}-height-in`, "aria-describedby": `${id}-height-in-help` })}
+        <p id={`${id}-height-in-help`} className="text-xs text-muted-foreground">How tall one keg stands, or one case sits in a layer. The portal stacks layers up to your pallet height. Leave blank to count no height.</p>
+      </div>}
       {editing && <p className="text-xs text-muted-foreground">Shared by every SKU using this format. Sizing changes affect future calculations and open plans; recorded movement volumes stay unchanged.</p>}
       {sizing.error && E.info(sizing.error, "alert")}
       {messages}

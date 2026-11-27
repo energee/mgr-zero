@@ -16,6 +16,8 @@ import { AgentsSettingsView } from "@/components/mgr/views/agents-settings";
 import { AiModelSettingsView } from "@/components/mgr/views/ai-model-settings";
 import { SuggestionSettingsView } from "@/components/mgr/views/suggestion-settings";
 import { BrewerySettingsFormView } from "@/components/mgr/views/brewery-settings-form";
+import { ReleaseSettingsFormView } from "@/components/mgr/views/release-settings-form";
+import { PalletRulesFormView } from "@/components/mgr/views/pallet-rules-form";
 import { PortalFulfillmentView } from "@/components/mgr/views/portal-fulfillment";
 import { ThemeToggle } from "@/components/mgr/theme-toggle";
 import { FieldSeparator } from "@/components/ui/field";
@@ -25,6 +27,8 @@ import { GravityUnitControls } from "@/components/mgr/views/units";
 export function SettingsView({
   model,
   breweryForm,
+  releaseForm,
+  palletForm,
   unitsForm,
   fulfillmentForm,
   aiModelForm,
@@ -35,6 +39,10 @@ export function SettingsView({
 }: {
   model: SettingsViewModel;
   breweryForm?: ReactNode;
+  /** Live: ReleaseSettingsForm. Inventory draws the section from model.releases. */
+  releaseForm?: ReactNode;
+  /** Live: PalletRulesForm. Inventory draws the section from model.pallets. */
+  palletForm?: ReactNode;
   /** Live: GravityUnitForm part="brewery". Inventory draws the chips from model.units. */
   unitsForm?: ReactNode;
   fulfillmentForm?: ReactNode;
@@ -57,6 +65,8 @@ export function SettingsView({
         <div className="@container flex min-w-0 flex-col gap-2">
           {breweryForm ?? <BrewerySettingsFormView basisLocked={model.hasFiledReports} initial={{ name: model.name, timezone: model.timezone, ttb: model.ttb, phone: model.phone, hours: model.overdueHours, daysToPackage: model.daysToPackage, booksOpenedOn: model.booksOpenedOn }} />}
           {unitsForm ?? (model.units && <GravityUnitControls model={model.units} part="brewery" />)}
+          {releaseForm ?? (model.releases && <ReleaseSettingsFormView initial={model.releases} shares={model.releaseShares} />)}
+          {palletForm ?? (model.pallets && <PalletRulesFormView initial={model.pallets.values} sizes={model.pallets.sizes} />)}
         </div>
         {/* Side by side on desk, the column gap parts Brewery details from the other two. */}
         <FieldSeparator className="@min-[48rem]:hidden" />

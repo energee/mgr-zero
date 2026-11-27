@@ -2,7 +2,10 @@
 // portal release (Phase A task A11 of docs/plans/portal-release-windows.md):
 // Slipped when the batch is now ready after the requested date, Over release
 // when the release was lowered below what is confirmed plus pre-ordered.
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { ConfirmOrderView } from "../components/mgr/views/confirm-order";
 import { toConfirmOrderViewProps, type ConfirmOrderSnapshot } from "../lib/mgr/confirm-order-view";
 import type { ReleaseRow } from "../lib/mgr/release-view";
 
@@ -38,5 +41,15 @@ describe("Confirm order release flags", () => {
 
   it("flags pre-orders over a release lowered below confirmed plus pre-ordered", () => {
     expect(flagsOf({ ...snapshot, releases: [{ ...release, qty: 25 }] })["line-release"]).toEqual(["Over release: 30 ordered of 25"]);
+  });
+});
+
+describe("Confirm order brand alias", () => {
+  it("heads a brand's lines with the brand name and its alias muted under it", () => {
+    const aliased = { ...snapshot, lines: [{ id: "g", sku_id: "s3", qty_ordered: 4, release_id: null, skus: { name: "Animal #31 · Sixtel", brands: { name: "Masai Giraffe", alias: "Animal #31" }, formats: { name: "Sixtel" } } }] };
+    const model = toConfirmOrderViewProps(aliased);
+    expect(model.lines[0]).toMatchObject({ group: "Masai Giraffe", alias: "Animal #31", name: "Sixtel" });
+    const markup = renderToStaticMarkup(createElement(ConfirmOrderView, { model }));
+    expect(markup).toMatch(/<h2[^>]*>Masai Giraffe<\/h2><p class="[^"]*text-muted-foreground[^"]*">Animal #31<\/p>/);
   });
 });

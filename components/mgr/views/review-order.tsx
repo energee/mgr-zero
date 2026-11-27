@@ -4,6 +4,8 @@ import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { OrderQuantity } from "./new-order";
+import { PalletFitBlock } from "./pallet-fit";
+import { BrandedName } from "./branded-name";
 import type { ReviewOrderViewModel } from "@/lib/mgr/review-order-view";
 
 export function ReviewOrderView({ model, onQuantity, onBack, onPlace, messages, locked = false, disabled = false, submitting = false, footer }: {
@@ -15,7 +17,7 @@ export function ReviewOrderView({ model, onQuantity, onBack, onPlace, messages, 
     <>
       <fieldset disabled={locked} className="contents">{model.lines.map((line) => (
         <Fragment key={line.key}>
-          {E.row(line.name, line.price, <OrderQuantity label={line.qtyLabel} value={line.qty} step="1" onChange={onQuantity && (value => onQuantity(line.key, value))} />)}
+          {E.row(<BrandedName name={line.name} alias={line.alias} />, line.price, <OrderQuantity label={line.qtyLabel} value={line.qty} step="1" onChange={onQuantity && (value => onQuantity(line.key, value))} />)}
         </Fragment>
       ))}</fieldset>
       {model.deposits?.map(deposit => <Fragment key={deposit.key}>{E.fld(deposit.name, `${deposit.detail} · ${deposit.amount}`)}</Fragment>)}
@@ -31,6 +33,7 @@ export function ReviewOrderView({ model, onQuantity, onBack, onPlace, messages, 
       {E.row("Ships from", model.source)}
       {E.fld("Your PO number", model.po)}
       {model.note && E.fld("Note", model.note)}
+      {model.palletFit?.length ? <div className="py-2"><PalletFitBlock groups={model.palletFit} /></div> : null}
       {E.info(model.info)}
       {messages}
       {E.sp()}

@@ -255,7 +255,7 @@ it("names a lone taproom instead of offering a one-option pick, and keeps the ta
   const html = renderToStaticMarkup(createElement(WeeklyCountView, { model: { ...weeklyCount, locations: [weeklyCount.locations[0]], boardHref: "/taproom/board", varianceHref: "/taproom/variance" }, draft: null }));
   expect(html).not.toMatch(/<label[^>]*>Location<\/label>/);
   expect(html).toContain("Ridgeline Tap Room");
-  expect(html).toMatch(/<h1[^>]*>Weekly count<\/h1><\/div><div[^>]*><a[^>]*href="\/taproom\/board"/);
+  expect(html).toMatch(/<h1[^>]*>Weekly count<\/h1>(?:<\/div>)+<div[^>]*><a[^>]*href="\/taproom\/board"/);
 });
 
 it("gives the saved count an anchor, so a history link lands on it and not on the list just clicked", () => {

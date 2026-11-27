@@ -91,6 +91,25 @@ describe("Catalog view", () => {
     ]);
   });
 
+  it("keeps the Catalog intro behind an ⓘ beside the title, not in a box of its own", () => {
+    const html = htmlOf(createElement(CatalogView, { model: toCatalogViewProps({ priceGroups: [], brands: [] }) }));
+    expect(html).toMatch(/aria-label="About this page"/);
+    expect(html).not.toMatch(/role="note"[^>]*>[^]*?Catalog holds your brands/);
+  });
+
+  it("puts a brand's alias beside its name on the phone card", () => {
+    const model = toCatalogViewProps({ priceGroups: [], brands: [{ id: "llama", name: "Llama", alias: "Animal #25", abv: null, styles: null, skus: [], colas: [] }] });
+    const card = htmlOf(createElement(CatalogView, { model })).split('role="listitem"')[1];
+    expect(card).toMatch(/flex flex-wrap items-baseline[^]*Llama[^]*Animal #25/);
+  });
+
+  it("reserves no image space on a brand without a label, so its name starts at the left edge", () => {
+    const model = toCatalogViewProps({ priceGroups: [], brands: [{ id: "bare", name: "Animal #38", abv: null, styles: null, skus: [], colas: [] }] });
+    const html = htmlOf(createElement(CatalogView, { model }));
+    expect(html).toContain("Animal #38");
+    expect(html).not.toContain("h-12 w-16");
+  });
+
   it("links an on-file COLA out to TTB, and offers Find COLA on a row with none", () => {
     const ttbPage = (id: string) => `https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicFormDisplay&ttbid=${id}`;
     const brand = { abv: null, styles: null, skus: [] };
@@ -104,6 +123,9 @@ describe("Catalog view", () => {
     expect(approved).toMatch(/href="https:\/\/ttbonline\.gov[^"]*ttbid=00123456789012"/);
     expect(approved).toContain('target="_blank"');
     expect(approved).toContain('title="Approved Oct 2, 2026"');
+    // A bare check in the success color, not a filled disc.
+    expect(approved).toContain("text-success-foreground");
+    expect(approved).not.toMatch(/rounded-full|bg-success/);
     expect(inventory).not.toContain('data-slot="badge"');
     expect(inventory).not.toContain(">Approved<");
     expect(inventory).not.toContain("TTB ID 00123456789012");
@@ -176,7 +198,7 @@ describe("Catalog view", () => {
     // What the alias is for stays visible while typing (#1131).
     expect(html).not.toContain('placeholder="Staff only"');
     expect(html).toMatch(/<input[^>]*aria-describedby="brand-alias-help"/);
-    expect(html).toMatch(/id="brand-alias-help"[^>]*>An informal name staff use, such as a series number\./);
+    expect(html).toMatch(/id="brand-alias-help"[^>]*>An informal name, such as a series number\. Search finds it; buyers see it under the brand name in the portal\./);
   });
 
   // #965: inventory and live draw the same Water profiles row, with no invented count.
@@ -831,6 +853,13 @@ describe("Format view", () => {
     expect(html).not.toMatch(/Basis|New SKU, then Pour,/);
     expect(html).toMatch(/Can body/);
     expect(html).not.toMatch(/→/);
+  });
+
+  it("offers Pallet fit only to Admin, with what it means", () => {
+    expect(htmlOf(createElement(FormatView, { model: toFormatViewProps(formatCan) }))).not.toMatch(/Pallet fit/);
+    const html = htmlOf(createElement(FormatView, { model: toFormatViewProps(formatCan), canSetPalletFit: true }));
+    expect(html).toMatch(/Pallet fit/);
+    expect(html).toContain("How many of this package fill one layer or pallet the way you load. Leave blank to skip. Advisory only.");
   });
 
   it("the Format inventory record is FormatView through its fixture adapter", () => {

@@ -5,6 +5,7 @@
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { startsGroup } from "@/lib/mgr/brand-lines";
+import { BrandedName } from "./branded-name";
 import type { PickSheetViewModel } from "@/lib/mgr/pick-sheet-view";
 import { navTitle } from "@/lib/mgr/nav";
 import { WORK_CHIPS, WORK_TABS } from "@/lib/mgr/work-view";
@@ -67,7 +68,7 @@ export function PickSheetView({
               <div className="min-w-0 self-start rounded-lg bg-muted/30 p-4 print:bg-transparent print:p-0">
                 <h3 className="text-sm font-medium">Totals</h3>
                 <p className="mb-3 mt-1 text-xs text-muted-foreground">All ordered quantities, including picked orders. Not quantities left to pick.</p>
-                {E.tbl(["Format", "Product", "Qty"], group.totals.map((t, i) => [startsGroup(group.totals, i) ? E.brand(t.group) : "", t.name, t.qty]), ["l", "l", "r"], { sortable: false, dense: true })}
+                {E.tbl(["Format", "Product", "Qty"], group.totals.map((t, i) => [startsGroup(group.totals, i) ? E.brand(t.group) : "", <BrandedName key="name" name={t.name} alias={t.alias} />, t.qty]), ["l", "l", "r"], { sortable: false, dense: true })}
               </div>
             </div>
           </section>

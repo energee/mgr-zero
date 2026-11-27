@@ -75,7 +75,7 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Palette roles (light): violet = primary, rose = destructive/error, orange = review,
+/* Palette roles (light): midnight navy = primary, rose = destructive/error, orange = review,
    yellow = warning, green = healthy, cyan = information/irreversible commit.
    accent1-6 are the palette ramp, defined per theme below (light inks are
    darkened for contrast on the light ground). Dark is the Aardvark Blue terminal
@@ -89,7 +89,7 @@
   --card-foreground: #1E1F1A;
   --popover: #FFFFFF;
   --popover-foreground: #1E1F1A;
-  --primary: #6453B3;
+  --primary: #1F2A44;
   --primary-foreground: #FFFFFF;
   --secondary: #F1F1EC;
   --secondary-foreground: #1E1F1A;
@@ -107,17 +107,17 @@
      unchecked Switch track; fields themselves draw no border at rest. */
   --control-border: #818278;
   --input: var(--control-border);
-  --ring: #6453B3;
+  --ring: #1F2A44;
   --radius: 0.375rem;
   --sidebar: #F4F4EF;
   --sidebar-foreground: #44453E;
-  --sidebar-primary: #6453B3;
+  --sidebar-primary: #1F2A44;
   --sidebar-primary-foreground: #FFFFFF;
   --sidebar-accent: #E7E7DF;
   --sidebar-accent-foreground: #1E1F1A;
   --sidebar-border: var(--border);
-  --sidebar-ring: #6453B3;
-  --chart-1: #6453B3;
+  --sidebar-ring: #1F2A44;
+  --chart-1: #1F2A44;
   --chart-2: #236773;
   --chart-3: #99451C;
   --chart-4: #426526;
@@ -241,6 +241,19 @@
     background-color: transparent;
     color: var(--muted-foreground);
   }
+}
+
+/* A phone card drops a fact's column label when the value names itself: a
+   quiet action (Find COLA), or a value marked data-card-bare (Catalog's style).
+   A role with no action sees words, which keep their label. */
+[data-slot="item"] dl > div:has(> dd [data-quiet-action] [data-row-action], > dd > [data-card-bare]) > dt {
+  display: none;
+}
+
+/* A phone card's fact marked data-card-end (Catalog's COLA) sits at the right
+   end of its line, the same place on every card. */
+[data-slot="item"] dl > div:has(> dd > [data-card-end]) {
+  margin-left: auto;
 }
 
 /* A quiet field (a Price groups cell) reads as a number in its table: it

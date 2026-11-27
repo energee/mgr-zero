@@ -1,6 +1,7 @@
 import { createUIMessageStreamResponse, gateway, isStepCount, streamText, toUIMessageStream } from "ai";
 import { consumeAdmission } from "@/lib/commands/admission";
 import { buildRouteContext } from "@/lib/commands/context";
+import { createRequestAuthContext } from "@/lib/auth/request-context";
 import { CommandError, runCommand, type Ctx } from "@/lib/commands/registry";
 import { askMgrStep, recordAgentStep } from "@/lib/agent/sessions";
 import { createComposerTools } from "@/lib/chat/agent";
@@ -22,6 +23,8 @@ export async function POST(req: Request) {
     const body = await readChatRequest(req);
     const context = await buildRouteContext(body.breweryId, body.expectedContext);
     if (context.breweryId === null) throw new CommandError("brewery context required", 403, "permission_denied");
+    // Ask MGR is limited to platform super admins for now; the layout hides its button for everyone else.
+    if (!(await createRequestAuthContext().getIdentity())?.superadmin) throw new CommandError("Ask MGR is limited to super admins", 403, "permission_denied");
     if (!isChatConfigured()) {
       return new Response(encodeChatFailure("not_configured"), { status: 503 });
     }

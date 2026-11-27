@@ -2,6 +2,7 @@
 // portal_order (order, lines, events, changes after confirm, shipment.invoices) plus buyerStatus.
 import { plural } from "@/lib/mgr/plural";
 import { docNo } from "./doc-no";
+import { brandLabel, byBrand, type BrandedSku } from "./brand-lines";
 import { money } from "./money";
 import { orderLineCents } from "./order-view";
 import { shipToLine } from "./ship-to-view";
@@ -12,6 +13,13 @@ import { changedAfterConfirmText, type OrderLineChange } from "./order-changes-v
 
 export type PortalOrderLineView = {
   key: string;
+  /** The brand heading lines sit under (brandLabel); absent for a SKU read without brand and format. */
+  group?: string;
+  /** The brand's alias, muted under the brand heading. */
+  alias?: string;
+  /** The brand, for the live heading's label and reference sheet. */
+  brandId?: string;
+  /** The format under the brand heading, or the SKU name. */
   name: string;
   detail: string;
   amount: string;
@@ -62,7 +70,8 @@ export type PortalOrderSnapshot = {
     qty_refused?: number;
     short_reason?: string | null;
     unit_price_cents: number;
-    skus: { name: string } | null;
+    /** portal_order_rows embeds the brand (id, name, alias) and format names. */
+    skus: (NonNullable<BrandedSku> & { brands?: { id?: string; name: string; alias?: string | null } | null }) | null;
   }[];
   events: {
     id: string;
@@ -108,13 +117,15 @@ export function toPortalOrderViewProps({ order, lines, events, changes = [], shi
     po: order.po_number ?? undefined,
     requested: order.requested_ship_date ?? undefined,
     note: order.note ?? undefined,
-    lines: lines.map((l) => {
+    // Lines group under their brand, as Shop and Confirm order draw them.
+    lines: byBrand(lines).map((l) => {
       const ordered = Number(l.qty_ordered);
       const shipped = l.qty_shipped === null ? null : Number(l.qty_shipped);
       const qty = shipped !== null && shipment?.invoice_timing === "on_delivery" ? shipped - Number(l.qty_refused ?? 0) : shipped ?? ordered;
       return {
         key: l.id,
-        name: l.skus?.name ?? "Item",
+        ...brandLabel(l.skus ?? { name: "Item" }),
+        ...(l.skus?.brands?.id ? { brandId: l.skus.brands.id } : {}),
         detail: shipped !== null ? `ordered ${ordered} · shipped ${shipped}${l.qty_refused ? ` · refused ${l.qty_refused} · accepted ${shipped - l.qty_refused}` : ""}` : `ordered ${ordered}`,
         amount: money(orderLineCents(qty, Number(l.unit_price_cents))),
         warning: Boolean(l.qty_refused) || (shipped !== null && shipped < ordered),

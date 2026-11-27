@@ -89,6 +89,25 @@ it("draws a header with text cells as a sort button, unsorted until clicked", ()
   }
 });
 
+it("noteBeside puts the phone card's note on the name's line, and leaves it under the name otherwise", () => {
+  const card = (noteBeside?: boolean) => renderToStaticMarkup(createElement(RecordTable, {
+    headers: ["Brand", "Style"], align: ["l", "l"], noteBeside, rows: [{ key: "a", cells: ["Llama", "IPA"], note: "Animal #25" }],
+  })).split('role="listitem"')[1];
+  expect(card(true)).toMatch(/<div class="flex flex-wrap items-baseline[^"]*"><div[^>]*data-slot="item-title"[^]*Llama[^]*<p[^>]*data-slot="item-description"[^>]*>Animal #25<\/p><\/div>/);
+  expect(card()).not.toContain("flex flex-wrap items-baseline");
+});
+
+it("draws a default sort as that header's arrow and orders the rows by it on the first paint", () => {
+  const out = renderToStaticMarkup(createElement(RecordTable, {
+    headers: ["Name", "Added"], align: ["l", "l"], defaultSort: { column: 1, desc: true },
+    rows: [{ key: "a", cells: ["Old", "Aug 18, 2026"] }, { key: "b", cells: ["New", "Nov 12, 2026"] }],
+  }));
+  const [name, added] = heads(out);
+  expect(name).toContain('aria-sort="none"');
+  expect(added).toContain('aria-sort="descending"');
+  expect(out.indexOf("New")).toBeLessThan(out.indexOf("Old"));
+});
+
 it("gives a column with nothing to sort (empty or component cells) a plain header", () => {
   const Comp = () => createElement("span", null, "3 kegs");
   const out = heads(renderToStaticMarkup(createElement(RecordTable, {

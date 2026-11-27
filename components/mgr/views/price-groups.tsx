@@ -92,8 +92,7 @@ export function PriceGroupsView({
   const edge = channel?.folded.lastIndexOf(false);
   return (
     <>
-      {E.back("More", "Price groups", createAction !== undefined ? createAction : E.btn("New price group"), backHref)}
-      {E.info("Price groups down, formats across. A beer sits on one group and a customer on one channel; the cell where they meet is the price.")}
+      {E.back("More", "Price groups", createAction !== undefined ? createAction : E.btn("New price group"), backHref, undefined, E.help("Price groups down, formats across. A beer sits on one group and a customer on one channel; the cell where they meet is the price."))}
       {model.groupCount === 0 ? E.blank("Add a price group, then put each brand on one from Catalog.")
         : !channel ? E.blank("No sale channels yet")
         : <ArrowKeyGrid data-price-grid className="group/grid flex shrink-0 flex-col gap-2">

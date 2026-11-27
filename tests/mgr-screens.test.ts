@@ -952,6 +952,24 @@ describe("SCREENS", () => {
     expect(hd).toContain("md:flex-row");
     expect(hd).toContain("md:justify-between");
     expect(hd).toContain("New order");
+    // Each page intro moved from a box under the header into E.help's ⓘ beside the title.
+    for (const [name, intro] of [
+      ["Agent activity", "What agents and Ask MGR did here"],
+      ["Agents", "Agents connected to your account act as you"],
+      ["My notification preferences", "These switches change only your personal Slack reminders"],
+      ["Locations", "Locations cannot be deleted or archived"],
+      ["Price groups", "Price groups down, formats across"],
+      ["Water profiles", "Water profiles cannot be deleted or archived"],
+    ] as const) {
+      const page = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
+      expect(page, name).toMatch(/<h1[^>]*>[^<]*<\/h1><button[^>]*aria-label="About this page"/);
+      expect(page, name).not.toContain(intro);
+    }
+    // E.help: a page's intro rides an ⓘ beside the title, outside the h1, instead of a box on its own line.
+    const helped = renderToStaticMarkup(E.back("More", "Catalog", undefined, "#", undefined, E.help("Catalog holds your brands.")));
+    expect(helped).toMatch(/<h1[^>]*>Catalog<\/h1>/);
+    expect(helped).toMatch(/<button[^>]*aria-label="About this page"/);
+    expect(helped).not.toContain('role="note"');
     const back = renderToStaticMarkup(E.back("More", "Customers", E.btn("New customer")));
     expect(back).toContain("md:flex-row");
     expect(back).toContain("New customer");
@@ -972,6 +990,8 @@ describe("SCREENS", () => {
     }
     expect(body("Me")).toMatch(/md:flex[\s\S]*Change password[\s\S]*Sign out/);
     expect(body("Portal Me")).toMatch(/md:flex[\s\S]*Change password[\s\S]*Sign out/);
+    // The portal has no Settings page, so its light/dark switch lives in Me.
+    expect(body("Portal Me")).toMatch(/Switch to dark mode/);
     const firstRun = body("First-run checklist");
     expect(firstRun).not.toMatch(/md:flex-row[^>]*>[\s\S]*Set up Demo Brewing[\s\S]*Add location/);
     expect(firstRun).toMatch(/>Add location</);

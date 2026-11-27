@@ -36,6 +36,8 @@ export const upsertCustomerInput = (values: CustomerEditValues, id?: string) => 
   taxTreatment: (values.taxTreatment || undefined) as TaxTreatment | undefined,
   // Only the detail form has the field; leaving it out keeps the saved delay.
   ...(values.releaseDelayDays === undefined ? {} : { releaseDelayDays: Number(values.releaseDelayDays) }),
+  // The same for the release share; a blank field removes the typed share.
+  ...(values.releaseSharePct === undefined ? {} : { releaseSharePct: values.releaseSharePct.trim() === "" ? null : Number(values.releaseSharePct) }),
 });
 
 /** Wholesale is the channel a wholesale account almost always sits on, so it is
