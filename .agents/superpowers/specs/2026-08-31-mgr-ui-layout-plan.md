@@ -371,7 +371,7 @@ recorded. It is an audit surface, not decoration, and never implies a row can be
 | `--background` | `#FAFAF7` | `#050a16` | Page ground |
 | `--card` / `--popover` | `#FFFFFF` | `#152a50` / `#08101f` | Cards, sheets, menus |
 | `--foreground` | `#1E1F1A` | `#dddddd` | Text |
-| `--primary` | `#6453B3` | `#60a4ec` | Mutable primary action, active nav, progress |
+| `--primary` | `#1F2A44` | `#60a4ec` | Mutable primary action, active nav, progress |
 | `--irreversible` | `#0F6B78` | `#60b6cb` | Append-only, filed, external, sign-out actions only |
 | `--destructive` | `#B52D51` | `#ff7a70` | Errors and destructive actions; passes AA as text on card and popover |
 | `--attention` / `--attention-foreground` | `#FFF0E7` / `#99451C` | `#2e2350` / `#e26be2` | Review (needs attention) surface and text |
@@ -381,7 +381,7 @@ recorded. It is an audit surface, not decoration, and never implies a row can be
 The remaining shadcn tokens (secondary, muted, accent, destructive, sidebar,
 chart) are set in `app/globals.css`; that file is the source of truth. The
 mood is Linear-quiet: near-grayscale neutrals with a faint warm tint, one
-violet accent, teal reserved for irreversible actions, orange for review and yellow
+midnight navy accent, teal reserved for irreversible actions, orange for review and yellow
 for warning. Dark mode is the Aardvark Blue terminal scheme: a navy ground, its blue
 as the accent and its cyan for irreversible actions.
 
