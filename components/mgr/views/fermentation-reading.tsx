@@ -75,10 +75,12 @@ export function FermentationReadingView({
           <summary className="text-sm">Observed {values.observedAt ? formatDateTime(`${values.observedAt}Z`, "UTC") : "now"} · Change</summary>
           {E.edit(`Observed at (${timeZone})`, values.observedAt, "datetime-local", undefined, { ...field("observedAt"), id: "fr-observed", step: "1", required: true })}
         </details>
-        {/* Each prior value is its field's placeholder: a reference, never a typed value (#1508). */}
-        {E.edit("Temperature (°F)", values.tempF, "number", undefined, { ...field("tempF"), id: "fr-temp", required: true, ...READING_BOUNDS.tempF, placeholder: prior?.tempF && `Prior ${prior.tempF}`, error: values.tempF ? errors.tempF : undefined })}
+        {/* Each prior value is its field's placeholder: a reference, never a typed value (#1508).
+            A live sheet opens on Temperature, the first value to type; an inventory frame takes no focus. */}
+        {E.edit("Temperature (°F)", values.tempF, "number", undefined, { ...field("tempF"), id: "fr-temp", autoFocus: Boolean(onChange), required: true, ...READING_BOUNDS.tempF, placeholder: prior?.tempF && `Prior ${prior.tempF}`, error: values.tempF ? errors.tempF : undefined })}
         <div className="flex flex-col gap-2">
-          {E.edit(`Gravity (${gravityUnitShort(unit)}) · optional`, values.gravity, "text", undefined, { ...field("gravity"), id: "fr-gravity", inputMode: "decimal", placeholder: prior?.gravity ? `Prior ${prior.gravity}` : gravityPlaceholder(unit), error: errors.gravity })}
+          {/* A phone's decimal keypad has no minus key, and a negative °P is valid, so °P gets the full keyboard. */}
+          {E.edit(`Gravity (${gravityUnitShort(unit)}) · optional`, values.gravity, "text", undefined, { ...field("gravity"), id: "fr-gravity", inputMode: unit === "plato" ? undefined : "decimal", placeholder: prior?.gravity ? `Prior ${prior.gravity}` : gravityPlaceholder(unit), error: errors.gravity })}
           {unit === "plato" && <p className="text-xs text-muted-foreground">Negative °P is valid for fermented beer; SG cannot be negative.</p>}
         </div>
         {E.edit("pH · optional", values.ph, "number", undefined, { ...field("ph"), id: "fr-ph", ...READING_BOUNDS.ph, placeholder: prior?.ph && `Prior ${prior.ph}`, error: errors.ph })}
@@ -92,6 +94,10 @@ export function FermentationReadingView({
     </form>
   );
 }
+
+/** E.pin's class for these actions: on a desk row the "Still needed" line sits on its own line above the two buttons,
+ *  not squeezed between them. */
+export const READING_PIN = "md:flex-wrap md:[&>p]:order-first md:[&>p]:basis-full md:[&>p]:text-right";
 
 /** `next` adds Save and next tank, a second submit named "next" that saves and opens the next occupied tank's reading
  *  in the Cellar map's tile order (#1508); the caller passes it only when such a tank exists. */

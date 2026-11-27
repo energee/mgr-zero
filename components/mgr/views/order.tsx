@@ -108,7 +108,7 @@ export function OrderView({
   reordering?: boolean;
 }) {
   const orderedField = (line: { key: string; name: string; ordered?: string }) => onQuantity
-    ? <div className="w-32 md:ml-auto"><OrderQuantity label={`${line.name} ordered`} value={quantities?.[line.key] ?? line.ordered ?? ""} onChange={(value) => onQuantity(line.key, value)} /></div>
+    ? <div className="w-32 md:ml-auto pointer-coarse:w-38"><OrderQuantity label={`${line.name} ordered`} value={quantities?.[line.key] ?? line.ordered ?? ""} onChange={(value) => onQuantity(line.key, value)} /></div>
     : line.ordered;
   const added = lineEdit?.added ?? [];
   const lineCount = model.lines.length + added.length;
