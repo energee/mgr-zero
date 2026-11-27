@@ -3,6 +3,10 @@
 Status: partially implemented: foundation #315, then #320 and #400 (all merged). The
 remaining coverage targets below are open.
 
+> **`aiExposed` removed.** PR #1785 deleted the `aiExposed` flag and `listTools({ aiOnly })`.
+> Ask MGR now reads its operations through `lib/agent/operations.ts`, and a definition opts out with `agentHidden`.
+> Mentions of either below are history.
+
 Target: PR #315, `fix/composer-chat-interface`, worktree
 `.agents/worktrees/composer`, PR base `main`.
 
