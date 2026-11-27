@@ -53,6 +53,11 @@ instead of `/accept`, and never sets a password. Keep the hosted Site URL
 free of a trailing slash: the template appends `/auth/confirm` to it. Both
 were set on 2026-11-23 after staff reported that invites did not let them in.
 
+Emailed links last 24 hours: `otp_expiry` in `supabase/config.toml` and
+`mailer_otp_exp` on hosted Auth are both 86400. The reset and sign-in emails
+state that limit, so change the setting and the wording together. An invite
+uses the same limit; at one hour, invites opened the next day had expired.
+
 Passwordless and password-recovery emails use the configured `APP_URL`, never
 the incoming request's Origin. Hosted Auth's Site URL and redirect allowlist
 must use the approved exact origin and `/auth/confirm` callback, without wildcard

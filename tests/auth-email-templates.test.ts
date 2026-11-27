@@ -32,3 +32,10 @@ it("shows the MGR mark from a PNG the app serves, since mail clients do not rend
   expect(read("invite")).toContain('src="{{ .SiteURL }}/email/mgr-mark.png"');
   expect(readFileSync("public/email/mgr-mark.png").subarray(1, 4).toString()).toBe("PNG");
 });
+
+it("states the link lifetime that local Auth enforces", () => {
+  const seconds = Number(readFileSync("supabase/config.toml", "utf8").match(/^otp_expiry = (\d+)$/m)?.[1]);
+  for (const name of ["recovery", "magic_link"]) {
+    expect(read(name)).toContain(`expires in ${seconds / 3600} hours`);
+  }
+});
