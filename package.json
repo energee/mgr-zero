@@ -27,7 +27,7 @@
     "@lobehub/icons": "^6.15.0",
     "@modelcontextprotocol/server": "^2.4.0",
     "@supabase/ssr": "^0.12.7",
-    "@supabase/supabase-js": "^2.119.0",
+    "@supabase/supabase-js": "^2.119.2",
     "@tanstack/react-query": "5.105.3",
     "@tanstack/react-table": "9.3.1",
     "@vercel/speed-insights": "2.0.0",
@@ -69,7 +69,7 @@
     "tailwindcss": "^4.3.4",
     "tsx": "^4.23.15",
     "typescript": "https://registry.npmjs.org/@typescript/typescript6/-/typescript6-6.0.2.tgz",
-    "vite": "8.3.4",
+    "vite": "8.3.8",
     "vitest": "^5.1.0"
   },
   "overrides": {
