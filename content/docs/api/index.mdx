@@ -718,10 +718,9 @@ A failure is the same envelope as a success, with `ok: false`:
 ```
 
 Branch on `code`, never on `message`. The code is a contract. The message is
-written for a person and will be reworded. Both are safe to show a user. The
-endpoint never returns raw database text, which is why an unmapped database
-failure arrives as a generic `db_error` while the detail goes to the server log
-under the same `correlationId` you were given.
+written for a person and will be reworded. Both are safe to show a user. A
+database failure with no public code arrives as a generic `db_error`, and the
+detail goes to the server log under the same `correlationId` you were given.
 
 Every response carries a `correlationId`, success or failure. Log it. It is the
 one value that ties what your client saw to what the server recorded.
