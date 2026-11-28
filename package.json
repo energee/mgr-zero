@@ -69,7 +69,7 @@
     "tailwindcss": "^4.3.5",
     "tsx": "^4.23.15",
     "typescript": "https://registry.npmjs.org/@typescript/typescript6/-/typescript6-6.0.2.tgz",
-    "vite": "8.3.4",
+    "vite": "8.3.8",
     "vitest": "^5.1.0"
   },
   "overrides": {
