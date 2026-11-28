@@ -108,9 +108,9 @@ export function IngredientSheet({ line, stage = "mash", materials, limits, batch
 /** The batch size and the eight process numbers in one sheet. Each field changes the editor's draft as it is typed, as
  *  the Water sheet's own fields do, so there is no Save here. `open` is the editor's: Edit recipe numbers opens the
  *  sheet, and so does each number the page reads out in a sentence. */
-export function RecipeNumbersSheet({ values, onChange, trigger, open, onOpenChange }: { values: Record<RecipeNumberField, string>; onChange: (field: RecipeNumberField, value: string) => void; trigger: ReactNode } & Opened) {
+export function RecipeNumbersSheet({ values, onChange, suggestions, trigger, open, onOpenChange }: { values: Record<RecipeNumberField, string>; onChange: (field: RecipeNumberField, value: string) => void; suggestions?: Parameters<typeof RecipeNumbersView>[0]["suggestions"]; trigger: ReactNode } & Opened) {
   return <CommandForm open={open} onOpenChange={onOpenChange} title="Recipe numbers" trigger={asTrigger(trigger)}>
-    <RecipeNumbersView values={values} onChange={onChange} />
+    <RecipeNumbersView values={values} onChange={onChange} suggestions={suggestions} />
   </CommandForm>;
 }
 

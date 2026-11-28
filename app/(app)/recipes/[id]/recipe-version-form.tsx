@@ -59,9 +59,11 @@ import { nameWithAlias } from "@/lib/mgr/labels";
 import { useCommandContext } from "@/lib/brewery-provider";
 import { gravityBlockers, recipeGravity } from "@/lib/recipe-gravity";
 import { readRecipeDraft, recipeDraftKey, shouldKeepDraft, writeRecipeDraft } from "@/lib/mgr/recipe-draft";
-import { batchSize, draftBlocker, draftIbu, figureStrip, gravityBlockerText, gristShares, ingredientCells, ingredientPack, materialsNowGive, movedBatchesText, noMashText, RECIPE_NUMBERS, storedRecipeNote, waterFacts, type RecipeDraft, type RecipeFigures, type RecipeNumberKey, type RecipeViewModel } from "@/lib/mgr/recipe-view";
+import { batchSize, draftBlocker, draftIbu, figureStrip, gravityBlockerText, gristKey, gristShares, ingredientCells, ingredientPack, materialsNowGive, movedBatchesText, noMashText, RECIPE_NUMBERS, storedRecipeNote, waterFacts, type RecipeDraft, type RecipeFigures, type RecipeNumberKey, type RecipeViewModel } from "@/lib/mgr/recipe-view";
 import { EMPTY_WATER, lineReady, materialLookup, optionalNumber as num, removeAt, scheduleDays, upsertAt, type RecipeMaterial, type MashStep, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 import { recipeCostTable, type MaterialCost } from "@/lib/mgr/recipe-cost-view";
+import { assumptionSuggestions, type BatchMeasurement } from "@/lib/mgr/recipe-assumptions";
+import { saccharificationRest } from "@/lib/mgr/recipe-schedule";
 import { FermentationScheduleSheet, IngredientSheet, MashScheduleSheet, RecipeNameSheet, RecipeNumbersSheet, WaterSheet } from "./schedule-sheets";
 
 type Numbers = Record<RecipeNumberKey, string>;
@@ -74,7 +76,7 @@ const BLANK_DRAFT: RecipeDraft = { batchBbl: "", numbers: BLANK_NUMBERS, notes: 
 const pctToFraction = (s: string) => Number(s) / 100;
 const NOT_KEPT = "Your changes could not be kept in this tab; they are lost if you leave the page before saving.";
 
-export function RecipeEditor({ recipeId, title, backHref, brandId = null, brands = [], storedNote = null, page, savedFigures, initial, baseVersionId = null, loaded, materials, profiles, unit, costs }: {
+export function RecipeEditor({ recipeId, title, backHref, brandId = null, brands = [], storedNote = null, page, savedFigures, initial, baseVersionId = null, loaded, materials, profiles, unit, costs, measurements }: {
   recipeId?: string; title: string; backHref: string;
   /** The brand the saved recipe brews, null for none; the pick in the page's sentence starts on it. */
   brandId?: string | null;
@@ -94,6 +96,8 @@ export function RecipeEditor({ recipeId, title, backHref, brandId = null, brands
   /** Use this again: an earlier copy to show as an unsaved change, and the notice naming where it came from. */
   loaded?: { draft: RecipeDraft; notice: string };
   materials: RecipeMaterial[]; profiles: WaterProfileIons[]; unit: GravityUnit;
+  /** What the brewery's finished batches measured (list_batch_measurements); Recipe numbers suggests the two assumptions from it. */
+  measurements: BatchMeasurement[];
   /** What each material costs now (list_material_costs); the sheet's cost is worked out from it as the lines change. */
   costs: Record<string, MaterialCost>;
 }) {
@@ -245,6 +249,13 @@ export function RecipeEditor({ recipeId, title, backHref, brandId = null, brands
   const ingredientSheet = { materials: sheetMaterials, limits: timingLimits, batchBbl: batchSize(batchBbl) };
   const shares = gristShares(lines.map((l) => ({ stage: l.stage, perBbl: Number(l.perBblQty), unit: material.unit(l.materialId) })));
   const liveStrip = figureStrip(live, unit, { saved: false, why: gravityWhy });
+  // The two assumptions as the brewery's batches measured them, for the sheet as typed: its grain bill, its yeast
+  // and its mash rest pick the batches it is compared with.
+  const suggestions = assumptionSuggestions({
+    gristKey: gristKey(validLines.filter((l) => l.stage === "mash").map((l) => ({ materialId: l.materialId, perBbl: Number(l.perBblQty) }))),
+    yeastIds: validLines.filter((l) => material.get(l.materialId)?.category === "yeast").map((l) => l.materialId),
+    mashRestF: saccharificationRest(mashSchedule)?.tempF ?? null,
+  }, measurements, numbers);
   const toggle = (sheet: "numbers" | "water") => (open: boolean) => setSheetOpen(open ? sheet : null);
   return (
     <RecipeView
@@ -288,7 +299,7 @@ export function RecipeEditor({ recipeId, title, backHref, brandId = null, brands
         rename: (trigger) => <RecipeNameSheet name={title} note={page?.recipeNote ?? ""} onSave={saveName} busy={nameAction.busy} error={nameAction.error} trigger={trigger} />,
         addIngredient: (stage, trigger) => <IngredientSheet stage={stage} {...ingredientSheet} onSave={(f) => change({ lines: [...draft.lines, f] })} trigger={trigger} />,
         sheet: (sheet, trigger) => {
-          if (sheet === "numbers") return <RecipeNumbersSheet open={sheetOpen === "numbers"} onOpenChange={toggle("numbers")} values={{ batchBbl, ...numbers }} onChange={(field, value) => change(field === "batchBbl" ? { batchBbl: value } : { numbers: { ...draft.numbers, [field]: value } })} trigger={trigger} />;
+          if (sheet === "numbers") return <RecipeNumbersSheet open={sheetOpen === "numbers"} onOpenChange={toggle("numbers")} values={{ batchBbl, ...numbers }} suggestions={suggestions} onChange={(field, value) => change(field === "batchBbl" ? { batchBbl: value } : { numbers: { ...draft.numbers, [field]: value } })} trigger={trigger} />;
           if (sheet === "mash") return <MashScheduleSheet steps={mashSchedule} onChange={(mashSchedule) => change({ mashSchedule })} trigger={trigger} />;
           if (sheet === "fermentation") return <FermentationScheduleSheet stages={fermentationSchedule} onChange={(fermentationSchedule) => change({ fermentationSchedule })} trigger={trigger} />;
           return <WaterSheet open={sheetOpen === "water"} onOpenChange={toggle("water")} water={water} profiles={profiles} materials={materials} onChange={(water) => change({ water })} trigger={trigger} />;

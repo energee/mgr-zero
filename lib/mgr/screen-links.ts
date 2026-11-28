@@ -190,6 +190,8 @@ export const INERT: (string | RegExp)[] = [
   "Hide password",
   // A combobox's icon button opens its own list in place.
   "Show options",
+  // Recipe numbers: Use fills the assumption's field with the measured number, in place.
+  /^Use \d+% for /,
   "Reschedule",
   "Cancel plan",
   /^Switch to (dark|light) mode$/,

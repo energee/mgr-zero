@@ -282,6 +282,21 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_batch_history", "input": { "status": "completed" } }'
 ```
 
+## list_batch_measurements [#list_batch_measurements]
+
+`query` · admin, brewer
+
+Each brewed, closed batch not started from a transfer whose copy's mash lines all have an extract potential, with the grain bill (gristKey), yeast materials and saccharification rest of that copy, and the brewhouse efficiency and apparent attenuation it measured (attenuation only from a last gravity reading taken at least 7 days after brew day, on the brewery's calendar, and below the first)
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_batch_measurements", "input": {} }'
+```
+
 ## list_batches [#list_batches]
 
 `query` · admin, brewer

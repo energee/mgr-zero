@@ -102,7 +102,7 @@ fill it. Outcomes can fill it now. **My call:** compute it instead of removing i
 
 With two or more closed batches of the shown version that have an efficiency, the note reads:
 "2 batches: efficiency 68–71% against 72% assumed; attenuation 75–78% against 78% assumed."
-Attenuation is left out with fewer than two values. The note states the gap and gives no advice.
+Attenuation is left out with fewer than two values. The note states the gap. The Recipe numbers sheet offers the measured number (`docs/plans/derived-assumptions.md`).
 
 ### Tasks
 
