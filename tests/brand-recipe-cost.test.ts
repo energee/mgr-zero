@@ -35,7 +35,7 @@ beforeAll(async () => {
 
 describe("get_brand_recipe_cost", () => {
   it("is empty for a brand with no recipe", async () => {
-    expect(await cost()).toEqual({ recipeVersionId: null, costCentsPerBbl: null, uncosted: [] });
+    expect(await cost()).toEqual({ recipeVersionId: null, costCentsPerBbl: null, uncosted: [], unreceived: [] });
   });
 
   it("reports no cost while an ingredient has no receipt, naming it once, then sums per barrel", async () => {
@@ -50,10 +50,10 @@ describe("get_brand_recipe_cost", () => {
       ],
     }, brewer)) as { id: string });
     // The view is NULL, not the malt-only partial sum, until every ingredient has a receipt.
-    expect(await cost()).toEqual({ recipeVersionId: v1, costCentsPerBbl: null, uncosted: ["Citra"] });
+    expect(await cost()).toEqual({ recipeVersionId: v1, costCentsPerBbl: null, uncosted: ["Citra"], unreceived: [] });
     await receipt(hop, 2000);
     // 60 × $1.00 + (1 + 0.5) × $20.00 per bbl.
-    expect(await cost()).toEqual({ recipeVersionId: v1, costCentsPerBbl: 9000, uncosted: [] });
+    expect(await cost()).toEqual({ recipeVersionId: v1, costCentsPerBbl: 9000, uncosted: [], unreceived: [] });
   });
 
   it("costs a material bought by the case at its received per-base-unit price (#448)", async () => {
@@ -67,7 +67,7 @@ describe("get_brand_recipe_cost", () => {
     await runCommand("receive_purchase_order", { poId: po.id, locationId: wh.id, binId: wh.binId, lines: [{ poLineId: lines[0].id, qtyCounted: 2 }] }, buyer);
     const other = (await runCommand("create_recipe", { name: "Hulls only", brandId }, brewer)) as { id: string };
     const v = (await runCommand("create_recipe_version", { recipeId: other.id, mashSchedule: [{ name: "Saccharification", kind: "infusion", tempF: 150, minutes: 60 }], brewhouseEfficiency: 0.8, yeastAttenuation: 0.8, ingredients: [{ materialId: hulls.id, perBblQty: 10, stage: "mash" }] }, brewer)) as { id: string };
-    expect(await cost()).toEqual({ recipeVersionId: v.id, costCentsPerBbl: 1000, uncosted: [] });
+    expect(await cost()).toEqual({ recipeVersionId: v.id, costCentsPerBbl: 1000, uncosted: [], unreceived: [] });
   });
 
   it("keeps sub-cent precision on a receipt's per-base-unit cost (#495)", async () => {
@@ -85,7 +85,7 @@ describe("get_brand_recipe_cost", () => {
     // 1000 g per barrel costs $22.05, not the $20.00 a whole-cent gram implied.
     const other = (await runCommand("create_recipe", { name: "Mosaic only", brandId }, brewer)) as { id: string };
     const v = (await runCommand("create_recipe_version", { recipeId: other.id, mashSchedule: [{ name: "Saccharification", kind: "infusion", tempF: 150, minutes: 60 }], brewhouseEfficiency: 0.8, yeastAttenuation: 0.8, ingredients: [{ materialId: mosaic.id, perBblQty: 1000, stage: "boil", timingMinutes: 60 }] }, brewer)) as { id: string };
-    expect(await cost()).toEqual({ recipeVersionId: v.id, costCentsPerBbl: 2205, uncosted: [] });
+    expect(await cost()).toEqual({ recipeVersionId: v.id, costCentsPerBbl: 2205, uncosted: [], unreceived: [] });
   });
 
   it("lets the last brewed version speak for the brand over a newer one, ignoring other brands and unrecorded brews", async () => {
@@ -100,7 +100,31 @@ describe("get_brand_recipe_cost", () => {
     await batch(null, brandId, "2026-09-06");
     expect((await cost() as { recipeVersionId: string }).recipeVersionId).not.toBe(theirV.id);
     await batch(v1, brandId, "2026-09-02");
-    expect(await cost()).toEqual({ recipeVersionId: v1, costCentsPerBbl: 9000, uncosted: [] });
+    expect(await cost()).toEqual({ recipeVersionId: v1, costCentsPerBbl: 9000, uncosted: [], unreceived: [] });
+  });
+
+  it("costs a never-received material at its typed price, follows a price edit, and lets a receipt replace it", async () => {
+    const buyer = await makeStaffCtx(ctx.breweryId, "admin");
+    // Bought by the 55 lb bag at $55.00 a bag: $1.00 a lb, and 10 lb per barrel costs $10.00.
+    const vienna = { name: "Vienna", category: "malt", baseUom: "lb", purchaseUom: "each", purchaseUomFactor: 55 } as const;
+    const { id } = await runCommand("upsert_material", { ...vienna, purchaseUnitCostCents: 5500 }, buyer) as { id: string };
+    const other = (await runCommand("create_recipe", { name: "Vienna only", brandId }, brewer)) as { id: string };
+    const v = (await runCommand("create_recipe_version", { recipeId: other.id, mashSchedule: [{ name: "Saccharification", kind: "infusion", tempF: 150, minutes: 60 }], brewhouseEfficiency: 0.8, yeastAttenuation: 0.8, ingredients: [{ materialId: id, perBblQty: 10, stage: "mash" }] }, brewer)) as { id: string };
+    const row = () => unwrap(admin.from("recipe_version_costs").select("cost_cents_per_bbl, uncosted_material_ids, unreceived_material_ids").eq("recipe_version_id", v.id).single()) as Promise<{ cost_cents_per_bbl: number; uncosted_material_ids: string[]; unreceived_material_ids: string[] }>;
+    // Costed, and named as resting on a typed price, not a receipt.
+    expect(await row()).toEqual({ cost_cents_per_bbl: 1000, uncosted_material_ids: [], unreceived_material_ids: [id] });
+    await runCommand("upsert_material", { ...vienna, id, purchaseUnitCostCents: 6600 }, buyer);
+    expect((await row()).cost_cents_per_bbl).toBe(1200);
+    // An edit that sends no price keeps it.
+    await runCommand("upsert_material", { ...vienna, id }, buyer);
+    expect((await row()).cost_cents_per_bbl).toBe(1200);
+    // The recipe page reads the same cost, and what backs it: nothing received, nothing in stock.
+    const recipeCost = async () => (await runCommand("get_recipe", { recipeId: other.id }, brewer) as { cost: unknown }).cost;
+    expect(await recipeCost()).toEqual({ costCentsPerBbl: 1200, uncosted: [], unreceived: ["Vienna"], outOfStock: ["Vienna"] });
+    // A receipt at $2.00 a lb is the cost from then on, and it put stock on hand.
+    await receipt(id, 200);
+    expect(await row()).toEqual({ cost_cents_per_bbl: 2000, uncosted_material_ids: [], unreceived_material_ids: [] });
+    expect(await recipeCost()).toEqual({ costCentsPerBbl: 2000, uncosted: [], unreceived: [], outOfStock: [] });
   });
 
   it("is a Sales and Admin read", async () => {

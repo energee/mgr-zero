@@ -1,6 +1,8 @@
 // components/mgr/views/material.tsx — shared Material sheet body. Sold by, beside
 // the pack size, is the word one purchase unit is sold by (bag, box…); it offers
 // None only until a word is saved, because a saved word cannot be cleared.
+// Price per purchase unit is the typed price a recipe costs the material at
+// until a purchase order receipt gives a cost.
 import { E } from "@/components/mgr/e";
 import { FieldDescription } from "@/components/ui/field";
 import { NONE } from "@/components/ui/select";
@@ -10,7 +12,7 @@ import { sentenceCase } from "@/lib/mgr/labels";
 import type { ReactNode } from "react";
 import { Fragment } from "react";
 
-type Controls = Partial<Record<"name" | "kind" | "baseUnits" | "purchaseUnit" | "soldBy" | "unit" | "defaultVendorId" | "extractPotential" | "alphaAcid", (value: string) => void>> & {
+type Controls = Partial<Record<"name" | "kind" | "baseUnits" | "purchaseUnit" | "soldBy" | "unit" | "defaultVendorId" | "extractPotential" | "alphaAcid" | "price", (value: string) => void>> & {
   lotTracked?: (value: boolean) => void;
   active?: (value: boolean) => void;
   /** Leaving Material name; the live form checks for a near-duplicate, and Add material asks for a suggested kind. */
@@ -98,6 +100,10 @@ export function MaterialView({ model, controls = {}, messages, footer, nameNote 
       {ALPHA_KINDS.has(model.kind.toLowerCase())
         ? E.edit("Alpha acid % · optional", model.alphaAcid ?? "", "number", undefined, { onChange: controls.alphaAcid, min: 0.01, max: 30, step: 0.01, inputMode: "decimal" })
         : null}
+      {E.edit("Price per purchase unit ($) · optional", model.price ?? "", "number", undefined, {
+        onChange: controls.price, min: 0, step: 0.01, inputMode: "decimal", error: model.priceError,
+      })}
+      {E.info("Recipes cost this material at its last purchase order receipt. Until it has one, they use this price.")}
       {pick(
         "Default vendor · optional",
         model.defaultVendorId || NONE,

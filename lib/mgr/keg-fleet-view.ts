@@ -4,7 +4,7 @@
 import { SIZE_LABEL } from "./keg-labels";
 import type { EmptyState } from "./empty-state";
 import type { KEG_EVENT_REASONS, KEG_POOL_KINDS, KEG_SIZES } from "./enums";
-import { centsMaxError } from "./money";
+import { optionalMoneyError } from "./money";
 import { isNumber, numberNotationError } from "./quantity-input";
 import { submitReason } from "./submit-reason";
 
@@ -126,23 +126,13 @@ export function kegEventReason(v: KegEventValue, options?: KegBinStock): string 
   ].filter((need): need is string => Boolean(need)));
 }
 
-/** Optional money stays optional, but a filled value must be dollars and cents the int-cent column holds. */
-function kegMoneyError(value: string): string | undefined {
-  if (value === "") return undefined;
-  const notation = numberNotationError(value);
-  if (notation) return notation;
-  if (!isNumber(value) || Number(value) < 0) return "Enter an amount of zero or more.";
-  if ((value.trim().split(".")[1]?.length ?? 0) > 2) return "Enter dollars and cents, with at most two decimal places.";
-  return centsMaxError(value, "an amount");
-}
-
 /** Add and Edit use the same money rules, including optional blank deposits. */
 export function kegPoolFieldErrors(v: KegPoolValue): Partial<Record<keyof KegPoolValue, string>> {
   const errors: Partial<Record<keyof KegPoolValue, string>> = {};
   if (!v.name.trim()) errors.name = "Enter a pool name.";
   if (v.kind !== "owned" && !v.vendorId) errors.vendorId = "Choose a vendor.";
-  const perFill = kegMoneyError(v.perFill);
-  const deposit = kegMoneyError(v.deposit);
+  const perFill = optionalMoneyError(v.perFill);
+  const deposit = optionalMoneyError(v.deposit);
   if (perFill) errors.perFill = perFill;
   else if (v.kind === "pay_per_fill" && v.perFill === "") errors.perFill = "Enter the per-fill cost.";
   if (deposit) errors.deposit = deposit;

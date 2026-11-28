@@ -286,7 +286,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, warehouse, brewer
 
-Materials, alphabetical, with kind, units, the word one purchase unit is sold by, lot tracking, default vendor, extract potential and alpha acid; optionally only one kind, one default vendor, or those whose name contains q
+Materials, alphabetical, with kind, units, the word one purchase unit is sold by, lot tracking, default vendor, extract potential, alpha acid and the typed price of one purchase unit; optionally only one kind, one default vendor, or those whose name contains q
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -509,7 +509,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse, brewer
 
-Create or edit a material definition: kind, base and purchase units with the factor between them, the word one purchase unit is sold by, lot tracking, default vendor, extract potential, alpha acid. A base unit change is refused once movements, recipe ingredients, format BOM lines, PO lines, contracts, transfer lines or brew pulls use the material; a purchase unit or factor change is refused only once PO lines or contracts do
+Create or edit a material definition: kind, base and purchase units with the factor between them, the word one purchase unit is sold by, lot tracking, default vendor, extract potential, alpha acid, and the typed price of one purchase unit. A base unit change is refused once movements, recipe ingredients, format BOM lines, PO lines, contracts, transfer lines or brew pulls use the material; a purchase unit or factor change is refused only once PO lines or contracts do
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -526,6 +526,7 @@ Create or edit a material definition: kind, base and purchase units with the fac
 | `extractPotential` | number | no |
 | `alphaAcid` | number | no |
 | `packName` | bag or sack or box or bottle or pitch or pail or drum or tote | no |
+| `purchaseUnitCostCents` | integer | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

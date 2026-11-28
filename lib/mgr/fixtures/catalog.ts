@@ -132,7 +132,7 @@ export const brandHazy: BrandSnapshot = {
   styles: [HAZY, "IPA", PILS, "Add “Cold IPA”"],
   priceGroups,
   // Hazy sits on group 3 by hand; its recipe cost lands in group 2's band.
-  cost: { costCentsPerBbl: 4810, uncosted: [] },
+  cost: { costCentsPerBbl: 4810, uncosted: [], unreceived: [] },
   compliance: {
     approvals: [{ id: "cola", brand_id: BRAND_HAZY, kind: "cola", ...HAZY_COLA, serial_number: "260135", expires_on: null, note: null, image_url: "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=DemoLabel.jpg&filetype=l" }],
     registrations: [{ id: "oh", brand_id: BRAND_HAZY, state: "OH", registration_no: "OH-88214", approved_on: null, expires_on: "2026-12-31" }],

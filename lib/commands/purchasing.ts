@@ -42,7 +42,7 @@ defineCommand({
 
 defineCommand({
   name: "upsert_material",
-  description: "Create or edit a material definition: kind, base and purchase units with the factor between them, the word one purchase unit is sold by, lot tracking, default vendor, extract potential, alpha acid. A base unit change is refused once movements, recipe ingredients, format BOM lines, PO lines, contracts, transfer lines or brew pulls use the material; a purchase unit or factor change is refused only once PO lines or contracts do",
+  description: "Create or edit a material definition: kind, base and purchase units with the factor between them, the word one purchase unit is sold by, lot tracking, default vendor, extract potential, alpha acid, and the typed price of one purchase unit. A base unit change is refused once movements, recipe ingredients, format BOM lines, PO lines, contracts, transfer lines or brew pulls use the material; a purchase unit or factor change is refused only once PO lines or contracts do",
   compensation: "Reverse an edit with upsert_material and the previous values; a new material cannot be deleted, only set inactive.",
   input: z.object({
     id: z.string().uuid().optional().describe("The material to edit; omit to create one"),
@@ -68,6 +68,8 @@ defineCommand({
     alphaAcid: z.number().gt(0).max(30).optional(),
     // Omitted on an edit keeps the word the material had, so an edit cannot clear one.
     packName: z.enum(PACK_NAMES).optional().describe("The word one purchase unit is sold by, so a recipe line of whole packs reads in them (23 bags)"),
+    // Omitted on an edit keeps the price the material had. Recipe cost reads it only until the material is received.
+    purchaseUnitCostCents: cents.optional().describe("The price of one purchase unit; a recipe costs the material at it until a purchase order receipt gives a cost"),
   }),
   roles: [...PURCHASING],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_material", {
@@ -75,6 +77,7 @@ defineCommand({
     p_purchase_uom: i.purchaseUom, p_purchase_uom_factor: i.purchaseUomFactor ?? null, p_lot_tracked: i.lotTracked ?? null,
     p_default_vendor: i.defaultVendorId ?? null, p_reorder_point: i.reorderPoint ?? null, p_active: i.active ?? null,
     p_extract_potential: i.extractPotential ?? null, p_alpha_acid: i.alphaAcid ?? null, p_pack_name: i.packName ?? null,
+    p_purchase_unit_cost_cents: i.purchaseUnitCostCents ?? null,
     p_request_id: execution.requestId,
   })),
 });
@@ -210,7 +213,7 @@ defineQuery({
 // page's default materials (#1586). Inactive materials are hidden unless asked
 // for: history keeps them, pickers do not.
 defineQuery({
-  name: "list_materials", description: "Materials, alphabetical, with kind, units, the word one purchase unit is sold by, lot tracking, default vendor, extract potential and alpha acid; optionally only one kind, one default vendor, or those whose name contains q",
+  name: "list_materials", description: "Materials, alphabetical, with kind, units, the word one purchase unit is sold by, lot tracking, default vendor, extract potential, alpha acid and the typed price of one purchase unit; optionally only one kind, one default vendor, or those whose name contains q",
   input: z.object({
     includeInactive: z.boolean().optional(),
     q: z.string().trim().max(100).optional().describe("Only materials whose name contains this text"),
@@ -219,7 +222,7 @@ defineQuery({
   }), roles: [...PURCHASING],
   handler: (ctx, i) => {
     let q = ctx.db.from("materials")
-      .select("id, name, category, base_uom, purchase_uom, purchase_uom_factor, lot_tracked, default_vendor_id, reorder_point, extract_potential, alpha_acid, pack_name, active")
+      .select("id, name, category, base_uom, purchase_uom, purchase_uom_factor, lot_tracked, default_vendor_id, reorder_point, extract_potential, alpha_acid, pack_name, purchase_unit_cost_cents, active")
       .eq("brewery_id", ctx.breweryId).order("name");
     if (!i.includeInactive) q = q.eq("active", true);
     if (i.q) q = q.regexIMatch("name", escapeRegex(i.q));

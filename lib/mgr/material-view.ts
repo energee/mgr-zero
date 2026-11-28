@@ -28,6 +28,11 @@ export type MaterialViewModel = {
   /** Percent, as on the bag; asked on hops only, where recipe IBU reads it
    * (lib/recipe-ibu.ts). Empty means none typed. */
   alphaAcid?: string;
+  /** Dollars for one purchase unit, the "Price per purchase unit" field: "82.00" for a bag. Empty means none typed.
+   * A recipe costs the material at it only until a purchase order receipt gives a cost. */
+  price?: string;
+  /** Why the typed price cannot be saved, drawn under the field. */
+  priceError?: string;
   lotTracked: boolean;
   active: boolean;
 };

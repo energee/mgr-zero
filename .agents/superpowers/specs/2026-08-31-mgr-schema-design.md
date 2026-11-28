@@ -573,7 +573,7 @@ material's `extract_potential` and `alpha_acid` when the version was saved, so a
 material edit moves no saved version's gravity or IBU). idx `(recipe_version_id)`,
 `(material_id)`. Revoke update/delete.
 
-### View `recipe_version_costs` — `sum(per_bbl_qty × material_last_cost)` per bbl.
+### View `recipe_version_costs` — `sum(per_bbl_qty × cost)` per bbl, where cost is `material_last_cost`, else the typed `materials.purchase_unit_cost_cents / purchase_uom_factor` (`docs/plans/material-price.md`).
 
 ## 9. Production (batches + cellar)
 

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { BRAND_ABV } from "@/lib/mgr/brand-abv";
 import { cents, completeRows, defineCommand, defineQuery, latestOf, PAGE_SIZE, unwrap, CommandError, STAFF_ROLES } from "./registry";
 import { quotedSearchPattern } from "@/lib/escape-regex";
+import { recipeVersionCost, type RecipeVersionCost } from "./recipe-cost";
 import { BRAND_SORTS } from "@/lib/mgr/enums";
 import { UPC_MESSAGE, UPC_PATTERN } from "@/lib/mgr/upc";
 
@@ -290,14 +291,14 @@ defineQuery({
 });
 
 // The cost a brand's recipe implies, for the price-group suggestion on Brand.
-// recipe_version_costs owns the rule (derived from last receipt costs, never
-// stored; NULL while any ingredient has no receipt, naming those materials);
-// this read only turns the ids into names. The brand's most recently brewed
-// version speaks for it; a never-brewed brand falls back to its newest.
-export type BrandRecipeCost = { recipeVersionId: string | null; costCentsPerBbl: number | null; uncosted: string[] };
+// recipeVersionCost reads it (lib/commands/recipe-cost.ts): each ingredient at
+// its last receipt cost, else the material's typed price; no cost while any
+// ingredient has neither. The brand's most recently brewed version speaks for
+// it; a never-brewed brand falls back to its newest.
+export type BrandRecipeCost = RecipeVersionCost & { recipeVersionId: string | null };
 
 defineQuery({
-  name: "get_brand_recipe_cost", description: "A brand's recipe cost per barrel from its last brewed (else newest) recipe version, naming any ingredient with no receipt cost yet",
+  name: "get_brand_recipe_cost", description: "A brand's recipe cost per barrel from its last brewed (else newest) recipe version, naming any ingredient with no price yet and any costed at a typed price because it has no receipt cost",
   roles: ["admin", "sales"],
   input: z.object({ brandId: z.string().uuid() }),
   handler: async (ctx, i): Promise<BrandRecipeCost> => {
@@ -308,12 +309,8 @@ defineQuery({
         .eq("brewery_id", ctx.breweryId).eq("recipes.brand_id", i.brandId), "created_at"),
     ]);
     const versionId = brewed?.recipe_version_id ?? newest?.id ?? null;
-    if (!versionId) return { recipeVersionId: null, costCentsPerBbl: null, uncosted: [] };
-    const row = await unwrap(ctx.db.from("recipe_version_costs").select("cost_cents_per_bbl, uncosted_material_ids").eq("recipe_version_id", versionId).maybeSingle()) as { cost_cents_per_bbl: number | null; uncosted_material_ids: string[] } | null;
-    const uncosted = row?.uncosted_material_ids.length
-      ? (await unwrap(ctx.db.from("materials").select("name").in("id", row.uncosted_material_ids).order("name")) as { name: string }[]).map((m) => m.name)
-      : [];
-    return { recipeVersionId: versionId, costCentsPerBbl: row?.cost_cents_per_bbl ?? null, uncosted };
+    if (!versionId) return { recipeVersionId: null, costCentsPerBbl: null, uncosted: [], unreceived: [] };
+    return { recipeVersionId: versionId, ...await recipeVersionCost(ctx, versionId) };
   },
 });
 

@@ -39,6 +39,7 @@ import { isNumber, numberNotationError, percent } from "./quantity-input";
 import { sentenceCase } from "./labels";
 import { plannedBarrelsError } from "./schedule-batch-view";
 import { submitReason } from "./submit-reason";
+import { recipeCostNotes, type RecipeCostNote } from "./recipe-cost-view";
 import { READING_BOUNDS } from "@/lib/composer/offline-policy";
 import {
   ingredientTiming, lineReady, materialLookup, perBblDisplay, scheduleDays, timingOutOfRange, toIngredientFields,
@@ -160,6 +161,8 @@ export type RecipeSnapshot = {
   ingredients: { id: string; material_id: string; per_bbl_qty: number; stage: string; timing_minutes: number | null; sort: number; extract_snapshot: number | null; materials: { base_uom: string } | null }[];
   waterAdditions: { material_id: string; qty: number; unit: string; stage: string }[];
   ogPlato: number | null; fgPlato: number | null; abv: number | null; ibu: RecipeIbu;
+  /** The copy's ingredient cost and what backs it; absent before the first save. */
+  cost?: RecipeCostNote;
 };
 type SnapshotVersion = NonNullable<RecipeSnapshot["version"]>;
 
@@ -559,7 +562,9 @@ export function toRecipePageModel(
     mashSchedule: v.mash_schedule,
     fermentationSchedule: v.fermentation_schedule,
     water: waterFacts(draft.water, ctx.profiles, material.name),
-    figures, figureNotes,
+    // The cost is the saved copy's, so it reads with the saved figures and leaves with them when the sheet changes.
+    // Only the current copy says it: the cost and stock are today's, and an earlier copy is read as it was brewed.
+    figures, figureNotes: [...figureNotes, ...(v.version === latest ? recipeCostNotes(s.cost, Number(draft.batchBbl)) : [])],
     actuals: outcomeTable(ctx.outcomes, ctx.unit, basis),
     actualsNote: outcomeSummary(ctx.outcomes, basis),
   };
