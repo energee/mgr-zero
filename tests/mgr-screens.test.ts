@@ -63,8 +63,12 @@ describe("SCREENS", () => {
     // Under the name, one sentence: the brand, the batch size, the recipe's note and the saved date. That save's change note has the next line.
     expect(recipe).toMatch(/Brews\s+Hazy IPA\s+at\s+22 bbl\s*, edit recipe numbers\s*\.\s+The flagship\. Keep it soft and juicy\. Saved Aug 28, 2026\.\s+Edit name and note\s+Last change: Whirlpool hard, knock out cold\./);
     expect(recipe).toMatch(/Assumes\s+72% efficiency\s*, edit recipe numbers\s+and\s+78% attenuation\s*, edit recipe numbers\s*\./);
-    // The day's two lists are the headings, then what the batches measured and the earlier copies they brewed.
-    expect([...body("Recipe").matchAll(/<h2[^>]*>([^<]*)<\/h2>/g)].map((m) => m[1])).toEqual(["Goes in on brew day", "In the cellar", "Batch actuals", "As brewed"]);
+    // The day's two lists are the headings, then what the ingredients cost, what the batches measured and the earlier copies they brewed.
+    expect([...body("Recipe").matchAll(/<h2[^>]*>([^<]*)<\/h2>/g)].map((m) => m[1])).toEqual(["Goes in on brew day", "In the cellar", "Ingredient cost", "Batch actuals", "As brewed"]);
+    // The cost is broken out by ingredient, a hop at three stages as one row, over a total that says what it leaves out.
+    expect(recipe).toMatch(/Ingredients cost at least \$[\d.,]+\/bbl, \$[\d.,]+ for 22 bbl · 1 ingredient has no price yet: House ale yeast\./);
+    expect(recipe).toMatch(/Citra\s*typed price/);
+    expect(recipe).toMatch(/Total\s*without 1 unpriced ingredient/);
     // A line over the brew-day list holds its facts: the target water, the mash pH, and the numbers that open their sheet.
     expect(recipe).toMatch(/Hazy target\s*, edit water\s*, mash pH 5\.35\. Boil from\s+24\.5 bbl\s*, edit recipe numbers\s*\. Whirlpool at\s+180 °F\s*, edit recipe numbers\s*, knock out at\s+65 °F/);
     // Each row is when, what, how much for the batch. The grain comes first, under the bar of its shares, with its

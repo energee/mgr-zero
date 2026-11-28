@@ -3,7 +3,9 @@
 // and the brands to pick from, its note as stored (for Edit name and note) and, from toRecipePageModel, the saved date,
 // Schedule batch, the figures the saved copy froze, Batch actuals
 // (get_recipe_outcomes, asked for the copy being shown, whose grain bill decides
-// which other recipes' batches it adds) and As brewed around the sheet. A
+// which other recipes' batches it adds) and As brewed around the sheet. The
+// editor also takes each material's cost now (list_material_costs) and works
+// the sheet's ingredient cost out as the lines change. A
 // recipe not saved yet opens the blank sheet. ?v=N naming an earlier copy reads
 // that copy out read only (RecipeView), and ignores ?from. ?from=N is Use this
 // again: the editor opens on the current copy with copy N loaded as an unsaved
@@ -22,6 +24,7 @@ import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 import { shouldKeepDraft } from "@/lib/mgr/recipe-draft";
 import { toRecipeMaterial, toWaterProfileOption, type RecipeMaterial, type WaterProfileRow } from "@/lib/mgr/recipe-process-view";
 import { loadedNotice, recipePageTitle, toRecipePageModel, versionToDraft, type RecipeOutcome } from "@/lib/mgr/recipe-view";
+import { toMaterialCosts } from "@/lib/mgr/recipe-cost-view";
 import { getRecipePageData } from "../recipe-data";
 
 type Copy = string | string[] | undefined;
@@ -44,13 +47,14 @@ export async function generateMetadata({ params, searchParams }: Props) {
 export default async function RecipePage({ params, searchParams }: Props) {
   const [{ id }, { v, from }] = await Promise.all([params, searchParams]);
   const { brewery, ctx, snapshot } = await getRecipePageData(id, copyNumber(v));
-  const [materials, gravityUnit, profiles, brands, outcomes] = (await Promise.all([
+  const [materials, gravityUnit, profiles, brands, outcomes, costs] = (await Promise.all([
     runCommand("list_materials", {}, ctx),
     runCommand("get_gravity_unit", {}, ctx),
     runCommand("list_water_profiles", {}, ctx),
     runCommand("list_brands", {}, ctx),
     runCommand("get_recipe_outcomes", { recipeId: id, version: snapshot.version?.version }, ctx),
-  ])) as [RecipeMaterial[], { effective: GravityUnit }, WaterProfileRow[], { id: string; name: string; alias: string | null }[], { batches: RecipeOutcome[] }];
+    runCommand("list_material_costs", {}, ctx),
+  ])) as [RecipeMaterial[], { effective: GravityUnit }, WaterProfileRow[], { id: string; name: string; alias: string | null }[], { batches: RecipeOutcome[] }, Parameters<typeof toMaterialCosts>[0]];
   const { recipe, version } = snapshot;
   const latest = snapshot.versions[0];
   if (v !== undefined && version?.version === latest) redirect(`/recipes/${id}`);
@@ -78,6 +82,7 @@ export default async function RecipePage({ params, searchParams }: Props) {
       savedFigures={version ? { ogPlato: snapshot.ogPlato, fgPlato: snapshot.fgPlato, abv: snapshot.abv, ibu: snapshot.ibu } : undefined}
       initial={initial} baseVersionId={version?.id ?? null} loaded={loaded}
       materials={materials.map(toRecipeMaterial)} profiles={profiles.map(toWaterProfileOption)} unit={gravityUnit.effective}
+      costs={toMaterialCosts(costs)}
     />
   );
 }

@@ -676,7 +676,7 @@ describe("Recipes view", () => {
 
   it("the fixture's IBU is computed from its boil and whirlpool hops, and its dry hops add nothing", () => {
     expect(recipeHazyV4.figures?.at(-1)).toEqual(["74", "IBU"]);
-    expect(recipeHazyV4.figureNotes).toEqual(["Whirlpool hops count at 5%.", "Ingredients cost $48.10/bbl, $1,058.20 for 22 bbl.", "Typed price, no receipt cost: Citra."]);
+    expect(recipeHazyV4.figureNotes).toEqual(["Whirlpool hops count at 5%."]);
   });
 
   it("the live Recipe page reads the outcomes and hands them to the page model", () => {

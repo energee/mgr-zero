@@ -118,13 +118,13 @@ describe("get_brand_recipe_cost", () => {
     // An edit that sends no price keeps it.
     await runCommand("upsert_material", { ...vienna, id }, buyer);
     expect((await row()).cost_cents_per_bbl).toBe(1200);
-    // The recipe page reads the same cost, and what backs it: nothing received, nothing in stock.
-    const recipeCost = async () => (await runCommand("get_recipe", { recipeId: other.id }, brewer) as { cost: unknown }).cost;
-    expect(await recipeCost()).toEqual({ costCentsPerBbl: 1200, uncosted: [], unreceived: ["Vienna"], outOfStock: ["Vienna"] });
+    // The editor's live preview reads each material's cost per base unit, where it came from, and whether any is on hand.
+    const materialCost = async () => (await runCommand("list_material_costs", {}, brewer) as { material_id: string }[]).find((row) => row.material_id === id);
+    expect(await materialCost()).toEqual({ material_id: id, unit_cost_cents: 120, from_receipt: false, in_stock: false });
     // A receipt at $2.00 a lb is the cost from then on, and it put stock on hand.
     await receipt(id, 200);
+    expect(await materialCost()).toEqual({ material_id: id, unit_cost_cents: 200, from_receipt: true, in_stock: true });
     expect(await row()).toEqual({ cost_cents_per_bbl: 2000, uncosted_material_ids: [], unreceived_material_ids: [] });
-    expect(await recipeCost()).toEqual({ costCentsPerBbl: 2000, uncosted: [], unreceived: [], outOfStock: [] });
   });
 
   it("is a Sales and Admin read", async () => {

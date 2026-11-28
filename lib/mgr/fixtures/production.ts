@@ -4,7 +4,7 @@ import type { BatchesSnapshot } from "@/lib/mgr/batches-view";
 import type { BrewDayViewModel } from "@/lib/mgr/brew-day-view";
 import { cellarPlanRows, startAtPlan, waterAdditionRows, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import type { ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
-import { recipeCostNotes } from "@/lib/mgr/recipe-cost-view";
+import { recipeCostTable, type MaterialCost } from "@/lib/mgr/recipe-cost-view";
 import { figureStrip, gristShares, ingredientCells, ingredientPack, outcomeSummary, outcomeTable, recipeHistory, waterFacts, type RecipeOutcome, type RecipeViewModel } from "@/lib/mgr/recipe-view";
 import type { RecipesSnapshot } from "@/lib/mgr/recipes-view";
 import type { RunClosedViewModel } from "@/lib/mgr/run-closed-view";
@@ -326,6 +326,19 @@ const HAZY_IBU = recipeIbu({
   lines: HAZY_LINES.flatMap((l) => (l.material.alphaAcid === undefined ? [] : [{ name: l.title, category: "hop", unit: l.material.base_uom, alphaAcid: l.material.alphaAcid, stage: l.stage, perBblQty: l.perBbl, timingMinutes: l.timing }])),
 });
 
+// What each Hazy material costs a base unit, keyed by its name (the fixture has no material ids).
+const HAZY_COSTS: Record<string, MaterialCost> = {
+  "2-row": { unitCostCents: 80, fromReceipt: true, inStock: true },
+  "Flaked oats": { unitCostCents: 95, fromReceipt: true, inStock: true },
+  Magnum: { unitCostCents: 1400, fromReceipt: true, inStock: true },
+  Citra: { unitCostCents: 1500, fromReceipt: false, inStock: true },
+  Mosaic: { unitCostCents: 1650, fromReceipt: true, inStock: false },
+  "House ale yeast": { unitCostCents: null, fromReceipt: false, inStock: true },
+  Biofine: { unitCostCents: 2200, fromReceipt: true, inStock: true },
+};
+const HAZY_COST_LINES = HAZY_LINES.map((l) => ({ materialId: l.title, perBblQty: String(l.perBbl) }));
+const HAZY_COST_MATERIAL = { name: (title: string) => title, unit: (title: string) => HAZY_LINES.find((l) => l.title === title)?.material.base_uom };
+
 /** Hazy IPA as saved (its fourth copy underneath, which the page never names), with no unsaved change. */
 export const recipeHazyV4: RecipeViewModel = {
   title: "Hazy IPA",
@@ -354,8 +367,9 @@ export const recipeHazyV4: RecipeViewModel = {
   mashSchedule: MASH_STEPS,
   fermentationSchedule: FERM_STAGES,
   water: waterFacts(WATER_HAZY, waterProfiles, (id) => WATER_HAZY_NAMES[id]),
-  // The cost lines get_recipe's cost gives: Hazy lands in price group 2's band on Brand, and one hop rests on a typed price.
-  ...(({ figures, notes }) => ({ figures, figureNotes: [...notes, ...recipeCostNotes({ costCentsPerBbl: 4810, uncosted: [], unreceived: ["Citra"], outOfStock: [] }, 22)] }))(figureStrip({ ...HAZY_V4.predicted, ibu: HAZY_IBU }, "plato", { saved: true })),
+  ...(({ figures, notes }) => ({ figures, figureNotes: notes }))(figureStrip({ ...HAZY_V4.predicted, ibu: HAZY_IBU }, "plato", { saved: true })),
+  // Ingredient cost as the editor works it out from the lines: Citra rests on a typed price, and the yeast has none yet.
+  cost: recipeCostTable(HAZY_COST_LINES, HAZY_COSTS, HAZY_COST_MATERIAL, 22),
   actuals: outcomeTable(HAZY_OUTCOMES, "plato", HAZY_V4),
   actualsNote: outcomeSummary(HAZY_OUTCOMES, HAZY_V4),
   // The inventory's rows open nothing by address; the Recipe record's `to` says where a tap goes.

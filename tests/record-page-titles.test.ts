@@ -245,7 +245,7 @@ describe("the recipe page picks the editor or the read-out", () => {
     const page = loadPage("app/(app)/recipes/[id]/page.tsx", {
       ...bindings, ...data, RecipeEditor, RecipeView,
       runCommand: async (name: string) => (name === "get_recipe_outcomes" ? { batches: [] } : name === "get_gravity_unit" ? { effective: "plato" } : []),
-      toRecipeMaterial: (m: unknown) => m, toWaterProfileOption: (p: unknown) => p,
+      toRecipeMaterial: (m: unknown) => m, toWaterProfileOption: (p: unknown) => p, toMaterialCosts: (rows: unknown) => rows,
       toRecipePageModel: (s: { recipe: { name: string } }) => ({ title: s.recipe.name, saved: "Nov 3, 2026" }),
       versionToDraft: (s: { version: { version: number } | null }) => (s.version ? { copy: s.version.version } : null),
       shouldKeepDraft: (a: unknown, b: unknown) => JSON.stringify(a) !== JSON.stringify(b),

@@ -11,7 +11,8 @@
 // cellar" draws the temperature by day over the pitch,
 // the dry hops and any packaging or other additions. A row is when, what, and
 // how much for the batch; without a batch size it reads per bbl. Under the
-// sheet sit Batch actuals, folded to its summary line over the table, and As
+// sheet sit Ingredient cost (the cost by ingredient with its total, open under
+// its summary line), Batch actuals, folded to its summary line over the table, and As
 // brewed, one row per earlier copy. The table has a row per batch, a row per
 // tank for a batch split across tanks that held beer at the same time ("in FV3"), and the newest batches other
 // recipes brewed on the same grain bill ("as Session IPA"). The rows, drawings
@@ -55,6 +56,7 @@ import { plural } from "@/lib/mgr/plural";
 import { assumptions, brewDayBand, brewDayFacts, brewDayMoments, cellarFacts, cellarMoments, cellarProfile, scheduleReadOut, sentence, type Fact, type GoesInMoment, type GoesInRow } from "@/lib/mgr/recipe-day-view";
 import type { IngredientStage } from "@/lib/mgr/recipe-process-view";
 import { batchSize, packRounding, wholePercent, type RecipeActuals, type RecipeViewModel } from "@/lib/mgr/recipe-view";
+import type { RecipeCostTable } from "@/lib/mgr/recipe-cost-view";
 import { rowLinkPrefetch } from "@/lib/mgr/row-link-prefetch";
 import { andList } from "@/lib/mgr/submit-reason";
 import { cn } from "@/lib/utils";
@@ -66,6 +68,47 @@ const NOT_BREWED_HERE = "Not brewed yet. Other recipes have brewed this grain bi
 
 /** A sheet a fact or an action opens: the recipe's numbers, its water, or a schedule. */
 type SheetKey = "numbers" | "water" | "mash" | "fermentation";
+
+/** Ingredient cost: one row per ingredient with its amount, price per unit and cost, then the total. Amount and
+ *  cost are for the batch, or per barrel while the recipe has no batch size; the head says which. */
+function CostTable({ cost }: { cost: RecipeCostTable }) {
+  const cell = "px-1.5 py-1 text-right tabular-nums first:pl-0 last:pr-0";
+  const head = "h-8 px-1.5 text-right font-normal text-muted-foreground text-xs last:pr-0";
+  return (
+    <Table className="text-sm" aria-label="Ingredient cost">
+      <TableHeader>
+        <TableRow className="hover:bg-transparent">
+          <TableHead className="h-8 px-1.5 pl-0 font-normal text-muted-foreground text-xs">Ingredient</TableHead>
+          <TableHead className={head}>Amount {cost.basis}</TableHead>
+          <TableHead className={head}>Price</TableHead>
+          <TableHead className={head}>Cost {cost.basis}</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {cost.rows.map((row) => (
+          <TableRow key={row.key} className="hover:bg-transparent">
+            <TableCell className="whitespace-normal px-1.5 py-1 pl-0" role="rowheader">
+              {row.name}
+              {row.note ? <span className="block text-muted-foreground text-xs">{row.note}</span> : null}
+            </TableCell>
+            <TableCell className={cell}>{row.amount}</TableCell>
+            <TableCell className={cell}>{row.price}</TableCell>
+            <TableCell className={cell}>{row.cost}</TableCell>
+          </TableRow>
+        ))}
+        <TableRow className="font-medium hover:bg-transparent">
+          <TableCell className="whitespace-normal px-1.5 py-1 pl-0" role="rowheader">
+            Total
+            {cost.totalNote ? <span className="block font-normal text-muted-foreground text-xs">{cost.totalNote}</span> : null}
+          </TableCell>
+          <TableCell className={cell} />
+          <TableCell className={cell} />
+          <TableCell className={cell}>{cost.total}</TableCell>
+        </TableRow>
+      </TableBody>
+    </Table>
+  );
+}
 
 /** Batch actuals: one narrow table at every width. The top row is what the shown copy predicts and assumes; a batch
  *  another copy brewed prints that copy's own prediction in brackets under its figure. The brew date drops under the
@@ -373,8 +416,22 @@ export function RecipeView({
         </div>
       ) : null}
 
-      {model.actuals || model.history?.length ? (
+      {model.cost || model.actuals || model.history?.length ? (
         <div className="mt-8 border-t">
+          {model.cost ? (
+            // Laid out as Batch actuals is: the heading, then the fold with its summary line over the table. It starts
+            // open, because the items are what the section is for.
+            <div className="flex flex-col gap-x-4 gap-y-1 border-b py-3 @md:flex-row @md:items-baseline">
+              <h2 className="shrink-0 font-semibold text-[0.9375rem]">Ingredient cost</h2>
+              <details open className="group min-w-0 flex-1">
+                <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-4 gap-y-1 rounded-sm [&::-webkit-details-marker]:hidden">
+                  <span className={quiet}>{model.cost.summary}</span>
+                  <span className="ml-auto text-primary text-sm"><span className="group-open:hidden">Show items</span><span className="hidden group-open:inline">Hide items</span></span>
+                </summary>
+                <div className="max-w-3xl pt-2"><CostTable cost={model.cost} /></div>
+              </details>
+            </div>
+          ) : null}
           {model.actuals ? (
             // The heading, then the fold: its summary line, and the table that opens under it. The heading sits before
             // the fold, as As brewed's does beside its rows, because a heading inside <summary> is dropped by many screen readers.

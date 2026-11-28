@@ -419,6 +419,12 @@ isOneToOne: false
       foreignKeyName: "brew_pulls_material_id_brewery_id_fkey"
       columns: ["material_id","brewery_id"]
 isOneToOne: false
+      referencedRelation: "material_unit_costs"
+      referencedColumns: ["material_id","brewery_id"]
+    },{
+      foreignKeyName: "brew_pulls_material_id_brewery_id_fkey"
+      columns: ["material_id","brewery_id"]
+isOneToOne: false
       referencedRelation: "materials"
       referencedColumns: ["id","brewery_id"]
     },{
@@ -923,6 +929,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "formats"
       referencedColumns: ["id","brewery_id"]
+    },{
+      foreignKeyName: "format_bom_material_id_brewery_id_fkey"
+      columns: ["material_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "material_unit_costs"
+      referencedColumns: ["material_id","brewery_id"]
     },{
       foreignKeyName: "format_bom_material_id_brewery_id_fkey"
       columns: ["material_id","brewery_id"]
@@ -1457,6 +1469,12 @@ isOneToOne: false
       foreignKeyName: "material_contracts_material_id_brewery_id_fkey"
       columns: ["material_id","brewery_id"]
 isOneToOne: false
+      referencedRelation: "material_unit_costs"
+      referencedColumns: ["material_id","brewery_id"]
+    },{
+      foreignKeyName: "material_contracts_material_id_brewery_id_fkey"
+      columns: ["material_id","brewery_id"]
+isOneToOne: false
       referencedRelation: "materials"
       referencedColumns: ["id","brewery_id"]
     },{
@@ -1497,6 +1515,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "material_lots"
       referencedColumns: ["id","material_id","brewery_id"]
+    },{
+      foreignKeyName: "material_count_lines_material_id_brewery_id_fkey"
+      columns: ["material_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "material_unit_costs"
+      referencedColumns: ["material_id","brewery_id"]
     },{
       foreignKeyName: "material_count_lines_material_id_brewery_id_fkey"
       columns: ["material_id","brewery_id"]
@@ -1571,6 +1595,12 @@ isOneToOne: false
       foreignKeyName: "material_lots_material_id_brewery_id_fkey"
       columns: ["material_id","brewery_id"]
 isOneToOne: false
+      referencedRelation: "material_unit_costs"
+      referencedColumns: ["material_id","brewery_id"]
+    },{
+      foreignKeyName: "material_lots_material_id_brewery_id_fkey"
+      columns: ["material_id","brewery_id"]
+isOneToOne: false
       referencedRelation: "materials"
       referencedColumns: ["id","brewery_id"]
     },{
@@ -1629,6 +1659,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "material_lots"
       referencedColumns: ["id","material_id","brewery_id"]
+    },{
+      foreignKeyName: "material_movements_material_id_brewery_id_fkey"
+      columns: ["material_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "material_unit_costs"
+      referencedColumns: ["material_id","brewery_id"]
     },{
       foreignKeyName: "material_movements_material_id_brewery_id_fkey"
       columns: ["material_id","brewery_id"]
@@ -1979,6 +2015,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "material_lots"
       referencedColumns: ["id","brewery_id"]
+    },{
+      foreignKeyName: "packaging_material_actuals_material_id_brewery_id_fkey"
+      columns: ["material_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "material_unit_costs"
+      referencedColumns: ["material_id","brewery_id"]
     },{
       foreignKeyName: "packaging_material_actuals_material_id_brewery_id_fkey"
       columns: ["material_id","brewery_id"]
@@ -2821,6 +2863,12 @@ isOneToOne: false
       foreignKeyName: "purchase_order_lines_material_id_brewery_id_fkey"
       columns: ["material_id","brewery_id"]
 isOneToOne: false
+      referencedRelation: "material_unit_costs"
+      referencedColumns: ["material_id","brewery_id"]
+    },{
+      foreignKeyName: "purchase_order_lines_material_id_brewery_id_fkey"
+      columns: ["material_id","brewery_id"]
+isOneToOne: false
       referencedRelation: "materials"
       referencedColumns: ["id","brewery_id"]
     },{
@@ -2995,6 +3043,12 @@ isOneToOne: false
       foreignKeyName: "receipt_lines_material_id_brewery_id_fkey"
       columns: ["material_id","brewery_id"]
 isOneToOne: false
+      referencedRelation: "material_unit_costs"
+      referencedColumns: ["material_id","brewery_id"]
+    },{
+      foreignKeyName: "receipt_lines_material_id_brewery_id_fkey"
+      columns: ["material_id","brewery_id"]
+isOneToOne: false
       referencedRelation: "materials"
       referencedColumns: ["id","brewery_id"]
     },{
@@ -3095,6 +3149,12 @@ isOneToOne: false
       foreignKeyName: "recipe_ingredients_material_id_brewery_id_fkey"
       columns: ["material_id","brewery_id"]
 isOneToOne: false
+      referencedRelation: "material_unit_costs"
+      referencedColumns: ["material_id","brewery_id"]
+    },{
+      foreignKeyName: "recipe_ingredients_material_id_brewery_id_fkey"
+      columns: ["material_id","brewery_id"]
+isOneToOne: false
       referencedRelation: "materials"
       referencedColumns: ["id","brewery_id"]
     },{
@@ -3161,6 +3221,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "breweries"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "recipe_water_additions_material_id_brewery_id_fkey"
+      columns: ["material_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "material_unit_costs"
+      referencedColumns: ["material_id","brewery_id"]
     },{
       foreignKeyName: "recipe_water_additions_material_id_brewery_id_fkey"
       columns: ["material_id","brewery_id"]
@@ -3539,6 +3605,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "keg_pools"
       referencedColumns: ["id","brewery_id"]
+    },{
+      foreignKeyName: "stock_transfer_lines_material_id_brewery_id_fkey"
+      columns: ["material_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "material_unit_costs"
+      referencedColumns: ["material_id","brewery_id"]
     },{
       foreignKeyName: "stock_transfer_lines_material_id_brewery_id_fkey"
       columns: ["material_id","brewery_id"]
@@ -4090,6 +4162,12 @@ isOneToOne: false
       foreignKeyName: "material_contracts_material_id_brewery_id_fkey"
       columns: ["material_id","brewery_id"]
 isOneToOne: false
+      referencedRelation: "material_unit_costs"
+      referencedColumns: ["material_id","brewery_id"]
+    },{
+      foreignKeyName: "material_contracts_material_id_brewery_id_fkey"
+      columns: ["material_id","brewery_id"]
+isOneToOne: false
       referencedRelation: "materials"
       referencedColumns: ["id","brewery_id"]
     },{
@@ -4354,6 +4432,12 @@ isOneToOne: false
       foreignKeyName: "material_movements_material_id_brewery_id_fkey"
       columns: ["material_id","brewery_id"]
 isOneToOne: false
+      referencedRelation: "material_unit_costs"
+      referencedColumns: ["material_id","brewery_id"]
+    },{
+      foreignKeyName: "material_movements_material_id_brewery_id_fkey"
+      columns: ["material_id","brewery_id"]
+isOneToOne: false
       referencedRelation: "materials"
       referencedColumns: ["id","brewery_id"]
     }
@@ -4370,6 +4454,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "breweries"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "material_movements_material_id_brewery_id_fkey"
+      columns: ["material_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "material_unit_costs"
+      referencedColumns: ["material_id","brewery_id"]
     },{
       foreignKeyName: "material_movements_material_id_brewery_id_fkey"
       columns: ["material_id","brewery_id"]
@@ -4412,6 +4502,12 @@ isOneToOne: false
       foreignKeyName: "material_movements_material_id_brewery_id_fkey"
       columns: ["material_id","brewery_id"]
 isOneToOne: false
+      referencedRelation: "material_unit_costs"
+      referencedColumns: ["material_id","brewery_id"]
+    },{
+      foreignKeyName: "material_movements_material_id_brewery_id_fkey"
+      columns: ["material_id","brewery_id"]
+isOneToOne: false
       referencedRelation: "materials"
       referencedColumns: ["id","brewery_id"]
     }
@@ -4438,6 +4534,12 @@ isOneToOne: false
       foreignKeyName: "material_movements_material_id_brewery_id_fkey"
       columns: ["material_id","brewery_id"]
 isOneToOne: false
+      referencedRelation: "material_unit_costs"
+      referencedColumns: ["material_id","brewery_id"]
+    },{
+      foreignKeyName: "material_movements_material_id_brewery_id_fkey"
+      columns: ["material_id","brewery_id"]
+isOneToOne: false
       referencedRelation: "materials"
       referencedColumns: ["id","brewery_id"]
     }
@@ -4458,6 +4560,12 @@ isOneToOne: false
       foreignKeyName: "material_movements_material_id_brewery_id_fkey"
       columns: ["material_id","brewery_id"]
 isOneToOne: false
+      referencedRelation: "material_unit_costs"
+      referencedColumns: ["material_id","brewery_id"]
+    },{
+      foreignKeyName: "material_movements_material_id_brewery_id_fkey"
+      columns: ["material_id","brewery_id"]
+isOneToOne: false
       referencedRelation: "materials"
       referencedColumns: ["id","brewery_id"]
     }
@@ -4474,6 +4582,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "breweries"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "purchase_order_lines_material_id_brewery_id_fkey"
+      columns: ["material_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "material_unit_costs"
+      referencedColumns: ["material_id","brewery_id"]
     },{
       foreignKeyName: "purchase_order_lines_material_id_brewery_id_fkey"
       columns: ["material_id","brewery_id"]
@@ -4504,6 +4618,12 @@ isOneToOne: false
       foreignKeyName: "material_movements_material_id_brewery_id_fkey"
       columns: ["material_id","brewery_id"]
 isOneToOne: false
+      referencedRelation: "material_unit_costs"
+      referencedColumns: ["material_id","brewery_id"]
+    },{
+      foreignKeyName: "material_movements_material_id_brewery_id_fkey"
+      columns: ["material_id","brewery_id"]
+isOneToOne: false
       referencedRelation: "materials"
       referencedColumns: ["id","brewery_id"]
     }
@@ -4515,6 +4635,20 @@ isOneToOne: false
                   ComputedFields: never
                   Relationships: [
 
+                  ]
+                },"material_unit_costs": {
+                  Row: {
+                    "brewery_id": string,"from_receipt": boolean | null,"material_id": string,"unit_cost_cents": number | null
+                  }
+                  ComputedFields: never
+                  Relationships: [
+                    {
+      foreignKeyName: "materials_brewery_id_fkey"
+      columns: ["brewery_id"]
+isOneToOne: false
+      referencedRelation: "breweries"
+      referencedColumns: ["id"]
+    }
                   ]
                 },"occupancy_volumes": {
                   Row: {
@@ -4652,6 +4786,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "material_contracts"
       referencedColumns: ["id","brewery_id"]
+    },{
+      foreignKeyName: "purchase_order_lines_material_id_brewery_id_fkey"
+      columns: ["material_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "material_unit_costs"
+      referencedColumns: ["material_id","brewery_id"]
     },{
       foreignKeyName: "purchase_order_lines_material_id_brewery_id_fkey"
       columns: ["material_id","brewery_id"]

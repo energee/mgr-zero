@@ -2,7 +2,8 @@
 // recipe_version_costs. The view owns the rule: each ingredient at its last
 // purchase-order receipt cost, else at the material's typed price, and no cost
 // at all while any ingredient has neither. This read only turns the view's
-// material ids into names. get_brand_recipe_cost and get_recipe both call it.
+// material ids into names for get_brand_recipe_cost. The recipe page does not
+// read it: the editor costs the sheet as typed (lib/mgr/recipe-cost-view.ts).
 import { unwrap, type Ctx } from "./registry";
 
 export type RecipeVersionCost = {
