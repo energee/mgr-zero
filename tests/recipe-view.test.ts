@@ -301,6 +301,14 @@ describe("toRecipePageModel", () => {
   const ctx = { materials, profiles: [{ id: "p-target", name: "Pale ale" }], unit: "plato" as const, timeZone: "America/Los_Angeles", outcomes: [] as RecipeOutcome[] };
   const predicted = { ...snapshot, ogPlato: 12.5, fgPlato: 2.5, abv: 5.25 };
 
+  it("gives the current copy's ingredient cost under the figures, and none on an earlier copy", () => {
+    const cost = { costCentsPerBbl: 4810, uncosted: [], unreceived: [], outOfStock: [] };
+    const estimate = { kind: "estimate" as const, ibu: 31, whirlpool: false };
+    expect(toRecipePageModel({ ...predicted, ibu: estimate, cost }, ctx).figureNotes?.at(-1)).toMatch(/^Ingredients cost \$48\.10\/bbl/);
+    // Today's prices and stock say nothing about a copy read as it was brewed.
+    expect(toRecipePageModel({ ...predicted, ibu: estimate, cost, versions: [9, 3] }, ctx).figureNotes).toEqual([]);
+  });
+
   it("prints the IBU get_recipe estimated from the frozen alpha acid, with the fix for a saved copy", () => {
     expect(toRecipePageModel({ ...predicted, ibu: { kind: "estimate", ibu: 31, whirlpool: true } }, ctx)).toMatchObject({ figures: expect.arrayContaining([["31", "IBU"]]), figureNotes: ["Whirlpool hops count at 5%."] });
     const lowerBound = { kind: "lowerBound" as const, ibu: 31, gaps: [{ name: "Mosaic", reason: "no alpha acid" as const }] };

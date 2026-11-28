@@ -71,7 +71,7 @@ export type BrandSnapshot = {
   /** list_price_groups; position and ceiling feed the suggestion. */
   priceGroups: PriceGroupRow[];
   /** get_brand_recipe_cost. Absent means no recipe. */
-  cost?: Pick<BrandRecipeCost, "costCentsPerBbl" | "uncosted">;
+  cost?: Pick<BrandRecipeCost, "costCentsPerBbl" | "uncosted" | "unreceived">;
   /** Sells as: packaged list_formats, list_channel_prices, list_sale_channels. Absent on a new brand, which sells nothing yet. */
   sells?: Omit<BrandSellsSnapshot, "brand">;
   /** This brand's rows from get_compliance_registry. Absent means none on file. */

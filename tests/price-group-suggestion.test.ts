@@ -11,34 +11,34 @@ const groups = [
 
 describe("suggestPriceGroup", () => {
   it("picks the first group in position order whose ceiling covers the cost", () => {
-    expect(suggestPriceGroup({ costCentsPerBbl: 4810, uncosted: [], groups })).toEqual({
+    expect(suggestPriceGroup({ costCentsPerBbl: 4810, uncosted: [], unreceived: [], groups })).toEqual({
       kind: "group", groupId: "g2", title: "Suggested group 2", detail: "Recipe cost $48.10/bbl · ceiling $65.00/bbl",
     });
-    expect(suggestPriceGroup({ costCentsPerBbl: 4500, uncosted: [], groups })?.kind === "group" && suggestPriceGroup({ costCentsPerBbl: 4500, uncosted: [], groups })).toMatchObject({ groupId: "g1" });
+    expect(suggestPriceGroup({ costCentsPerBbl: 4500, uncosted: [], unreceived: [], groups })?.kind === "group" && suggestPriceGroup({ costCentsPerBbl: 4500, uncosted: [], unreceived: [], groups })).toMatchObject({ groupId: "g1" });
   });
 
   it("says so when the cost clears every ceiling, naming the highest", () => {
-    expect(suggestPriceGroup({ costCentsPerBbl: 9000, uncosted: [], groups })).toEqual({
+    expect(suggestPriceGroup({ costCentsPerBbl: 9000, uncosted: [], unreceived: [], groups })).toEqual({
       kind: "above", title: "Above every ceiling", detail: "Recipe cost $90.00/bbl · highest ceiling $65.00/bbl",
     });
   });
 
   it("shows the cost alone when no group has a ceiling", () => {
     const bare = groups.map((g) => ({ ...g, cost_ceiling_cents: null }));
-    expect(suggestPriceGroup({ costCentsPerBbl: 4810, uncosted: [], groups: bare })).toEqual({
+    expect(suggestPriceGroup({ costCentsPerBbl: 4810, uncosted: [], unreceived: [], groups: bare })).toEqual({
       kind: "cost", title: "Recipe cost $48.10/bbl", detail: "No price group has a ceiling.",
     });
   });
 
   it("refuses to suggest from a partly costed recipe and names the gaps", () => {
-    expect(suggestPriceGroup({ costCentsPerBbl: 1200, uncosted: ["Citra", "Mosaic"], groups })).toEqual({
-      kind: "unknown", title: "Recipe cost unknown", detail: "2 ingredients have no receipt cost yet: Citra, Mosaic",
+    expect(suggestPriceGroup({ costCentsPerBbl: 1200, uncosted: ["Citra", "Mosaic"], unreceived: [], groups })).toEqual({
+      kind: "unknown", title: "Recipe cost unknown", detail: "2 ingredients have no price yet: Citra, Mosaic",
     });
   });
 
   it("names at most three uncosted ingredients and counts the rest", () => {
-    expect(suggestPriceGroup({ costCentsPerBbl: null, uncosted: ["A", "B", "C", "D", "E"], groups })?.detail)
-      .toBe("5 ingredients have no receipt cost yet: A, B, C and 2 more");
+    expect(suggestPriceGroup({ costCentsPerBbl: null, uncosted: ["A", "B", "C", "D", "E"], unreceived: [], groups })?.detail)
+      .toBe("5 ingredients have no price yet: A, B, C and 2 more");
   });
 
   it("bands by position, not array order, and skips a group with no ceiling in the middle", () => {
@@ -47,8 +47,8 @@ describe("suggestPriceGroup", () => {
       { id: "g2", name: "2", position: 2, cost_ceiling_cents: null },
       { id: "g1", name: "1", position: 1, cost_ceiling_cents: 5000 },
     ];
-    expect(suggestPriceGroup({ costCentsPerBbl: 7000, uncosted: [], groups: scrambled })).toMatchObject({ kind: "group", groupId: "g3" });
-    expect(suggestPriceGroup({ costCentsPerBbl: 4000, uncosted: [], groups: scrambled })).toMatchObject({ kind: "group", groupId: "g1" });
+    expect(suggestPriceGroup({ costCentsPerBbl: 7000, uncosted: [], unreceived: [], groups: scrambled })).toMatchObject({ kind: "group", groupId: "g3" });
+    expect(suggestPriceGroup({ costCentsPerBbl: 4000, uncosted: [], unreceived: [], groups: scrambled })).toMatchObject({ kind: "group", groupId: "g1" });
   });
 
   it("names the highest ceiling above, even when a later group's is lower", () => {
@@ -56,10 +56,19 @@ describe("suggestPriceGroup", () => {
       { id: "g1", name: "1", position: 1, cost_ceiling_cents: 9000 },
       { id: "g2", name: "2", position: 2, cost_ceiling_cents: 5000 },
     ];
-    expect(suggestPriceGroup({ costCentsPerBbl: 9500, uncosted: [], groups: dipping })).toMatchObject({ kind: "above", detail: "Recipe cost $95.00/bbl · highest ceiling $90.00/bbl" });
+    expect(suggestPriceGroup({ costCentsPerBbl: 9500, uncosted: [], unreceived: [], groups: dipping })).toMatchObject({ kind: "above", detail: "Recipe cost $95.00/bbl · highest ceiling $90.00/bbl" });
+  });
+
+  it("names the ingredients a cost takes at a typed price, since no purchase order backs them", () => {
+    expect(suggestPriceGroup({ costCentsPerBbl: 4810, uncosted: [], unreceived: ["Citra", "Vienna"], groups })?.detail)
+      .toBe("Recipe cost $48.10/bbl · ceiling $65.00/bbl · typed price, no receipt cost: Citra, Vienna");
+    expect(suggestPriceGroup({ costCentsPerBbl: 9000, uncosted: [], unreceived: ["Citra"], groups })?.detail)
+      .toBe("Recipe cost $90.00/bbl · highest ceiling $65.00/bbl · typed price, no receipt cost: Citra");
+    expect(suggestPriceGroup({ costCentsPerBbl: 4810, uncosted: [], unreceived: ["Citra"], groups: groups.map((g) => ({ ...g, cost_ceiling_cents: null })) })?.detail)
+      .toBe("No price group has a ceiling. · typed price, no receipt cost: Citra");
   });
 
   it("is silent for a brand with no recipe", () => {
-    expect(suggestPriceGroup({ costCentsPerBbl: null, uncosted: [], groups })).toBeNull();
+    expect(suggestPriceGroup({ costCentsPerBbl: null, uncosted: [], unreceived: [], groups })).toBeNull();
   });
 });

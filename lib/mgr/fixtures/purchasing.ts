@@ -190,6 +190,7 @@ export const materialCitra: MaterialViewModel = {
     { id: "cm", label: "Fictional Malt Supply" },
   ],
   alphaAcid: "12.5",
+  price: "660.00",
   lotTracked: true,
   active: true,
 };

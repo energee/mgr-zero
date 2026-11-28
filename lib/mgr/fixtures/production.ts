@@ -4,6 +4,7 @@ import type { BatchesSnapshot } from "@/lib/mgr/batches-view";
 import type { BrewDayViewModel } from "@/lib/mgr/brew-day-view";
 import { cellarPlanRows, startAtPlan, waterAdditionRows, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import type { ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
+import { recipeCostNotes } from "@/lib/mgr/recipe-cost-view";
 import { figureStrip, gristShares, ingredientCells, ingredientPack, outcomeSummary, outcomeTable, recipeHistory, waterFacts, type RecipeOutcome, type RecipeViewModel } from "@/lib/mgr/recipe-view";
 import type { RecipesSnapshot } from "@/lib/mgr/recipes-view";
 import type { RunClosedViewModel } from "@/lib/mgr/run-closed-view";
@@ -353,7 +354,8 @@ export const recipeHazyV4: RecipeViewModel = {
   mashSchedule: MASH_STEPS,
   fermentationSchedule: FERM_STAGES,
   water: waterFacts(WATER_HAZY, waterProfiles, (id) => WATER_HAZY_NAMES[id]),
-  ...(({ figures, notes }) => ({ figures, figureNotes: notes }))(figureStrip({ ...HAZY_V4.predicted, ibu: HAZY_IBU }, "plato", { saved: true })),
+  // The cost lines get_recipe's cost gives: Hazy lands in price group 2's band on Brand, and one hop rests on a typed price.
+  ...(({ figures, notes }) => ({ figures, figureNotes: [...notes, ...recipeCostNotes({ costCentsPerBbl: 4810, uncosted: [], unreceived: ["Citra"], outOfStock: [] }, 22)] }))(figureStrip({ ...HAZY_V4.predicted, ibu: HAZY_IBU }, "plato", { saved: true })),
   actuals: outcomeTable(HAZY_OUTCOMES, "plato", HAZY_V4),
   actualsNote: outcomeSummary(HAZY_OUTCOMES, HAZY_V4),
   // The inventory's rows open nothing by address; the Recipe record's `to` says where a tap goes.
