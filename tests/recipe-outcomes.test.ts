@@ -22,6 +22,8 @@ let outcomes: RecipeOutcome[];
 /** 60 lb of malt per barrel at 1.037. */
 const POTENTIAL = (60 * 37) / 31;
 const efficiency = (ogPlato: number, knockoutBbl: number, plannedBbl: number, potential = POTENTIAL) => ((platoToSg(ogPlato) - 1) * 1000 * knockoutBbl) / (potential * plannedBbl);
+// The ABV formula lib/recipe-gravity.ts uses, written out again so these expectations do not lean on it.
+const highGravityAbv = (og: number, fg: number) => 76.08 * (og - fg) / (1.775 - og) * (fg / 0.794);
 const MASH = [{ name: "Rest", kind: "infusion", tempF: 152, minutes: 60 }];
 
 const createRecipe = async (name: string) => ((await runCommand("create_recipe", { name }, brewer)) as { id: string }).id;
@@ -117,7 +119,7 @@ describe("get_recipe_outcomes", () => {
 
   it("reads OG from the first gravity reading and FG from the last, skipping readings with no gravity", () => {
     expect(outcome("corrected")).toMatchObject({ ogPlato: 14, fgPlato: 3.2, closed: true, brewedOn: "2026-10-05", version: 2 });
-    expect(outcome("corrected").abv).toBeCloseTo((platoToSg(14) - platoToSg(3.2)) * 131.25, 6);
+    expect(outcome("corrected").abv).toBeCloseTo(highGravityAbv(platoToSg(14), platoToSg(3.2)), 6);
     expect(outcome("corrected").apparentAttenuation).toBeCloseTo((platoToSg(14) - platoToSg(3.2)) / (platoToSg(14) - 1), 6);
   });
 
@@ -245,7 +247,7 @@ describe("get_recipe_outcomes by tank", () => {
   it("gives a batch read in two tanks one row per tank, each with its own OG and FG", () => {
     const split = rows.filter((o) => o.batchId === ids.split);
     expect(split.map((o) => [o.vessel, o.ogPlato, o.fgPlato])).toEqual([[tanks[0], 14, 3.4], [tanks[1], 13.8, 3.9]]);
-    expect(split[0].abv).toBeCloseTo((platoToSg(14) - platoToSg(3.4)) * 131.25, 6);
+    expect(split[0].abv).toBeCloseTo(highGravityAbv(platoToSg(14), platoToSg(3.4)), 6);
     expect(split[1].apparentAttenuation).toBeCloseTo((platoToSg(13.8) - platoToSg(3.9)) / (platoToSg(13.8) - 1), 6);
   });
 
@@ -262,7 +264,7 @@ describe("get_recipe_outcomes by tank", () => {
     expect(handoff).toHaveLength(1);
     expect(handoff[0]).toMatchObject({ ogPlato: 14.1, fgPlato: 3.5 });
     expect(handoff[0].vessel).toBeUndefined();
-    expect(handoff[0].abv).toBeCloseTo((platoToSg(14.1) - platoToSg(3.5)) * 131.25, 6);
+    expect(handoff[0].abv).toBeCloseTo(highGravityAbv(platoToSg(14.1), platoToSg(3.5)), 6);
   });
 
   it("keeps a double batch into one tank as one row that names no tank", () => {

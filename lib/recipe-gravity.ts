@@ -36,7 +36,10 @@
 //   OG (SG)   = 1 + GU / 1000
 //   FG (SG)   = 1 + (OG - 1) * (1 - yeastAttenuation)
 //   Plato(SG) = max(0, -616.868 + 1111.14*SG - 630.272*SG^2 + 135.997*SG^3)  (ASBC cubic, clamped at water)
-//   ABV       = (OG - FG) * 131.25
+//   ABV       = 76.08 * (OG - FG) / (1.775 - OG) * (FG / 0.794)
+//
+// ABV uses the high-gravity form everywhere. The short (OG - FG) * 131.25
+// reads low as beer gets stronger: 0.3 points at 7%, over half a point near 9%.
 //
 // recipe_versions.mash_temp_f is stored but not an input here: it is reserved
 // for a later mash-efficiency model, so callers do not marshal it.
@@ -131,7 +134,9 @@ export function potentialPointsPerBbl(ingredients: RecipeGravityIngredient[]): n
   return mash.reduce((sum, ingredient) => sum + ingredient.perBblQty * LB_PER[ingredient.unit!] * (ingredient.extractPotential! - 1) * 1000, 0) / BBL_TO_GALLONS;
 }
 
-const abvFromSg = (og: number, fg: number) => (og - fg) * 131.25;
+/** Percent ABV from SG readings, by the high-gravity formula: alcohol by weight from the gravity drop, then by
+ *  volume through the beer's density over ethanol's (0.794). */
+const abvFromSg = (og: number, fg: number) => 76.08 * (og - fg) / (1.775 - og) * (fg / 0.794);
 
 /**
  * Predicts OG/FG/ABV from a recipe version's mash-stage ingredients, or null
