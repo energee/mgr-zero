@@ -36,7 +36,7 @@ jobs:
 
       - name: Mint MGR GitHub App identity
         id: mgr-app
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
         with:
           app-id: ${{ vars.MGR_APP_ID }}
           private-key: ${{ secrets.MGR_APP_PRIVATE_KEY }}
@@ -147,7 +147,7 @@ jobs:
 
       - name: Run dream
         if: steps.window.outputs.new == 'true'
-        uses: anthropics/claude-code-action@469588f42e6b1e94cd14ad09dccfeaec772ce0fd # v1
+        uses: anthropics/claude-code-action@4411a9e9b0283becf4b924f7bce360fd7756c78c # v1
         env:
           GH_TOKEN: ${{ github.token }}
         with:
@@ -255,7 +255,7 @@ jobs:
     steps:
       - name: Mint MGR GitHub App token
         id: mgr-app
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
         with:
           app-id: ${{ vars.MGR_APP_ID }}
           private-key: ${{ secrets.MGR_APP_PRIVATE_KEY }}
