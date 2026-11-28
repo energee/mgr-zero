@@ -1,6 +1,6 @@
 # Derived efficiency and attenuation
 
-Status: plan, awaiting approval. No implementation code yet.
+Status: approved 2026-11-28; in build.
 
 ## Problem
 
@@ -50,7 +50,7 @@ value is the median, shown as a whole percent.
 | Attenuation | 3 | Same yeast |
 | Attenuation | 4 | Every counted batch in the brewery |
 
-"Same yeast" means the copies share a yeast material on a fermentation line.
+"Same yeast" means the copies share a yeast material, on a line at any stage.
 
 A suggestion is shown only when it differs from the number in the field. So an
 imported recipe at 75% gets one without 75 being treated as special, and a
@@ -90,24 +90,24 @@ offers the measured number; nothing changes an assumption until the brewer uses 
    - Files: `lib/mgr/recipe-assumptions.ts` (new).
    - `suggestAssumptions(sheet: { gristKey: string; yeastIds: string[]; mashRestF: number | null }, history: BatchMeasurement[])`
      returns `{ efficiency?: AssumptionSuggestion; attenuation?: AssumptionSuggestion }`,
-     where `AssumptionSuggestion = { percent: number; batches: number; basis: string }`.
+     where `AssumptionSuggestion = { percent: number; batches: number; text: string }` and `text` is the sentence the sheet shows.
    - Accept: each rule in the table above has a case; under two batches falls to the next rule;
      an even count takes the mean of the middle two; `vitest` green.
    - Depends on: the `BatchMeasurement` type from task 1. Can be written in parallel with task 1.
 
 3. **Recipe numbers sheet.**
-   - Test first: `tests/recipe-view.test.ts` (the sheet draws the line and Use; none when the field already holds the number).
+   - Test first: `tests/recipe-assumptions.test.ts` (the sheet draws the line and Use; none when the field already holds the number).
    - Files: `components/mgr/views/recipe-numbers.tsx`, `app/(app)/recipes/[id]/schedule-sheets.tsx`,
      `app/(app)/recipes/[id]/recipe-version-form.tsx`, `app/(app)/recipes/[id]/page.tsx`, `app/(app)/recipes/new/page.tsx`.
-   - `RecipeNumbersView` takes `suggestions?: Partial<Record<"efficiency" | "attenuation", { text: string; use: string }>>`.
+   - `RecipeNumbersView` takes `suggestions?: Partial<Record<RecipeNumberKey, AssumptionOffer>>`, where `AssumptionOffer = { text: string; use: string }`; only the two assumptions ever get one.
      The editor works them out from the draft with `suggestAssumptions`; both pages load `list_batch_measurements`.
    - Use is a borderless button. No new control.
    - Accept: `tsc`, lint and the screen suites green; the rendered sheet looked at with `browse`.
    - Depends on: tasks 1 and 2.
 
 4. **Screen inventory and docs.**
-   - Files: `components/mgr/screens.tsx` (Recipe and Recipe numbers entries, fixture with one suggestion),
-     `lib/mgr/fixtures/production.ts`, `content/docs/staff-guide.mdx` (Recipes), `content/docs/api/` via `bun run docs:api`.
+   - Files: `components/mgr/screens.tsx` (Recipe and Recipe numbers entries; the Recipe numbers frame draws one suggestion),
+     `content/docs/staff-guide.mdx` (Recipes), `content/docs/api/` via `bun run docs:api`.
    - Accept: `tests/mgr-screens.test.ts`, `tests/docs.test.ts`, `tests/api-docs.test.ts` green.
    - Depends on: task 3.
 
@@ -119,6 +119,12 @@ No database change: everything is read from existing tables.
 
 - No automatic change to a saved recipe. Existing recipes show the suggestion; a person accepts it.
 - No mash-temperature formula.
+- The seven days are counted on the brewery's calendar, as brew day is.
+- A batch split across tanks is read as one batch: its last reading in any tank. Batch actuals reads each tank.
+- A recipe on a yeast that has been set inactive loses the yeast rules in the editor, because the editor's
+  material list leaves inactive materials out. It falls back to the brewery-wide number.
+- A measurement keeps its batch number and brew day, though the sheet does not draw them: an API caller can
+  say which batches a number came from.
 - A new recipe is not pre-filled. It shows the suggestion like any other sheet.
 - Knockout volume on imported batches equals the planned volume on 188 of 197 batches, which
   looks like an import default. Efficiency measured from them may read a little high.
