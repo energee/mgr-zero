@@ -21,6 +21,11 @@ reason `upsert_material` keeps `purchaseUomFactor` to four decimal places
 (the `materials` table checks it too), so a whole-unit count always converts
 exactly.
 
+`upsert_material` also takes `purchaseUnitCostCents`, the typed price of one
+purchase unit. Recipe cost reads it only until a purchase order receipt gives
+the material a cost. Omitting it keeps the saved price, so an edit cannot clear
+it; `null` is not accepted.
+
 Each line of `receive_purchase_order` and `correct_purchase_receipt` accepts
 optional `unitCostCents`: integer cents per purchase unit from 0 to 2147483647.
 Omitting it keeps the ordered price on receive or the frozen receipt price on
