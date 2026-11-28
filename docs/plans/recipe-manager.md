@@ -82,7 +82,7 @@ Gravity is stored in °Plato. Formulas run in SG through `platoToSg` and `sgToPl
 | Batches | `recipe_version_id` is a version of the recipe and `brewed_on` is set. |
 | OG | The first `fermentation_readings.gravity_plato` by `at`, skipping readings with no gravity. |
 | FG | The last gravity reading, so an open batch's FG is its latest reading. With one reading, FG and everything built on it is null. |
-| ABV | `(OG_sg - FG_sg) * 131.25` |
+| ABV | `76.08 * (OG_sg - FG_sg) / (1.775 - OG_sg) * (FG_sg / 0.794)` (the high-gravity form; the short `* 131.25` reads low on strong beer) |
 | Apparent attenuation | `(OG_sg - FG_sg) / (OG_sg - 1)` |
 | Knockout | Sum of `brew_records.initial_bbl` over each turn's current revision. |
 | Efficiency | `(OG_sg - 1) * 1000 * knockoutBbl / (potentialPointsPerBbl * plannedBbl)`, on a closed batch only |

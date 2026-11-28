@@ -35,7 +35,7 @@ it("gives a tank its current ABV and attenuation from the batch's first gravity 
   const batch = { id: "batch", batch_no: 1, planned_on: "2026-09-27", planned_bbl: 10, brewed_on: "2026-09-27", closed_at: null, cancelled_at: null, brand_name: "Pils", recipe_name: null, vessel_name: "FV1",
     og_reading: { id: "og", gravity_plato: 20 }, active_occupancies: [{ id: "first", vessel_name: "FV1", latest_reading: latest, recent_gravity: [{ id: "latest", at: latest.at, gravity_plato: 5 }] }] };
   const tank = (row: typeof batch | Omit<typeof batch, "og_reading">) => batchesFromQuery([row], []).active![0].readings![0];
-  expect(tank(batch)).toMatchObject({ abv: "8.3%", attenuation: "76%" });
+  expect(tank(batch)).toMatchObject({ abv: "8.9%", attenuation: "76%" });
   // One gravity reading is the OG alone: nothing has fermented yet, so there is no figure.
   expect(tank({ ...batch, og_reading: { id: "latest", gravity_plato: 5 } })).not.toHaveProperty("abv");
   // A tank with no gravity reading, and a batch with no gravity reading, give none either.
@@ -48,7 +48,7 @@ it("gives a completed batch its final ABV and attenuation from its first and las
   const batch = { id: "batch", batch_no: 1, planned_on: "2026-09-27", planned_bbl: 10, brewed_on: "2026-09-27", closed_at: "2026-10-10T00:00:00Z", cancelled_at: null, brand_name: "Pils", recipe_name: null, vessel_name: null,
     og_reading: { id: "og", gravity_plato: 20 }, fg_reading: { id: "fg", gravity_plato: 5 }, active_occupancies: [] };
   const done = (row: typeof batch) => batchesFromQuery([row], []).completed![0];
-  expect(done(batch)).toMatchObject({ abv: "8.3%", attenuation: "76%" });
+  expect(done(batch)).toMatchObject({ abv: "8.9%", attenuation: "76%" });
   // One gravity reading is both first and last: the figures stay blank, and the columns still draw.
   expect(done({ ...batch, fg_reading: batch.og_reading })).toMatchObject({ abv: "", attenuation: "" });
 });

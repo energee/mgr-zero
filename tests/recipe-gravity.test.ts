@@ -12,7 +12,7 @@ describe("recipeGravity", () => {
     //   Plato(SG) = max(0, -616.868 + 1111.14*SG - 630.272*SG^2 + 135.997*SG^3)
     //     ogPlato = 2.294056595291295 -> 2.29
     //     fgPlato = 0.5745809755756852 -> 0.57
-    //   ABV = (OG - FG) * 131.25 = 0.8811743951613049 -> 0.88
+    //   ABV = 76.08 * (OG - FG) / (1.775 - OG) * (FG / 0.794) = 0.8417 -> 0.84
     const result = recipeGravity({
       brewhouseEfficiency: 0.75,
       yeastAttenuation: 0.75,
@@ -21,7 +21,7 @@ describe("recipeGravity", () => {
 
     expect(result?.ogPlato).toBeCloseTo(2.29, 2);
     expect(result?.fgPlato).toBeCloseTo(0.57, 2);
-    expect(result?.abv).toBeCloseTo(0.88, 2);
+    expect(result?.abv).toBeCloseTo(0.84, 2);
   });
 
   it("ignores non-mash-stage ingredients (e.g. boil hops carry no extract here)", () => {
@@ -156,8 +156,16 @@ describe("measuredGravity", () => {
   it("computes ABV and apparent attenuation in SG", () => {
     const measured = measuredGravity({ ogPlato: 14.8, fgPlato: 3.5, potentialPointsPerBbl: null, plannedBbl: 30, knockoutBbl: null });
     const [og, fg] = [platoToSg(14.8), platoToSg(3.5)];
-    expect(measured.abv).toBeCloseTo((og - fg) * 131.25, 6);
+    expect(measured.abv).toBeCloseTo(76.08 * (og - fg) / (1.775 - og) * (fg / 0.794), 6);
     expect(measured.apparentAttenuation).toBeCloseTo((og - fg) / (og - 1), 6);
+  });
+
+  it("uses the high-gravity ABV formula, which the short (OG - FG) * 131.25 form understates as beer gets stronger", () => {
+    const abv = (ogPlato: number, fgPlato: number) => measuredGravity({ ogPlato, fgPlato, potentialPointsPerBbl: null, plannedBbl: 22, knockoutBbl: null }).abv;
+    // A double IPA from 20.3 °P finishing at 5.5 °P is about 8.9%, where the short form says 8.2%.
+    expect(abv(20.3, 5.5)).toBeCloseTo(8.88, 1);
+    // An IPA from 15.7 °P finishing at 3.3 °P is about 7.0%, where the short form says 6.7%.
+    expect(abv(15.7, 3.3)).toBeCloseTo(7.0, 1);
   });
 
   it("keeps ABV under 20 from Plato inputs (v1 read Plato as SG and printed about 1508)", () => {
