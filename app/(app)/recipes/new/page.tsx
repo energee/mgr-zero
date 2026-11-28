@@ -8,6 +8,7 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toRecipeMaterial, toWaterProfileOption, type RecipeMaterial, type WaterProfileRow } from "@/lib/mgr/recipe-process-view";
 import "@/lib/commands/all";
 import type { GravityUnit } from "@/lib/mgr/gravity-unit";
+import { toMaterialCosts } from "@/lib/mgr/recipe-cost-view";
 import { RecipeEditor } from "../[id]/recipe-version-form";
 import { navTitle } from "@/lib/mgr/nav";
 
@@ -18,15 +19,17 @@ type Named = { id: string; name: string; alias?: string | null };
 export default async function NewRecipePage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [brands, materials, gravityUnit, profiles] = (await Promise.all([
+  const [brands, materials, gravityUnit, profiles, costs] = (await Promise.all([
     runCommand("list_brands", {}, ctx), runCommand("list_materials", {}, ctx), runCommand("get_gravity_unit", {}, ctx), runCommand("list_water_profiles", {}, ctx),
-  ])) as [Named[], RecipeMaterial[], { effective: GravityUnit }, WaterProfileRow[]];
+    runCommand("list_material_costs", {}, ctx),
+  ])) as [Named[], RecipeMaterial[], { effective: GravityUnit }, WaterProfileRow[], Parameters<typeof toMaterialCosts>[0]];
   return (
     <RecipeEditor
       title="New recipe" backHref="/recipes"
       brands={brands.map(({ id, name, alias }) => ({ id, name, alias }))}
       materials={materials.map(toRecipeMaterial)}
       profiles={profiles.map(toWaterProfileOption)} unit={gravityUnit.effective}
+      costs={toMaterialCosts(costs)}
     />
   );
 }

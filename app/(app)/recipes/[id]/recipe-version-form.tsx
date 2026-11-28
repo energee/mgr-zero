@@ -61,6 +61,7 @@ import { gravityBlockers, recipeGravity } from "@/lib/recipe-gravity";
 import { readRecipeDraft, recipeDraftKey, shouldKeepDraft, writeRecipeDraft } from "@/lib/mgr/recipe-draft";
 import { batchSize, draftBlocker, draftIbu, figureStrip, gravityBlockerText, gristShares, ingredientCells, ingredientPack, materialsNowGive, movedBatchesText, noMashText, RECIPE_NUMBERS, storedRecipeNote, waterFacts, type RecipeDraft, type RecipeFigures, type RecipeNumberKey, type RecipeViewModel } from "@/lib/mgr/recipe-view";
 import { EMPTY_WATER, lineReady, materialLookup, optionalNumber as num, removeAt, scheduleDays, upsertAt, type RecipeMaterial, type MashStep, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
+import { draftCost, recipeCostNotes, type MaterialCost } from "@/lib/mgr/recipe-cost-view";
 import { FermentationScheduleSheet, IngredientSheet, MashScheduleSheet, RecipeNameSheet, RecipeNumbersSheet, WaterSheet } from "./schedule-sheets";
 
 type Numbers = Record<RecipeNumberKey, string>;
@@ -93,6 +94,8 @@ export function RecipeEditor({ recipeId, title, backHref, brandId = null, brands
   /** Use this again: an earlier copy to show as an unsaved change, and the notice naming where it came from. */
   loaded?: { draft: RecipeDraft; notice: string };
   materials: RecipeMaterial[]; profiles: WaterProfileIons[]; unit: GravityUnit;
+  /** What each material costs now (list_material_costs); the sheet's cost is worked out from it as the lines change. */
+  costs: Record<string, MaterialCost>;
 }) {
   const router = useRouter();
   const action = useCommandAction();
@@ -257,7 +260,9 @@ export function RecipeEditor({ recipeId, title, backHref, brandId = null, brands
           onRound: (perBbl: number) => change({ lines: upsertAt(draft.lines, i, { ...l, perBblQty: String(perBbl) }) }),
         })),
         mashSchedule, fermentationSchedule, water: waterFacts(water, profiles, material.name),
-        ...(frozen ? {} : { figures: liveStrip.figures, figureNotes: liveStrip.notes }),
+        ...(frozen ? {} : { figures: liveStrip.figures }),
+        // The cost follows the sheet as typed, at today's prices, whether or not it is saved.
+        figureNotes: [...(frozen ? page?.figureNotes ?? [] : liveStrip.notes), ...recipeCostNotes(draftCost(lines, costs, material.name), batchSize(batchBbl))],
       }}
       parentForm={creating ? <>
         <NewRecipeFieldsView brands={brands} values={parent} onChange={setParent} busy={action.busy || parentLocked} />

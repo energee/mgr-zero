@@ -31,7 +31,7 @@ what was paid, so they never read a typed price.
 | Screen | What it shows |
 | --- | --- |
 | Edit material | **Price per purchase unit ($)**, optional. |
-| Recipe | Under the figures: the saved copy's cost per barrel, and for the batch when it has a batch size. |
+| Recipe | Under the figures: the cost per barrel of the sheet as typed, and for the batch when it has a batch size. It changes with every edit, before a save. |
 | Recipe | *Typed price, no receipt cost:* the ingredients no purchase order backs. |
 | Recipe | *None in stock:* the ingredients with nothing on hand now. |
 | Brand | The price-group suggestion names the ingredients costed at a typed price. |
@@ -41,15 +41,32 @@ what was paid, so they never read a typed price.
 - A typed price cannot be cleared, only changed. `upsert_material` keeps the
   saved price when none is sent, as it does for Sold by.
 - Water salts are not costed. They are `recipe_water_additions`, not recipe ingredients.
-- The recipe editor does not preview the cost of an unsaved change.
 - An earlier copy read from As brewed shows no cost: the cost and stock are today's.
 - `get_recipe` asks the materials table for the names of uncosted and typed-price ingredients, though it
   already holds every ingredient's name. One shared reader (`recipeVersionCost`) was kept over two name paths.
 - A contract price is not a cost source.
 
+## Live preview
+
+The editor works the cost out from the lines as typed (`draftCost`), so an
+unsaved change shows its cost.
+
+`material_unit_costs` is the one owner of what a material costs per base unit:
+the last receipt cost, else the typed price over the purchase-unit factor, with
+`from_receipt` saying which. `recipe_version_costs` reads it for saved copies.
+`list_material_costs` returns it to the editor with whether any is in stock.
+
+The sum (amount per barrel times cost, rounded once per barrel) exists twice:
+in `recipe_version_costs` for saved copies and in `draftCost` for the sheet
+being edited. The price rule exists once.
+
+The editor reads prices and stock when the page opens. A receipt or price edit
+made elsewhere shows after a reload.
+
 ## Files
 
 - `supabase/migrations/20261128100000_material_price.sql`
+- `supabase/migrations/20261128120000_material_unit_costs.sql`
 - `lib/commands/recipe-cost.ts`, read by `get_recipe` and `get_brand_recipe_cost`
 - `lib/mgr/recipe-cost-view.ts`
 - Tests: `tests/brand-recipe-cost.test.ts`, `tests/recipe-cost-view.test.ts`, `tests/price-group-suggestion.test.ts`

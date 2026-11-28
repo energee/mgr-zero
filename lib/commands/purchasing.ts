@@ -232,6 +232,29 @@ defineQuery({
   },
 });
 
+// What each material costs per base unit, for the recipe editor's live cost
+// preview. material_unit_costs owns the rule (last receipt cost, else the typed
+// price over the purchase-unit factor); material_on_hand says whether any is in
+// stock. Recipe roles read it: the editor is theirs.
+defineQuery({
+  name: "list_material_costs", description: "Every material's cost per base unit in cents (its last purchase order receipt cost, else its typed price; null when it has neither), whether that cost is a receipt's, and whether any is in stock",
+  input: z.object({}), roles: ["admin", "brewer"],
+  handler: async (ctx) => {
+    const [costs, stock] = await Promise.all([
+      completeRows("Material costs", start => ctx.db.from("material_unit_costs").select("material_id, unit_cost_cents, from_receipt", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).order("material_id").range(start, start + PAGE_SIZE - 1)),
+      completeRows("Material stock", start => ctx.db.from("material_on_hand").select("material_id", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).gt("qty", 0).order("material_id").range(start, start + PAGE_SIZE - 1)),
+    ]);
+    const stocked = new Set(stock.map((row) => row.material_id));
+    // A numeric can arrive as text; the editor multiplies it.
+    return costs.map((row) => ({
+      material_id: row.material_id, unit_cost_cents: row.unit_cost_cents == null ? null : Number(row.unit_cost_cents),
+      from_receipt: row.from_receipt, in_stock: stocked.has(row.material_id),
+    }));
+  },
+});
+
 // On hand per material at bin grain (material_bin_on_hand), optionally one
 // location or one material: Materials on hand reads it, Cycle count snapshots
 // it as qty_expected, and Receive PO starts on the bin holding the most of the
