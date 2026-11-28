@@ -39,6 +39,7 @@ import { isNumber, numberNotationError, percent } from "./quantity-input";
 import { sentenceCase } from "./labels";
 import { plannedBarrelsError } from "./schedule-batch-view";
 import { submitReason } from "./submit-reason";
+import type { RecipeCostTable } from "./recipe-cost-view";
 import { READING_BOUNDS } from "@/lib/composer/offline-policy";
 import {
   ingredientTiming, lineReady, materialLookup, perBblDisplay, scheduleDays, timingOutOfRange, toIngredientFields,
@@ -144,6 +145,9 @@ export type RecipeViewModel = {
   /** Batch actuals: the table (outcomeTable) and its summary line (outcomeSummary). */
   actuals?: RecipeActuals;
   actualsNote?: string;
+  /** Ingredient cost: the sheet's cost broken out by ingredient, with its total and summary line (recipeCostTable).
+   *  Only the editable sheet has it. */
+  cost?: RecipeCostTable;
 };
 
 /** What get_recipe returns: the recipe, its selected version (null before the

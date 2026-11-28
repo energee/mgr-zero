@@ -265,6 +265,21 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_purchase_order", "input": { "poId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
+## list_material_costs [#list_material_costs]
+
+`query` · admin, brewer
+
+Every material's cost per base unit in cents (its last purchase order receipt cost, else its typed price; null when it has neither), whether that cost is a receipt's, and whether any is in stock
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_material_costs", "input": {} }'
+```
+
 ## list_material_lots [#list_material_lots]
 
 `query` · admin, brewer, warehouse

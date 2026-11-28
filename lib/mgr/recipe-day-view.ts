@@ -227,7 +227,7 @@ export type GoesInMoment = { when: string; rows: GoesInRow[] };
 /** A batch amount as a person writes it. Thousands are grouped ("1,265"). Under 100 it reads to three significant
  *  digits, as a per-bbl amount does (perBblDisplay): "0.253", "8.8". From 100 up it keeps one decimal at most
  *  ("272.7"). Display only; nothing stored is rounded. */
-const batchAmount = (qty: number) => (qty < 100 ? perBblDisplay(qty) : qty.toLocaleString("en-US", { maximumFractionDigits: 1 }));
+export const batchAmount = (qty: number) => (qty < 100 ? perBblDisplay(qty) : qty.toLocaleString("en-US", { maximumFractionDigits: 1 }));
 
 function lineRow(line: RecipeIngredientView, bbl: number): GoesInRow {
   const share = line.share === undefined ? undefined : wholePercent(line.share);

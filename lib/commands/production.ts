@@ -21,7 +21,6 @@ import { gristKey, type RecipeOutcome } from "@/lib/mgr/recipe-view";
 import { fermentationReadingInput, fermentationReadingOfflinePolicy, MASH_PH_BOUNDS, READING_BOUNDS } from "@/lib/composer/offline-policy";
 import { isoDate, completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, CommandError, type Ctx, latestOf } from "./registry";
 import { brandNames } from "./packaging";
-import { recipeVersionCost } from "./recipe-cost";
 import { measuredGravity, potentialPointsPerBbl, recipeGravity, type RecipeGravityIngredient } from "@/lib/recipe-gravity";
 import { recipeIbu, type IbuLine } from "@/lib/recipe-ibu";
 import { escapeRegex } from "@/lib/escape-regex";
@@ -263,7 +262,7 @@ function byBrewingOrder(a: { stage: string; timing_minutes: number | null }, b: 
 
 defineQuery({
   name: "get_recipe",
-  description: "One recipe with its requested version (latest by default) and the batch size that version is written for when it has one, all version numbers, that version's ingredients in brewing order, the OG/FG/ABV they predict, its estimated IBU or why there is none, and its ingredient cost per barrel with the ingredients that have no price, that are costed at a typed price because they have no receipt cost, and that are not in stock",
+  description: "One recipe with its requested version (latest by default) and the batch size that version is written for when it has one, all version numbers, that version's ingredients in brewing order, the OG/FG/ABV they predict, and its estimated IBU or why there is none",
   input: z.object({ recipeId: z.string().uuid(), version: z.number().int().positive().optional() }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {
     const versionQuery = ctx.db.from("recipe_versions").select("*").eq("recipe_id", i.recipeId);
@@ -281,23 +280,11 @@ defineQuery({
     const versions = versionRows.map((row) => row.version);
     if (!version) return { recipe, version: null, versions, ingredients: [], waterAdditions: [], ogPlato: null, fgPlato: null, abv: null, ibu: recipeIbu({ ogPlato: null, lines: [] }) };
 
-    const ingredientRows = unwrap(ctx.db.from("recipe_ingredients")
-      .select("id, material_id, per_bbl_qty, stage, timing_minutes, sort, extract_snapshot, alpha_snapshot, materials(base_uom, name, category)")
-      .eq("recipe_version_id", version.id).order("sort")).then((r) => (r ?? []).sort(byBrewingOrder));
-    // An ingredient is out of stock when nothing of it is on hand in any bin. A material used twice is named once.
-    // materials is a required foreign key, so every line has its name; the embed is only typed as nullable.
-    const outOfStockNames = ingredientRows.then(async (lines) => {
-      const materialIds = [...new Set(lines.map((line) => line.material_id))];
-      if (!materialIds.length) return [];
-      const stocked = new Set((await unwrap(ctx.db.from("material_on_hand").select("material_id")
-        .eq("brewery_id", ctx.breweryId).in("material_id", materialIds).gt("qty", 0).limit(materialIds.length)) as { material_id: string }[]).map((row) => row.material_id));
-      return [...new Set(lines.flatMap((line) => (stocked.has(line.material_id) || !line.materials ? [] : [line.materials.name])))].sort();
-    });
-    const [ingredients, waterAdditions, cost, outOfStock] = await Promise.all([
-      ingredientRows,
+    const [ingredients, waterAdditions] = await Promise.all([
+      unwrap(ctx.db.from("recipe_ingredients")
+        .select("id, material_id, per_bbl_qty, stage, timing_minutes, sort, extract_snapshot, alpha_snapshot, materials(base_uom, name, category)")
+        .eq("recipe_version_id", version.id).order("sort")).then((r) => (r ?? []).sort(byBrewingOrder)),
       unwrap(ctx.db.from("recipe_water_additions").select("material_id, qty, unit, stage").eq("recipe_version_id", version.id).order("sort")).then((r) => r ?? []),
-      recipeVersionCost(ctx, version.id),
-      outOfStockNames,
     ]);
 
     const predicted = recipeGravity({
@@ -306,7 +293,7 @@ defineQuery({
       ingredients: gravityLines(ingredients),
     });
     return {
-      recipe, version, versions, ingredients, waterAdditions, cost: { ...cost, outOfStock },
+      recipe, version, versions, ingredients, waterAdditions,
       ...(predicted ?? { ogPlato: null, fgPlato: null, abv: null }),
       ibu: recipeIbu({ ogPlato: predicted?.ogPlato ?? null, lines: ibuLines(ingredients) }),
     };
